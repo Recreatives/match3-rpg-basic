@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Dungeon Match RPG</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --board-bg: #34495e;
+            --accent: #f1c40f;
+            --text: #ecf0f1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            user-select: none;
+        }
+        h1 { margin: 10px 0; font-size: 1.5rem; }
+        
+        /* UI Bars */
+        .hud {
+            width: 320px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .stat-box { text-align: center; }
+        .bar-container {
+            width: 100px;
+            height: 10px;
+            background: #555;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .bar { height: 100%; transition: width 0.3s; }
+        #player-hp-bar { background-color: #e74c3c; width: 100%; }
+        #enemy-hp-bar { background-color: #9b59b6; width: 100%; }
+        #ult-bar { background-color: #f1c40f; width: 0%; }
+
+        /* Game Board */
+        .grid {
+            width: 320px;
+            height: 320px;
+            display: flex;
+            flex-wrap: wrap;
+            background-color: var(--board-bg);
+            border-radius: 8px;
+            border: 4px solid #1a252f;
+        }
+        .tile {
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-sizing: border-box;
+        }
+        .tile:hover { filter: brightness(1.2); }
+        .selected {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid var(--accent);
+            border-radius: 4px;
+        }
+
+        /* Monster Display */
+        .enemy-display {
+            font-size: 3rem;
+            margin-bottom: 5px;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Log */
+        #log {
+            width: 300px;
+            height: 60px;
+            background: rgba(0,0,0,0.3);
+            margin-top: 10px;
+            padding: 5px;
+            font-size: 0.8rem;
+            overflow-y: auto;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .log-hit { color: #f1c40f; }
+        .log-heal { color: #2ecc71; }
+        .log-enemy { color: #e74c3c; }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="enemy-display" id="enemy-sprite">👾</div>
+    <div id="enemy-name">Slime Lvl 1</div>
+
+    <div class="hud">
+        <div class="stat-box">
+            <div>HERO</div>
+            <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
+            <span id="hp-text">100/100</span>
+        </div>
+        <div class="stat-box">
+            <div>ULTIMATE</div>
+            <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
+        </div>
+        <div class="stat-box">
+            <div>ENEMY</div>
+            <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
+            <span id="enemy-hp-text">50/50</span>
+        </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    
+    <div id="log">Welcome to the Dungeon...</div>
+    <button onclick="useUltimate()" id="ult-btn" disabled>USE ULTIMATE (Requires 100%)</button>
+
+    <script>
+        const gridDisplay = document.querySelector('.grid');
+        const logDisplay = document.getElementById('log');
+        const width = 8;
+        const tiles = [];
+        
+        // RPG Stats
+        let playerHP = 100;
+        let maxPlayerHP = 100;
+        let enemyHP = 50;
+        let maxEnemyHP = 50;
+        let ultCharge = 0;
+        let level = 1;
+        let isProcessing = false;
+
+        // Tile Types
+        const tileTypes = [
+            { type: 'sword', symbol: '⚔️', color: 'red' },
+            { type: 'heart', symbol: '💖', color: 'pink' },
+            { type: 'shield', symbol: '🛡️', color: 'blue' },
+            { type: 'energy', symbol: '⚡', color: 'yellow' },
+            { type: 'skull', symbol: '💀', color: 'gray' } // Skulls hurt you if matched!
+        ];
+
+        // Init Game
+        function createBoard() {
+            for (let i = 0; i < width * width; i++) {
+                const tile = document.createElement('div');
+                tile.setAttribute('id', i);
+                let randomType = Math.floor(Math.random() * tileTypes.length);
+                tile.dataset.type = tileTypes[randomType].type;
+                tile.innerHTML = tileTypes[randomType].symbol;
+                tile.classList.add('tile');
+                gridDisplay.appendChild(tile);
+                tiles.push(tile);
+                
+                tile.addEventListener('click', () => clickTile(tile));
+            }
+            // Clear initial matches without triggering effects
+            checkMatches(true); 
+        }
+
+        let selectedTile = null;
+
+        function clickTile(tile) {
+            if (isProcessing) return;
+
+            if (!selectedTile) {
+                selectedTile = tile;
+                tile.classList.add('selected');
+            } else {
+                let currentId = parseInt(tile.id);
+                let prevId = parseInt(selectedTile.id);
+                
+                // Check adjacency
+                const validMoves = [prevId - 1, prevId + 1, prevId - width, prevId + width];
+                
+                if (validMoves.includes(currentId)) {
+                    swapTiles(selectedTile, tile);
+                } else {
+                    selectedTile.classList.remove('selected');
+                    selectedTile = tile; // New selection
+                    tile.classList.add('selected');
+                    return;
+                }
+                
+                selectedTile.classList.remove('selected');
+                selectedTile = null;
+            }
+        }
+
+        function swapTiles(tile1, tile2) {
+            isProcessing = true;
+            
+            // Swap visual content and data
+            let tempType = tile1.dataset.type;
+            let tempHTML = tile1.innerHTML;
+
+            tile1.dataset.type = tile2.dataset.type;
+            tile1.innerHTML = tile2.innerHTML;
+
+            tile2.dataset.type = tempType;
+            tile2.innerHTML = tempHTML;
+
+            // Check if valid match
+            let isMatch = checkMatches(false);
+            
+            if (!isMatch) {
+                // Swap back after short delay
+                setTimeout(() => {
+                    let tempType = tile1.dataset.type;
+                    let tempHTML = tile1.innerHTML;
+                    tile1.dataset.type = tile2.dataset.type;
+                    tile1.innerHTML = tile2.innerHTML;
+                    tile2.dataset.type = tempType;
+                    tile2.innerHTML = tempHTML;
+                    isProcessing = false;
+                }, 200);
+            } else {
+                // Enemy turn after player match
+                setTimeout(enemyTurn, 1000);
+            }
+        }
+
+        function checkMatches(isInitial) {
+            let matchFound = false;
+
+            // Check Rows
+            for (let i = 0; i < 64; i++) {
+                if (i % width > width - 3) continue; // Skip last 2 of row
+                let row = [i, i + 1, i + 2];
+                let decidedType = tiles[i].dataset.type;
+                const isBlank = tiles[i].dataset.type === '';
+
+                if (row.every(index => tiles[index].dataset.type === decidedType && !isBlank)) {
+                    processMatch(row, decidedType, isInitial);
+                    matchFound = true;
+                }
+            }
+
+            // Check Columns
+            for (let i = 0; i < 47; i++) { // Width * (Height - 2) - 1
+                let col = [i, i + width, i + width * 2];
+                let decidedType = tiles[i].dataset.type;
+                const isBlank = tiles[i].dataset.type === '';
+
+                if (col.every(index => tiles[index].dataset.type === decidedType && !isBlank)) {
+                    processMatch(col, decidedType, isInitial);
+                    matchFound = true;
+                }
+            }
+            
+            if(matchFound) {
+                setTimeout(fillBoard, 200);
+            } else if (!isInitial) {
+                isProcessing = false;
+            }
+
+            return matchFound;
+        }
+
+        function processMatch(indices, type, isInitial) {
+            indices.forEach(index => {
+                tiles[index].innerHTML = '';
+                tiles[index].dataset.type = '';
+            });
+            
+            if (!isInitial) applyRPGEffects(type, indices.length);
+        }
+
+        function fillBoard() {
+            // Drop down logic simplified
+            for (let i = 0; i < 64; i++) {
+                if (tiles[i].dataset.type === '') {
+                    // Start filling from top
+                    let randomType = Math.floor(Math.random() * tileTypes.length);
+                    tiles[i].dataset.type = tileTypes[randomType].type;
+                    tiles[i].innerHTML = tileTypes[randomType].symbol;
+                }
+            }
+            // Recursively check for new matches caused by filling
+            checkMatches(true); 
+            updateUI();
+        }
+
+        function applyRPGEffects(type, count) {
+            let multiplier = count - 2; // Match 3 = 1x, Match 4 = 2x
+            let msg = "";
+
+            if (type === 'sword') {
+                let dmg = 5 * multiplier;
+                enemyHP -= dmg;
+                msg = `Hit enemy for ${dmg} DMG!`;
+                log(msg, 'log-hit');
+            } else if (type === 'heart') {
+                let heal = 5 * multiplier;
+                playerHP = Math.min(playerHP + heal, maxPlayerHP);
+                msg = `Healed for ${heal} HP.`;
+                log(msg, 'log-heal');
+            } else if (type === 'energy') {
+                ultCharge = Math.min(ultCharge + (10 * multiplier), 100);
+                msg = `Ult charged +${10 * multiplier}%`;
+                log(msg, 'log-hit');
+            } else if (type === 'shield') {
+                msg = `Shield Up! (Reduced damage next turn)`;
+                log(msg, 'log-heal');
+                // Simplified: Just heal a tiny bit for armor feel in this demo
+                playerHP = Math.min(playerHP + 2, maxPlayerHP);
+            } else if (type === 'skull') {
+                playerHP -= 5;
+                msg = `Ouch! Cursed skull hit you for 5.`;
+                log(msg, 'log-enemy');
+            }
+
+            checkWinCondition();
+        }
+
+        function enemyTurn() {
+            if(enemyHP <= 0) return;
+            
+            // Random enemy damage
+            let dmg = Math.floor(Math.random() * 5) + 2 + level; 
+            playerHP -= dmg;
+            log(`Enemy attacks! -${dmg} HP`, 'log-enemy');
+            checkWinCondition();
+            updateUI();
+        }
+
+        function useUltimate() {
+            if (ultCharge >= 100) {
+                enemyHP -= 30;
+                ultCharge = 0;
+                log("ULTIMATE ATTACK! -30 Enemy HP", "log-hit");
+                checkWinCondition();
+                updateUI();
+            }
+        }
+
+        function checkWinCondition() {
+            if (enemyHP <= 0) {
+                level++;
+                enemyHP = maxEnemyHP + (level * 10);
+                maxEnemyHP = enemyHP;
+                log(`Enemy Defeated! Level ${level} reached.`, 'log-hit');
+                document.getElementById('enemy-name').innerText = `Goblin Lvl ${level}`;
+                document.getElementById('enemy-sprite').innerText = ['👹','👺','👻','🤖'][level % 4];
+            }
+            if (playerHP <= 0) {
+                log("YOU DIED. Refresh to restart.", "log-enemy");
+                gridDisplay.style.pointerEvents = 'none';
+            }
+        }
+
+        function updateUI() {
+            const pPct = (playerHP / maxPlayerHP) * 100;
+            const ePct = (enemyHP / maxEnemyHP) * 100;
+            
+            document.getElementById('player-hp-bar').style.width = `${pPct}%`;
+            document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
+            document.getElementById('ult-bar').style.width = `${ultCharge}%`;
+            
+            document.getElementById('hp-text').innerText = `${Math.floor(playerHP)}/${maxPlayerHP}`;
+            document.getElementById('enemy-hp-text').innerText = `${Math.floor(enemyHP)}/${maxEnemyHP}`;
+
+            document.getElementById('ult-btn').disabled = ultCharge < 100;
+        }
+
+        function log(msg, cls) {
+            let div = document.createElement('div');
+            div.innerText = `> ${msg}`;
+            if(cls) div.classList.add(cls);
+            logDisplay.prepend(div);
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
