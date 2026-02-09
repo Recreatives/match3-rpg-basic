@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Dungeon Match RPG</title>
+    <title>Pixel Dungeon Match PvE - Balance Update</title>
     <style>
         :root {
             --bg-color: #2c3e50;
             --board-bg: #34495e;
             --accent: #f1c40f;
             --text: #ecf0f1;
+            --armor-color: #bdc3c7;
+            --modal-bg: rgba(0, 0, 0, 0.85);
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,31 +23,88 @@
             margin: 0;
             user-select: none;
         }
-        h1 { margin: 10px 0; font-size: 1.5rem; }
         
+        /* Top Bar */
+        .top-bar {
+            width: 340px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .version {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            font-family: monospace;
+        }
+        .help-btn {
+            background: none;
+            border: 1px solid #7f8c8d;
+            color: #bdc3c7;
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .help-btn:hover { background: #fff; color: #000; }
+
+        /* Turn Indicator */
+        .turn-indicator {
+            margin-top: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 20px;
+            background: #222;
+            color: #777;
+            transition: all 0.3s;
+        }
+        .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 10px #2ecc71; }
+        .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 10px #e74c3c; }
+
         /* UI Bars */
         .hud {
-            width: 320px;
+            width: 340px;
             display: flex;
             justify-content: space-between;
             margin-bottom: 10px;
             background: rgba(0,0,0,0.2);
             padding: 10px;
             border-radius: 8px;
+            margin-top: 10px;
         }
-        .stat-box { text-align: center; }
+        .stat-box { text-align: center; width: 110px; }
+        
         .bar-container {
-            width: 100px;
+            width: 100%;
             height: 10px;
-            background: #555;
+            background: #444;
             border-radius: 5px;
             overflow: hidden;
-            margin-top: 5px;
+            margin-top: 3px;
+            position: relative;
         }
+        /* Armor bar */
+        .armor-container {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+
         .bar { height: 100%; transition: width 0.3s; }
-        #player-hp-bar { background-color: #e74c3c; width: 100%; }
-        #enemy-hp-bar { background-color: #9b59b6; width: 100%; }
+        
+        #player-hp-bar { background-color: #2ecc71; width: 100%; }
+        #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
         #ult-bar { background-color: #f1c40f; width: 0%; }
+        
+        #player-armor-bar { background-color: var(--armor-color); width: 0%; }
+        #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
+
+        .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; }
+        .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
 
         /* Game Board */
         .grid {
@@ -56,7 +115,11 @@
             background-color: var(--board-bg);
             border-radius: 8px;
             border: 4px solid #1a252f;
+            overflow: hidden;
+            position: relative;
         }
+        .grid.locked { pointer-events: none; filter: grayscale(0.5); }
+
         .tile {
             width: 40px;
             height: 40px;
@@ -65,14 +128,66 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
             box-sizing: border-box;
+            z-index: 1;
+            transition: transform 0.2s, filter 0.2s;
         }
-        .tile:hover { filter: brightness(1.2); }
+        .tile:hover { filter: brightness(1.2); transform: scale(1.1); z-index: 2; }
+        
         .selected {
             background-color: rgba(255, 255, 255, 0.2);
             border: 2px solid var(--accent);
             border-radius: 4px;
+            transform: scale(1.1);
+        }
+
+        /* ANIMATIONS */
+        .falling { animation: dropIn 0.4s ease-out; }
+        @keyframes dropIn {
+            0% { transform: translateY(-50px); opacity: 0; }
+            100% { transform: translateY(0px); opacity: 1; }
+        }
+
+        .matched {
+            animation: matchPop 0.4s forwards ease-in-out;
+            z-index: 10;
+        }
+        @keyframes matchPop {
+            0% { transform: scale(1); filter: brightness(2) drop-shadow(0 0 5px white); background-color: rgba(255,255,255,0.4); }
+            40% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Enemy Cursor */
+        .ai-cursor {
+            position: absolute;
+            width: 38px;
+            height: 38px;
+            border: 3px solid #e74c3c;
+            border-radius: 50%;
+            z-index: 10;
+            transition: all 0.5s ease;
+            pointer-events: none;
+            box-shadow: 0 0 10px #e74c3c;
+            display: none;
+        }
+
+        /* Popups */
+        .pop-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.4rem;
+            pointer-events: none;
+            animation: floatUp 1.5s forwards;
+            text-shadow: 2px 2px 0 #000;
+            z-index: 20;
+            white-space: nowrap;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 0; }
+            20% { transform: translateY(-10px) scale(1.2); opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
         }
 
         /* Monster Display */
@@ -89,8 +204,8 @@
 
         /* Log */
         #log {
-            width: 300px;
-            height: 60px;
+            width: 320px;
+            height: 80px;
             background: rgba(0,0,0,0.3);
             margin-top: 10px;
             padding: 5px;
@@ -98,12 +213,18 @@
             overflow-y: auto;
             border-radius: 4px;
             font-family: monospace;
+            display: flex;
+            flex-direction: column-reverse; 
         }
         .log-hit { color: #f1c40f; }
+        .log-crit { color: #ff6b6b; font-weight: bold; }
         .log-heal { color: #2ecc71; }
+        .log-armor { color: #bdc3c7; }
         .log-enemy { color: #e74c3c; }
+        .log-turn { color: #3498db; font-weight: bold; text-decoration: underline; margin-top: 5px;}
 
-        button {
+        /* Buttons */
+        .action-btn {
             margin-top: 10px;
             padding: 10px 20px;
             background: var(--accent);
@@ -112,62 +233,216 @@
             font-weight: bold;
             border-radius: 4px;
         }
+        .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-bg);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #34495e;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 8px;
+            padding: 20px;
+            border: 2px solid #7f8c8d;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #bdc3c7;
+        }
+        .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
+        .modal-title { color: var(--accent); margin-top: 0; }
+        .dual-lang { display: flex; gap: 20px; flex-wrap: wrap; }
+        .lang-col { flex: 1; min-width: 250px; }
+        h4 { margin-bottom: 5px; color: #3498db; }
+        ul { padding-left: 20px; margin-top: 5px; }
+        li { margin-bottom: 5px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
+    <div id="info-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-modal" onclick="toggleModal()">×</span>
+            
+            <div class="modal-section">
+                <div class="dual-lang">
+                    <div class="lang-col">
+                        <h2 class="modal-title">GAME MANUAL</h2>
+                        <h4>Mechanics</h4>
+                        <ul>
+                            <li><strong>Match 3:</strong> Basic action.</li>
+                            <li><strong>Match 4:</strong> 2x Effect + Extra Turn.</li>
+                            <li><strong>Match 5:</strong> 3x Effect + Ultimate Charge + Extra Turn.</li>
+                        </ul>
+                        <h4>Tile Types</h4>
+                        <ul>
+                            <li>⚔️ <strong>Sword:</strong> Deals damage (Reduced by Armor).</li>
+                            <li>🛡️ <strong>Shield:</strong> Adds <strong>Stackable Armor</strong>. Armor takes damage before HP.</li>
+                            <li>💖 <strong>Heart:</strong> Heals HP.</li>
+                            <li>⚡ <strong>Energy:</strong> Charges Ultimate.</li>
+                            <li>💀 <strong>Skull:</strong> Massive Damage to Enemy, but Recoil Damage to YOU.</li>
+                        </ul>
+                    </div>
+                    <div class="lang-col">
+                        <h2 class="modal-title">OYUN KILAVUZU</h2>
+                        <h4>Mekanikler</h4>
+                        <ul>
+                            <li><strong>3'lü Eşleşme:</strong> Temel hareket.</li>
+                            <li><strong>4'lü Eşleşme:</strong> 2x Etki + Ekstra Tur.</li>
+                            <li><strong>5'li Eşleşme:</strong> 3x Etki + Ulti Doldurma + Ekstra Tur.</li>
+                        </ul>
+                        <h4>Taş Tipleri</h4>
+                        <ul>
+                            <li>⚔️ <strong>Kılıç:</strong> Hasar verir (Zırh tarafından azaltılır).</li>
+                            <li>🛡️ <strong>Kalkan:</strong> <strong>Biriken Zırh</strong> ekler. Hasar önce Zırhtan düşer.</li>
+                            <li>💖 <strong>Kalp:</strong> Can (HP) yeniler.</li>
+                            <li>⚡ <strong>Enerji:</strong> Ulti barını doldurur.</li>
+                            <li>💀 <strong>Kurukafa:</strong> Düşmana büyük hasar verir, ancak SİZE de sekme hasarı verir.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
 
-    <div class="enemy-display" id="enemy-sprite">👾</div>
-    <div id="enemy-name">Slime Lvl 1</div>
-
-    <div class="hud">
-        <div class="stat-box">
-            <div>HERO</div>
-            <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
-            <span id="hp-text">100/100</span>
-        </div>
-        <div class="stat-box">
-            <div>ULTIMATE</div>
-            <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
-        </div>
-        <div class="stat-box">
-            <div>ENEMY</div>
-            <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
-            <span id="enemy-hp-text">50/50</span>
+            <div class="modal-section" style="border:none;">
+                <div class="dual-lang">
+                    <div class="lang-col">
+                        <h2 class="modal-title">VERSION LOG</h2>
+                        <p><strong>v0.8.0 - Balance Update</strong></p>
+                        <ul>
+                            <li>Added specific base values for every tile type.</li>
+                            <li><strong>Buff:</strong> Swords base damage increased (5 &rarr; 6).</li>
+                            <li><strong>Nerf:</strong> Hearts healing decreased (5 &rarr; 4).</li>
+                            <li><strong>Nerf:</strong> Energy charge slowed slightly (15 &rarr; 12).</li>
+                            <li>Added bilingual Manual and Changelog.</li>
+                        </ul>
+                        <p style="color:#777">v0.7.0 - Armor System Added.</p>
+                    </div>
+                    <div class="lang-col">
+                        <h2 class="modal-title">SÜRÜM GÜNLÜĞÜ</h2>
+                        <p><strong>v0.8.0 - Denge Güncellemesi</strong></p>
+                        <ul>
+                            <li>Her taş tipi için özel temel değerler eklendi.</li>
+                            <li><strong>Güçlendirme:</strong> Kılıç hasarı artırıldı (5 &rarr; 6).</li>
+                            <li><strong>Zayıflatma:</strong> Kalp iyileştirmesi azaltıldı (5 &rarr; 4).</li>
+                            <li><strong>Zayıflatma:</strong> Enerji dolumu biraz yavaşlatıldı (15 &rarr; 12).</li>
+                            <li>İki dilli Kılavuz ve Değişiklik Günlüğü eklendi.</li>
+                        </ul>
+                        <p style="color:#777">v0.7.0 - Zırh Sistemi Eklendi.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="grid" id="grid"></div>
+    <div class="top-bar">
+        <div class="version">v0.8.0 Balanced</div>
+        <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
+    </div>
     
-    <div id="log">Welcome to the Dungeon...</div>
-    <button onclick="useUltimate()" id="ult-btn" disabled>USE ULTIMATE (Requires 100%)</button>
+    <div class="enemy-display" id="enemy-sprite">👾</div>
+    <div id="enemy-name">Slime Lvl 1</div>
+    
+    <div id="turn-banner" class="turn-indicator turn-player">PLAYER TURN</div>
+
+    <div class="hud">
+        <div class="stat-box">
+            <div>YOU</div>
+            <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
+            <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
+            <span id="hp-text" class="hp-text">100/100</span>
+        </div>
+        
+        <div class="stat-box" style="width: 80px;">
+            <div>ULT</div>
+            <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
+        </div>
+        
+        <div class="stat-box">
+            <div>ENEMY</div>
+            <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
+            <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
+            <span id="enemy-hp-text" class="hp-text">50/50</span>
+        </div>
+    </div>
+
+    <div class="grid" id="grid">
+        <div class="ai-cursor" id="ai-cursor"></div>
+    </div>
+    
+    <div id="log"></div>
+    <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>USE ULTIMATE (Requires 100%)</button>
 
     <script>
         const gridDisplay = document.querySelector('.grid');
         const logDisplay = document.getElementById('log');
+        const turnBanner = document.getElementById('turn-banner');
+        const aiCursor = document.getElementById('ai-cursor');
+        const modal = document.getElementById('info-modal');
         const width = 8;
         const tiles = [];
+
+        // --- GAME BALANCE CONFIGURATION (Denge Ayarları) ---
+        // Modify these values to Buff/Nerf specific tiles
+        const BALANCE = {
+            sword: 6,       // Base Damage (Buffed from 5)
+            heart: 4,       // Base Heal (Nerfed from 5)
+            shield: 5,      // Base Armor Gain
+            energy: 12,     // Base Ult Charge (Nerfed from 15)
+            skull_dmg: 25,  // Skull Damage to Enemy
+            skull_self: 8,  // Skull Self Damage (Recoil)
+            ult_dmg: 35     // Ultimate Damage
+        };
         
-        // RPG Stats
+        // Stats
         let playerHP = 100;
         let maxPlayerHP = 100;
+        let playerArmor = 0;
+
         let enemyHP = 50;
         let maxEnemyHP = 50;
+        let enemyArmor = 0;
+
         let ultCharge = 0;
         let level = 1;
         
-        // This flag locks the board while animations happen
+        // Game State
         let isProcessing = false;
+        let isPlayerTurn = true;
+        let extraTurnTriggered = false;
 
         const tileTypes = [
-            { type: 'sword', symbol: '⚔️', color: 'red' },
-            { type: 'heart', symbol: '💖', color: 'pink' },
-            { type: 'shield', symbol: '🛡️', color: 'blue' },
-            { type: 'energy', symbol: '⚡', color: 'yellow' },
-            { type: 'skull', symbol: '💀', color: 'gray' }
+            { type: 'sword', symbol: '⚔️' },
+            { type: 'heart', symbol: '💖' },
+            { type: 'shield', symbol: '🛡️' },
+            { type: 'energy', symbol: '⚡' },
+            { type: 'skull', symbol: '💀' }
         ];
 
+        function toggleModal() {
+            if (modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            } else {
+                modal.style.display = 'flex';
+            }
+        }
+
         function createBoard() {
-            gridDisplay.innerHTML = ''; // Clear existing if any
+            gridDisplay.innerHTML = ''; 
+            gridDisplay.appendChild(aiCursor); 
             tiles.length = 0;
             for (let i = 0; i < width * width; i++) {
                 const tile = document.createElement('div');
@@ -180,14 +455,15 @@
                 tiles.push(tile);
                 tile.addEventListener('click', () => clickTile(tile));
             }
-            // Initial check: clear matches without effects, don't unlock input yet
             resolveMatches(true); 
+            log("Battle Start! Press Help for info.", "log-turn");
+            updateUI();
         }
 
         let selectedTile = null;
 
         function clickTile(tile) {
-            if (isProcessing) return; // Prevent clicking while animations play
+            if (isProcessing || !isPlayerTurn) return; 
 
             if (!selectedTile) {
                 selectedTile = tile;
@@ -195,11 +471,10 @@
             } else {
                 let currentId = parseInt(tile.id);
                 let prevId = parseInt(selectedTile.id);
-                
                 const validMoves = [prevId - 1, prevId + 1, prevId - width, prevId + width];
                 
                 if (validMoves.includes(currentId)) {
-                    swapTiles(selectedTile, tile);
+                    attemptSwap(selectedTile, tile);
                 } else {
                     selectedTile.classList.remove('selected');
                     selectedTile = tile; 
@@ -212,10 +487,9 @@
             }
         }
 
-        function swapTiles(tile1, tile2) {
+        function attemptSwap(tile1, tile2) {
             isProcessing = true;
             
-            // Visual Swap
             let tempType = tile1.dataset.type;
             let tempHTML = tile1.innerHTML;
             tile1.dataset.type = tile2.dataset.type;
@@ -223,12 +497,9 @@
             tile2.dataset.type = tempType;
             tile2.innerHTML = tempHTML;
 
-            // Check if this move created a match
-            // We pass 'false' because this is a player move, we want effects!
-            let isMatch = checkForMatches(false); 
+            let hasMatch = checkForMatches(false); 
             
-            if (!isMatch) {
-                // Invalid move: Swap back
+            if (!hasMatch) {
                 setTimeout(() => {
                     let tempType = tile1.dataset.type;
                     let tempHTML = tile1.innerHTML;
@@ -236,144 +507,348 @@
                     tile1.innerHTML = tile2.innerHTML;
                     tile2.dataset.type = tempType;
                     tile2.innerHTML = tempHTML;
-                    isProcessing = false; // Unlock board
+                    isProcessing = false; 
                 }, 200);
-            } else {
-                // Valid move: Wait for cascade to finish, then Enemy Turn
-                // Enemy turn is triggered inside fillBoard when settling finishes
             }
         }
 
-        // Helper to run check and handle loop
         function resolveMatches(isInitial) {
             checkForMatches(isInitial);
         }
 
         function checkForMatches(isInitial) {
-            let matchFound = false;
+            let matchesFound = false;
+            let hRuns = [];
+            let vRuns = [];
 
-            // Check Rows
-            for (let i = 0; i < 64; i++) {
-                if (i % width > width - 3) continue;
-                let row = [i, i + 1, i + 2];
-                let decidedType = tiles[i].dataset.type;
-                const isBlank = tiles[i].dataset.type === '';
-
-                if (row.every(index => tiles[index].dataset.type === decidedType && !isBlank)) {
-                    processMatch(row, decidedType, isInitial);
-                    matchFound = true;
+            // Horizontal
+            for (let r = 0; r < width; r++) {
+                let count = 1;
+                for (let c = 0; c < width; c++) {
+                    let i = r * width + c;
+                    if (c < width-1 && tiles[i].dataset.type !== '' && tiles[i].dataset.type === tiles[i+1].dataset.type) {
+                        count++;
+                    } else {
+                        if (count >= 3) {
+                            let indices = [];
+                            for(let k=0; k<count; k++) indices.push(i-k);
+                            hRuns.push({indices: indices, type: tiles[i].dataset.type});
+                            matchesFound = true;
+                        }
+                        count = 1;
+                    }
+                }
+            }
+            // Vertical
+            for (let c = 0; c < width; c++) {
+                let count = 1;
+                for (let r = 0; r < width; r++) {
+                    let i = r * width + c;
+                    if (r < width-1 && tiles[i].dataset.type !== '' && tiles[i].dataset.type === tiles[i+width].dataset.type) {
+                        count++;
+                    } else {
+                        if (count >= 3) {
+                            let indices = [];
+                            for(let k=0; k<count; k++) indices.push(i-(k*width));
+                            vRuns.push({indices: indices, type: tiles[i].dataset.type});
+                            matchesFound = true;
+                        }
+                        count = 1;
+                    }
                 }
             }
 
-            // Check Columns
-            for (let i = 0; i < 47; i++) {
-                let col = [i, i + width, i + width * 2];
-                let decidedType = tiles[i].dataset.type;
-                const isBlank = tiles[i].dataset.type === '';
-
-                if (col.every(index => tiles[index].dataset.type === decidedType && !isBlank)) {
-                    processMatch(col, decidedType, isInitial);
-                    matchFound = true;
-                }
-            }
+            let finalGroups = [...hRuns, ...vRuns];
             
-            if(matchFound) {
-                // If matches found, fill holes
-                setTimeout(() => fillBoard(isInitial), 200);
+            if (finalGroups.length > 0) {
+                finalGroups.forEach(group => processMatch(group, isInitial));
+                setTimeout(() => fillBoard(isInitial), 400);
                 return true;
             } else {
-                // No matches found, board is settled.
-                // If this wasn't the initial setup, we unlock the player.
-                if (!isInitial) {
-                    isProcessing = false; 
-                    // Since the player moved, trigger enemy turn now?
-                    // We only want enemy to attack if player actually did something.
-                    // Simple check: if we are not in initial setup, enemy attacks.
-                    // Note: This runs every time the board settles. 
-                    // To prevent enemy attacking multiple times on one cascade, 
-                    // we could add a "playerActed" flag, but for this simple version, 
-                    // let's just trigger enemy turn after a delay.
-                }
+                if (!isInitial) isProcessing = false;
                 return false;
             }
         }
 
-        function processMatch(indices, type, isInitial) {
-            indices.forEach(index => {
-                tiles[index].innerHTML = '';
-                tiles[index].dataset.type = '';
-            });
+        function processMatch(group, isInitial) {
+            let shape = '3';
+            if (group.indices.length === 4) shape = '4';
+            if (group.indices.length >= 5) shape = '5';
             
-            if (!isInitial) applyRPGEffects(type, indices.length);
+            let validTiles = 0;
+            group.indices.forEach(index => {
+                if (tiles[index].dataset.type !== '') {
+                    if (!isInitial) tiles[index].classList.add('matched');
+                    else tiles[index].innerHTML = ''; 
+                    
+                    tiles[index].dataset.type = '';
+                    validTiles++;
+                }
+            });
+
+            if (validTiles > 0 && !isInitial) {
+                if (shape === '4' || shape === '5') {
+                    extraTurnTriggered = true;
+                    let center = tiles[group.indices[1]];
+                    let text = shape === '5' ? "LEGENDARY!" : "CRITICAL!";
+                    let color = shape === '5' ? "#f1c40f" : "#ff6b6b";
+                    showFloatingText(text, center, color);
+                }
+                applyRPGEffects(group.type, shape);
+            }
+        }
+
+        function showFloatingText(text, tileElement, color) {
+            let rect = tileElement.getBoundingClientRect();
+            let pop = document.createElement('div');
+            pop.classList.add('pop-text');
+            pop.innerText = text;
+            pop.style.color = color;
+            pop.style.left = (rect.left + window.scrollX) + 'px';
+            pop.style.top = (rect.top + window.scrollY) + 'px';
+            document.body.appendChild(pop);
+            setTimeout(() => pop.remove(), 1500);
+        }
+
+        // --- RPG LOGIC WITH NEW BALANCE VALUES ---
+        function applyRPGEffects(type, shape) {
+            let multiplier = 1;
+            if (shape === '4') multiplier = 2;
+            if (shape === '5') multiplier = 3;
+
+            let user = isPlayerTurn ? "Player" : "Enemy";
+            
+            if (type === 'sword') {
+                let baseVal = BALANCE.sword * multiplier;
+                let target = isPlayerTurn ? 'enemy' : 'player';
+                inflictDamage(target, baseVal);
+                log(`${user} attacks for ${baseVal} dmg`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+            
+            } else if (type === 'heart') {
+                let baseVal = BALANCE.heart * multiplier;
+                if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
+                else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
+                log(`${user} heals +${baseVal} HP`, 'log-heal');
+            
+            } else if (type === 'shield') {
+                let baseVal = BALANCE.shield * multiplier;
+                if (isPlayerTurn) playerArmor += baseVal;
+                else enemyArmor += baseVal;
+                log(`${user} gains +${baseVal} Armor`, 'log-armor');
+            
+            } else if (type === 'energy') {
+                let baseVal = BALANCE.energy * multiplier;
+                if (isPlayerTurn) {
+                    ultCharge = Math.min(ultCharge + baseVal, 100);
+                    log(`Ult Charge: +${baseVal}%`, 'log-hit');
+                } else {
+                    // Enemy absorbs small amount of health instead of energy
+                    let absorb = Math.floor(baseVal / 2);
+                    enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
+                    log(`Enemy absorbs ${absorb} HP`, "log-enemy");
+                }
+            
+            } else if (type === 'skull') {
+                // Skull Logic: Multipliers increase both damage and recoil
+                let dmgToOpponent = BALANCE.skull_dmg * (shape === '3' ? 1 : 1.5);
+                let recoil = BALANCE.skull_self * (shape === '3' ? 1 : 1.5);
+
+                let target = isPlayerTurn ? 'enemy' : 'player';
+                let self = isPlayerTurn ? 'player' : 'enemy';
+
+                inflictDamage(target, dmgToOpponent);
+                inflictDamage(self, recoil);
+                
+                log(`SKULLS! ${user} takes ${recoil}, Target takes ${dmgToOpponent}`, 'log-crit');
+            }
+
+            if (shape === '5' && isPlayerTurn) {
+                ultCharge = 100;
+                log("LEGENDARY! ULT READY!", "log-hit");
+            }
+
+            checkWinCondition();
+            updateUI();
+        }
+
+        function inflictDamage(targetStr, amount) {
+            if (targetStr === 'player') {
+                if (playerArmor >= amount) {
+                    playerArmor -= amount; 
+                } else {
+                    let remainder = amount - playerArmor;
+                    playerArmor = 0;
+                    playerHP -= remainder;
+                }
+            } else {
+                if (enemyArmor >= amount) {
+                    enemyArmor -= amount;
+                } else {
+                    let remainder = amount - enemyArmor;
+                    enemyArmor = 0;
+                    enemyHP -= remainder;
+                }
+            }
         }
 
         function fillBoard(isInitial) {
-            for (let i = 0; i < 64; i++) {
-                if (tiles[i].dataset.type === '') {
+            for (let col = 0; col < width; col++) {
+                let columnTiles = [];
+                for (let row = 0; row < width; row++) {
+                    let index = col + (row * width);
+                    if (tiles[index].dataset.type !== '') {
+                        columnTiles.push({ type: tiles[index].dataset.type, html: tiles[index].innerHTML });
+                    }
+                }
+                let missingCount = width - columnTiles.length;
+                for (let i = 0; i < missingCount; i++) {
                     let randomType = Math.floor(Math.random() * tileTypes.length);
-                    tiles[i].dataset.type = tileTypes[randomType].type;
-                    tiles[i].innerHTML = tileTypes[randomType].symbol;
+                    columnTiles.unshift({ type: tileTypes[randomType].type, html: tileTypes[randomType].symbol, isNew: true });
+                }
+                for (let row = 0; row < width; row++) {
+                    let index = col + (row * width);
+                    let tileData = columnTiles[row];
+                    
+                    if (tiles[index].dataset.type !== tileData.type || tileData.isNew) {
+                        tiles[index].dataset.type = tileData.type;
+                        tiles[index].innerHTML = tileData.html;
+                        tiles[index].classList.remove('matched');
+                        
+                        if (!isInitial) {
+                            tiles[index].classList.remove('falling');
+                            void tiles[index].offsetWidth; 
+                            tiles[index].classList.add('falling');
+                        }
+                    }
                 }
             }
-            // Check if the new tiles created NEW matches (Chain Reaction)
-            // Pass 'isInitial' so that if we are setting up board, we keep suppressing effects
-            // If we are playing, we pass false to get Combo Bonuses!
+
             let chainReaction = checkForMatches(isInitial);
             
             if (!chainReaction && !isInitial) {
-                // If no chain reaction and not setup, turn is truly over.
-                // Trigger Enemy Turn
-                setTimeout(enemyTurn, 500);
+                endTurnLogic();
             }
         }
 
-        function applyRPGEffects(type, count) {
-            let multiplier = count - 2; 
-            let msg = "";
-
-            if (type === 'sword') {
-                let dmg = 5 * multiplier;
-                enemyHP -= dmg;
-                msg = `Hit enemy for ${dmg} DMG!`;
-                log(msg, 'log-hit');
-            } else if (type === 'heart') {
-                let heal = 5 * multiplier;
-                playerHP = Math.min(playerHP + heal, maxPlayerHP);
-                msg = `Healed for ${heal} HP.`;
-                log(msg, 'log-heal');
-            } else if (type === 'energy') {
-                ultCharge = Math.min(ultCharge + (10 * multiplier), 100);
-                msg = `Ult charged +${10 * multiplier}%`;
-                log(msg, 'log-hit');
-            } else if (type === 'shield') {
-                msg = `Shield Up! (Small Heal)`;
-                log(msg, 'log-heal');
-                playerHP = Math.min(playerHP + 2, maxPlayerHP);
-            } else if (type === 'skull') {
-                playerHP -= 5;
-                msg = `Ouch! Cursed skull hit you for 5.`;
-                log(msg, 'log-enemy');
+        function endTurnLogic() {
+            if (extraTurnTriggered) {
+                log(isPlayerTurn ? ">> YOU GET AN EXTRA TURN!" : ">> ENEMY GETS AN EXTRA TURN!", "log-turn");
+                extraTurnTriggered = false;
+                isProcessing = false;
+                if (!isPlayerTurn) setTimeout(enemyPlayTurn, 1000); 
+                else { gridDisplay.classList.remove('locked'); }
+            } else {
+                isPlayerTurn = !isPlayerTurn;
+                updateTurnBanner();
+                
+                if (!isPlayerTurn) {
+                    gridDisplay.classList.add('locked'); 
+                    setTimeout(enemyPlayTurn, 1500);
+                } else {
+                    gridDisplay.classList.remove('locked');
+                    isProcessing = false;
+                }
             }
-
-            checkWinCondition();
-            updateUI();
         }
 
-        function enemyTurn() {
-            if(enemyHP <= 0 || playerHP <= 0) return;
-            
-            let dmg = Math.floor(Math.random() * 5) + 2 + level; 
-            playerHP -= dmg;
-            log(`Enemy attacks! -${dmg} HP`, 'log-enemy');
-            checkWinCondition();
-            updateUI();
+        function updateTurnBanner() {
+            if (isPlayerTurn) {
+                turnBanner.innerText = "PLAYER TURN";
+                turnBanner.className = "turn-indicator turn-player";
+            } else {
+                turnBanner.innerText = "ENEMY TURN";
+                turnBanner.className = "turn-indicator turn-enemy";
+            }
+        }
+
+        function enemyPlayTurn() {
+            if (playerHP <= 0 || enemyHP <= 0) return;
+
+            let bestMove = findBestMove();
+
+            if (bestMove) {
+                let t1 = tiles[bestMove.index];
+                let t2 = tiles[bestMove.target];
+                
+                aiCursor.style.display = 'block';
+                aiCursor.style.left = (t1.offsetLeft) + 'px';
+                aiCursor.style.top = (t1.offsetTop) + 'px';
+
+                setTimeout(() => {
+                    aiCursor.style.left = (t2.offsetLeft) + 'px';
+                    aiCursor.style.top = (t2.offsetTop) + 'px';
+                }, 500);
+
+                setTimeout(() => {
+                    aiCursor.style.display = 'none';
+                    attemptSwap(t1, t2);
+                }, 1000);
+
+            } else {
+                log("Enemy found no moves. Passing...", "log-enemy");
+                isPlayerTurn = true;
+                updateTurnBanner();
+                gridDisplay.classList.remove('locked');
+                isProcessing = false;
+            }
+        }
+
+        function findBestMove() {
+            let possibleMoves = [];
+            for (let i = 0; i < 64; i++) {
+                let r = Math.floor(i / width);
+                let c = i % width;
+                if (c < width - 1) {
+                    let score = simulateSwap(i, i + 1);
+                    if (score > 0) possibleMoves.push({index: i, target: i + 1, score: score});
+                }
+                if (r < width - 1) {
+                    let score = simulateSwap(i, i + width);
+                    if (score > 0) possibleMoves.push({index: i, target: i + width, score: score});
+                }
+            }
+            possibleMoves.sort((a, b) => b.score - a.score);
+            return possibleMoves.length > 0 ? possibleMoves[0] : null;
+        }
+
+        function simulateSwap(i1, i2) {
+            let tempTypes = tiles.map(t => t.dataset.type);
+            let h = tempTypes[i1]; tempTypes[i1] = tempTypes[i2]; tempTypes[i2] = h;
+            let score = 0;
+             for (let r = 0; r < width; r++) {
+                for (let c = 0; c < width - 2; c++) {
+                    let idx = r * width + c;
+                    let t = tempTypes[idx];
+                    if (!t) continue;
+                    if (tempTypes[idx+1] == t && tempTypes[idx+2] == t) score += calculateScore(t, 3);
+                }
+            }
+            for (let c = 0; c < width; c++) {
+                for (let r = 0; r < width - 2; r++) {
+                    let idx = r * width + c;
+                    let t = tempTypes[idx];
+                    if (!t) continue;
+                    if (tempTypes[idx+width] == t && tempTypes[idx+width*2] == t) score += calculateScore(t, 3);
+                }
+            }
+            return score;
+        }
+
+        function calculateScore(type, length) {
+            let base = 10;
+            // AI now considers the BALANCE object implicitly by prioritizing damage/defense
+            if (type === 'skull') base += 25; 
+            if (type === 'shield' && enemyArmor < 10) base += 20; 
+            if (type === 'sword') base += 5;
+            return base;
         }
 
         function useUltimate() {
-            if (ultCharge >= 100) {
-                enemyHP -= 30;
+            if (ultCharge >= 100 && isPlayerTurn) {
+                // Uses Balance Variable for Ult Damage
+                inflictDamage('enemy', BALANCE.ult_dmg);
                 ultCharge = 0;
-                log("ULTIMATE ATTACK! -30 Enemy HP", "log-hit");
+                log(`ULTIMATE! ${BALANCE.ult_dmg} Damage!`, "log-hit");
                 checkWinCondition();
                 updateUI();
             }
@@ -382,8 +857,9 @@
         function checkWinCondition() {
             if (enemyHP <= 0) {
                 level++;
-                enemyHP = maxEnemyHP + (level * 10);
+                enemyHP = maxEnemyHP + (level * 15);
                 maxEnemyHP = enemyHP;
+                enemyArmor = 0; 
                 log(`Enemy Defeated! Level ${level} reached.`, 'log-hit');
                 document.getElementById('enemy-name').innerText = `Goblin Lvl ${level}`;
                 document.getElementById('enemy-sprite').innerText = ['👹','👺','👻','🤖'][level % 4];
@@ -391,21 +867,30 @@
             if (playerHP <= 0) {
                 log("YOU DIED. Refresh to restart.", "log-enemy");
                 gridDisplay.style.pointerEvents = 'none';
+                turnBanner.innerText = "GAME OVER";
             }
         }
 
         function updateUI() {
             const pPct = Math.max(0, (playerHP / maxPlayerHP) * 100);
             const ePct = Math.max(0, (enemyHP / maxEnemyHP) * 100);
-            
+            const pArmPct = Math.min(100, (playerArmor / maxPlayerHP) * 100);
+            const eArmPct = Math.min(100, (enemyArmor / maxEnemyHP) * 100);
+
             document.getElementById('player-hp-bar').style.width = `${pPct}%`;
             document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
             document.getElementById('ult-bar').style.width = `${ultCharge}%`;
             
-            document.getElementById('hp-text').innerText = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}`;
-            document.getElementById('enemy-hp-text').innerText = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}`;
+            document.getElementById('player-armor-bar').style.width = `${pArmPct}%`;
+            document.getElementById('enemy-armor-bar').style.width = `${eArmPct}%`;
+            
+            let pArmorText = playerArmor > 0 ? ` <span class="armor-text">[+${playerArmor}]</span>` : "";
+            let eArmorText = enemyArmor > 0 ? ` <span class="armor-text">[+${enemyArmor}]</span>` : "";
 
-            document.getElementById('ult-btn').disabled = ultCharge < 100;
+            document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
+            document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
+
+            document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
         }
 
         function log(msg, cls) {
