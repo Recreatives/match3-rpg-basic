@@ -154,19 +154,21 @@
         let maxEnemyHP = 50;
         let ultCharge = 0;
         let level = 1;
+        
+        // This flag locks the board while animations happen
         let isProcessing = false;
 
-        // Tile Types
         const tileTypes = [
             { type: 'sword', symbol: '⚔️', color: 'red' },
             { type: 'heart', symbol: '💖', color: 'pink' },
             { type: 'shield', symbol: '🛡️', color: 'blue' },
             { type: 'energy', symbol: '⚡', color: 'yellow' },
-            { type: 'skull', symbol: '💀', color: 'gray' } // Skulls hurt you if matched!
+            { type: 'skull', symbol: '💀', color: 'gray' }
         ];
 
-        // Init Game
         function createBoard() {
+            gridDisplay.innerHTML = ''; // Clear existing if any
+            tiles.length = 0;
             for (let i = 0; i < width * width; i++) {
                 const tile = document.createElement('div');
                 tile.setAttribute('id', i);
@@ -176,17 +178,16 @@
                 tile.classList.add('tile');
                 gridDisplay.appendChild(tile);
                 tiles.push(tile);
-                
                 tile.addEventListener('click', () => clickTile(tile));
             }
-            // Clear initial matches without triggering effects
-            checkMatches(true); 
+            // Initial check: clear matches without effects, don't unlock input yet
+            resolveMatches(true); 
         }
 
         let selectedTile = null;
 
         function clickTile(tile) {
-            if (isProcessing) return;
+            if (isProcessing) return; // Prevent clicking while animations play
 
             if (!selectedTile) {
                 selectedTile = tile;
@@ -195,14 +196,13 @@
                 let currentId = parseInt(tile.id);
                 let prevId = parseInt(selectedTile.id);
                 
-                // Check adjacency
                 const validMoves = [prevId - 1, prevId + 1, prevId - width, prevId + width];
                 
                 if (validMoves.includes(currentId)) {
                     swapTiles(selectedTile, tile);
                 } else {
                     selectedTile.classList.remove('selected');
-                    selectedTile = tile; // New selection
+                    selectedTile = tile; 
                     tile.classList.add('selected');
                     return;
                 }
@@ -215,21 +215,20 @@
         function swapTiles(tile1, tile2) {
             isProcessing = true;
             
-            // Swap visual content and data
+            // Visual Swap
             let tempType = tile1.dataset.type;
             let tempHTML = tile1.innerHTML;
-
             tile1.dataset.type = tile2.dataset.type;
             tile1.innerHTML = tile2.innerHTML;
-
             tile2.dataset.type = tempType;
             tile2.innerHTML = tempHTML;
 
-            // Check if valid match
-            let isMatch = checkMatches(false);
+            // Check if this move created a match
+            // We pass 'false' because this is a player move, we want effects!
+            let isMatch = checkForMatches(false); 
             
             if (!isMatch) {
-                // Swap back after short delay
+                // Invalid move: Swap back
                 setTimeout(() => {
                     let tempType = tile1.dataset.type;
                     let tempHTML = tile1.innerHTML;
@@ -237,20 +236,25 @@
                     tile1.innerHTML = tile2.innerHTML;
                     tile2.dataset.type = tempType;
                     tile2.innerHTML = tempHTML;
-                    isProcessing = false;
+                    isProcessing = false; // Unlock board
                 }, 200);
             } else {
-                // Enemy turn after player match
-                setTimeout(enemyTurn, 1000);
+                // Valid move: Wait for cascade to finish, then Enemy Turn
+                // Enemy turn is triggered inside fillBoard when settling finishes
             }
         }
 
-        function checkMatches(isInitial) {
+        // Helper to run check and handle loop
+        function resolveMatches(isInitial) {
+            checkForMatches(isInitial);
+        }
+
+        function checkForMatches(isInitial) {
             let matchFound = false;
 
             // Check Rows
             for (let i = 0; i < 64; i++) {
-                if (i % width > width - 3) continue; // Skip last 2 of row
+                if (i % width > width - 3) continue;
                 let row = [i, i + 1, i + 2];
                 let decidedType = tiles[i].dataset.type;
                 const isBlank = tiles[i].dataset.type === '';
@@ -262,7 +266,7 @@
             }
 
             // Check Columns
-            for (let i = 0; i < 47; i++) { // Width * (Height - 2) - 1
+            for (let i = 0; i < 47; i++) {
                 let col = [i, i + width, i + width * 2];
                 let decidedType = tiles[i].dataset.type;
                 const isBlank = tiles[i].dataset.type === '';
@@ -274,12 +278,24 @@
             }
             
             if(matchFound) {
-                setTimeout(fillBoard, 200);
-            } else if (!isInitial) {
-                isProcessing = false;
+                // If matches found, fill holes
+                setTimeout(() => fillBoard(isInitial), 200);
+                return true;
+            } else {
+                // No matches found, board is settled.
+                // If this wasn't the initial setup, we unlock the player.
+                if (!isInitial) {
+                    isProcessing = false; 
+                    // Since the player moved, trigger enemy turn now?
+                    // We only want enemy to attack if player actually did something.
+                    // Simple check: if we are not in initial setup, enemy attacks.
+                    // Note: This runs every time the board settles. 
+                    // To prevent enemy attacking multiple times on one cascade, 
+                    // we could add a "playerActed" flag, but for this simple version, 
+                    // let's just trigger enemy turn after a delay.
+                }
+                return false;
             }
-
-            return matchFound;
         }
 
         function processMatch(indices, type, isInitial) {
@@ -291,23 +307,28 @@
             if (!isInitial) applyRPGEffects(type, indices.length);
         }
 
-        function fillBoard() {
-            // Drop down logic simplified
+        function fillBoard(isInitial) {
             for (let i = 0; i < 64; i++) {
                 if (tiles[i].dataset.type === '') {
-                    // Start filling from top
                     let randomType = Math.floor(Math.random() * tileTypes.length);
                     tiles[i].dataset.type = tileTypes[randomType].type;
                     tiles[i].innerHTML = tileTypes[randomType].symbol;
                 }
             }
-            // Recursively check for new matches caused by filling
-            checkMatches(true); 
-            updateUI();
+            // Check if the new tiles created NEW matches (Chain Reaction)
+            // Pass 'isInitial' so that if we are setting up board, we keep suppressing effects
+            // If we are playing, we pass false to get Combo Bonuses!
+            let chainReaction = checkForMatches(isInitial);
+            
+            if (!chainReaction && !isInitial) {
+                // If no chain reaction and not setup, turn is truly over.
+                // Trigger Enemy Turn
+                setTimeout(enemyTurn, 500);
+            }
         }
 
         function applyRPGEffects(type, count) {
-            let multiplier = count - 2; // Match 3 = 1x, Match 4 = 2x
+            let multiplier = count - 2; 
             let msg = "";
 
             if (type === 'sword') {
@@ -325,9 +346,8 @@
                 msg = `Ult charged +${10 * multiplier}%`;
                 log(msg, 'log-hit');
             } else if (type === 'shield') {
-                msg = `Shield Up! (Reduced damage next turn)`;
+                msg = `Shield Up! (Small Heal)`;
                 log(msg, 'log-heal');
-                // Simplified: Just heal a tiny bit for armor feel in this demo
                 playerHP = Math.min(playerHP + 2, maxPlayerHP);
             } else if (type === 'skull') {
                 playerHP -= 5;
@@ -336,12 +356,12 @@
             }
 
             checkWinCondition();
+            updateUI();
         }
 
         function enemyTurn() {
-            if(enemyHP <= 0) return;
+            if(enemyHP <= 0 || playerHP <= 0) return;
             
-            // Random enemy damage
             let dmg = Math.floor(Math.random() * 5) + 2 + level; 
             playerHP -= dmg;
             log(`Enemy attacks! -${dmg} HP`, 'log-enemy');
@@ -375,15 +395,15 @@
         }
 
         function updateUI() {
-            const pPct = (playerHP / maxPlayerHP) * 100;
-            const ePct = (enemyHP / maxEnemyHP) * 100;
+            const pPct = Math.max(0, (playerHP / maxPlayerHP) * 100);
+            const ePct = Math.max(0, (enemyHP / maxEnemyHP) * 100);
             
             document.getElementById('player-hp-bar').style.width = `${pPct}%`;
             document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
             document.getElementById('ult-bar').style.width = `${ultCharge}%`;
             
-            document.getElementById('hp-text').innerText = `${Math.floor(playerHP)}/${maxPlayerHP}`;
-            document.getElementById('enemy-hp-text').innerText = `${Math.floor(enemyHP)}/${maxEnemyHP}`;
+            document.getElementById('hp-text').innerText = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}`;
+            document.getElementById('enemy-hp-text').innerText = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}`;
 
             document.getElementById('ult-btn').disabled = ultCharge < 100;
         }
