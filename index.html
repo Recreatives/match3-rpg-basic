@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Dungeon Match PvE - Drag Controls</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Dungeon Match PvE - Restart Fix</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -12,7 +12,7 @@
             --text: #ecf0f1;
             --armor-color: #bdc3c7;
             --modal-bg: rgba(0, 0, 0, 0.85);
-            --overlay-bg: rgba(0, 0, 0, 0.7);
+            --overlay-bg: rgba(0, 0, 0, 0.85);
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,79 +22,78 @@
             flex-direction: column;
             align-items: center;
             margin: 0;
+            padding: 10px;
             user-select: none;
-            font-size: 16px; 
+            font-size: 14px; 
+            touch-action: manipulation;
         }
         
         /* Top Bar */
         .top-bar {
-            width: 500px;
+            width: 340px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 15px;
+            margin-bottom: 10px;
         }
         .version {
-            font-size: 1rem;
+            font-size: 0.8rem;
             color: #7f8c8d;
             font-family: monospace;
         }
         .help-btn {
             background: none;
-            border: 2px solid #7f8c8d;
+            border: 1px solid #7f8c8d;
             color: #bdc3c7;
-            padding: 5px 15px;
-            font-size: 1rem;
+            padding: 4px 10px;
+            font-size: 0.9rem;
             cursor: pointer;
-            border-radius: 6px;
-            font-weight: bold;
+            border-radius: 4px;
         }
-        .help-btn:hover { background: #fff; color: #000; }
 
         /* Turn Indicator */
         .turn-indicator {
-            margin-top: 15px;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: bold;
-            padding: 8px 25px;
-            border-radius: 25px;
+            padding: 5px 20px;
+            border-radius: 20px;
             background: #222;
             color: #777;
+            margin-bottom: 5px;
             transition: all 0.3s;
         }
-        .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 15px #2ecc71; }
-        .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 15px #e74c3c; }
+        .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 10px #2ecc71; }
+        .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 10px #e74c3c; }
 
         /* UI Bars */
         .hud {
-            width: 500px;
+            width: 340px;
             display: flex;
             justify-content: space-between;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             background: rgba(0,0,0,0.2);
-            padding: 15px;
-            border-radius: 12px;
-            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
         }
-        .stat-box { text-align: center; width: 140px; }
-        .stat-box div:first-child { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+        .stat-box { text-align: center; width: 100px; }
+        .stat-box div:first-child { font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }
         
         .bar-container {
             width: 100%;
-            height: 14px;
+            height: 10px;
             background: #444;
-            border-radius: 7px;
+            border-radius: 5px;
             overflow: hidden;
-            margin-top: 5px;
+            margin-top: 3px;
             position: relative;
         }
         .armor-container {
             width: 100%;
-            height: 8px;
+            height: 6px;
             background: #333;
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .bar { height: 100%; transition: width 0.3s; }
@@ -106,49 +105,48 @@
         #player-armor-bar { background-color: var(--armor-color); width: 0%; }
         #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
 
-        .hp-text { font-size: 1rem; display: block; margin-top: 5px; font-weight: bold; }
-        .armor-text { color: var(--armor-color); font-size: 0.9rem; font-weight: bold; }
+        .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
+        .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
 
         /* Game Board */
         .grid {
-            width: 480px;  
-            height: 480px; 
+            width: 320px;  
+            height: 320px; 
             display: flex;
             flex-wrap: wrap;
             background-color: var(--board-bg);
-            border-radius: 12px;
-            border: 6px solid #1a252f;
+            border-radius: 8px;
+            border: 4px solid #1a252f;
             overflow: hidden;
             position: relative;
-            touch-action: none; /* Important for dragging on mobile */
+            touch-action: none;
         }
         .grid.locked { pointer-events: none; filter: grayscale(0.5); }
 
         .tile {
-            width: 60px;
-            height: 60px;
-            font-size: 36px;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
             display: flex;
             justify-content: center;
             align-items: center;
-            cursor: grab; /* Shows drag capability */
+            cursor: pointer;
             box-sizing: border-box;
             z-index: 1;
             transition: transform 0.2s, filter 0.2s;
         }
-        .tile:active { cursor: grabbing; }
         .tile:hover { filter: brightness(1.2); transform: scale(1.1); z-index: 2; }
         .selected {
             background-color: rgba(255, 255, 255, 0.2);
-            border: 3px solid var(--accent);
-            border-radius: 8px;
+            border: 2px solid var(--accent);
+            border-radius: 4px;
             transform: scale(1.1);
         }
 
         /* ANIMATIONS */
         .falling { animation: dropIn 0.4s ease-out; }
         @keyframes dropIn {
-            0% { transform: translateY(-60px); opacity: 0; }
+            0% { transform: translateY(-40px); opacity: 0; }
             100% { transform: translateY(0px); opacity: 1; }
         }
 
@@ -157,7 +155,7 @@
             z-index: 10;
         }
         @keyframes matchPop {
-            0% { transform: scale(1); filter: brightness(2) drop-shadow(0 0 10px white); background-color: rgba(255,255,255,0.4); }
+            0% { transform: scale(1); filter: brightness(2) drop-shadow(0 0 5px white); background-color: rgba(255,255,255,0.4); }
             40% { transform: scale(1.3); opacity: 1; }
             100% { transform: scale(0); opacity: 0; }
         }
@@ -175,45 +173,44 @@
             text-align: center;
             backdrop-filter: blur(4px);
         }
-        .overlay-title { font-size: 2.5rem; color: var(--accent); margin-bottom: 25px; text-shadow: 3px 3px 0 #000; }
+        .overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
         .overlay-btn {
-            padding: 20px 40px;
-            font-size: 1.5rem;
+            padding: 15px 30px;
+            font-size: 1.1rem;
             background: #27ae60;
             color: white;
-            border: 3px solid #2ecc71;
-            border-radius: 10px;
+            border: 2px solid #2ecc71;
+            border-radius: 8px;
             cursor: pointer;
-            margin: 15px;
+            margin: 10px;
             transition: all 0.2s;
             font-weight: bold;
         }
         .overlay-btn:hover { background: #2ecc71; transform: scale(1.05); }
-        .reward-container { display: flex; flex-direction: column; gap: 15px; width: 80%; }
+        .reward-container { display: flex; flex-direction: column; gap: 8px; width: 90%; }
         .reward-btn {
             background: #2980b9;
-            border: 3px solid #3498db;
+            border: 2px solid #3498db;
             color: white;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 6px;
             cursor: pointer;
             text-align: left;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
         }
-        .reward-btn:hover { background: #3498db; transform: translateX(5px); transition: transform 0.2s;}
-        .reward-btn b { color: var(--accent); font-size: 1.2rem; }
+        .reward-btn b { color: var(--accent); font-size: 1rem; }
 
         /* Enemy Cursor */
         .ai-cursor {
             position: absolute;
-            width: 56px;
-            height: 56px;
-            border: 4px solid #e74c3c;
+            width: 38px;
+            height: 38px;
+            border: 3px solid #e74c3c;
             border-radius: 50%;
             z-index: 10;
             transition: all 0.5s ease;
             pointer-events: none;
-            box-shadow: 0 0 15px #e74c3c;
+            box-shadow: 0 0 10px #e74c3c;
             display: none;
         }
 
@@ -221,43 +218,43 @@
         .pop-text {
             position: absolute;
             font-weight: bold;
-            font-size: 2rem;
+            font-size: 1.4rem;
             pointer-events: none;
             animation: floatUp 1.5s forwards;
-            text-shadow: 3px 3px 0 #000;
+            text-shadow: 2px 2px 0 #000;
             z-index: 20;
             white-space: nowrap;
         }
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.8); opacity: 0; }
-            20% { transform: translateY(-15px) scale(1.2); opacity: 1; }
+            20% { transform: translateY(-10px) scale(1.2); opacity: 1; }
             80% { opacity: 1; }
-            100% { transform: translateY(-80px) scale(1); opacity: 0; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
         }
 
         /* Monster Display */
         .enemy-display {
-            font-size: 4rem;
+            font-size: 3rem;
             margin-bottom: 5px;
             animation: float 3s ease-in-out infinite;
         }
-        #enemy-name { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+        #enemy-name { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
         @keyframes float {
             0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
+            50% { transform: translateY(-10px); }
             100% { transform: translateY(0px); }
         }
 
         /* Log */
         #log {
-            width: 500px;
-            height: 180px; /* Even taller for more details */
+            width: 340px;
+            height: 120px; 
             background: rgba(0,0,0,0.4);
-            margin-top: 15px;
-            padding: 10px;
-            font-size: 1rem;
+            margin-top: 10px;
+            padding: 8px;
+            font-size: 0.85rem;
             overflow-y: auto;
-            border-radius: 8px;
+            border-radius: 6px;
             font-family: 'Consolas', monospace;
             display: flex;
             flex-direction: column-reverse; 
@@ -273,15 +270,16 @@
 
         /* Buttons */
         .action-btn {
-            margin-top: 15px;
-            padding: 15px 30px;
+            margin-top: 10px;
+            padding: 12px 25px;
             background: var(--accent);
             border: none;
             cursor: pointer;
             font-weight: bold;
-            border-radius: 8px;
-            font-size: 1.1rem;
+            border-radius: 6px;
+            font-size: 1rem;
             color: #2c3e50;
+            width: 340px;
         }
         .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
@@ -297,31 +295,30 @@
         }
         .modal-content {
             background: #34495e;
-            width: 85%;
-            max-width: 700px;
-            max-height: 85vh;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
             overflow-y: auto;
-            border-radius: 12px;
-            padding: 30px;
-            border: 3px solid #7f8c8d;
+            border-radius: 8px;
+            padding: 20px;
+            border: 2px solid #7f8c8d;
             position: relative;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
         }
         .close-modal {
             position: absolute;
-            top: 15px;
-            right: 20px;
-            font-size: 2rem;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5rem;
             cursor: pointer;
             color: #bdc3c7;
         }
-        .modal-section { margin-bottom: 25px; border-bottom: 2px solid #555; padding-bottom: 20px; }
-        .modal-title { color: var(--accent); margin-top: 0; font-size: 1.8rem; }
-        .dual-lang { display: flex; gap: 30px; flex-wrap: wrap; }
-        .lang-col { flex: 1; min-width: 280px; }
-        h4 { margin-bottom: 10px; color: #3498db; font-size: 1.3rem; }
+        .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
+        .modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; }
+        .dual-lang { display: flex; flex-direction: column; gap: 20px; }
+        h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
         ul { padding-left: 20px; margin-top: 5px; }
-        li { margin-bottom: 8px; }
+        li { margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -332,43 +329,33 @@
                 <div class="dual-lang">
                     <div class="lang-col">
                         <h2 class="modal-title">GAME MANUAL</h2>
-                        <h4>Controls / Kontroller</h4>
+                        <h4>Rules Update</h4>
                         <ul>
-                            <li><strong>Click & Click:</strong> Select one tile, then a neighbor.</li>
-                            <li><strong>Drag & Slide:</strong> Hold click on a tile, slide to neighbor.</li>
-                        </ul>
-                        <h4>Mechanics</h4>
-                        <ul>
-                            <li><strong>Match 3:</strong> Basic action.</li>
-                            <li><strong>Match 4:</strong> 2x Effect + Extra Turn.</li>
-                            <li><strong>Match 5:</strong> 3x Effect + Ultimate + Extra Turn.</li>
+                            <li><strong>Match 3:</strong> Standard Move (Passes Turn).</li>
+                            <li><strong>Match 4/5:</strong> Grants an <strong>Extra Turn</strong>.</li>
+                            <li><strong>Chain Reaction:</strong> Only matches of 4+ falling tiles give extra turns. Simple 3-matches do not.</li>
                         </ul>
                     </div>
                     <div class="lang-col">
                         <h2 class="modal-title">OYUN KILAVUZU</h2>
-                        <h4>Kontroller</h4>
+                        <h4>Kural Güncellemesi</h4>
                         <ul>
-                            <li><strong>Tıkla & Tıkla:</strong> Bir taşa tıkla, sonra yanındakine.</li>
-                            <li><strong>Sürükle & Kaydır:</strong> Taşa basılı tut, yanındakine kaydır.</li>
-                        </ul>
-                        <h4>Mekanikler</h4>
-                        <ul>
-                            <li><strong>3'lü Eşleşme:</strong> Temel hareket.</li>
-                            <li><strong>4'lü Eşleşme:</strong> 2x Etki + Ekstra Tur.</li>
-                            <li><strong>5'li Eşleşme:</strong> 3x Etki + Ulti + Ekstra Tur.</li>
+                            <li><strong>3'lü Eşleşme:</strong> Sıra düşmana geçer.</li>
+                            <li><strong>4/5 Eşleşme:</strong> <strong>Ekstra Tur</strong> kazandırır.</li>
+                            <li><strong>Zincirleme Reaksiyon:</strong> Sadece düşen taşlar 4+ eşleşme yaparsa ekstra tur verir. 3'lü eşleşmeler vermez.</li>
                         </ul>
                     </div>
                 </div>
             </div>
             <div class="modal-section" style="border:none;">
-                <h4 style="color:#777">v0.11.0 - Controls & Logging Update</h4>
-                <p>Added "Hold & Slide" controls and detailed match logging.</p>
+                <h4 style="color:#777">v0.16.0 - Restart Fix</h4>
+                <p>Fixed "Try Again" button not resetting the game board correctly.</p>
             </div>
         </div>
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.11.0 Controls+Log</div>
+        <div class="version">v0.16.0 Restart Fix</div>
         <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
     </div>
     
@@ -385,7 +372,7 @@
             <span id="hp-text" class="hp-text">100/100</span>
         </div>
         
-        <div class="stat-box" style="width: 100px;">
+        <div class="stat-box" style="width: 80px;">
             <div>ULT</div>
             <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
         </div>
@@ -417,7 +404,6 @@
         const aiCursor = document.getElementById('ai-cursor');
         const modal = document.getElementById('info-modal');
         
-        // Overlay Elements
         const overlay = document.getElementById('game-overlay');
         const overlayTitle = document.getElementById('overlay-title');
         const overlayBtn = document.getElementById('overlay-btn');
@@ -426,40 +412,23 @@
         const width = 8;
         const tiles = [];
 
-        // --- DYNAMIC STATS (Mutable) ---
+        // --- STATS ---
         let TILE_STATS = {
-            sword: 6,
-            heart: 4,
-            shield: 5,
-            energy: 12,
-            skull_dmg: 25,
-            skull_self: 8,
-            ult_dmg: 35
+            sword: 6, heart: 4, shield: 5, energy: 12,
+            skull_dmg: 25, skull_self: 8, ult_dmg: 35
         };
 
         const STATE = { START: 0, PLAYING: 1, REWARD: 2, GAMEOVER: 3 };
         let currentState = STATE.START;
 
-        // Player Stats
-        let playerHP = 100;
-        let maxPlayerHP = 100;
-        let playerArmor = 0;
-        let ultCharge = 0;
-
-        // Level Stats
-        let level = 1;
-        let enemyHP = 50;
-        let maxEnemyHP = 50;
-        let enemyArmor = 0;
-
-        // Log Counter
+        let playerHP = 100, maxPlayerHP = 100, playerArmor = 0, ultCharge = 0;
+        let level = 1, enemyHP = 50, maxEnemyHP = 50, enemyArmor = 0;
         let logCounter = 1;
 
         let isProcessing = false;
         let isPlayerTurn = true;
         let extraTurnTriggered = false;
-
-        // Input Handling State
+        
         let isMouseDown = false;
         let selectedTile = null;
 
@@ -471,11 +440,12 @@
             { type: 'skull', symbol: '💀' }
         ];
 
-        // --- GLOBAL INPUT LISTENERS FOR DRAG RELEASE ---
+        // --- INPUT LISTENERS ---
         document.body.addEventListener('mouseup', () => { isMouseDown = false; });
         document.body.addEventListener('mouseleave', () => { isMouseDown = false; });
+        document.body.addEventListener('touchend', () => { isMouseDown = false; });
 
-        // --- OVERLAY & GAME FLOW ---
+        // --- GAME FLOW ---
 
         function handleOverlayClick() {
             if (currentState === STATE.START || currentState === STATE.GAMEOVER) {
@@ -487,14 +457,13 @@
         }
 
         function resetGame() {
-            playerHP = 100;
-            maxPlayerHP = 100;
-            playerArmor = 0;
-            ultCharge = 0;
-            level = 1;
-            logCounter = 1;
-            
+            playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
+            level = 1; logCounter = 1;
             TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self: 8, ult_dmg: 35 };
+            
+            // Reset Flags
+            isProcessing = false;
+            extraTurnTriggered = false;
             
             log("Game Reset.", "log-turn");
         }
@@ -503,6 +472,9 @@
             currentState = STATE.PLAYING;
             overlay.style.display = 'none'; 
             
+            // Fix: Ensure grid isn't locked from previous game over
+            gridDisplay.classList.remove('locked');
+
             maxEnemyHP = 50 + ((level - 1) * 20);
             enemyHP = maxEnemyHP;
             enemyArmor = 0;
@@ -521,20 +493,20 @@
         }
 
         function winLevel() {
+            if (currentState === STATE.REWARD) return; 
             currentState = STATE.REWARD;
+            gridDisplay.classList.remove('locked') //Oyun bittikten sonra ekran kitlenmesin 
+
             log("Level Complete! Choose a reward.", "log-hit");
-            
             overlay.style.display = 'flex';
             overlayTitle.innerText = "VICTORY! / ZAFER!";
             overlayBtn.style.display = 'none';
             rewardArea.style.display = 'flex';
-            
             generateRewards();
         }
 
         function generateRewards() {
             rewardArea.innerHTML = '';
-            
             const pool = [
                 { id: 'sword', en: "Sharpen Swords (+1 Dmg)", tr: "Kılıçları Bile (+1 Hasar)", fn: () => TILE_STATS.sword += 1 },
                 { id: 'shield', en: "Reinforce Shields (+1 Armor)", tr: "Kalkanları Güçlendir (+1 Zırh)", fn: () => TILE_STATS.shield += 1 },
@@ -543,10 +515,8 @@
                 { id: 'energy', en: "Focus (+2 Ult Charge)", tr: "Odaklanma (+2 Şarj)", fn: () => TILE_STATS.energy += 2 },
                 { id: 'ult', en: "Ult Power (+10 Dmg)", tr: "Ulti Gücü (+10 Hasar)", fn: () => TILE_STATS.ult_dmg += 10 }
             ];
-
             pool.sort(() => 0.5 - Math.random());
             const choices = pool.slice(0, 3);
-
             choices.forEach(reward => {
                 let btn = document.createElement('button');
                 btn.className = 'reward-btn';
@@ -565,13 +535,13 @@
             overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
             overlayBtn.innerText = "START NEXT LEVEL / SIRADAKİ SEVİYE";
             overlayBtn.style.display = 'block';
-            
             playerHP = Math.min(playerHP + 10, maxPlayerHP);
             level++;
         }
 
         function gameOver() {
             currentState = STATE.GAMEOVER;
+            gridDisplay.classList.remove('locked'); //Oyun bittikten sonra ekran kitlenmesin 
             overlay.style.display = 'flex';
             overlayTitle.innerText = "GAME OVER";
             overlayBtn.innerText = "TRY AGAIN / TEKRAR DENE";
@@ -579,11 +549,11 @@
             rewardArea.style.display = 'none';
         }
 
-        // --- CORE GAME LOGIC ---
-
         function toggleModal() {
             modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         }
+
+        // --- GRID LOGIC ---
 
         function createBoard() {
             gridDisplay.innerHTML = ''; 
@@ -600,31 +570,30 @@
                 gridDisplay.appendChild(tile);
                 tiles.push(tile);
                 
-                // MOUSE INPUT (Drag & Click)
-                tile.addEventListener('mousedown', (e) => handleInputStart(tile));
-                tile.addEventListener('mouseenter', (e) => handleInputEnter(tile));
+                tile.addEventListener('mousedown', (e) => { e.preventDefault(); handleInputStart(tile); });
+                tile.addEventListener('mouseenter', (e) => { e.preventDefault(); handleInputEnter(tile); });
+                tile.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart(tile); }, {passive: false});
+                tile.addEventListener('touchmove', (e) => { 
+                    e.preventDefault(); 
+                    let touch = e.touches[0];
+                    let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (target && target.classList.contains('tile')) handleInputEnter(target);
+                }, {passive: false});
             }
             resolveMatches(true); 
             updateUI();
         }
 
-        // --- NEW INPUT HANDLING ---
         function handleInputStart(tile) {
-            if (currentState !== STATE.PLAYING) return;
-            if (isProcessing || !isPlayerTurn) return;
-
+            if (currentState !== STATE.PLAYING || isProcessing || !isPlayerTurn) return;
+            
             isMouseDown = true;
-
             if (!selectedTile) {
-                // Select first tile
                 selectedTile = tile;
                 tile.classList.add('selected');
             } else {
-                // Standard Click-Click Swap
-                if (tile !== selectedTile) {
-                    checkAndSwap(selectedTile, tile);
-                } else {
-                    // Deselect if clicking same tile
+                if (tile !== selectedTile) checkAndSwap(selectedTile, tile);
+                else {
                     selectedTile.classList.remove('selected');
                     selectedTile = null;
                 }
@@ -633,55 +602,38 @@
 
         function handleInputEnter(tile) {
             if (!isMouseDown || !selectedTile || isProcessing) return;
-            
-            if (tile !== selectedTile) {
-                // Dragged into a new tile -> Attempt Drag Swap
-                checkAndSwap(selectedTile, tile);
-            }
+            if (tile !== selectedTile) checkAndSwap(selectedTile, tile);
         }
 
         function checkAndSwap(tile1, tile2) {
-            let id1 = parseInt(tile1.id);
-            let id2 = parseInt(tile2.id);
+            let id1 = parseInt(tile1.id), id2 = parseInt(tile2.id);
             const validMoves = [id1 - 1, id1 + 1, id1 - width, id1 + width];
-            
             if (validMoves.includes(id2)) {
-                // Valid Neighbor -> Swap
                 attemptSwap(tile1, tile2);
-                
-                // Reset Selection & Drag State after swap attempt
                 tile1.classList.remove('selected');
                 selectedTile = null;
                 isMouseDown = false; 
-            } else {
-                // Invalid neighbor (clicked far away) -> Change selection
-                if (!isMouseDown) { // Only change selection on click, not drag pass-through
-                    tile1.classList.remove('selected');
-                    selectedTile = tile2;
-                    tile2.classList.add('selected');
-                }
+            } else if (!isMouseDown) { 
+                tile1.classList.remove('selected');
+                selectedTile = tile2;
+                tile2.classList.add('selected');
             }
         }
 
         function attemptSwap(tile1, tile2) {
             isProcessing = true;
-            let tempType = tile1.dataset.type;
-            let tempHTML = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type;
-            tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = tempType;
-            tile2.innerHTML = tempHTML;
+            let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
+            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
+            tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
 
+            // This is a manual move, we check logic
             let hasMatch = checkForMatches(false); 
             
             if (!hasMatch) {
                 setTimeout(() => {
-                    let tempType = tile1.dataset.type;
-                    let tempHTML = tile1.innerHTML;
-                    tile1.dataset.type = tile2.dataset.type;
-                    tile1.innerHTML = tile2.innerHTML;
-                    tile2.dataset.type = tempType;
-                    tile2.innerHTML = tempHTML;
+                    let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
+                    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
+                    tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
                     isProcessing = false; 
                 }, 200);
             }
@@ -692,6 +644,9 @@
         }
 
         function checkForMatches(isInitial) {
+            // Safety check for end of game
+            if (!isInitial && currentState !== STATE.PLAYING) return false;
+
             let matchesFound = false;
             let hRuns = [];
             let vRuns = [];
@@ -737,7 +692,11 @@
             
             if (finalGroups.length > 0) {
                 finalGroups.forEach(group => processMatch(group, isInitial));
-                setTimeout(() => fillBoard(isInitial), 400);
+                
+                // If Playing, continue physics loop
+                if (currentState === STATE.PLAYING || isInitial) {
+                    setTimeout(() => fillBoard(isInitial), 400);
+                }
                 return true;
             } else {
                 if (!isInitial) isProcessing = false;
@@ -746,15 +705,14 @@
         }
 
         function processMatch(group, isInitial) {
+            if (currentState !== STATE.PLAYING && !isInitial) return;
+
             let shape = '3';
             if (group.indices.length === 4) shape = '4';
             if (group.indices.length >= 5) shape = '5';
             
-            let validTiles = 0;
-            
-            // --- DETAILED LOGGING (New) ---
+            // --- LOGGING ---
             if (!isInitial && group.indices.length > 0) {
-                // Find icon
                 let typeInfo = tileTypes.find(t => t.type === group.type);
                 let icon = typeInfo ? typeInfo.symbol : "?";
                 let user = isPlayerTurn ? "Player" : "Enemy";
@@ -765,19 +723,20 @@
                 
                 log(msg, "log-match");
             }
-            // ------------------------------
 
+            // Visual Processing
+            let validTiles = 0;
             group.indices.forEach(index => {
                 if (tiles[index].dataset.type !== '') {
                     if (!isInitial) tiles[index].classList.add('matched');
                     else tiles[index].innerHTML = ''; 
-                    
                     tiles[index].dataset.type = '';
                     validTiles++;
                 }
             });
 
             if (validTiles > 0 && !isInitial) {
+                // RULE: Only 4 or 5 grants extra turn. Chain 3s do NOT.
                 if (shape === '4' || shape === '5') {
                     extraTurnTriggered = true;
                     let center = tiles[group.indices[1]];
@@ -809,10 +768,10 @@
             if (shape === '5') multiplier = 3;
 
             let user = isPlayerTurn ? "Player" : "Enemy";
+            let target = isPlayerTurn ? 'enemy' : 'player';
             
             if (type === 'sword') {
                 let baseVal = TILE_STATS.sword * multiplier;
-                let target = isPlayerTurn ? 'enemy' : 'player';
                 inflictDamage(target, baseVal);
                 log(`${user} attacks for ${baseVal} dmg`, isPlayerTurn ? 'log-hit' : 'log-enemy');
             
@@ -842,10 +801,8 @@
             } else if (type === 'skull') {
                 let dmgToOpponent = TILE_STATS.skull_dmg * (shape === '3' ? 1 : 1.5);
                 let recoil = TILE_STATS.skull_self * (shape === '3' ? 1 : 1.5);
-
-                let target = isPlayerTurn ? 'enemy' : 'player';
                 let self = isPlayerTurn ? 'player' : 'enemy';
-
+                
                 inflictDamage(target, dmgToOpponent);
                 inflictDamage(self, recoil);
                 log(`SKULLS! ${user} takes ${recoil}, Target takes ${dmgToOpponent}`, 'log-crit');
@@ -862,17 +819,15 @@
 
         function inflictDamage(targetStr, amount) {
             if (targetStr === 'player') {
-                if (playerArmor >= amount) {
-                    playerArmor -= amount; 
-                } else {
+                if (playerArmor >= amount) playerArmor -= amount; 
+                else {
                     let remainder = amount - playerArmor;
                     playerArmor = 0;
                     playerHP -= remainder;
                 }
             } else {
-                if (enemyArmor >= amount) {
-                    enemyArmor -= amount;
-                } else {
+                if (enemyArmor >= amount) enemyArmor -= amount;
+                else {
                     let remainder = amount - enemyArmor;
                     enemyArmor = 0;
                     enemyHP -= remainder;
@@ -881,6 +836,8 @@
         }
 
         function fillBoard(isInitial) {
+            if (!isInitial && currentState !== STATE.PLAYING) return;
+
             for (let col = 0; col < width; col++) {
                 let columnTiles = [];
                 for (let row = 0; row < width; row++) {
@@ -897,12 +854,10 @@
                 for (let row = 0; row < width; row++) {
                     let index = col + (row * width);
                     let tileData = columnTiles[row];
-                    
                     if (tiles[index].dataset.type !== tileData.type || tileData.isNew) {
                         tiles[index].dataset.type = tileData.type;
                         tiles[index].innerHTML = tileData.html;
                         tiles[index].classList.remove('matched');
-                        
                         if (!isInitial) {
                             tiles[index].classList.remove('falling');
                             void tiles[index].offsetWidth; 
@@ -911,9 +866,7 @@
                     }
                 }
             }
-
             let chainReaction = checkForMatches(isInitial);
-            
             if (!chainReaction && !isInitial) {
                 endTurnLogic();
             }
@@ -921,16 +874,21 @@
 
         function endTurnLogic() {
             if (currentState !== STATE.PLAYING) return;
+            
+            // Post-Mortem Check
+            if (enemyHP <= 0) return;
 
             if (extraTurnTriggered) {
-                log(isPlayerTurn ? ">> YOU GET AN EXTRA TURN!" : ">> ENEMY GETS AN EXTRA TURN!", "log-turn");
+                log(isPlayerTurn ? ">> EXTRA TURN!" : ">> ENEMY EXTRA TURN!", "log-turn");
                 extraTurnTriggered = false;
                 isProcessing = false;
+                updateUI();
                 if (!isPlayerTurn) setTimeout(enemyPlayTurn, 1000); 
-                else { gridDisplay.classList.remove('locked'); }
+                else gridDisplay.classList.remove('locked'); 
             } else {
                 isPlayerTurn = !isPlayerTurn;
                 updateTurnBanner();
+                updateUI();
                 
                 if (!isPlayerTurn) {
                     gridDisplay.classList.add('locked'); 
@@ -953,32 +911,28 @@
         }
 
         function enemyPlayTurn() {
-            if (currentState !== STATE.PLAYING) return;
+            if (currentState !== STATE.PLAYING || enemyHP <= 0) return;
 
             let bestMove = findBestMove();
-
             if (bestMove) {
                 let t1 = tiles[bestMove.index];
                 let t2 = tiles[bestMove.target];
-                
                 aiCursor.style.display = 'block';
                 aiCursor.style.left = (t1.offsetLeft) + 'px';
                 aiCursor.style.top = (t1.offsetTop) + 'px';
-
                 setTimeout(() => {
                     aiCursor.style.left = (t2.offsetLeft) + 'px';
                     aiCursor.style.top = (t2.offsetTop) + 'px';
                 }, 500);
-
                 setTimeout(() => {
                     aiCursor.style.display = 'none';
                     attemptSwap(t1, t2);
                 }, 1000);
-
             } else {
                 log("Enemy found no moves. Passing...", "log-enemy");
                 isPlayerTurn = true;
                 updateTurnBanner();
+                updateUI();
                 gridDisplay.classList.remove('locked');
                 isProcessing = false;
             }
@@ -1046,11 +1000,13 @@
         function checkWinCondition() {
             if (currentState !== STATE.PLAYING) return;
 
-            if (enemyHP <= 0) {
-                winLevel();
-            } else if (playerHP <= 0) {
+            if (playerHP <= 0){
                 gameOver();
             }
+            else if (enemyHP <=0) {
+                winLevel();
+            }
+
         }
 
         function updateUI() {
@@ -1072,6 +1028,7 @@
             document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
 
+            // Fix: Re-enable button if charge is full and it's player turn
             document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
         }
 
@@ -1082,7 +1039,6 @@
             logDisplay.prepend(div);
         }
 
-        // Initialize Overlay but don't start level yet
         createBoard();
     </script>
 </body>
