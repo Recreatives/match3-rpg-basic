@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Dungeon Match PvE - Restart Fix</title>
+    <title>Pixel Dungeon - Smooth Transition Update</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -11,7 +11,7 @@
             --accent: #f1c40f;
             --text: #ecf0f1;
             --armor-color: #bdc3c7;
-            --modal-bg: rgba(0, 0, 0, 0.85);
+            --modal-bg: rgba(0, 0, 0, 0.9);
             --overlay-bg: rgba(0, 0, 0, 0.85);
         }
         body {
@@ -26,141 +26,42 @@
             user-select: none;
             font-size: 14px; 
             touch-action: manipulation;
+            overflow: hidden; /* Prevent scroll during shakes */
         }
         
-        /* Top Bar */
-        .top-bar {
-            width: 340px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .version {
-            font-size: 0.8rem;
-            color: #7f8c8d;
-            font-family: monospace;
-        }
-        .help-btn {
-            background: none;
-            border: 1px solid #7f8c8d;
-            color: #bdc3c7;
-            padding: 4px 10px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-
-        /* Turn Indicator */
-        .turn-indicator {
-            font-size: 1.2rem;
-            font-weight: bold;
-            padding: 5px 20px;
-            border-radius: 20px;
-            background: #222;
-            color: #777;
-            margin-bottom: 5px;
-            transition: all 0.3s;
-        }
-        .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 10px #2ecc71; }
-        .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 10px #e74c3c; }
-
-        /* UI Bars */
-        .hud {
-            width: 340px;
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            background: rgba(0,0,0,0.2);
-            padding: 10px;
-            border-radius: 8px;
-        }
-        .stat-box { text-align: center; width: 100px; }
-        .stat-box div:first-child { font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }
+        /* --- ANIMATIONS & TRANSITIONS --- */
         
-        .bar-container {
-            width: 100%;
-            height: 10px;
-            background: #444;
-            border-radius: 5px;
-            overflow: hidden;
-            margin-top: 3px;
-            position: relative;
+        /* 1. Death Animation (Spin & Shrink) */
+        .dying {
+            animation: deathAnim 1.5s forwards ease-in-out;
+            pointer-events: none;
         }
-        .armor-container {
-            width: 100%;
-            height: 6px;
-            background: #333;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 2px;
+        @keyframes deathAnim {
+            0% { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); opacity: 1; }
+            20% { transform: scale(1.2) rotate(-10deg); filter: hue-rotate(90deg) brightness(2); }
+            40% { transform: scale(0.9) rotate(10deg); filter: hue-rotate(180deg); }
+            60% { transform: scale(0.8) rotate(-5deg); opacity: 0.8; }
+            100% { transform: scale(0) rotate(720deg); opacity: 0; }
         }
 
-        .bar { height: 100%; transition: width 0.3s; }
-        
-        #player-hp-bar { background-color: #2ecc71; width: 100%; }
-        #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
-        #ult-bar { background-color: #f1c40f; width: 0%; }
-        
-        #player-armor-bar { background-color: var(--armor-color); width: 0%; }
-        #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
-
-        .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
-        .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
-
-        /* Game Board */
-        .grid {
-            width: 320px;  
-            height: 320px; 
-            display: flex;
-            flex-wrap: wrap;
-            background-color: var(--board-bg);
-            border-radius: 8px;
-            border: 4px solid #1a252f;
-            overflow: hidden;
-            position: relative;
-            touch-action: none;
-        }
-        .grid.locked { pointer-events: none; filter: grayscale(0.5); }
-
-        .tile {
-            width: 40px;
-            height: 40px;
-            font-size: 24px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-sizing: border-box;
-            z-index: 1;
-            transition: transform 0.2s, filter 0.2s;
-        }
-        .tile:hover { filter: brightness(1.2); transform: scale(1.1); z-index: 2; }
-        .selected {
-            background-color: rgba(255, 255, 255, 0.2);
-            border: 2px solid var(--accent);
-            border-radius: 4px;
-            transform: scale(1.1);
+        /* 2. Player Death (Grayscale Fade) */
+        .gray-out {
+            filter: grayscale(100%) blur(2px);
+            transition: filter 2s ease;
         }
 
-        /* ANIMATIONS */
-        .falling { animation: dropIn 0.4s ease-out; }
-        @keyframes dropIn {
-            0% { transform: translateY(-40px); opacity: 0; }
-            100% { transform: translateY(0px); opacity: 1; }
+        /* 3. Screen Shake */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
         }
 
-        .matched {
-            animation: matchPop 0.4s forwards ease-in-out;
-            z-index: 10;
-        }
-        @keyframes matchPop {
-            0% { transform: scale(1); filter: brightness(2) drop-shadow(0 0 5px white); background-color: rgba(255,255,255,0.4); }
-            40% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(0); opacity: 0; }
-        }
-
-        /* GAME OVERLAY */
+        /* 4. Smooth Overlay Fade */
         .game-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -172,58 +73,139 @@
             align-items: center;
             text-align: center;
             backdrop-filter: blur(4px);
+            
+            /* Transition Logic */
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease-in-out;
         }
+        
+        .game-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* --- STANDARD UI --- */
+        .top-bar {
+            width: 340px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; }
+        .help-btn {
+            background: none; border: 1px solid #7f8c8d; color: #bdc3c7;
+            padding: 4px 10px; font-size: 0.9rem; cursor: pointer; border-radius: 4px;
+        }
+
+        .turn-indicator {
+            font-size: 1.2rem; font-weight: bold; padding: 5px 20px;
+            border-radius: 20px; background: #222; color: #777;
+            margin-bottom: 5px; transition: all 0.3s;
+        }
+        .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 10px #2ecc71; }
+        .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 10px #e74c3c; }
+
+        .hud {
+            width: 340px; display: flex; justify-content: space-between;
+            margin-bottom: 10px; background: rgba(0,0,0,0.2);
+            padding: 10px; border-radius: 8px;
+        }
+        .stat-box { text-align: center; width: 100px; }
+        .stat-box div:first-child { font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }
+        
+        .bar-container {
+            width: 100%; height: 10px; background: #444;
+            border-radius: 5px; overflow: hidden; margin-top: 3px; position: relative;
+        }
+        .armor-container {
+            width: 100%; height: 6px; background: #333;
+            border-radius: 3px; overflow: hidden; margin-top: 2px;
+        }
+        .bar { height: 100%; transition: width 0.3s; }
+        #player-hp-bar { background-color: #2ecc71; width: 100%; }
+        #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
+        #ult-bar { background-color: #f1c40f; width: 0%; }
+        #player-armor-bar { background-color: var(--armor-color); width: 0%; }
+        #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
+        .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
+        .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
+
+        /* Game Board */
+        .grid {
+            width: 320px; height: 320px; 
+            display: flex; flex-wrap: wrap;
+            background-color: var(--board-bg);
+            border-radius: 8px; border: 4px solid #1a252f;
+            overflow: hidden; position: relative;
+            touch-action: none;
+            transition: filter 1s ease; /* For Grayscale transition */
+        }
+        .grid.locked { pointer-events: none; filter: grayscale(0.5); }
+
+        .tile {
+            width: 40px; height: 40px; font-size: 24px;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; box-sizing: border-box; z-index: 1;
+            transition: transform 0.2s, filter 0.2s;
+        }
+        .tile:hover { filter: brightness(1.2); transform: scale(1.1); z-index: 2; }
+        .selected {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid var(--accent); border-radius: 4px; transform: scale(1.1);
+        }
+        .falling { animation: dropIn 0.4s ease-out; }
+        @keyframes dropIn {
+            0% { transform: translateY(-40px); opacity: 0; }
+            100% { transform: translateY(0px); opacity: 1; }
+        }
+        .matched {
+            animation: matchPop 0.4s forwards ease-in-out; z-index: 10;
+        }
+        @keyframes matchPop {
+            0% { transform: scale(1); filter: brightness(2) drop-shadow(0 0 5px white); background-color: rgba(255,255,255,0.4); }
+            40% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Overlay Content */
         .overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
         .overlay-btn {
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            background: #27ae60;
-            color: white;
-            border: 2px solid #2ecc71;
-            border-radius: 8px;
-            cursor: pointer;
-            margin: 10px;
-            transition: all 0.2s;
-            font-weight: bold;
+            padding: 15px 30px; font-size: 1.1rem; background: #27ae60;
+            color: white; border: 2px solid #2ecc71; border-radius: 8px;
+            cursor: pointer; margin: 10px; transition: all 0.2s; font-weight: bold;
         }
         .overlay-btn:hover { background: #2ecc71; transform: scale(1.05); }
-        .reward-container { display: flex; flex-direction: column; gap: 8px; width: 90%; }
+        .reward-container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px; /* Reduced gap */
+            width: 95%; 
+            max-height: 300px; /* Limits height */
+            overflow-y: auto; /* Adds scroll if needed */
+        }
+
+        /* Add this new rule below it to make buttons smaller */
         .reward-btn {
-            background: #2980b9;
-            border: 2px solid #3498db;
-            color: white;
-            padding: 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            text-align: left;
-            font-size: 0.9rem;
+            padding: 6px 10px; /* Slimmer buttons */
+            font-size: 0.85rem;
         }
         .reward-btn b { color: var(--accent); font-size: 1rem; }
 
         /* Enemy Cursor */
         .ai-cursor {
-            position: absolute;
-            width: 38px;
-            height: 38px;
-            border: 3px solid #e74c3c;
-            border-radius: 50%;
-            z-index: 10;
-            transition: all 0.5s ease;
-            pointer-events: none;
-            box-shadow: 0 0 10px #e74c3c;
-            display: none;
+            position: absolute; width: 38px; height: 38px;
+            border: 3px solid #e74c3c; border-radius: 50%;
+            z-index: 10; transition: all 0.5s ease;
+            pointer-events: none; box-shadow: 0 0 10px #e74c3c; display: none;
         }
 
         /* Popups */
         .pop-text {
-            position: absolute;
-            font-weight: bold;
-            font-size: 1.4rem;
-            pointer-events: none;
-            animation: floatUp 1.5s forwards;
-            text-shadow: 2px 2px 0 #000;
-            z-index: 20;
-            white-space: nowrap;
+            position: absolute; font-weight: bold; font-size: 1.4rem;
+            pointer-events: none; animation: floatUp 1.5s forwards;
+            text-shadow: 2px 2px 0 #000; z-index: 20; white-space: nowrap;
         }
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.8); opacity: 0; }
@@ -234,9 +216,9 @@
 
         /* Monster Display */
         .enemy-display {
-            font-size: 3rem;
-            margin-bottom: 5px;
+            font-size: 3rem; margin-bottom: 5px;
             animation: float 3s ease-in-out infinite;
+            transition: transform 0.2s, filter 0.2s;
         }
         #enemy-name { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
         @keyframes float {
@@ -247,18 +229,10 @@
 
         /* Log */
         #log {
-            width: 340px;
-            height: 120px; 
-            background: rgba(0,0,0,0.4);
-            margin-top: 10px;
-            padding: 8px;
-            font-size: 0.85rem;
-            overflow-y: auto;
-            border-radius: 6px;
-            font-family: 'Consolas', monospace;
-            display: flex;
-            flex-direction: column-reverse; 
-            border: 1px solid #555;
+            width: 340px; height: 120px; background: rgba(0,0,0,0.4);
+            margin-top: 10px; padding: 8px; font-size: 0.85rem;
+            overflow-y: auto; border-radius: 6px; font-family: 'Consolas', monospace;
+            display: flex; flex-direction: column-reverse; border: 1px solid #555;
         }
         .log-hit { color: #f1c40f; }
         .log-crit { color: #ff6b6b; font-weight: bold; }
@@ -268,50 +242,28 @@
         .log-match { color: #3498db; }
         .log-turn { color: #fff; font-weight: bold; text-decoration: underline; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #444;}
 
-        /* Buttons */
         .action-btn {
-            margin-top: 10px;
-            padding: 12px 25px;
-            background: var(--accent);
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            border-radius: 6px;
-            font-size: 1rem;
-            color: #2c3e50;
-            width: 340px;
+            margin-top: 10px; padding: 12px 25px; background: var(--accent);
+            border: none; cursor: pointer; font-weight: bold; border-radius: 6px;
+            font-size: 1rem; color: #2c3e50; width: 340px;
         }
         .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
         /* INFO MODAL */
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--modal-bg);
-            z-index: 100;
-            display: none;
-            justify-content: center;
-            align-items: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-bg); z-index: 100; display: none;
+            justify-content: center; align-items: center;
         }
         .modal-content {
-            background: #34495e;
-            width: 90%;
-            max-width: 400px;
-            max-height: 80vh;
-            overflow-y: auto;
-            border-radius: 8px;
-            padding: 20px;
-            border: 2px solid #7f8c8d;
-            position: relative;
+            background: #34495e; width: 90%; max-width: 400px;
+            max-height: 80vh; overflow-y: auto; border-radius: 8px;
+            padding: 20px; border: 2px solid #7f8c8d; position: relative;
             font-size: 0.9rem;
         }
         .close-modal {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #bdc3c7;
+            position: absolute; top: 10px; right: 15px; font-size: 1.5rem;
+            cursor: pointer; color: #bdc3c7;
         }
         .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
         .modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; }
@@ -329,33 +281,24 @@
                 <div class="dual-lang">
                     <div class="lang-col">
                         <h2 class="modal-title">GAME MANUAL</h2>
-                        <h4>Rules Update</h4>
+                        <h4>Rules</h4>
                         <ul>
                             <li><strong>Match 3:</strong> Standard Move (Passes Turn).</li>
                             <li><strong>Match 4/5:</strong> Grants an <strong>Extra Turn</strong>.</li>
                             <li><strong>Chain Reaction:</strong> Only matches of 4+ falling tiles give extra turns. Simple 3-matches do not.</li>
                         </ul>
                     </div>
-                    <div class="lang-col">
-                        <h2 class="modal-title">OYUN KILAVUZU</h2>
-                        <h4>Kural Güncellemesi</h4>
-                        <ul>
-                            <li><strong>3'lü Eşleşme:</strong> Sıra düşmana geçer.</li>
-                            <li><strong>4/5 Eşleşme:</strong> <strong>Ekstra Tur</strong> kazandırır.</li>
-                            <li><strong>Zincirleme Reaksiyon:</strong> Sadece düşen taşlar 4+ eşleşme yaparsa ekstra tur verir. 3'lü eşleşmeler vermez.</li>
-                        </ul>
-                    </div>
                 </div>
             </div>
             <div class="modal-section" style="border:none;">
-                <h4 style="color:#777">v0.16.0 - Restart Fix</h4>
-                <p>Fixed "Try Again" button not resetting the game board correctly.</p>
+                <h4 style="color:#777">v0.17.0 - Smooth Transitions</h4>
+                <p>Added Death Animations, Screen Shake, and Smooth Menu Fades.</p>
             </div>
         </div>
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.16.0 Restart Fix</div>
+        <div class="version">v0.17.0 Smooth</div>
         <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
     </div>
     
@@ -387,10 +330,12 @@
 
     <div class="grid" id="grid">
         <div class="ai-cursor" id="ai-cursor"></div>
-        <div id="game-overlay" class="game-overlay">
-            <h1 id="overlay-title" class="overlay-title">PIXEL MATCH RPG</h1>
+        <div id="game-overlay" class="game-overlay visible">
+            <h1 id="overlay-title" class="overlay-title">SELECT YOUR HERO</h1>
+            <div id="class-selection" class="reward-container"></div>
+    
             <div id="reward-area" class="reward-container" style="display:none;"></div>
-            <button id="overlay-btn" class="overlay-btn" onclick="handleOverlayClick()">START BATTLE / BAŞLA</button>
+            <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">START BATTLE</button>
         </div>
     </div>
     
@@ -408,6 +353,7 @@
         const overlayTitle = document.getElementById('overlay-title');
         const overlayBtn = document.getElementById('overlay-btn');
         const rewardArea = document.getElementById('reward-area');
+        const enemySprite = document.getElementById('enemy-sprite');
 
         const width = 8;
         const tiles = [];
@@ -420,6 +366,68 @@
 
         const STATE = { START: 0, PLAYING: 1, REWARD: 2, GAMEOVER: 3 };
         let currentState = STATE.START;
+
+        // --- CLASS DEFINITIONS ---
+        const CLASSES = {
+            WARRIOR: {
+                name: "Warrior", emoji: "🛡️", desc: "High Armor & Shield efficiency.",
+                passive: (stats) => { stats.shield += 2; },
+                ultName: "SHIELD SLAM",
+                ultEffect: () => {
+                    let dmg = TILE_STATS.ult_dmg + playerArmor; 
+                    inflictDamage('enemy', dmg);
+                    log(`ULT: Shield Slam deals ${dmg} damage!`, "log-hit");
+                }
+            },
+            BERSERKER: {
+                name: "Berserker", emoji: "🪓", desc: "Huge dmg. Gains 50% less Armor.",
+                passive: (stats) => { 
+                    stats.sword += 4; 
+                    stats.shield = Math.floor(stats.shield * 0.5); // Cuts shield efficiency in half
+                },
+                ultName: "BLOOD LUST",
+                ultEffect: () => {
+                    playerHP -= 10;
+                    inflictDamage('enemy', TILE_STATS.ult_dmg * 2);
+                    log(`ULT: Blood Lust deals double damage!`, "log-crit");
+                }
+            },
+            ROGUE: {
+                name: "Rogue", emoji: "🗡️", desc: "Easier extra turns & energy.",
+                passive: (stats) => { stats.energy += 5; },
+                ultName: "ASSASSINATE",
+                ultEffect: () => {
+                    inflictDamage('enemy', TILE_STATS.ult_dmg);
+                    extraTurnTriggered = true;
+                    log(`ULT: Assassinate! Extra Turn granted!`, "log-match");
+                }
+            },
+            ARCHER: {
+                name: "Archer", emoji: "🏹", desc: "High Skull dmg, no self-harm.",
+                passive: (stats) => { stats.skull_dmg += 10; stats.skull_self = 0; },
+                ultName: "VOLLEY",
+                ultEffect: () => {
+                    inflictDamage('enemy', 15);
+                    setTimeout(() => inflictDamage('enemy', 15), 200);
+                    setTimeout(() => inflictDamage('enemy', 15), 400);
+                    log(`ULT: Volley hits 3 times!`, "log-hit");
+                }
+            },
+            MAGE: {
+                name: "Mage", emoji: "🧙", desc: "Infinite Ultimate scaling.",
+                passive: (stats) => { stats.energy += 10; stats.sword -= 2; },
+                ultName: "ARCANE BLAST",
+                ultEffect: () => {
+                    inflictDamage('enemy', TILE_STATS.ult_dmg);
+                    TILE_STATS.ult_dmg += 10;
+                    log(`ULT: Arcane Blast! Power increased!`, "log-match");
+                }
+            }
+        };
+        let selectedClass = null; // This will hold our choice+
+
+
+
 
         let playerHP = 100, maxPlayerHP = 100, playerArmor = 0, ultCharge = 0;
         let level = 1, enemyHP = 50, maxEnemyHP = 50, enemyArmor = 0;
@@ -446,12 +454,46 @@
         document.body.addEventListener('touchend', () => { isMouseDown = false; });
 
         // --- GAME FLOW ---
+        
+        function renderClassButtons() {
+            const container = document.getElementById('class-selection');
+            container.innerHTML = '';
+            container.style.display = 'flex';
+            overlayBtn.style.display = 'none'; // Hide start button until class is picked
+
+            Object.keys(CLASSES).forEach(key => {
+                const c = CLASSES[key];
+                const btn = document.createElement('button');
+                btn.className = 'reward-btn';
+                btn.innerHTML = `<span>${c.emoji} <b>${c.name}</b></span><br><small>${c.desc}</small>`;
+                btn.onclick = () => {
+                    selectedClass = c;
+                    selectedClass.passive(TILE_STATS); // Apply the unique bonus
+                    
+                    // Update UI to show class name and specific Ult name
+                    document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
+                    document.querySelector('.stat-box div:first-child').innerText = `${c.emoji} YOU`;
+                    
+                    container.style.display = 'none';
+                    overlayTitle.innerText = `READY, ${c.name.toUpperCase()}?`;
+                    overlayBtn.style.display = 'block';
+                };
+                container.appendChild(btn);
+            });
+        }
 
         function handleOverlayClick() {
+            // Only show class selection if game hasn't started or player just died
             if (currentState === STATE.START || currentState === STATE.GAMEOVER) {
+                if (!selectedClass) {
+                    renderClassButtons();
+                    overlayTitle.innerText = "SELECT YOUR HERO";
+                    return;
+                }
                 resetGame();
                 startLevel();
             } else if (currentState === STATE.REWARD) {
+                // Keeps the same class for the next level
                 startLevel();
             }
         }
@@ -459,22 +501,38 @@
         function resetGame() {
             playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
             level = 1; logCounter = 1;
+            
+            // Reset base stats first
             TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self: 8, ult_dmg: 35 };
             
-            // Reset Flags
+            // Re-apply the selected class passive now that stats are fresh
+            if (selectedClass) {
+                selectedClass.passive(TILE_STATS);
+            }
+            
             isProcessing = false;
             extraTurnTriggered = false;
+            gridDisplay.classList.remove('shake');
+            enemySprite.classList.remove('dying');
             
             log("Game Reset.", "log-turn");
         }
 
         function startLevel() {
             currentState = STATE.PLAYING;
-            overlay.style.display = 'none'; 
             
-            // Fix: Ensure grid isn't locked from previous game over
+            // Fade out overlay
+            overlay.classList.remove('visible');
+            rewardArea.style.display = 'none';
+            
+            // Reset grid locks
             gridDisplay.classList.remove('locked');
 
+            // Reset Enemy Visuals
+            enemySprite.classList.remove('dying');
+            enemySprite.classList.add('enemy-display');
+
+            // Setup Enemy Stats
             maxEnemyHP = 50 + ((level - 1) * 20);
             enemyHP = maxEnemyHP;
             enemyArmor = 0;
@@ -492,17 +550,74 @@
             log(`LEVEL ${level} START`, "log-turn");
         }
 
+        // --- TRANSITION SEQUENCES ---
+
+        function checkWinCondition() {
+            if (currentState !== STATE.PLAYING) return;
+
+            if (playerHP <= 0) {
+                triggerDeathSequence('player');
+            }
+            else if (enemyHP <= 0) {
+                triggerDeathSequence('enemy');
+            }
+        }
+
+        function triggerDeathSequence(who) {
+            currentState = STATE.GAMEOVER; // Block input
+            isProcessing = true; 
+
+            if (who === 'enemy') {
+                // Enemy dies
+                enemySprite.classList.remove('enemy-display'); // Stop floating
+                enemySprite.classList.add('dying'); // Start spin/shrink
+                
+                log("ENEMY DEFEATED!", "log-crit");
+                gridDisplay.classList.add('shake'); // Shake screen
+                setTimeout(() => gridDisplay.classList.remove('shake'), 500);
+
+                // Wait for animation
+                setTimeout(() => {
+                    winLevel();
+                }, 1500);
+
+            } else {
+                // Player dies
+                gridDisplay.classList.add('shake');
+                setTimeout(() => gridDisplay.classList.remove('shake'), 500);
+                
+                log("YOU DIED...", "log-enemy");
+
+                setTimeout(() => {
+                    gameOver();
+                }, 1500);
+            }
+        }
+
         function winLevel() {
             if (currentState === STATE.REWARD) return; 
             currentState = STATE.REWARD;
-            gridDisplay.classList.remove('locked') //Oyun bittikten sonra ekran kitlenmesin 
 
             log("Level Complete! Choose a reward.", "log-hit");
-            overlay.style.display = 'flex';
-            overlayTitle.innerText = "VICTORY! / ZAFER!";
+            
+            generateRewards();
+            overlayTitle.innerText = "VICTORY!";
             overlayBtn.style.display = 'none';
             rewardArea.style.display = 'flex';
-            generateRewards();
+            
+            // Fade In Overlay
+            overlay.classList.add('visible');
+        }
+
+        function gameOver() {
+            currentState = STATE.GAMEOVER;
+            overlayTitle.innerText = "GAME OVER";
+            overlayBtn.innerText = "TRY AGAIN";
+            overlayBtn.style.display = 'block';
+            rewardArea.style.display = 'none';
+            overlay.classList.add('visible');
+            
+            selectedClass = null; // Forces a new selection on next click
         }
 
         function generateRewards() {
@@ -533,20 +648,10 @@
         function showReadyForNext() {
             rewardArea.style.display = 'none';
             overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
-            overlayBtn.innerText = "START NEXT LEVEL / SIRADAKİ SEVİYE";
+            overlayBtn.innerText = "START NEXT LEVEL";
             overlayBtn.style.display = 'block';
             playerHP = Math.min(playerHP + 10, maxPlayerHP);
             level++;
-        }
-
-        function gameOver() {
-            currentState = STATE.GAMEOVER;
-            gridDisplay.classList.remove('locked'); //Oyun bittikten sonra ekran kitlenmesin 
-            overlay.style.display = 'flex';
-            overlayTitle.innerText = "GAME OVER";
-            overlayBtn.innerText = "TRY AGAIN / TEKRAR DENE";
-            overlayBtn.style.display = 'block';
-            rewardArea.style.display = 'none';
         }
 
         function toggleModal() {
@@ -644,7 +749,6 @@
         }
 
         function checkForMatches(isInitial) {
-            // Safety check for end of game
             if (!isInitial && currentState !== STATE.PLAYING) return false;
 
             let matchesFound = false;
@@ -693,7 +797,6 @@
             if (finalGroups.length > 0) {
                 finalGroups.forEach(group => processMatch(group, isInitial));
                 
-                // If Playing, continue physics loop
                 if (currentState === STATE.PLAYING || isInitial) {
                     setTimeout(() => fillBoard(isInitial), 400);
                 }
@@ -711,7 +814,6 @@
             if (group.indices.length === 4) shape = '4';
             if (group.indices.length >= 5) shape = '5';
             
-            // --- LOGGING ---
             if (!isInitial && group.indices.length > 0) {
                 let typeInfo = tileTypes.find(t => t.type === group.type);
                 let icon = typeInfo ? typeInfo.symbol : "?";
@@ -724,7 +826,6 @@
                 log(msg, "log-match");
             }
 
-            // Visual Processing
             let validTiles = 0;
             group.indices.forEach(index => {
                 if (tiles[index].dataset.type !== '') {
@@ -736,7 +837,6 @@
             });
 
             if (validTiles > 0 && !isInitial) {
-                // RULE: Only 4 or 5 grants extra turn. Chain 3s do NOT.
                 if (shape === '4' || shape === '5') {
                     extraTurnTriggered = true;
                     let center = tiles[group.indices[1]];
@@ -818,6 +918,13 @@
         }
 
         function inflictDamage(targetStr, amount) {
+            // Visual Shake for damage
+            if (currentState === STATE.PLAYING) {
+                gridDisplay.classList.remove('shake');
+                void gridDisplay.offsetWidth; // trigger reflow
+                gridDisplay.classList.add('shake');
+            }
+
             if (targetStr === 'player') {
                 if (playerArmor >= amount) playerArmor -= amount; 
                 else {
@@ -875,8 +982,7 @@
         function endTurnLogic() {
             if (currentState !== STATE.PLAYING) return;
             
-            // Post-Mortem Check
-            if (enemyHP <= 0) return;
+            if (enemyHP <= 0 || playerHP <= 0) return;
 
             if (extraTurnTriggered) {
                 log(isPlayerTurn ? ">> EXTRA TURN!" : ">> ENEMY EXTRA TURN!", "log-turn");
@@ -989,24 +1095,12 @@
 
         function useUltimate() {
             if (ultCharge >= 100 && isPlayerTurn && currentState === STATE.PLAYING) {
-                inflictDamage('enemy', TILE_STATS.ult_dmg);
+                selectedClass.ultEffect();
                 ultCharge = 0;
                 log(`ULTIMATE! ${TILE_STATS.ult_dmg} Damage!`, "log-hit");
                 checkWinCondition();
                 updateUI();
             }
-        }
-
-        function checkWinCondition() {
-            if (currentState !== STATE.PLAYING) return;
-
-            if (playerHP <= 0){
-                gameOver();
-            }
-            else if (enemyHP <=0) {
-                winLevel();
-            }
-
         }
 
         function updateUI() {
@@ -1028,7 +1122,6 @@
             document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
 
-            // Fix: Re-enable button if charge is full and it's player turn
             document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
         }
 
@@ -1040,6 +1133,7 @@
         }
 
         createBoard();
+        renderClassButtons();
     </script>
 </body>
 </html>
