@@ -275,30 +275,63 @@
 </head>
 <body>
     <div id="info-modal" class="modal-overlay">
-        <div class="modal-content">
-            <span class="close-modal" onclick="toggleModal()">×</span>
-            <div class="modal-section">
-                <div class="dual-lang">
-                    <div class="lang-col">
-                        <h2 class="modal-title">GAME MANUAL</h2>
-                        <h4>Rules</h4>
-                        <ul>
-                            <li><strong>Match 3:</strong> Standard Move (Passes Turn).</li>
-                            <li><strong>Match 4/5:</strong> Grants an <strong>Extra Turn</strong>.</li>
-                            <li><strong>Chain Reaction:</strong> Only matches of 4+ falling tiles give extra turns. Simple 3-matches do not.</li>
-                        </ul>
-                    </div>
-                </div>
+        <span class="close-modal" onclick="toggleModal()">×</span>
+
+        <div class="modal-section">
+            <h2 class="modal-title">PIXEL DUNGEON ACADEMY</h2>
+            <p>Welcome, Traveler! To survive this dungeon, you must master the grid and your hero's unique soul.</p>
+        </div>
+
+        <div class="modal-section">
+            <h4>🔥 THE BASICS (Nasıl Oynanır?)</h4>
+            <ul>
+                <li><b>Match 3:</b> Drag tiles to align 3 of the same type. This performs an action and ends your turn.</li>
+                <li><b>Match 4 or 5:</b> Rewards you with an <b>EXTRA TURN</b>. Skilled players hunt for these to stay in control.</li>
+                <li><b>Chain Reactions:</b> If falling tiles create a match of 4 or 5, you get another turn!</li>
+            </ul>
+        </div>
+
+        <div class="modal-section">
+            <h4>💎 TILE TYPES (Taş Özellikleri)</h4>
+            <ul>
+                <li>⚔️ <b>Sword:</b> Deals direct damage to the enemy's HP (or Armor).</li>
+                <li>🛡️ <b>Shield:</b> Builds your Armor bar. Armor absorbs damage before your HP drops.</li>
+                <li>💖 <b>Heart:</b> Restores your Health Points (HP).</li>
+                <li>⚡ <b>Energy:</b> Charges your <b>ULTIMATE</b> bar at the bottom.</li>
+                <li>💀 <b>Skull:</b> Dangerous! Deals huge damage to the enemy but usually hurts you too (Recoil).</li>
+            </ul>
+        </div>
+
+
+
+        <div class="modal-section">
+            <h2 class="modal-title">CLASS STRATEGIES (Sınıf Rehberi)</h2>
+            
+            <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                <p><b>🛡️ Warrior:</b> Focus on matching <b>Shields</b>. Since your Ultimate deals more damage the more Armor you have, spend the first half of the fight building a massive defense, then "Slam" them for the finish.</p>
+                
+                <p><b>🪓 Berserker:</b> You are a glass cannon. Don't worry about Armor; just match <b>Swords</b>. Your goal is to kill the enemy before your low defense catches up to you.</p>
+                
+                <p><b>🗡️ Rogue:</b> Watch the board for <b>Matches of 4</b>. Your passive helps you get Ultimates faster. Use your Ult to finish a turn, then use the free extra turn it gives you to start a new combo.</p>
+                
+                <p><b>🏹 Archer:</b> Unlike other classes, you should <b>hunt for Skulls</b>. They are your strongest weapon and they won't hurt you. Keep the enemy's HP low with constant Skull pressure.</p>
+                
+                <p><b>🧙 Mage:</b> Match <b>Energy</b> above all else. Your first few "Arcane Blasts" might feel weak, but by Level 5+, your Ultimate will become an unstoppable one-shot nuke.</p>
             </div>
-            <div class="modal-section" style="border:none;">
-                <h4 style="color:#777">v0.17.0 - Smooth Transitions</h4>
-                <p>Added Death Animations, Screen Shake, and Smooth Menu Fades.</p>
+        </div>
+
+        <div class="modal-section" style="border:none;">
+            <h4 style="color:#777">v0.18.0 - Hero Academy Update</h4>
+            <p>TIP: Check your Combat Log (bottom) to see exactly how much damage you are dealing!</p>
+        </div>
+                <h4 style="color:#777">v0.18.0 - Hero Academy</h4>
+                <p>Added Class Selection, Unique Ultimates, and Class Passives. Fixed death blur bug and Berserker armor scaling.</p>
             </div>
         </div>
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.17.0 Smooth</div>
+        <div class="version">v0.18.0 Hero Academy</div> <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
         <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
     </div>
     
@@ -468,12 +501,18 @@
                 btn.innerHTML = `<span>${c.emoji} <b>${c.name}</b></span><br><small>${c.desc}</small>`;
                 btn.onclick = () => {
                     selectedClass = c;
+                    
+                    // This updates the HUD to show your class name (e.g., 🛡️ WARRIOR)
+                    const playerBox = document.querySelector('.stat-box div:first-child');
+                    playerBox.style.color = 'var(--accent)';
+                    playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
+
                     selectedClass.passive(TILE_STATS); // Apply the unique bonus
                     
-                    // Update UI to show class name and specific Ult name
+                    // Update the Ultimate button text
                     document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
-                    document.querySelector('.stat-box div:first-child').innerText = `${c.emoji} YOU`;
                     
+                    // Clean up the menu
                     container.style.display = 'none';
                     overlayTitle.innerText = `READY, ${c.name.toUpperCase()}?`;
                     overlayBtn.style.display = 'block';
@@ -904,6 +943,10 @@
                 let self = isPlayerTurn ? 'player' : 'enemy';
                 
                 inflictDamage(target, dmgToOpponent);
+                if (isPlayerTurn && selectedClass.name === "Archer") {
+                    recoil = 0; 
+                }
+
                 inflictDamage(self, recoil);
                 log(`SKULLS! ${user} takes ${recoil}, Target takes ${dmgToOpponent}`, 'log-crit');
             }
