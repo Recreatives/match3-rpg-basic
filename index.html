@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Dungeon - Smooth Transition Update</title>
+    <title>Pixel Dungeon - Scrollable & Grid Stats</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -11,8 +11,15 @@
             --accent: #f1c40f;
             --text: #ecf0f1;
             --armor-color: #bdc3c7;
-            --modal-bg: rgba(0, 0, 0, 0.9);
-            --overlay-bg: rgba(0, 0, 0, 0.85);
+            --modal-bg: rgba(0, 0, 0, 0.95);
+            --overlay-bg: rgba(0, 0, 0, 0.9);
+            
+            /* Rarity Colors */
+            --common: #95a5a6;    /* Grey */
+            --uncommon: #2ecc71;  /* Green */
+            --rare: #3498db;      /* Blue */
+            --epic: #9b59b6;      /* Purple */
+            --legendary: #e67e22; /* Orange */
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,16 +29,16 @@
             flex-direction: column;
             align-items: center;
             margin: 0;
-            padding: 10px;
+            padding: 10px 5px 30px 5px; /* Added bottom padding for scroll space */
             user-select: none;
             font-size: 14px; 
             touch-action: manipulation;
-            overflow: hidden; /* Prevent scroll during shakes */
+            /* CHANGED: Allowed scrolling */
+            overflow-y: auto; 
+            min-height: 100vh;
         }
         
         /* --- ANIMATIONS & TRANSITIONS --- */
-        
-        /* 1. Death Animation (Spin & Shrink) */
         .dying {
             animation: deathAnim 1.5s forwards ease-in-out;
             pointer-events: none;
@@ -44,13 +51,6 @@
             100% { transform: scale(0) rotate(720deg); opacity: 0; }
         }
 
-        /* 2. Player Death (Grayscale Fade) */
-        .gray-out {
-            filter: grayscale(100%) blur(2px);
-            transition: filter 2s ease;
-        }
-
-        /* 3. Screen Shake */
         .shake {
             animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
         }
@@ -61,7 +61,6 @@
             40%, 60% { transform: translate3d(4px, 0, 0); }
         }
 
-        /* 4. Smooth Overlay Fade */
         .game-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -73,8 +72,6 @@
             align-items: center;
             text-align: center;
             backdrop-filter: blur(4px);
-            
-            /* Transition Logic */
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.8s ease-in-out;
@@ -91,7 +88,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
         .version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; }
         .help-btn {
@@ -109,8 +106,9 @@
 
         .hud {
             width: 340px; display: flex; justify-content: space-between;
-            margin-bottom: 10px; background: rgba(0,0,0,0.2);
+            margin-bottom: 5px; background: rgba(0,0,0,0.2);
             padding: 10px; border-radius: 8px;
+            box-sizing: border-box;
         }
         .stat-box { text-align: center; width: 100px; }
         .stat-box div:first-child { font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }
@@ -132,6 +130,38 @@
         .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
         .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
 
+        /* --- STATS BAR (UPDATED TO GRID) --- */
+        .stats-bar {
+            width: 340px;
+            display: grid; /* Changed to Grid */
+            grid-template-columns: repeat(4, 1fr); /* Exactly 4 columns */
+            gap: 8px; /* Gap between items */
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #555;
+            box-sizing: border-box;
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #bdc3c7;
+        }
+        .stat-item span:first-child {
+            font-size: 1.2rem; /* Slightly larger icons */
+            margin-bottom: 2px;
+        }
+        .stat-val {
+            font-weight: bold;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
         /* Game Board */
         .grid {
             width: 320px; height: 320px; 
@@ -140,7 +170,8 @@
             border-radius: 8px; border: 4px solid #1a252f;
             overflow: hidden; position: relative;
             touch-action: none;
-            transition: filter 1s ease; /* For Grayscale transition */
+            transition: filter 1s ease;
+            flex-shrink: 0; /* Prevent grid squishing */
         }
         .grid.locked { pointer-events: none; filter: grayscale(0.5); }
 
@@ -180,18 +211,37 @@
         .reward-container { 
             display: flex; 
             flex-direction: column; 
-            gap: 5px; /* Reduced gap */
+            gap: 8px; 
             width: 95%; 
-            max-height: 300px; /* Limits height */
-            overflow-y: auto; /* Adds scroll if needed */
+            max-height: 400px; 
+            overflow-y: auto; 
+            padding-bottom: 20px;
         }
 
-        /* Add this new rule below it to make buttons smaller */
         .reward-btn {
-            padding: 6px 10px; /* Slimmer buttons */
-            font-size: 0.85rem;
+            padding: 12px 15px;
+            font-size: 0.95rem;
+            background: rgba(30, 30, 30, 0.9);
+            border-style: solid;
+            border-width: 2px;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        .reward-btn b { color: var(--accent); font-size: 1rem; }
+        .reward-btn:hover { transform: translateX(5px); filter: brightness(1.2); }
+        .reward-btn b { font-size: 1.1rem; display: block; margin-bottom: 3px; }
+        .reward-btn small { color: #ecf0f1; display: block; line-height: 1.3; opacity: 0.9; }
+        
+        .rarity-common { border-color: var(--common); color: #fff; }
+        .rarity-uncommon { border-color: var(--uncommon); background: rgba(46, 204, 113, 0.15); }
+        .rarity-rare { border-color: var(--rare); background: rgba(52, 152, 219, 0.15); }
+        .rarity-epic { border-color: var(--epic); background: rgba(155, 89, 182, 0.15); }
+        .rarity-legendary { border-color: var(--legendary); background: rgba(230, 126, 34, 0.25); box-shadow: 0 0 15px rgba(230, 126, 34, 0.3); }
 
         /* Enemy Cursor */
         .ai-cursor {
@@ -229,10 +279,12 @@
 
         /* Log */
         #log {
-            width: 340px; height: 120px; background: rgba(0,0,0,0.4);
+            width: 340px; height: 100px; 
+            background: rgba(0,0,0,0.4);
             margin-top: 10px; padding: 8px; font-size: 0.85rem;
             overflow-y: auto; border-radius: 6px; font-family: 'Consolas', monospace;
             display: flex; flex-direction: column-reverse; border: 1px solid #555;
+            flex-shrink: 0;
         }
         .log-hit { color: #f1c40f; }
         .log-crit { color: #ff6b6b; font-weight: bold; }
@@ -246,6 +298,8 @@
             margin-top: 10px; padding: 12px 25px; background: var(--accent);
             border: none; cursor: pointer; font-weight: bold; border-radius: 6px;
             font-size: 1rem; color: #2c3e50; width: 340px;
+            flex-shrink: 0;
+            margin-bottom: 20px;
         }
         .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
@@ -267,7 +321,6 @@
         }
         .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
         .modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; }
-        .dual-lang { display: flex; flex-direction: column; gap: 20px; }
         h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
         ul { padding-left: 20px; margin-top: 5px; }
         li { margin-bottom: 5px; }
@@ -275,64 +328,48 @@
 </head>
 <body>
     <div id="info-modal" class="modal-overlay">
-        <span class="close-modal" onclick="toggleModal()">×</span>
+        <div class="modal-content">
+            <span class="close-modal" onclick="toggleModal()">×</span>
 
-        <div class="modal-section">
-            <h2 class="modal-title">PIXEL DUNGEON ACADEMY</h2>
-            <p>Welcome, Traveler! To survive this dungeon, you must master the grid and your hero's unique soul.</p>
-        </div>
-
-        <div class="modal-section">
-            <h4>🔥 THE BASICS (Nasıl Oynanır?)</h4>
-            <ul>
-                <li><b>Match 3:</b> Drag tiles to align 3 of the same type. This performs an action and ends your turn.</li>
-                <li><b>Match 4 or 5:</b> Rewards you with an <b>EXTRA TURN</b>. Skilled players hunt for these to stay in control.</li>
-                <li><b>Chain Reactions:</b> If falling tiles create a match of 4 or 5, you get another turn!</li>
-            </ul>
-        </div>
-
-        <div class="modal-section">
-            <h4>💎 TILE TYPES (Taş Özellikleri)</h4>
-            <ul>
-                <li>⚔️ <b>Sword:</b> Deals direct damage to the enemy's HP (or Armor).</li>
-                <li>🛡️ <b>Shield:</b> Builds your Armor bar. Armor absorbs damage before your HP drops.</li>
-                <li>💖 <b>Heart:</b> Restores your Health Points (HP).</li>
-                <li>⚡ <b>Energy:</b> Charges your <b>ULTIMATE</b> bar at the bottom.</li>
-                <li>💀 <b>Skull:</b> Dangerous! Deals huge damage to the enemy but usually hurts you too (Recoil).</li>
-            </ul>
-        </div>
-
-
-
-        <div class="modal-section">
-            <h2 class="modal-title">CLASS STRATEGIES (Sınıf Rehberi)</h2>
-            
-            <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
-                <p><b>🛡️ Warrior:</b> Focus on matching <b>Shields</b>. Since your Ultimate deals more damage the more Armor you have, spend the first half of the fight building a massive defense, then "Slam" them for the finish.</p>
-                
-                <p><b>🪓 Berserker:</b> You are a glass cannon. Don't worry about Armor; just match <b>Swords</b>. Your goal is to kill the enemy before your low defense catches up to you.</p>
-                
-                <p><b>🗡️ Rogue:</b> Watch the board for <b>Matches of 4</b>. Your passive helps you get Ultimates faster. Use your Ult to finish a turn, then use the free extra turn it gives you to start a new combo.</p>
-                
-                <p><b>🏹 Archer:</b> Unlike other classes, you should <b>hunt for Skulls</b>. They are your strongest weapon and they won't hurt you. Keep the enemy's HP low with constant Skull pressure.</p>
-                
-                <p><b>🧙 Mage:</b> Match <b>Energy</b> above all else. Your first few "Arcane Blasts" might feel weak, but by Level 5+, your Ultimate will become an unstoppable one-shot nuke.</p>
+            <div class="modal-section">
+                <h2 class="modal-title">PIXEL DUNGEON MANUAL</h2>
+                <p>Welcome, Traveler! Master the grid and use your class abilities to survive.</p>
             </div>
-        </div>
 
-        <div class="modal-section" style="border:none;">
-            <h4 style="color:#777">v0.18.0 - Hero Academy Update</h4>
-            <p>TIP: Check your Combat Log (bottom) to see exactly how much damage you are dealing!</p>
-        </div>
-                <h4 style="color:#777">v0.18.0 - Hero Academy</h4>
-                <p>Added Class Selection, Unique Ultimates, and Class Passives. Fixed death blur bug and Berserker armor scaling.</p>
+            <div class="modal-section">
+                <h4>🧠 ENEMY AI</h4>
+                <ul>
+                    <li><b>Minions (Normal Levels):</b> Clumsy. 30% chance to make mistakes.</li>
+                    <li><b>Bosses (Every 5th Level):</b> Masterminds. They plan ahead and use 4-match combos.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h2 class="modal-title">CLASS GUIDE</h2>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                    <p><b>🛡️ Warrior (Tank)</b><br>
+                    Strategy: Build Armor with Shields, then use Ult to deal damage equal to your Armor.</p>
+                    
+                    <p><b>🪓 Berserker (DPS)</b><br>
+                    Strategy: High Sword & Skull damage, but takes 35% extra damage. Kill fast.</p>
+                    
+                    <p><b>🏹 Archer (Evasion)</b><br>
+                    Strategy: 30% Dodge chance. Ult hits 3 times for consistent damage.</p>
+                    
+                    <p><b>🗡️ Rogue (Combo)</b><br>
+                    Strategy: High Energy gain. Ult grants an Extra Turn.</p>
+                    
+                    <p><b>🧙 Mage (Scaler)</b><br>
+                    Strategy: Weak start. Ult gets +10 damage permanently every use.</p>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.18.0 Hero Academy</div> <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
-        <button class="help-btn" onclick="toggleModal()">Help / Yardım</button>
+        <div class="version">v0.24 Grid Stats & Scroll</div> 
+        <button class="help-btn" onclick="toggleModal()">Help / Manual</button>
     </div>
     
     <div class="enemy-display" id="enemy-sprite">👾</div>
@@ -359,6 +396,18 @@
             <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
             <span id="enemy-hp-text" class="hp-text">50/50</span>
         </div>
+    </div>
+
+    <div class="stats-bar">
+        <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
+        <div class="stat-item" title="Shield Gain"><span>🛡️</span><span id="stat-shield" class="stat-val">5</span></div>
+        <div class="stat-item" title="Heal Amount"><span>💖</span><span id="stat-heart" class="stat-val">4</span></div>
+        <div class="stat-item" title="Energy Gain"><span>⚡</span><span id="stat-energy" class="stat-val">12</span></div>
+        
+        <div class="stat-item" title="Skull Damage"><span>💀</span><span id="stat-skull" class="stat-val">25</span></div>
+        <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self" class="stat-val">12</span></div>
+        <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
+        <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
     </div>
 
     <div class="grid" id="grid">
@@ -394,17 +443,20 @@
         // --- STATS ---
         let TILE_STATS = {
             sword: 6, heart: 4, shield: 5, energy: 12,
-            skull_dmg: 25, skull_self: 8, ult_dmg: 35
+            skull_dmg: 25, skull_self: 12, ult_dmg: 35, lifeSteal: 0
         };
 
         const STATE = { START: 0, PLAYING: 1, REWARD: 2, GAMEOVER: 3 };
         let currentState = STATE.START;
+        let rewardPicksLeft = 1;
 
         // --- CLASS DEFINITIONS ---
         const CLASSES = {
             WARRIOR: {
-                name: "Warrior", emoji: "🛡️", desc: "High Armor & Shield efficiency.",
+                name: "Warrior", emoji: "🛡️", 
+                desc: "<b>Tank:</b> Gains +2 Bonus Shield. Ult deals damage based on Armor.",
                 passive: (stats) => { stats.shield += 2; },
+                dodgeChance: 0, incomingDmgMult: 1.0,
                 ultName: "SHIELD SLAM",
                 ultEffect: () => {
                     let dmg = TILE_STATS.ult_dmg + playerArmor; 
@@ -413,11 +465,10 @@
                 }
             },
             BERSERKER: {
-                name: "Berserker", emoji: "🪓", desc: "Huge dmg. Gains 50% less Armor.",
-                passive: (stats) => { 
-                    stats.sword += 4; 
-                    stats.shield = Math.floor(stats.shield * 0.5); // Cuts shield efficiency in half
-                },
+                name: "Berserker", emoji: "🪓", 
+                desc: "<b>DPS:</b> +5 Sword/ +15 Skull Dmg, but takes <b>35% MORE DAMAGE</b>.",
+                passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
+                dodgeChance: 0, incomingDmgMult: 1.35,
                 ultName: "BLOOD LUST",
                 ultEffect: () => {
                     playerHP -= 10;
@@ -426,18 +477,22 @@
                 }
             },
             ROGUE: {
-                name: "Rogue", emoji: "🗡️", desc: "Easier extra turns & energy.",
+                name: "Rogue", emoji: "🗡️", 
+                desc: "<b>Combo:</b> Gains Energy fast. Ult grants an <b>EXTRA TURN</b>.",
                 passive: (stats) => { stats.energy += 5; },
+                dodgeChance: 0.1, incomingDmgMult: 1.0,
                 ultName: "ASSASSINATE",
                 ultEffect: () => {
                     inflictDamage('enemy', TILE_STATS.ult_dmg);
                     extraTurnTriggered = true;
-                    log(`ULT: Assassinate! Extra Turn granted!`, "log-match");
+                    log(`ULT: Assassinate! Extra Turn!`, "log-match");
                 }
             },
             ARCHER: {
-                name: "Archer", emoji: "🏹", desc: "High Skull dmg, no self-harm.",
-                passive: (stats) => { stats.skull_dmg += 10; stats.skull_self = 0; },
+                name: "Archer", emoji: "🏹", 
+                desc: "<b>Evasion:</b> <b>30% Dodge Chance</b>. Best survivor.",
+                passive: (stats) => {},
+                dodgeChance: 0.3, incomingDmgMult: 1.0,
                 ultName: "VOLLEY",
                 ultEffect: () => {
                     inflictDamage('enemy', 15);
@@ -447,20 +502,19 @@
                 }
             },
             MAGE: {
-                name: "Mage", emoji: "🧙", desc: "Infinite Ultimate scaling.",
+                name: "Mage", emoji: "🧙", 
+                desc: "<b>Scaling:</b> Ult gains <b>+10 Power</b> every use.",
                 passive: (stats) => { stats.energy += 10; stats.sword -= 2; },
+                dodgeChance: 0, incomingDmgMult: 1.0,
                 ultName: "ARCANE BLAST",
                 ultEffect: () => {
                     inflictDamage('enemy', TILE_STATS.ult_dmg);
                     TILE_STATS.ult_dmg += 10;
-                    log(`ULT: Arcane Blast! Power increased!`, "log-match");
+                    log(`ULT: Power increased to ${TILE_STATS.ult_dmg}!`, "log-match");
                 }
             }
         };
-        let selectedClass = null; // This will hold our choice+
-
-
-
+        let selectedClass = null; 
 
         let playerHP = 100, maxPlayerHP = 100, playerArmor = 0, ultCharge = 0;
         let level = 1, enemyHP = 50, maxEnemyHP = 50, enemyArmor = 0;
@@ -469,7 +523,6 @@
         let isProcessing = false;
         let isPlayerTurn = true;
         let extraTurnTriggered = false;
-        
         let isMouseDown = false;
         let selectedTile = null;
 
@@ -481,38 +534,27 @@
             { type: 'skull', symbol: '💀' }
         ];
 
-        // --- INPUT LISTENERS ---
-        document.body.addEventListener('mouseup', () => { isMouseDown = false; });
-        document.body.addEventListener('mouseleave', () => { isMouseDown = false; });
-        document.body.addEventListener('touchend', () => { isMouseDown = false; });
-
         // --- GAME FLOW ---
         
         function renderClassButtons() {
             const container = document.getElementById('class-selection');
             container.innerHTML = '';
             container.style.display = 'flex';
-            overlayBtn.style.display = 'none'; // Hide start button until class is picked
+            overlayBtn.style.display = 'none';
 
             Object.keys(CLASSES).forEach(key => {
                 const c = CLASSES[key];
                 const btn = document.createElement('button');
-                btn.className = 'reward-btn';
-                btn.innerHTML = `<span>${c.emoji} <b>${c.name}</b></span><br><small>${c.desc}</small>`;
+                btn.className = 'reward-btn rarity-rare';
+                btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${c.desc}</small>`;
                 btn.onclick = () => {
                     selectedClass = c;
-                    
-                    // This updates the HUD to show your class name (e.g., 🛡️ WARRIOR)
                     const playerBox = document.querySelector('.stat-box div:first-child');
                     playerBox.style.color = 'var(--accent)';
                     playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
-
-                    selectedClass.passive(TILE_STATS); // Apply the unique bonus
-                    
-                    // Update the Ultimate button text
+                    selectedClass.passive(TILE_STATS); 
                     document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
-                    
-                    // Clean up the menu
+                    updateUI();
                     container.style.display = 'none';
                     overlayTitle.innerText = `READY, ${c.name.toUpperCase()}?`;
                     overlayBtn.style.display = 'block';
@@ -522,7 +564,6 @@
         }
 
         function handleOverlayClick() {
-            // Only show class selection if game hasn't started or player just died
             if (currentState === STATE.START || currentState === STATE.GAMEOVER) {
                 if (!selectedClass) {
                     renderClassButtons();
@@ -531,54 +572,41 @@
                 }
                 resetGame();
                 startLevel();
-            } else if (currentState === STATE.REWARD) {
-                // Keeps the same class for the next level
-                startLevel();
             }
         }
 
         function resetGame() {
             playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
             level = 1; logCounter = 1;
-            
-            // Reset base stats first
-            TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self: 8, ult_dmg: 35 };
-            
-            // Re-apply the selected class passive now that stats are fresh
-            if (selectedClass) {
-                selectedClass.passive(TILE_STATS);
-            }
-            
+            TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self: 12, ult_dmg: 35, lifeSteal: 0 };
+            if (selectedClass) selectedClass.passive(TILE_STATS);
             isProcessing = false;
             extraTurnTriggered = false;
             gridDisplay.classList.remove('shake');
             enemySprite.classList.remove('dying');
-            
             log("Game Reset.", "log-turn");
         }
 
         function startLevel() {
             currentState = STATE.PLAYING;
-            
-            // Fade out overlay
             overlay.classList.remove('visible');
             rewardArea.style.display = 'none';
-            
-            // Reset grid locks
             gridDisplay.classList.remove('locked');
 
-            // Reset Enemy Visuals
             enemySprite.classList.remove('dying');
             enemySprite.classList.add('enemy-display');
 
-            // Setup Enemy Stats
             maxEnemyHP = 50 + ((level - 1) * 20);
             enemyHP = maxEnemyHP;
             enemyArmor = 0;
             
-            document.getElementById('enemy-name').innerText = `Enemy Lvl ${level}`;
-            document.getElementById('enemy-sprite').innerText = ['👾','👹','👺','👻','🤖'][level % 5];
+            let isBoss = (level % 5 === 0);
+            let name = isBoss ? `BOSS Lvl ${level}` : `Minion Lvl ${level}`;
+            document.getElementById('enemy-name').innerText = name;
+            document.getElementById('enemy-sprite').innerText = isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4];
             
+            if(isBoss) log("WARNING: BOSS BATTLE!", "log-crit");
+
             turnBanner.innerText = "PLAYER TURN";
             turnBanner.className = "turn-indicator turn-player";
             isPlayerTurn = true;
@@ -589,47 +617,24 @@
             log(`LEVEL ${level} START`, "log-turn");
         }
 
-        // --- TRANSITION SEQUENCES ---
-
         function checkWinCondition() {
             if (currentState !== STATE.PLAYING) return;
-
-            if (playerHP <= 0) {
-                triggerDeathSequence('player');
-            }
-            else if (enemyHP <= 0) {
-                triggerDeathSequence('enemy');
-            }
+            if (playerHP <= 0) triggerDeathSequence('player');
+            else if (enemyHP <= 0) triggerDeathSequence('enemy');
         }
 
         function triggerDeathSequence(who) {
-            currentState = STATE.GAMEOVER; // Block input
+            currentState = STATE.GAMEOVER;
             isProcessing = true; 
-
             if (who === 'enemy') {
-                // Enemy dies
-                enemySprite.classList.remove('enemy-display'); // Stop floating
-                enemySprite.classList.add('dying'); // Start spin/shrink
-                
+                enemySprite.classList.remove('enemy-display'); 
+                enemySprite.classList.add('dying'); 
                 log("ENEMY DEFEATED!", "log-crit");
-                gridDisplay.classList.add('shake'); // Shake screen
-                setTimeout(() => gridDisplay.classList.remove('shake'), 500);
-
-                // Wait for animation
-                setTimeout(() => {
-                    winLevel();
-                }, 1500);
-
+                gridDisplay.classList.add('shake'); 
+                setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
             } else {
-                // Player dies
                 gridDisplay.classList.add('shake');
-                setTimeout(() => gridDisplay.classList.remove('shake'), 500);
-                
-                log("YOU DIED...", "log-enemy");
-
-                setTimeout(() => {
-                    gameOver();
-                }, 1500);
+                setTimeout(() => { gridDisplay.classList.remove('shake'); gameOver(); }, 1500);
             }
         }
 
@@ -637,15 +642,127 @@
             if (currentState === STATE.REWARD) return; 
             currentState = STATE.REWARD;
 
-            log("Level Complete! Choose a reward.", "log-hit");
+            // Calculate Reward Picks
+            let hpPercent = (playerHP / maxPlayerHP);
+            if (hpPercent >= 1.0) { rewardPicksLeft = 2; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); }
+            else if (hpPercent < 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
+            else if (hpPercent < 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
+            else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
             
             generateRewards();
-            overlayTitle.innerText = "VICTORY!";
+            updateRewardTitle();
             overlayBtn.style.display = 'none';
             rewardArea.style.display = 'flex';
-            
-            // Fade In Overlay
             overlay.classList.add('visible');
+        }
+
+        function updateRewardTitle() {
+            if (rewardPicksLeft > 0) {
+                overlayTitle.innerText = `VICTORY! PICK ${rewardPicksLeft}`;
+            } else {
+                overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
+                rewardArea.style.display = 'none';
+                overlayBtn.innerText = "START NEXT LEVEL";
+                overlayBtn.style.display = 'block';
+                overlayBtn.onclick = () => {
+                    playerHP = Math.min(playerHP + 10, maxPlayerHP);
+                    level++;
+                    startLevel();
+                };
+            }
+        }
+
+        function generateRewards() {
+            rewardArea.innerHTML = '';
+            
+            const REWARDS = [
+                // === COMMON (40%) - 1 Stat ===
+                { tier: 'common', name: 'Whetstone', desc: 'Sword +1', fn: () => TILE_STATS.sword += 1 },
+                { tier: 'common', name: 'Leather Patch', desc: 'Shield +1', fn: () => TILE_STATS.shield += 1 },
+                { tier: 'common', name: 'Herb Mix', desc: 'Heal +1', fn: () => TILE_STATS.heart += 1 },
+                { tier: 'common', name: 'Meditation', desc: 'Energy +1', fn: () => TILE_STATS.energy += 1 },
+                { tier: 'common', name: 'Bone Shard', desc: 'Skull +6/ Self +3', fn: () => { TILE_STATS.skull_dmg += 6; TILE_STATS.skull_self += 3; } },
+                { tier: 'common', name: 'Minor Charge', desc: 'Ult Dmg +10', fn: () => TILE_STATS.ult_dmg += 10 },
+                { tier: 'common', name: 'Leech Seed', desc: 'Life Steal +1%', fn: () => TILE_STATS.lifeSteal += 1 },
+                
+                // === UNCOMMON (30%) - 1 Stat (Stronger) ===
+                { tier: 'uncommon', name: 'Steel Sword', desc: 'Sword +2', fn: () => TILE_STATS.sword += 2 },
+                { tier: 'uncommon', name: 'Iron Plate', desc: 'Shield +2', fn: () => TILE_STATS.shield += 2 },
+                { tier: 'uncommon', name: 'Potion', desc: 'Heal +2', fn: () => TILE_STATS.heart += 2 },
+                { tier: 'uncommon', name: 'Focus', desc: 'Energy +2', fn: () => TILE_STATS.energy += 2 },
+                { tier: 'uncommon', name: 'Skull Idol', desc: 'Skull +10/ Self +5', fn: () => { TILE_STATS.skull_dmg += 10; TILE_STATS.skull_self += 5; } },
+                { tier: 'uncommon', name: 'Mana Crystal', desc: 'Ult Dmg +20', fn: () => TILE_STATS.ult_dmg += 20 },
+                { tier: 'uncommon', name: 'Bat Wing', desc: 'Life Steal +2%', fn: () => TILE_STATS.lifeSteal += 2 },
+
+                // === RARE (15%) - 1 Stat (Big) ===
+                { tier: 'rare', name: 'Diamond Blade', desc: 'Sword +3', fn: () => TILE_STATS.sword += 3 },
+                { tier: 'rare', name: 'Tower Shield', desc: 'Shield +3', fn: () => TILE_STATS.shield += 3 },
+                { tier: 'rare', name: 'Elixir', desc: 'Heal +3', fn: () => TILE_STATS.heart += 3 },
+                { tier: 'rare', name: 'Deep Focus', desc: 'Energy +3', fn: () => TILE_STATS.energy += 3 },
+                { tier: 'rare', name: 'Cursed Skull', desc: 'Skull +14/ Self +7', fn: () => { TILE_STATS.skull_dmg += 14; TILE_STATS.skull_self += 7; } },
+                { tier: 'rare', name: 'Spell Book', desc: 'Ult Dmg +35', fn: () => TILE_STATS.ult_dmg += 35 },
+                { tier: 'rare', name: 'Vampire Tooth', desc: 'Life Steal +3%', fn: () => TILE_STATS.lifeSteal += 3 },
+
+                // === EPIC (10%) - 2 Stats (Enriched Pool) ===
+                { tier: 'epic', name: 'Paladin Set', desc: 'Sword +3 & Shield +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; } },
+                { tier: 'epic', name: 'Blood Mage', desc: 'Ult +30 & Steal +3%', fn: () => { TILE_STATS.ult_dmg += 30; TILE_STATS.lifeSteal += 3; } },
+                { tier: 'epic', name: 'Berserker Soul', desc: 'Skull +20(Self+10) & Sword +4', fn: () => { TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self += 10; TILE_STATS.sword += 4; } },
+                { tier: 'epic', name: 'Monk Vow', desc: 'Heal +4 & Energy +4', fn: () => { TILE_STATS.heart += 4; TILE_STATS.energy += 4; } },
+                { tier: 'epic', name: 'Stone Skin', desc: 'Shield +4 & HP +30', fn: () => { TILE_STATS.shield += 4; maxPlayerHP += 30; playerHP += 30; } },
+                { tier: 'epic', name: 'Crimson Edge', desc: 'Sword +4 & Steal +3%', fn: () => { TILE_STATS.sword += 4; TILE_STATS.lifeSteal += 3; } },
+                { tier: 'epic', name: 'Storm Caller', desc: 'Energy +4 & Ult +25', fn: () => { TILE_STATS.energy += 4; TILE_STATS.ult_dmg += 25; } },
+                { tier: 'epic', name: 'Iron Heart', desc: 'Shield +4 & Heal +4', fn: () => { TILE_STATS.shield += 4; TILE_STATS.heart += 4; } },
+                { tier: 'epic', name: 'Necromancer', desc: 'Skull +24(Self+12) & Steal +3%', fn: () => { TILE_STATS.skull_dmg += 24; TILE_STATS.skull_self += 12; TILE_STATS.lifeSteal += 3; } },
+                { tier: 'epic', name: 'Gladiator', desc: 'Sword +4 & Energy +3', fn: () => { TILE_STATS.sword += 4; TILE_STATS.energy += 3; } },
+                { tier: 'epic', name: 'Giant Strength', desc: 'Max HP +40 & Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.sword += 3; } },
+
+                // === LEGENDARY (5%) - 3 Stats ===
+                { tier: 'legendary', name: 'God Slayer', desc: 'Sword +5, Ult +40, Energy +3', fn: () => { TILE_STATS.sword += 5; TILE_STATS.ult_dmg += 40; TILE_STATS.energy += 3; } },
+                { tier: 'legendary', name: 'Immortality', desc: 'Shield +5, Heal +5, Max HP +50', fn: () => { TILE_STATS.shield += 5; TILE_STATS.heart += 5; maxPlayerHP+=50; playerHP+=50; } },
+                { tier: 'legendary', name: 'Demon Lord', desc: 'Skull +30(Self+15), Steal +5%, Sword +4', fn: () => { TILE_STATS.skull_dmg += 30; TILE_STATS.skull_self += 15; TILE_STATS.lifeSteal += 5; TILE_STATS.sword += 4; } },
+                { tier: 'legendary', name: 'Archmage', desc: 'Energy +5, Ult +30, Shield +4', fn: () => { TILE_STATS.energy += 5; TILE_STATS.ult_dmg += 30; TILE_STATS.shield += 4; } },
+                { tier: 'legendary', name: 'Trinity', desc: 'Sword +3, Shield +3, Heal +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
+                { tier: 'legendary', name: 'Titan Blood', desc: 'Max HP +40, Heal +4, Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
+                { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull +20(Self+10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self += 10; TILE_STATS.energy += 3; } },
+                { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
+            ];
+
+            for (let i = 0; i < 3; i++) {
+                let rand = Math.random();
+                let chosenTier = 'common';
+                
+                if (rand < 0.05) chosenTier = 'legendary';
+                else if (rand < 0.15) chosenTier = 'epic';
+                else if (rand < 0.30) chosenTier = 'rare';
+                else if (rand < 0.60) chosenTier = 'uncommon';
+
+                let pool = REWARDS.filter(r => r.tier === chosenTier);
+                // Fallback if pool is empty (shouldn't happen)
+                if(pool.length === 0) pool = REWARDS.filter(r => r.tier === 'common');
+                
+                let reward = pool[Math.floor(Math.random() * pool.length)];
+
+                let btn = document.createElement('button');
+                btn.className = `reward-btn rarity-${reward.tier}`;
+                // Rarity name in parenthesis for clarity
+                btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
+                btn.onclick = () => {
+                    reward.fn();
+                    log(`Picked: ${reward.name}`, "log-heal");
+                    rewardPicksLeft--;
+                    
+                    updateUI();
+                    
+                    if (rewardPicksLeft > 0) {
+                        generateRewards(); 
+                        updateRewardTitle();
+                    } else {
+                        btn.style.display = 'none'; 
+                        updateRewardTitle();
+                    }
+                };
+                rewardArea.appendChild(btn);
+            }
         }
 
         function gameOver() {
@@ -653,52 +770,13 @@
             overlayTitle.innerText = "GAME OVER";
             overlayBtn.innerText = "TRY AGAIN";
             overlayBtn.style.display = 'block';
+            overlayBtn.onclick = handleOverlayClick;
             rewardArea.style.display = 'none';
             overlay.classList.add('visible');
-            
-            selectedClass = null; // Forces a new selection on next click
+            selectedClass = null; 
         }
 
-        function generateRewards() {
-            rewardArea.innerHTML = '';
-            const pool = [
-                { id: 'sword', en: "Sharpen Swords (+1 Dmg)", tr: "Kılıçları Bile (+1 Hasar)", fn: () => TILE_STATS.sword += 1 },
-                { id: 'shield', en: "Reinforce Shields (+1 Armor)", tr: "Kalkanları Güçlendir (+1 Zırh)", fn: () => TILE_STATS.shield += 1 },
-                { id: 'heart', en: "Potent Potions (+1 Heal)", tr: "Güçlü İksirler (+1 Can)", fn: () => TILE_STATS.heart += 1 },
-                { id: 'hp', en: "Vitality (+20 Max HP)", tr: "Canlılık (+20 Max Can)", fn: () => { maxPlayerHP += 20; playerHP += 20; } },
-                { id: 'energy', en: "Focus (+2 Ult Charge)", tr: "Odaklanma (+2 Şarj)", fn: () => TILE_STATS.energy += 2 },
-                { id: 'ult', en: "Ult Power (+10 Dmg)", tr: "Ulti Gücü (+10 Hasar)", fn: () => TILE_STATS.ult_dmg += 10 }
-            ];
-            pool.sort(() => 0.5 - Math.random());
-            const choices = pool.slice(0, 3);
-            choices.forEach(reward => {
-                let btn = document.createElement('button');
-                btn.className = 'reward-btn';
-                btn.innerHTML = `<b>${reward.en}</b><br><small>${reward.tr}</small>`;
-                btn.onclick = () => {
-                    reward.fn();
-                    log(`Upgraded: ${reward.en}`, "log-heal");
-                    showReadyForNext();
-                };
-                rewardArea.appendChild(btn);
-            });
-        }
-
-        function showReadyForNext() {
-            rewardArea.style.display = 'none';
-            overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
-            overlayBtn.innerText = "START NEXT LEVEL";
-            overlayBtn.style.display = 'block';
-            playerHP = Math.min(playerHP + 10, maxPlayerHP);
-            level++;
-        }
-
-        function toggleModal() {
-            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-        }
-
-        // --- GRID LOGIC ---
-
+        // --- GAME LOGIC ---
         function createBoard() {
             gridDisplay.innerHTML = ''; 
             gridDisplay.appendChild(aiCursor); 
@@ -715,12 +793,12 @@
                 tiles.push(tile);
                 
                 tile.addEventListener('mousedown', (e) => { e.preventDefault(); handleInputStart(tile); });
-                tile.addEventListener('mouseenter', (e) => { e.preventDefault(); handleInputEnter(tile); });
                 tile.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart(tile); }, {passive: false});
+                tile.addEventListener('mouseenter', (e) => { e.preventDefault(); handleInputEnter(tile); });
                 tile.addEventListener('touchmove', (e) => { 
                     e.preventDefault(); 
-                    let touch = e.touches[0];
-                    let target = document.elementFromPoint(touch.clientX, touch.clientY);
+                    let t = e.touches[0];
+                    let target = document.elementFromPoint(t.clientX, t.clientY);
                     if (target && target.classList.contains('tile')) handleInputEnter(target);
                 }, {passive: false});
             }
@@ -730,7 +808,6 @@
 
         function handleInputStart(tile) {
             if (currentState !== STATE.PLAYING || isProcessing || !isPlayerTurn) return;
-            
             isMouseDown = true;
             if (!selectedTile) {
                 selectedTile = tile;
@@ -770,9 +847,7 @@
             tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
             tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
 
-            // This is a manual move, we check logic
             let hasMatch = checkForMatches(false); 
-            
             if (!hasMatch) {
                 setTimeout(() => {
                     let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
@@ -789,10 +864,8 @@
 
         function checkForMatches(isInitial) {
             if (!isInitial && currentState !== STATE.PLAYING) return false;
-
             let matchesFound = false;
-            let hRuns = [];
-            let vRuns = [];
+            let hRuns = [], vRuns = [];
 
             // Horizontal
             for (let r = 0; r < width; r++) {
@@ -832,10 +905,8 @@
             }
 
             let finalGroups = [...hRuns, ...vRuns];
-            
             if (finalGroups.length > 0) {
                 finalGroups.forEach(group => processMatch(group, isInitial));
-                
                 if (currentState === STATE.PLAYING || isInitial) {
                     setTimeout(() => fillBoard(isInitial), 400);
                 }
@@ -848,7 +919,6 @@
 
         function processMatch(group, isInitial) {
             if (currentState !== STATE.PLAYING && !isInitial) return;
-
             let shape = '3';
             if (group.indices.length === 4) shape = '4';
             if (group.indices.length >= 5) shape = '5';
@@ -858,10 +928,8 @@
                 let icon = typeInfo ? typeInfo.symbol : "?";
                 let user = isPlayerTurn ? "Player" : "Enemy";
                 let msg = `${user} matched ${group.indices.length} ${icon}`;
-                
-                if (shape === '4') msg += " (2x Bonus!)";
-                if (shape === '5') msg += " (3x Bonus!)";
-                
+                if (shape === '4') msg += " (2x!)";
+                if (shape === '5') msg += " (3x!)";
                 log(msg, "log-match");
             }
 
@@ -901,7 +969,6 @@
 
         function applyRPGEffects(type, shape) {
             if (currentState !== STATE.PLAYING) return;
-
             let multiplier = 1;
             if (shape === '4') multiplier = 2;
             if (shape === '5') multiplier = 3;
@@ -912,59 +979,71 @@
             if (type === 'sword') {
                 let baseVal = TILE_STATS.sword * multiplier;
                 inflictDamage(target, baseVal);
-                log(`${user} attacks for ${baseVal} dmg`, isPlayerTurn ? 'log-hit' : 'log-enemy');
-            
+                log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
             } else if (type === 'heart') {
                 let baseVal = TILE_STATS.heart * multiplier;
                 if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
                 else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
-                log(`${user} heals +${baseVal} HP`, 'log-heal');
-            
+                log(`${user} Heal +${baseVal}`, 'log-heal');
             } else if (type === 'shield') {
                 let baseVal = TILE_STATS.shield * multiplier;
                 if (isPlayerTurn) playerArmor += baseVal;
                 else enemyArmor += baseVal;
-                log(`${user} gains +${baseVal} Armor`, 'log-armor');
-            
+                log(`${user} Armor +${baseVal}`, 'log-armor');
             } else if (type === 'energy') {
                 let baseVal = TILE_STATS.energy * multiplier;
                 if (isPlayerTurn) {
                     ultCharge = Math.min(ultCharge + baseVal, 100);
-                    log(`Ult Charge: +${baseVal}%`, 'log-hit');
+                    log(`Ult +${baseVal}%`, 'log-hit');
                 } else {
                     let absorb = Math.floor(baseVal / 2);
                     enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
-                    log(`Enemy absorbs ${absorb} HP`, "log-enemy");
+                    log(`Enemy Absorbs ${absorb}`, "log-enemy");
                 }
-            
             } else if (type === 'skull') {
                 let dmgToOpponent = TILE_STATS.skull_dmg * (shape === '3' ? 1 : 1.5);
                 let recoil = TILE_STATS.skull_self * (shape === '3' ? 1 : 1.5);
                 let self = isPlayerTurn ? 'player' : 'enemy';
-                
                 inflictDamage(target, dmgToOpponent);
-                if (isPlayerTurn && selectedClass.name === "Archer") {
-                    recoil = 0; 
-                }
-
                 inflictDamage(self, recoil);
-                log(`SKULLS! ${user} takes ${recoil}, Target takes ${dmgToOpponent}`, 'log-crit');
+                log(`Skull Dmg: ${dmgToOpponent} / Recoil: ${recoil}`, 'log-crit');
             }
 
             if (shape === '5' && isPlayerTurn) {
                 ultCharge = 100;
                 log("LEGENDARY! ULT READY!", "log-hit");
             }
-
             checkWinCondition();
             updateUI();
         }
 
         function inflictDamage(targetStr, amount) {
-            // Visual Shake for damage
+            // Dodge
+            if (targetStr === 'player' && selectedClass && selectedClass.dodgeChance > 0) {
+                if (Math.random() < selectedClass.dodgeChance) {
+                    showFloatingText("DODGE!", document.getElementById('player-hp-bar'), "#2ecc71");
+                    log("DODGED!", "log-heal");
+                    return; 
+                }
+            }
+            // Vulnerability
+            if (targetStr === 'player' && selectedClass && selectedClass.incomingDmgMult) {
+                amount = Math.floor(amount * selectedClass.incomingDmgMult);
+            }
+
+            // Life Steal
+            if (targetStr === 'enemy' && isPlayerTurn && TILE_STATS.lifeSteal > 0) {
+                let heal = Math.floor(amount * (TILE_STATS.lifeSteal / 100));
+                if (heal > 0) {
+                    playerHP = Math.min(playerHP + heal, maxPlayerHP);
+                    log(`Life Steal +${heal}`, 'log-heal');
+                }
+            }
+
+            // Visual Shake
             if (currentState === STATE.PLAYING) {
                 gridDisplay.classList.remove('shake');
-                void gridDisplay.offsetWidth; // trigger reflow
+                void gridDisplay.offsetWidth; 
                 gridDisplay.classList.add('shake');
             }
 
@@ -987,7 +1066,6 @@
 
         function fillBoard(isInitial) {
             if (!isInitial && currentState !== STATE.PLAYING) return;
-
             for (let col = 0; col < width; col++) {
                 let columnTiles = [];
                 for (let row = 0; row < width; row++) {
@@ -1017,14 +1095,11 @@
                 }
             }
             let chainReaction = checkForMatches(isInitial);
-            if (!chainReaction && !isInitial) {
-                endTurnLogic();
-            }
+            if (!chainReaction && !isInitial) endTurnLogic();
         }
 
         function endTurnLogic() {
             if (currentState !== STATE.PLAYING) return;
-            
             if (enemyHP <= 0 || playerHP <= 0) return;
 
             if (extraTurnTriggered) {
@@ -1038,7 +1113,6 @@
                 isPlayerTurn = !isPlayerTurn;
                 updateTurnBanner();
                 updateUI();
-                
                 if (!isPlayerTurn) {
                     gridDisplay.classList.add('locked'); 
                     setTimeout(enemyPlayTurn, 1500);
@@ -1061,11 +1135,12 @@
 
         function enemyPlayTurn() {
             if (currentState !== STATE.PLAYING || enemyHP <= 0) return;
+            let isBoss = (level % 5 === 0);
+            let move = isBoss ? findBestMove() : findMinionMove();
 
-            let bestMove = findBestMove();
-            if (bestMove) {
-                let t1 = tiles[bestMove.index];
-                let t2 = tiles[bestMove.target];
+            if (move) {
+                let t1 = tiles[move.index];
+                let t2 = tiles[move.target];
                 aiCursor.style.display = 'block';
                 aiCursor.style.left = (t1.offsetLeft) + 'px';
                 aiCursor.style.top = (t1.offsetTop) + 'px';
@@ -1105,30 +1180,59 @@
             return possibleMoves.length > 0 ? possibleMoves[0] : null;
         }
 
+        function findMinionMove() {
+            let makeMistake = Math.random() < 0.30;
+            let legalMoves = [];
+            for (let i = 0; i < 64; i++) {
+                let r = Math.floor(i / width);
+                let c = i % width;
+                if (c < width - 1) {
+                    if (simulateSwap(i, i+1) > 0) {
+                        if (!makeMistake) return {index: i, target: i+1}; 
+                        legalMoves.push({index: i, target: i+1});
+                    }
+                }
+                if (r < width - 1) {
+                    if (simulateSwap(i, i+width) > 0) {
+                        if (!makeMistake) return {index: i, target: i+width}; 
+                        legalMoves.push({index: i, target: i+width});
+                    }
+                }
+            }
+            if (legalMoves.length > 0) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+            return null;
+        }
+
         function simulateSwap(i1, i2) {
             let tempTypes = tiles.map(t => t.dataset.type);
             let h = tempTypes[i1]; tempTypes[i1] = tempTypes[i2]; tempTypes[i2] = h;
             let score = 0;
-             for (let r = 0; r < width; r++) {
-                for (let c = 0; c < width - 2; c++) {
-                    let idx = r * width + c;
-                    let t = tempTypes[idx];
-                    if (!t) continue;
-                    if (tempTypes[idx+1] == t && tempTypes[idx+2] == t) score += calculateScore(t, 3);
+            function getMatchLength(types, idx, step) {
+                let type = types[idx]; if (!type) return 0;
+                let count = 1; let curr = idx + step;
+                while(curr >= 0 && curr < 64 && types[curr] === type) {
+                    if (step === 1 && Math.floor(curr/width) !== Math.floor(idx/width)) break;
+                    count++; curr += step;
                 }
+                return count;
             }
-            for (let c = 0; c < width; c++) {
-                for (let r = 0; r < width - 2; r++) {
-                    let idx = r * width + c;
-                    let t = tempTypes[idx];
-                    if (!t) continue;
-                    if (tempTypes[idx+width] == t && tempTypes[idx+width*2] == t) score += calculateScore(t, 3);
-                }
+            let checkIndices = [i1, i2];
+            for (let idx of checkIndices) {
+                let r = Math.floor(idx / width), c = idx % width;
+                let startC = c; while(startC > 0 && tempTypes[r*width + (startC-1)] === tempTypes[idx]) startC--;
+                let hLen = getMatchLength(tempTypes, r*width + startC, 1);
+                let startR = r; while(startR > 0 && tempTypes[(startR-1)*width + c] === tempTypes[idx]) startR--;
+                let vLen = getMatchLength(tempTypes, startR*width + c, width);
+                [hLen, vLen].forEach(len => {
+                    if (len >= 5) score += 1000;
+                    else if (len === 4) score += 500;
+                    else if (len === 3) score += calculateScore(tempTypes[idx]);
+                });
             }
             return score;
         }
 
-        function calculateScore(type, length) {
+        function calculateScore(type) {
             let base = 10;
             if (type === 'skull') base += 25; 
             if (type === 'shield' && enemyArmor < 10) base += 20; 
@@ -1155,7 +1259,6 @@
             document.getElementById('player-hp-bar').style.width = `${pPct}%`;
             document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
             document.getElementById('ult-bar').style.width = `${ultCharge}%`;
-            
             document.getElementById('player-armor-bar').style.width = `${pArmPct}%`;
             document.getElementById('enemy-armor-bar').style.width = `${eArmPct}%`;
             
@@ -1164,8 +1267,21 @@
 
             document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
-
             document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
+
+            // Updated Stats Display
+            document.getElementById('stat-sword').innerText = TILE_STATS.sword;
+            document.getElementById('stat-shield').innerText = TILE_STATS.shield;
+            document.getElementById('stat-heart').innerText = TILE_STATS.heart;
+            document.getElementById('stat-energy').innerText = TILE_STATS.energy;
+            document.getElementById('stat-skull').innerText = TILE_STATS.skull_dmg;
+            document.getElementById('stat-self').innerText = TILE_STATS.skull_self;
+            document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
+            document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
+        }
+
+        function toggleModal() {
+            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         }
 
         function log(msg, cls) {
