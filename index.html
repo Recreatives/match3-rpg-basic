@@ -559,7 +559,7 @@
                 name: "Berserker", emoji: "🪓", 
                 desc: "<b>DPS:</b> +5 Sword/ +15 Skull Dmg, but takes <b>35% MORE DAMAGE</b>.",
                 passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
-                dodgeChance: 0, incomingDmgMult: 1.35,
+                dodgeChance: 0, incomingDmgMult: 1.25,
                 ultName: "BLOOD LUST",
                 ultEffect: () => {
                     playerHP -= 10;
@@ -580,32 +580,31 @@
                 }
             },
             ARCHER: {
-                name: "Archer", emoji: "🏹", 
-                desc: "<b>Volley:</b> Fires 3 arrows. Each deals <b>40% of Ult Power</b>. (Total 120%)",
-                passive: (stats) => {}, // Archer relies on base stats
-                dodgeChance: 0.3, incomingDmgMult: 1.0,
-                ultName: "VOLLEY",
+                name: "Sniper", emoji: "🏹", 
+                desc: "<b>Piercing:</b> <b>30% Dodge</b>. Ult ignores Armor and deals direct HP damage.",
+                passive: (stats) => {}, 
+                dodgeChance: 0.2, incomingDmgMult: 1.0,
+                ultName: "PIERCING SHOT",
                 ultEffect: () => {
-                    // Calculate damage based on stats (Scales with upgrades now!)
-                    let damagePerArrow = Math.floor(TILE_STATS.ult_dmg * 0.4);
+                    // Calculate damage: Base Ult Damage + your Sword Stat
+                    let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
                     
-                    // Function to handle the sequence
-                    const fireArrow = (count) => {
-                        if (currentState !== STATE.PLAYING || enemyHP <= 0) return; // Stop if enemy dead
-
-                        inflictDamage('enemy', damagePerArrow);
-                        updateUI(); // Force UI update to show HP dropping
+                    // Direct HP modification (Bypassing inflictDamage function to skip armor logic)
+                    if (enemyHP > 0) {
+                        enemyHP -= pierceDmg;
                         
-                        if (count < 3 && enemyHP > 0) {
-                            setTimeout(() => fireArrow(count + 1), 250);
-                        } else {
-                             log(`ULT: Volley Complete! (${damagePerArrow * 3} total)`, "log-hit");
-                        }
-                    };
-
-                    // Start the sequence
-                    log(`ULT: Firing Volley...`, "log-match");
-                    fireArrow(1);
+                        // Visuals
+                        log(`ULT: Piercing Shot ignored Armor! -${pierceDmg} HP`, "log-crit");
+                        showFloatingText(`-${pierceDmg}`, document.getElementById('enemy-hp-bar'), "#e74c3c");
+                        
+                        // Shake effect
+                        const grid = document.querySelector('.grid');
+                        grid.classList.remove('shake');
+                        void grid.offsetWidth; 
+                        grid.classList.add('shake');
+                        
+                        checkWinCondition();
+                    }
                 }
             },
             MAGE: {
