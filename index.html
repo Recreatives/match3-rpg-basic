@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Dungeon - Enriched Combat</title>
+    <title>Pixel Dungeon (MUB) - Match-3 & Be Free</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -92,6 +92,11 @@
         .version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; }
         .help-btn {
             background: none; border: 1px solid #7f8c8d; color: #bdc3c7;
+            padding: 4px 10px; font-size: 0.9rem; cursor: pointer; border-radius: 4px;
+            margin-left: 5px;
+        }
+        .loot-btn {
+            background: rgba(241, 196, 15, 0.1); border: 1px solid var(--accent); color: var(--accent);
             padding: 4px 10px; font-size: 0.9rem; cursor: pointer; border-radius: 4px;
         }
 
@@ -381,12 +386,45 @@
         .stat-explain { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; }
         .stat-explain div { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px; border: 1px solid #444; }
         .stat-explain b { color: var(--accent); }
+
+        /* --- HISTORY MODAL STYLES --- */
+        .history-summary {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+        .history-summary div { color: #bdc3c7; }
+        .history-summary b { color: #2ecc71; float: right; }
+        
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-left: 3px solid;
+            background: rgba(255,255,255,0.05);
+            border-radius: 0 4px 4px 0;
+            font-size: 0.85rem;
+        }
+        .history-name { font-weight: bold; }
+        .history-stats { font-size: 0.75rem; color: #aaa; text-align: right; }
     </style>
 </head>
 <body>
     <div id="info-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
-            <span class="close-modal" onclick="toggleModal()">×</span>
+            <span class="close-modal" onclick="toggleModal('info-modal')">×</span>
 
             <div class="modal-section">
                 <h2 class="modal-title">📜 BATTLE MANUAL</h2>
@@ -519,9 +557,28 @@
         </div>
     </div>
 
+    <div id="history-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('history-modal')">×</span>
+            <div class="modal-section">
+                <h2 class="modal-title">🎒 LOOT HISTORY</h2>
+                <p>Total stats gained from items this run:</p>
+                <div id="total-stats-summary" class="history-summary">
+                    </div>
+                
+                <h4>ITEM LOG</h4>
+                <div id="history-list-container" class="history-list">
+                    </div>
+            </div>
+        </div>
+    </div>
+
     <div class="top-bar">
-        <div class="version">v0.27 Ulti bug fixed. Playing extra turn after ulti kill fixed. Because of Cutinyo</div> 
-        <button class="help-btn" onclick="toggleModal()">Help / Manual</button>
+        <div class="version">v0.29 Loot History Added. Extra Turn at the start of the level fixed. Because of Cutinyo</div> 
+        <div>
+            <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
+            <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
+        </div>
     </div>
     
     <div class="enemy-display" id="enemy-sprite">👾</div>
@@ -582,7 +639,6 @@
         const logDisplay = document.getElementById('log');
         const turnBanner = document.getElementById('turn-banner');
         const aiCursor = document.getElementById('ai-cursor');
-        const modal = document.getElementById('info-modal');
         
         const overlay = document.getElementById('game-overlay');
         const overlayTitle = document.getElementById('overlay-title');
@@ -599,6 +655,13 @@
             skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0
         };
 
+        // --- HISTORY TRACKING ---
+        let pickedRewards = [];
+        let totalStatsGained = {
+            sword: 0, shield: 0, heart: 0, energy: 0, 
+            skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, maxHP: 0
+        };
+
         const STATE = { START: 0, PLAYING: 1, REWARD: 2, GAMEOVER: 3 };
         let currentState = STATE.START;
         let rewardPicksLeft = 1;
@@ -607,7 +670,7 @@
         const CLASSES = {
             WARRIOR: {
                 name: "Warrior", emoji: "🛡️", 
-                desc: "<b>Tank:</b> Gains +2 Bonus Shield. Ult deals damage based on Armor.",
+                desc: "<b>Tank:</b> Gains +2 Bonus Shield. Ult deals dmg based on your Armor.",
                 passive: (stats) => { stats.shield += 2; },
                 dodgeChance: 0, incomingDmgMult: 1.0,
                 ultName: "SHIELD SLAM",
@@ -747,6 +810,14 @@
             playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
             level = 1; logCounter = 1;
             TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0 };
+            
+            // Reset History
+            pickedRewards = [];
+            totalStatsGained = {
+                sword: 0, shield: 0, heart: 0, energy: 0, 
+                skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, maxHP: 0
+            };
+            
             if (selectedClass) selectedClass.passive(TILE_STATS);
             isProcessing = false;
             extraTurnTriggered = false;
@@ -914,7 +985,30 @@
                 btn.className = `reward-btn rarity-${reward.tier}`;
                 btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
                 btn.onclick = () => {
+                    // --- SNAPSHOT STATS BEFORE ---
+                    let prevStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+
+                    // Apply Reward
                     reward.fn();
+
+                    // --- SNAPSHOT STATS AFTER ---
+                    let newStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+                    
+                    // Calculate Difference for History
+                    let diff = {};
+                    for(let key in newStats) {
+                        let d = newStats[key] - prevStats[key];
+                        if(d !== 0) diff[key] = d;
+                    }
+
+                    // Save to History
+                    pickedRewards.push({ name: reward.name, tier: reward.tier, desc: reward.desc, diff: diff });
+                    
+                    // Update Global Total Stats
+                    for(let key in diff) {
+                        totalStatsGained[key] = (totalStatsGained[key] || 0) + diff[key];
+                    }
+
                     log(`Picked: ${reward.name}`, "log-heal");
                     rewardPicksLeft--;
                     
@@ -1027,6 +1121,7 @@
 
         function resolveMatches(isInitial) {
             checkForMatches(isInitial);
+            extraTurnTriggered = false;
         }
         
         // --- NEW MERGE LOGIC ---
@@ -1477,7 +1572,6 @@
         }
 
         function useUltimate() {
-            // --- FIX: Add isProcessing check to prevent simultaneous actions ---
             if (ultCharge >= 100 && isPlayerTurn && currentState === STATE.PLAYING && !isProcessing) {
                 
                 // 1. Lock the game immediately
@@ -1524,7 +1618,6 @@
             document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
             
-            // --- FIX: Disable button if not 100%, OR not player turn, OR TILES ARE MOVING (isProcessing) ---
             document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
 
             // Stats Display
@@ -1538,8 +1631,64 @@
             document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
             document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
         }
-        function toggleModal() {
-            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        
+        function toggleModal(modalId) {
+            let m = document.getElementById(modalId);
+            if(m.style.display === 'flex') {
+                m.style.display = 'none';
+            } else {
+                m.style.display = 'flex';
+                // Only render history if opening history modal
+                if(modalId === 'history-modal') renderHistory();
+            }
+        }
+
+        function renderHistory() {
+            const listContainer = document.getElementById('history-list-container');
+            const summaryContainer = document.getElementById('total-stats-summary');
+            
+            // 1. Render Summary
+            summaryContainer.innerHTML = '';
+            const statLabels = {
+                sword: 'Sword', shield: 'Shield', heart: 'Heal', energy: 'Energy', 
+                skull_dmg: 'Skull', skull_self_dmg: 'Self Dmg', ult_dmg: 'Ult', lifeSteal: 'Steal %', maxHP: 'Max HP'
+            };
+            
+            let hasStats = false;
+            for(let key in totalStatsGained) {
+                if(totalStatsGained[key] > 0) {
+                    hasStats = true;
+                    let div = document.createElement('div');
+                    div.innerHTML = `${statLabels[key] || key}: <b>+${totalStatsGained[key]}</b>`;
+                    summaryContainer.appendChild(div);
+                }
+            }
+            if(!hasStats) summaryContainer.innerHTML = '<div style="grid-column: span 2; text-align:center;">No items collected yet.</div>';
+
+            // 2. Render List
+            listContainer.innerHTML = '';
+            if(pickedRewards.length === 0) {
+                listContainer.innerHTML = '<div style="color:#777; text-align:center;">Empty</div>';
+                return;
+            }
+
+            // Reverse order to show newest first
+            [...pickedRewards].reverse().forEach(item => {
+                let div = document.createElement('div');
+                div.className = `history-item rarity-${item.tier}`;
+                div.style.borderColor = `var(--${item.tier})`; // Helper color border
+                
+                // Format stats string
+                let statStr = Object.entries(item.diff)
+                    .map(([k, v]) => `${statLabels[k] || k} +${v}`)
+                    .join(', ');
+
+                div.innerHTML = `
+                    <div class="history-name">${item.name}</div>
+                    <div class="history-stats">${statStr}</div>
+                `;
+                listContainer.appendChild(div);
+            });
         }
 
         function log(msg, cls) {
