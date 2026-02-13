@@ -477,6 +477,7 @@
         
         <div class="stat-box" style="width: 80px;">
             <div>ULT</div>
+            <span id="ult-text" class="hp-text" style="color: var(--accent);">0%</span>
             <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
         </div>
         
@@ -735,8 +736,8 @@
             // Calculate Reward Picks
             let hpPercent = (playerHP / maxPlayerHP);
             if (hpPercent >= 1.0) { rewardPicksLeft = 2; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); }
-            else if (hpPercent < 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
-            else if (hpPercent < 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
+            else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
+            else if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
             else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
             
             generateRewards();
@@ -1433,6 +1434,7 @@
             document.getElementById('stat-self').innerText = TILE_STATS.skull_self;
             document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
             document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
+            document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
         }
 
         function toggleModal() {
