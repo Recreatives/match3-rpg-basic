@@ -520,7 +520,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.26 Archer Fixed. Manual updated</div> 
+        <div class="version">v0.27 Ulti bug fixed. Playing extra turn after ulti kill fixed. Because of Cutinyo</div> 
         <button class="help-btn" onclick="toggleModal()">Help / Manual</button>
     </div>
     
@@ -779,6 +779,7 @@
             turnBanner.className = "turn-indicator turn-player";
             isPlayerTurn = true;
             isProcessing = false;
+            extraTurnTriggered = false;
             
             createBoard();
             updateUI();
@@ -1476,12 +1477,32 @@
         }
 
         function useUltimate() {
-            if (ultCharge >= 100 && isPlayerTurn && currentState === STATE.PLAYING) {
+            // --- FIX: Add isProcessing check to prevent simultaneous actions ---
+            if (ultCharge >= 100 && isPlayerTurn && currentState === STATE.PLAYING && !isProcessing) {
+                
+                // 1. Lock the game immediately
+                isProcessing = true; 
+                
+                // 2. Apply Effect
                 selectedClass.ultEffect();
                 ultCharge = 0;
-                log(`ULTIMATE! ${TILE_STATS.ult_dmg} Damage!`, "log-hit");
-                checkWinCondition();
-                updateUI();
+                
+                // 3. Visuals
+                log(`ULTIMATE! ${selectedClass.ultName} used!`, "log-hit");
+                updateUI(); // Disables button immediately
+
+                // 4. Check Win Condition
+                if (enemyHP <= 0) {
+                    checkWinCondition();
+                    // If we won, stop here. Do not pass turn.
+                    return; 
+                }
+
+                // 5. Pass Turn Logic
+                // We use a small delay to let the user see the damage before the turn ends
+                setTimeout(() => {
+                    endTurnLogic(); 
+                }, 600);
             }
         }
 
@@ -1502,7 +1523,9 @@
 
             document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
-            document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
+            
+            // --- FIX: Disable button if not 100%, OR not player turn, OR TILES ARE MOVING (isProcessing) ---
+            document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
 
             // Stats Display
             document.getElementById('stat-sword').innerText = TILE_STATS.sword;
@@ -1515,7 +1538,6 @@
             document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
             document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
         }
-
         function toggleModal() {
             modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         }
