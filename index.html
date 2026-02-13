@@ -581,15 +581,31 @@
             },
             ARCHER: {
                 name: "Archer", emoji: "🏹", 
-                desc: "<b>Evasion:</b> <b>30% Dodge Chance</b>. Best survivor.",
-                passive: (stats) => {},
+                desc: "<b>Volley:</b> Fires 3 arrows. Each deals <b>40% of Ult Power</b>. (Total 120%)",
+                passive: (stats) => {}, // Archer relies on base stats
                 dodgeChance: 0.3, incomingDmgMult: 1.0,
                 ultName: "VOLLEY",
                 ultEffect: () => {
-                    inflictDamage('enemy', 15);
-                    setTimeout(() => inflictDamage('enemy', 15), 200);
-                    setTimeout(() => inflictDamage('enemy', 15), 400);
-                    log(`ULT: Volley hits 3 times!`, "log-hit");
+                    // Calculate damage based on stats (Scales with upgrades now!)
+                    let damagePerArrow = Math.floor(TILE_STATS.ult_dmg * 0.4);
+                    
+                    // Function to handle the sequence
+                    const fireArrow = (count) => {
+                        if (currentState !== STATE.PLAYING || enemyHP <= 0) return; // Stop if enemy dead
+
+                        inflictDamage('enemy', damagePerArrow);
+                        updateUI(); // Force UI update to show HP dropping
+                        
+                        if (count < 3 && enemyHP > 0) {
+                            setTimeout(() => fireArrow(count + 1), 250);
+                        } else {
+                             log(`ULT: Volley Complete! (${damagePerArrow * 3} total)`, "log-hit");
+                        }
+                    };
+
+                    // Start the sequence
+                    log(`ULT: Firing Volley...`, "log-match");
+                    fireArrow(1);
                 }
             },
             MAGE: {
