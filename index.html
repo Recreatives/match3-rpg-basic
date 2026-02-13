@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Dungeon - Scrollable & Grid Stats</title>
+    <title>Pixel Dungeon - Enriched Combat</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -33,7 +33,6 @@
             user-select: none;
             font-size: 14px; 
             touch-action: manipulation;
-            /* CHANGED: Allowed scrolling */
             overflow-y: auto; 
             min-height: 100vh;
         }
@@ -130,12 +129,12 @@
         .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
         .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
 
-        /* --- STATS BAR (UPDATED TO GRID) --- */
+        /* --- STATS BAR (GRID) --- */
         .stats-bar {
             width: 340px;
-            display: grid; /* Changed to Grid */
-            grid-template-columns: repeat(4, 1fr); /* Exactly 4 columns */
-            gap: 8px; /* Gap between items */
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
             background: rgba(0, 0, 0, 0.3);
             padding: 10px;
             border-radius: 6px;
@@ -152,7 +151,7 @@
             color: #bdc3c7;
         }
         .stat-item span:first-child {
-            font-size: 1.2rem; /* Slightly larger icons */
+            font-size: 1.2rem;
             margin-bottom: 2px;
         }
         .stat-val {
@@ -171,7 +170,7 @@
             overflow: hidden; position: relative;
             touch-action: none;
             transition: filter 1s ease;
-            flex-shrink: 0; /* Prevent grid squishing */
+            flex-shrink: 0;
         }
         .grid.locked { pointer-events: none; filter: grayscale(0.5); }
 
@@ -324,51 +323,204 @@
         h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
         ul { padding-left: 20px; margin-top: 5px; }
         li { margin-bottom: 5px; }
+
+        /* --- MANUAL SPECIFIC STYLES --- */
+        .manual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .manual-tile {
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #555;
+        }
+        .manual-icon { font-size: 1.5rem; margin-right: 10px; width: 30px; text-align: center; }
+        .manual-desc { font-size: 0.85rem; color: #bdc3c7; }
+        .manual-desc b { color: #fff; display: block; margin-bottom: 2px; }
+
+        .tip-box {
+            background: rgba(241, 196, 15, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.85rem;
+            font-style: italic;
+            color: #f1c40f;
+        }
+        .warning-box {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.85rem;
+            color: #e74c3c;
+        }
+        table.stat-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+        table.stat-table td {
+            padding: 4px;
+            border-bottom: 1px solid #444;
+        }
+        table.stat-table td:first-child { color: var(--accent); font-weight: bold; width: 80px;}
+
+        /* --- NEW MANUAL STYLES --- */
+        .class-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
+        .class-table td { padding: 6px; border-bottom: 1px solid #555; vertical-align: middle; }
+        .class-table tr:last-child td { border-bottom: none; }
+        .class-icon { font-size: 1.4rem; text-align: center; width: 40px; }
+        
+        .stat-explain { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; }
+        .stat-explain div { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px; border: 1px solid #444; }
+        .stat-explain b { color: var(--accent); }
     </style>
 </head>
 <body>
     <div id="info-modal" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal" onclick="toggleModal()">×</span>
 
             <div class="modal-section">
-                <h2 class="modal-title">PIXEL DUNGEON MANUAL</h2>
-                <p>Welcome, Traveler! Master the grid and use your class abilities to survive.</p>
+                <h2 class="modal-title">📜 BATTLE MANUAL</h2>
+                <p>Welcome to <b>Pixel Dungeon</b>. Your goal is to defeat endless waves of monsters. You lose if your HP reaches 0.</p>
+                <div class="tip-box">
+                    <b>Core Loop:</b> Pick a Class ➡ Fight ➡ Win ➡ Draft Items to upgrade stats ➡ Repeat.
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>🦸 HERO CLASSES</h4>
+                <table class="class-table">
+                    <tr>
+                        <td class="class-icon">🛡️</td>
+                        <td><b>Warrior (Tank)</b><br>Starts with Bonus Shield. Ult deals dmg based on your Armor.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">🪓</td>
+                        <td><b>Berserker (Risk)</b><br>High Dmg, but takes +25% Dmg. Ult hurts self to deal double dmg.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">🗡️</td>
+                        <td><b>Rogue (Combo)</b><br>Gains Energy fast. Ult triggers an <b>Instant Extra Turn</b>.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">🏹</td>
+                        <td><b>Archer (Sniper)</b><br>20% Dodge Chance. Ult <b>Ignores Armor</b> (Direct HP Dmg).</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">🧙</td>
+                        <td><b>Mage (Scaler)</b><br>Ult gains <b>+10 Permanent Power</b> every time you cast it.</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="modal-section">
+                <h4>💠 TILE EFFECTS</h4>
+                <div class="manual-grid">
+                    <div class="manual-tile">
+                        <div class="manual-icon">⚔️</div>
+                        <div class="manual-desc"><b>SWORD</b><br>Deals physical damage. Blocked by Armor.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">🛡️</div>
+                        <div class="manual-desc"><b>SHIELD</b><br>Adds Armor. Armor takes damage before HP.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">💖</div>
+                        <div class="manual-desc"><b>HEART</b><br>Heals your HP. Cannot exceed Max HP.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">⚡</div>
+                        <div class="manual-desc"><b>ENERGY</b><br>Charges Ultimate. <br><b style="color:#e74c3c;">(Enemies EAT this to Heal!)</b></div>
+                    </div>
+                </div>
+                <div class="manual-tile" style="margin-top: 5px; border-color: #e74c3c;">
+                    <div class="manual-icon">💀</div>
+                    <div class="manual-desc"><b>SKULL (High Risk)</b><br>Deals massive damage to Enemy, but deals <b>Recoil Damage</b> to you. Be careful when low on HP!</div>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>📊 STATS EXPLAINED</h4>
+                <div class="stat-explain">
+                    <div><b>⚔️ Sword:</b> Damage per tile.</div>
+                    <div><b>🛡️ Shield:</b> Armor gain per tile.</div>
+                    <div><b>💖 Heart:</b> Healing per tile.</div>
+                    <div><b>⚡ Energy:</b> Ult Charge % per tile.</div>
+                    <div><b>💀 Skull Damage:</b> The Damage you deal to the opponent using skulls</div>
+                    <div><b>☠️ Skull Self Damage:</b> The Damage you deal to yourself using skulls</div>
+                    <div><b>💥 Ult Power:</b> Base damage of Ultimate.</div>
+                    <div><b>🧛 Life Steal:</b> % of Dmg dealt returns as HP.</div>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>🔥 COMBOS & TURNS (CRITICAL!)</h4>
+                <p>Mastering combos is the only way to survive high levels.</p>
+                <table class="stat-table">
+                    <tr>
+                        <td>Match 3</td>
+                        <td>1x Effect. Turn passes to Enemy.</td>
+                    </tr>
+                    <tr>
+                        <td>Match 4</td>
+                        <td><b>2x Effect</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                    </tr>
+                    <tr>
+                        <td>L / T Shape</td>
+                        <td><b>2.5x Effect</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                    </tr>
+                    <tr>
+                        <td>Match 5</td>
+                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%30</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                    </tr>
+                    <tr>
+                        <td>Match 6</td>
+                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%60</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                    </tr>
+                    <tr>
+                        <td>Match 7</td>
+                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%90</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                    </tr>
+                </table>
             </div>
 
             <div class="modal-section">
                 <h4>🧠 ENEMY AI</h4>
                 <ul>
-                    <li><b>Minions (Normal Levels):</b> Clumsy. 30% chance to make mistakes.</li>
-                    <li><b>Bosses (Every 5th Level):</b> Masterminds. They plan ahead and use 4-match combos.</li>
+                    <li><b>Minions:</b> Make random moves. 30% chance to miss a good move.</li>
+                    <li><b>Bosses (Lvl 5, 10...):</b> Highly intelligent. They prioritize Match-4s and Skulls.</li>
+                    <li><b>Armor:</b> If an enemy has Armor (Grey bar), you must break it before you can hurt their HP (Red bar).</li>
+                    <li><b>Energy Denial:</b> Enemies CANNOT use Ultimates. If they match ⚡ Energy, they <b>Heal</b> instead. Don't leave Energy for them!</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h2 class="modal-title">CLASS GUIDE</h2>
-                
-                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
-                    <p><b>🛡️ Warrior (Tank)</b><br>
-                    Strategy: Build Armor with Shields, then use Ult to deal damage equal to your Armor.</p>
-                    
-                    <p><b>🪓 Berserker (DPS)</b><br>
-                    Strategy: High Sword & Skull damage, but takes 35% extra damage. Kill fast.</p>
-                    
-                    <p><b>🏹 Archer (Evasion)</b><br>
-                    Strategy: 30% Dodge chance. Ult hits 3 times for consistent damage.</p>
-                    
-                    <p><b>🗡️ Rogue (Combo)</b><br>
-                    Strategy: High Energy gain. Ult grants an Extra Turn.</p>
-                    
-                    <p><b>🧙 Mage (Scaler)</b><br>
-                    Strategy: Weak start. Ult gets +10 damage permanently every use.</p>
+                <h4>🎁 REWARDS & LOOT</h4>
+                <p>After winning, you pick items. The quality depends on your performance:</p>
+                <ul style="font-size: 0.85rem;">
+                    <li><b>Flawless (100% HP):</b> Pick 2 Items (Best for scaling).</li>
+                    <li><b>Standard Win:</b> Pick 1 Item.</li>
+                    <li><b>Near Death (<10% HP):</b> Pick 3 Items (Comeback mechanic).</li>
+                    <li><b>Last Stand (<1% HP):</b> Pick 5 Items (Comeback mechanic).</li>
+                </ul>
+                <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;">
+                    <b>Rarities:</b> <span style="color:#95a5a6">Common</span>, <span style="color:#2ecc71">Uncommon</span>, <span style="color:#3498db">Rare</span>, <span style="color:#9b59b6">Epic</span>, <span style="color:#e67e22">Legendary</span>.
                 </div>
             </div>
         </div>
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.24 Grid Stats & Scroll</div> 
+        <div class="version">v0.25 Enriched Combat</div> 
         <button class="help-btn" onclick="toggleModal()">Help / Manual</button>
     </div>
     
@@ -387,6 +539,7 @@
         
         <div class="stat-box" style="width: 80px;">
             <div>ULT</div>
+            <span id="ult-text" class="hp-text" style="color: var(--accent);">0%</span>
             <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
         </div>
         
@@ -405,7 +558,7 @@
         <div class="stat-item" title="Energy Gain"><span>⚡</span><span id="stat-energy" class="stat-val">12</span></div>
         
         <div class="stat-item" title="Skull Damage"><span>💀</span><span id="stat-skull" class="stat-val">25</span></div>
-        <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self" class="stat-val">12</span></div>
+        <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
         <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
         <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
     </div>
@@ -443,7 +596,7 @@
         // --- STATS ---
         let TILE_STATS = {
             sword: 6, heart: 4, shield: 5, energy: 12,
-            skull_dmg: 25, skull_self: 12, ult_dmg: 35, lifeSteal: 0
+            skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0
         };
 
         const STATE = { START: 0, PLAYING: 1, REWARD: 2, GAMEOVER: 3 };
@@ -468,7 +621,7 @@
                 name: "Berserker", emoji: "🪓", 
                 desc: "<b>DPS:</b> +5 Sword/ +15 Skull Dmg, but takes <b>35% MORE DAMAGE</b>.",
                 passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
-                dodgeChance: 0, incomingDmgMult: 1.35,
+                dodgeChance: 0, incomingDmgMult: 1.25,
                 ultName: "BLOOD LUST",
                 ultEffect: () => {
                     playerHP -= 10;
@@ -490,15 +643,30 @@
             },
             ARCHER: {
                 name: "Archer", emoji: "🏹", 
-                desc: "<b>Evasion:</b> <b>30% Dodge Chance</b>. Best survivor.",
-                passive: (stats) => {},
-                dodgeChance: 0.3, incomingDmgMult: 1.0,
-                ultName: "VOLLEY",
+                desc: "<b>Piercing:</b> <b>30% Dodge</b>. Ult ignores Armor and deals direct HP damage.",
+                passive: (stats) => {}, 
+                dodgeChance: 0.2, incomingDmgMult: 1.0,
+                ultName: "PIERCING SHOT",
                 ultEffect: () => {
-                    inflictDamage('enemy', 15);
-                    setTimeout(() => inflictDamage('enemy', 15), 200);
-                    setTimeout(() => inflictDamage('enemy', 15), 400);
-                    log(`ULT: Volley hits 3 times!`, "log-hit");
+                    // Calculate damage: Base Ult Damage + your Sword Stat
+                    let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
+                    
+                    // Direct HP modification (Bypassing inflictDamage function to skip armor logic)
+                    if (enemyHP > 0) {
+                        enemyHP -= pierceDmg;
+                        
+                        // Visuals
+                        log(`ULT: Piercing Shot ignored Armor! -${pierceDmg} HP`, "log-crit");
+                        showFloatingText(`-${pierceDmg}`, document.getElementById('enemy-hp-bar'), "#e74c3c");
+                        
+                        // Shake effect
+                        const grid = document.querySelector('.grid');
+                        grid.classList.remove('shake');
+                        void grid.offsetWidth; 
+                        grid.classList.add('shake');
+                        
+                        checkWinCondition();
+                    }
                 }
             },
             MAGE: {
@@ -578,7 +746,7 @@
         function resetGame() {
             playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
             level = 1; logCounter = 1;
-            TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self: 12, ult_dmg: 35, lifeSteal: 0 };
+            TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0 };
             if (selectedClass) selectedClass.passive(TILE_STATS);
             isProcessing = false;
             extraTurnTriggered = false;
@@ -645,8 +813,8 @@
             // Calculate Reward Picks
             let hpPercent = (playerHP / maxPlayerHP);
             if (hpPercent >= 1.0) { rewardPicksLeft = 2; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); }
-            else if (hpPercent < 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
-            else if (hpPercent < 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
+            else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
+            else if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
             else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
             
             generateRewards();
@@ -681,7 +849,7 @@
                 { tier: 'common', name: 'Leather Patch', desc: 'Shield +1', fn: () => TILE_STATS.shield += 1 },
                 { tier: 'common', name: 'Herb Mix', desc: 'Heal +1', fn: () => TILE_STATS.heart += 1 },
                 { tier: 'common', name: 'Meditation', desc: 'Energy +1', fn: () => TILE_STATS.energy += 1 },
-                { tier: 'common', name: 'Bone Shard', desc: 'Skull +6/ Self +3', fn: () => { TILE_STATS.skull_dmg += 6; TILE_STATS.skull_self += 3; } },
+                { tier: 'common', name: 'Bone Shard', desc: 'Skull Dmg +6/ Self Dmg +3', fn: () => { TILE_STATS.skull_dmg += 6; TILE_STATS.skull_self_dmg += 3; } },
                 { tier: 'common', name: 'Minor Charge', desc: 'Ult Dmg +10', fn: () => TILE_STATS.ult_dmg += 10 },
                 { tier: 'common', name: 'Leech Seed', desc: 'Life Steal +1%', fn: () => TILE_STATS.lifeSteal += 1 },
                 
@@ -690,7 +858,7 @@
                 { tier: 'uncommon', name: 'Iron Plate', desc: 'Shield +2', fn: () => TILE_STATS.shield += 2 },
                 { tier: 'uncommon', name: 'Potion', desc: 'Heal +2', fn: () => TILE_STATS.heart += 2 },
                 { tier: 'uncommon', name: 'Focus', desc: 'Energy +2', fn: () => TILE_STATS.energy += 2 },
-                { tier: 'uncommon', name: 'Skull Idol', desc: 'Skull +10/ Self +5', fn: () => { TILE_STATS.skull_dmg += 10; TILE_STATS.skull_self += 5; } },
+                { tier: 'uncommon', name: 'Skull Idol', desc: 'Skull +10/ Self Dmg +5', fn: () => { TILE_STATS.skull_dmg += 10; TILE_STATS.skull_self_dmg += 5; } },
                 { tier: 'uncommon', name: 'Mana Crystal', desc: 'Ult Dmg +20', fn: () => TILE_STATS.ult_dmg += 20 },
                 { tier: 'uncommon', name: 'Bat Wing', desc: 'Life Steal +2%', fn: () => TILE_STATS.lifeSteal += 2 },
 
@@ -699,31 +867,31 @@
                 { tier: 'rare', name: 'Tower Shield', desc: 'Shield +3', fn: () => TILE_STATS.shield += 3 },
                 { tier: 'rare', name: 'Elixir', desc: 'Heal +3', fn: () => TILE_STATS.heart += 3 },
                 { tier: 'rare', name: 'Deep Focus', desc: 'Energy +3', fn: () => TILE_STATS.energy += 3 },
-                { tier: 'rare', name: 'Cursed Skull', desc: 'Skull +14/ Self +7', fn: () => { TILE_STATS.skull_dmg += 14; TILE_STATS.skull_self += 7; } },
+                { tier: 'rare', name: 'Cursed Skull', desc: 'Skull +14/ Self Dmg +7', fn: () => { TILE_STATS.skull_dmg += 14; TILE_STATS.skull_self_dmg += 7; } },
                 { tier: 'rare', name: 'Spell Book', desc: 'Ult Dmg +35', fn: () => TILE_STATS.ult_dmg += 35 },
                 { tier: 'rare', name: 'Vampire Tooth', desc: 'Life Steal +3%', fn: () => TILE_STATS.lifeSteal += 3 },
 
                 // === EPIC (10%) - 2 Stats (Enriched Pool) ===
                 { tier: 'epic', name: 'Paladin Set', desc: 'Sword +3 & Shield +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; } },
                 { tier: 'epic', name: 'Blood Mage', desc: 'Ult +30 & Steal +3%', fn: () => { TILE_STATS.ult_dmg += 30; TILE_STATS.lifeSteal += 3; } },
-                { tier: 'epic', name: 'Berserker Soul', desc: 'Skull +20(Self+10) & Sword +4', fn: () => { TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self += 10; TILE_STATS.sword += 4; } },
+                { tier: 'epic', name: 'Berserker Soul', desc: 'Skull Dmg +20(Self Dmg +10) & Sword +4', fn: () => { TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.sword += 4; } },
                 { tier: 'epic', name: 'Monk Vow', desc: 'Heal +4 & Energy +4', fn: () => { TILE_STATS.heart += 4; TILE_STATS.energy += 4; } },
                 { tier: 'epic', name: 'Stone Skin', desc: 'Shield +4 & HP +30', fn: () => { TILE_STATS.shield += 4; maxPlayerHP += 30; playerHP += 30; } },
                 { tier: 'epic', name: 'Crimson Edge', desc: 'Sword +4 & Steal +3%', fn: () => { TILE_STATS.sword += 4; TILE_STATS.lifeSteal += 3; } },
                 { tier: 'epic', name: 'Storm Caller', desc: 'Energy +4 & Ult +25', fn: () => { TILE_STATS.energy += 4; TILE_STATS.ult_dmg += 25; } },
                 { tier: 'epic', name: 'Iron Heart', desc: 'Shield +4 & Heal +4', fn: () => { TILE_STATS.shield += 4; TILE_STATS.heart += 4; } },
-                { tier: 'epic', name: 'Necromancer', desc: 'Skull +24(Self+12) & Steal +3%', fn: () => { TILE_STATS.skull_dmg += 24; TILE_STATS.skull_self += 12; TILE_STATS.lifeSteal += 3; } },
+                { tier: 'epic', name: 'Necromancer', desc: 'Skull Dmg +24 (Self Dmg +12) & Steal +3%', fn: () => { TILE_STATS.skull_dmg += 24; TILE_STATS.skull_self_dmg += 12; TILE_STATS.lifeSteal += 3; } },
                 { tier: 'epic', name: 'Gladiator', desc: 'Sword +4 & Energy +3', fn: () => { TILE_STATS.sword += 4; TILE_STATS.energy += 3; } },
                 { tier: 'epic', name: 'Giant Strength', desc: 'Max HP +40 & Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.sword += 3; } },
 
                 // === LEGENDARY (5%) - 3 Stats ===
                 { tier: 'legendary', name: 'God Slayer', desc: 'Sword +5, Ult +40, Energy +3', fn: () => { TILE_STATS.sword += 5; TILE_STATS.ult_dmg += 40; TILE_STATS.energy += 3; } },
                 { tier: 'legendary', name: 'Immortality', desc: 'Shield +5, Heal +5, Max HP +50', fn: () => { TILE_STATS.shield += 5; TILE_STATS.heart += 5; maxPlayerHP+=50; playerHP+=50; } },
-                { tier: 'legendary', name: 'Demon Lord', desc: 'Skull +30(Self+15), Steal +5%, Sword +4', fn: () => { TILE_STATS.skull_dmg += 30; TILE_STATS.skull_self += 15; TILE_STATS.lifeSteal += 5; TILE_STATS.sword += 4; } },
+                { tier: 'legendary', name: 'Demon Lord', desc: 'Skull Dmg +30(Self Dmg +15), Steal +5%, Sword +4', fn: () => { TILE_STATS.skull_dmg += 30; TILE_STATS.skull_self_dmg += 15; TILE_STATS.lifeSteal += 5; TILE_STATS.sword += 4; } },
                 { tier: 'legendary', name: 'Archmage', desc: 'Energy +5, Ult +30, Shield +4', fn: () => { TILE_STATS.energy += 5; TILE_STATS.ult_dmg += 30; TILE_STATS.shield += 4; } },
                 { tier: 'legendary', name: 'Trinity', desc: 'Sword +3, Shield +3, Heal +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
                 { tier: 'legendary', name: 'Titan Blood', desc: 'Max HP +40, Heal +4, Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
-                { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull +20(Self+10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self += 10; TILE_STATS.energy += 3; } },
+                { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull Dmg +20(Self Dmg +10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.energy += 3; } },
                 { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
             ];
 
@@ -737,14 +905,12 @@
                 else if (rand < 0.60) chosenTier = 'uncommon';
 
                 let pool = REWARDS.filter(r => r.tier === chosenTier);
-                // Fallback if pool is empty (shouldn't happen)
                 if(pool.length === 0) pool = REWARDS.filter(r => r.tier === 'common');
                 
                 let reward = pool[Math.floor(Math.random() * pool.length)];
 
                 let btn = document.createElement('button');
                 btn.className = `reward-btn rarity-${reward.tier}`;
-                // Rarity name in parenthesis for clarity
                 btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
                 btn.onclick = () => {
                     reward.fn();
@@ -861,6 +1027,45 @@
         function resolveMatches(isInitial) {
             checkForMatches(isInitial);
         }
+        
+        // --- NEW MERGE LOGIC ---
+        function mergeIntersectingMatches(hRuns, vRuns) {
+            let allMatches = [];
+            let processedV = new Set();
+            
+            // 1. Try to merge every Horizontal run with any intersecting Vertical run
+            hRuns.forEach(hGroup => {
+                let merged = false;
+                for (let i = 0; i < vRuns.length; i++) {
+                    let vGroup = vRuns[i];
+                    
+                    // Check if Same Type AND they share a tile (Intersection)
+                    if (hGroup.type === vGroup.type && hGroup.indices.some(idx => vGroup.indices.includes(idx))) {
+                        // Merge indices ensuring no duplicates
+                        let uniqueIndices = [...new Set([...hGroup.indices, ...vGroup.indices])];
+                        
+                        allMatches.push({
+                            indices: uniqueIndices,
+                            type: hGroup.type,
+                            subShape: 'cross' // Mark as special shape
+                        });
+                        
+                        processedV.add(i); // Mark vertical as used
+                        merged = true;
+                        break; 
+                    }
+                }
+                // If not merged, keep as standard line
+                if (!merged) allMatches.push({...hGroup, subShape: 'line'});
+            });
+
+            // 2. Add remaining Vertical runs
+            vRuns.forEach((vGroup, i) => {
+                if (!processedV.has(i)) allMatches.push({...vGroup, subShape: 'line'});
+            });
+
+            return allMatches;
+        }
 
         function checkForMatches(isInitial) {
             if (!isInitial && currentState !== STATE.PLAYING) return false;
@@ -904,7 +1109,9 @@
                 }
             }
 
-            let finalGroups = [...hRuns, ...vRuns];
+            // NEW: Merge intersections
+            let finalGroups = mergeIntersectingMatches(hRuns, vRuns);
+            
             if (finalGroups.length > 0) {
                 finalGroups.forEach(group => processMatch(group, isInitial));
                 if (currentState === STATE.PLAYING || isInitial) {
@@ -919,18 +1126,55 @@
 
         function processMatch(group, isInitial) {
             if (currentState !== STATE.PLAYING && !isInitial) return;
-            let shape = '3';
-            if (group.indices.length === 4) shape = '4';
-            if (group.indices.length >= 5) shape = '5';
-            
-            if (!isInitial && group.indices.length > 0) {
+
+            let count = group.indices.length;
+            let shapeLabel = '3';
+            let multiplier = 1;
+            let isCross = (group.subShape === 'cross');
+
+            // --- NEW BALANCE LOGIC ---
+            if (count === 3) {
+                multiplier = 1;
+            } 
+            else if (count === 4) {
+                shapeLabel = '4';
+                multiplier = 2;
+                extraTurnTriggered = true; // Extra Turn
+            } 
+            else if (isCross) { // L or T Shape
+                shapeLabel = 'CROSS';
+                multiplier = 2.5;
+                extraTurnTriggered = true; // Extra Turn
+            } 
+            else if (count === 5) { // Straight Line of 5
+                shapeLabel = '5';
+                multiplier = 3;
+                if(isPlayerTurn) ultCharge += 30; // +30 Percent Ult
+                extraTurnTriggered = true;
+            } 
+            else if (count === 6) {
+                shapeLabel = '6!';
+                multiplier = 3.5;
+                if (isPlayerTurn) ultCharge += 60;
+                extraTurnTriggered = true;
+            } 
+            else if (count >= 7) {
+                shapeLabel = '7!!';
+                multiplier = 4;
+                if (isPlayerTurn) ultCharge += 90;
+                extraTurnTriggered = true;
+            }
+
+            // --- VISUALS & LOGS ---
+            if (!isInitial && count > 3) {
                 let typeInfo = tileTypes.find(t => t.type === group.type);
-                let icon = typeInfo ? typeInfo.symbol : "?";
                 let user = isPlayerTurn ? "Player" : "Enemy";
-                let msg = `${user} matched ${group.indices.length} ${icon}`;
-                if (shape === '4') msg += " (2x!)";
-                if (shape === '5') msg += " (3x!)";
-                log(msg, "log-match");
+                
+                log(`${user}: ${shapeLabel} Match! (x${multiplier})`, "log-match");
+
+                let centerTile = tiles[group.indices[1]];
+                let color = (shapeLabel === '5' || count >= 6) ? "#f1c40f" : "#e74c3c";
+                showFloatingText(`${shapeLabel}x${multiplier}`, centerTile, color);
             }
 
             let validTiles = 0;
@@ -944,14 +1188,7 @@
             });
 
             if (validTiles > 0 && !isInitial) {
-                if (shape === '4' || shape === '5') {
-                    extraTurnTriggered = true;
-                    let center = tiles[group.indices[1]];
-                    let text = shape === '5' ? "LEGENDARY!" : "CRITICAL!";
-                    let color = shape === '5' ? "#f1c40f" : "#ff6b6b";
-                    showFloatingText(text, center, color);
-                }
-                applyRPGEffects(group.type, shape);
+                applyRPGEffects(group.type, multiplier);
             }
         }
 
@@ -967,31 +1204,31 @@
             setTimeout(() => pop.remove(), 1500);
         }
 
-        function applyRPGEffects(type, shape) {
+        function applyRPGEffects(type, multiplier) {
             if (currentState !== STATE.PLAYING) return;
-            let multiplier = 1;
-            if (shape === '4') multiplier = 2;
-            if (shape === '5') multiplier = 3;
-
+            
             let user = isPlayerTurn ? "Player" : "Enemy";
             let target = isPlayerTurn ? 'enemy' : 'player';
             
             if (type === 'sword') {
-                let baseVal = TILE_STATS.sword * multiplier;
+                let baseVal = Math.floor(TILE_STATS.sword * multiplier);
                 inflictDamage(target, baseVal);
                 log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+
             } else if (type === 'heart') {
-                let baseVal = TILE_STATS.heart * multiplier;
+                let baseVal = Math.floor(TILE_STATS.heart * multiplier);
                 if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
                 else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
                 log(`${user} Heal +${baseVal}`, 'log-heal');
+
             } else if (type === 'shield') {
-                let baseVal = TILE_STATS.shield * multiplier;
+                let baseVal = Math.floor(TILE_STATS.shield * multiplier);
                 if (isPlayerTurn) playerArmor += baseVal;
                 else enemyArmor += baseVal;
                 log(`${user} Armor +${baseVal}`, 'log-armor');
+
             } else if (type === 'energy') {
-                let baseVal = TILE_STATS.energy * multiplier;
+                let baseVal = Math.floor(TILE_STATS.energy * multiplier);
                 if (isPlayerTurn) {
                     ultCharge = Math.min(ultCharge + baseVal, 100);
                     log(`Ult +${baseVal}%`, 'log-hit');
@@ -1000,19 +1237,17 @@
                     enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
                     log(`Enemy Absorbs ${absorb}`, "log-enemy");
                 }
+
             } else if (type === 'skull') {
-                let dmgToOpponent = TILE_STATS.skull_dmg * (shape === '3' ? 1 : 1.5);
-                let recoil = TILE_STATS.skull_self * (shape === '3' ? 1 : 1.5);
+                let dmgToOpponent = Math.floor(TILE_STATS.skull_dmg * multiplier);
+                let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
+                
                 let self = isPlayerTurn ? 'player' : 'enemy';
                 inflictDamage(target, dmgToOpponent);
                 inflictDamage(self, recoil);
-                log(`Skull Dmg: ${dmgToOpponent} / Recoil: ${recoil}`, 'log-crit');
+                log(`Skull! Dmg: ${dmgToOpponent} / Self: ${recoil}`, 'log-crit');
             }
-
-            if (shape === '5' && isPlayerTurn) {
-                ultCharge = 100;
-                log("LEGENDARY! ULT READY!", "log-hit");
-            }
+            
             checkWinCondition();
             updateUI();
         }
@@ -1269,15 +1504,16 @@
             document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
             document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn;
 
-            // Updated Stats Display
+            // Stats Display
             document.getElementById('stat-sword').innerText = TILE_STATS.sword;
             document.getElementById('stat-shield').innerText = TILE_STATS.shield;
             document.getElementById('stat-heart').innerText = TILE_STATS.heart;
             document.getElementById('stat-energy').innerText = TILE_STATS.energy;
             document.getElementById('stat-skull').innerText = TILE_STATS.skull_dmg;
-            document.getElementById('stat-self').innerText = TILE_STATS.skull_self;
+            document.getElementById('stat-self-dmg').innerText = TILE_STATS.skull_self_dmg
             document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
             document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
+            document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
         }
 
         function toggleModal() {

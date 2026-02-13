@@ -1,0 +1,9 @@
+Archer ulti 1 defa vuruyor cok gucsuz kaliyor
+
+alinan rewardlar liste olarak gorulebilsin 
+
+kutulari kaydirma yaparken kontrolde bir gariplik var bunu kontrol et
+
+Boss kesince +olarak reward verilebilir
+
+ulti gelmeye yakin energy esleyip siran bitmeden ulti atabiliyorun (bu kalmali mi kalkmali mi emin olamadim)
