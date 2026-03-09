@@ -884,7 +884,8 @@
 
             // Calculate Reward Picks
             let hpPercent = (playerHP / maxPlayerHP);
-            if (hpPercent >= 1.0) { rewardPicksLeft = 2; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); }
+            if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); } 
+            else if (hpPercent >= 0.75) {rewardPicksLeft = 2; log("DECENT WIN! PICK 2 Rewwards!", "log-match");}
             else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
             else if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
             else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
@@ -1228,24 +1229,13 @@
             let multiplier = 1;
             let isCross = (group.subShape === 'cross');
 
-            // --- NEW BALANCE LOGIC ---
-            if (count === 3) {
-                multiplier = 1;
-            } 
-            else if (count === 4) {
-                shapeLabel = '4';
-                multiplier = 2;
-                extraTurnTriggered = true; // Extra Turn
-            } 
-            else if (isCross) { // L or T Shape
-                shapeLabel = 'CROSS';
-                multiplier = 2.5;
-                extraTurnTriggered = true; // Extra Turn
-            } 
-            else if (count === 5) { // Straight Line of 5
-                shapeLabel = '5';
-                multiplier = 3;
-                if(isPlayerTurn) ultCharge += 30; // +30 Percent Ult
+            // --- FIXED PRIORITY LOGIC ---
+            
+            // 1. Check for Massive Matches FIRST (Rare & Powerful)
+            if (count >= 7) {
+                shapeLabel = '7!!';
+                multiplier = 4;
+                if (isPlayerTurn) ultCharge += 90;
                 extraTurnTriggered = true;
             } 
             else if (count === 6) {
@@ -1254,22 +1244,39 @@
                 if (isPlayerTurn) ultCharge += 60;
                 extraTurnTriggered = true;
             } 
-            else if (count >= 7) {
-                shapeLabel = '7!!';
-                multiplier = 4;
-                if (isPlayerTurn) ultCharge += 90;
+            // 2. Then check for 5 (Straight Line usually beats Cross in Match-3 logic)
+            else if (count === 5 && !isCross) { 
+                shapeLabel = '5';
+                multiplier = 3;
+                if(isPlayerTurn) ultCharge += 30; 
                 extraTurnTriggered = true;
+            }
+            // 3. Then check for Crosses (L / T Shapes of 5 tiles)
+            else if (isCross) { 
+                shapeLabel = 'CROSS';
+                multiplier = 2.5;
+                extraTurnTriggered = true; 
+            } 
+            // 4. Finally, standard matches
+            else if (count === 4) {
+                shapeLabel = '4';
+                multiplier = 2;
+                extraTurnTriggered = true; 
+            } 
+            else {
+                // Default Match 3
+                multiplier = 1;
             }
 
             // --- VISUALS & LOGS ---
-            if (!isInitial && count > 3) {
+            if (!isInitial && multiplier > 1) { // Only log if it's special
                 let typeInfo = tileTypes.find(t => t.type === group.type);
                 let user = isPlayerTurn ? "Player" : "Enemy";
                 
                 log(`${user}: ${shapeLabel} Match! (x${multiplier})`, "log-match");
 
                 let centerTile = tiles[group.indices[1]];
-                let color = (shapeLabel === '5' || count >= 6) ? "#f1c40f" : "#e74c3c";
+                let color = (multiplier >= 3) ? "#f1c40f" : "#e74c3c";
                 showFloatingText(`${shapeLabel}x${multiplier}`, centerTile, color);
             }
 
@@ -1287,7 +1294,7 @@
                 applyRPGEffects(group.type, multiplier);
             }
         }
-
+        
         function showFloatingText(text, tileElement, color) {
             let rect = tileElement.getBoundingClientRect();
             let pop = document.createElement('div');
