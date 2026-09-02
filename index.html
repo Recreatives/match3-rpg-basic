@@ -545,10 +545,12 @@
                 <h4>🎁 REWARDS & LOOT</h4>
                 <p>After winning, you pick items. The quality depends on your performance:</p>
                 <ul style="font-size: 0.85rem;">
-                    <li><b>Flawless (100% HP):</b> Pick 2 Items (Best for scaling).</li>
+                    <li><b>Flawless (100% HP):</b> Pick 3 Items (Best for scaling).</li>
+                    <li><b>Decent Win (75%+ HP):</b> Pick 2 Items.</li>
                     <li><b>Standard Win:</b> Pick 1 Item.</li>
                     <li><b>Near Death (<10% HP):</b> Pick 3 Items (Comeback mechanic).</li>
                     <li><b>Last Stand (<1% HP):</b> Pick 5 Items (Comeback mechanic).</li>
+                    <li><b>Boss Kill Bonus:</b> +1 extra Item on top of the above.</li>
                 </ul>
                 <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;">
                     <b>Rarities:</b> <span style="color:#95a5a6">Common</span>, <span style="color:#2ecc71">Uncommon</span>, <span style="color:#3498db">Rare</span>, <span style="color:#9b59b6">Epic</span>, <span style="color:#e67e22">Legendary</span>.
@@ -574,7 +576,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.30 5orMore Matching Fixed. Loot History Added. Extra Turn at the start of the level fixed. Because of Cutinyo</div> 
+        <div class="version">v0.31 Fixed diagonal tile-swap bug, boss reward bonus added, reward tier order fixed, Archer dodge text fixed</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
@@ -706,7 +708,7 @@
             },
             ARCHER: {
                 name: "Archer", emoji: "🏹", 
-                desc: "<b>Piercing:</b> <b>30% Dodge</b>. Ult ignores Armor and deals direct HP damage.",
+                desc: "<b>Piercing:</b> <b>20% Dodge</b>. Ult ignores Armor and deals direct HP damage.",
                 passive: (stats) => {}, 
                 dodgeChance: 0.2, incomingDmgMult: 1.0,
                 ultName: "PIERCING SHOT",
@@ -756,6 +758,11 @@
         let extraTurnTriggered = false;
         let isMouseDown = false;
         let selectedTile = null;
+
+        // Without these, isMouseDown never resets after an invalid tap/drag,
+        // which permanently disabled the "reselect on invalid move" behavior.
+        document.addEventListener('mouseup', () => { isMouseDown = false; });
+        document.addEventListener('touchend', () => { isMouseDown = false; });
 
         const tileTypes = [
             { type: 'sword', symbol: '⚔️' },
@@ -883,13 +890,21 @@
             currentState = STATE.REWARD;
 
             // Calculate Reward Picks
+            // NOTE: order matters here - the <=0.01 case must be checked before
+            // <=0.10, otherwise it is unreachable (0.01 also satisfies <=0.10).
             let hpPercent = (playerHP / maxPlayerHP);
-            if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 2 Rewards!", "log-hit"); } 
-            else if (hpPercent >= 0.75) {rewardPicksLeft = 2; log("DECENT WIN! PICK 2 Rewwards!", "log-match");}
+            if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
             else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
-            else if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
+            else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 3 Rewards!", "log-hit"); }
+            else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log("DECENT WIN! Pick 2 Rewards!", "log-match"); }
             else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
-            
+
+            // Boss Bonus: an extra pick for clearing a boss level (Lvl 5, 10...)
+            if (level % 5 === 0) {
+                rewardPicksLeft += 1;
+                log("BOSS BONUS! +1 Reward!", "log-crit");
+            }
+
             generateRewards();
             updateRewardTitle();
             overlayBtn.style.display = 'none';
@@ -1075,7 +1090,7 @@
                 selectedTile = tile;
                 tile.classList.add('selected');
             } else {
-                if (tile !== selectedTile) checkAndSwap(selectedTile, tile);
+                if (tile !== selectedTile) checkAndSwap(selectedTile, tile, true);
                 else {
                     selectedTile.classList.remove('selected');
                     selectedTile = null;
@@ -1085,18 +1100,24 @@
 
         function handleInputEnter(tile) {
             if (!isMouseDown || !selectedTile || isProcessing) return;
-            if (tile !== selectedTile) checkAndSwap(selectedTile, tile);
+            if (tile !== selectedTile) checkAndSwap(selectedTile, tile, false);
         }
 
-        function checkAndSwap(tile1, tile2) {
+        // allowReselect: only a fresh tap/click (handleInputStart) may jump the
+        // selection to the tapped tile when the move is invalid; a drag passing
+        // over a non-adjacent tile (handleInputEnter) should be ignored instead.
+        function checkAndSwap(tile1, tile2, allowReselect) {
             let id1 = parseInt(tile1.id), id2 = parseInt(tile2.id);
-            const validMoves = [id1 - 1, id1 + 1, id1 - width, id1 + width];
-            if (validMoves.includes(id2)) {
+            let r1 = Math.floor(id1 / width), c1 = id1 % width;
+            let r2 = Math.floor(id2 / width), c2 = id2 % width;
+            let isAdjacent = (r1 === r2 && Math.abs(c1 - c2) === 1) || (c1 === c2 && Math.abs(r1 - r2) === 1);
+
+            if (isAdjacent) {
                 attemptSwap(tile1, tile2);
                 tile1.classList.remove('selected');
                 selectedTile = null;
-                isMouseDown = false; 
-            } else if (!isMouseDown) { 
+                isMouseDown = false;
+            } else if (allowReselect) {
                 tile1.classList.remove('selected');
                 selectedTile = tile2;
                 tile2.classList.add('selected');

@@ -1,5 +1,3 @@
-Archer ulti 1 defa vuruyor cok gucsuz kaliyor
-
 alinan rewardlar liste olarak gorulebilsin 
 
 kutulari kaydirma yaparken kontrolde bir gariplik var bunu kontrol et
