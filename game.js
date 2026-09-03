@@ -1173,6 +1173,9 @@ function toggleModal(modalId) {
         if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
             renderAchievements();
         }
+        if (modalId === 'leaderboard-modal' && typeof renderLeaderboard === 'function') {
+            renderLeaderboard();
+        }
     }
 }
 

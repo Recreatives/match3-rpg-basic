@@ -179,3 +179,29 @@ create policy "read own achievements" on public.player_achievements
 drop policy if exists "insert own achievements" on public.player_achievements;
 create policy "insert own achievements" on public.player_achievements
     for insert with check (auth.uid() = player_id);
+
+-- 9. leaderboard ---------------------------------------------------------------
+-- A player can only ever SELECT their own wallet row ("read own wallet"
+-- above) - a leaderboard needs to compare across players, which is exactly
+-- what that policy is supposed to prevent a client from doing directly.
+-- security definer lets this one function read across every wallet, but it
+-- only ever returns a display name and a gold total - never a player id,
+-- never materials, never anything else in players/wallets a player hasn't
+-- chosen to make public by setting their own display_name (players.
+-- display_name is nullable and defaults to null - "update own player row"
+-- already lets a client set it on their own row, no new policy needed for
+-- that part).
+create or replace function public.get_leaderboard(limit_count integer default 10)
+returns table(display_name text, gold integer)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select coalesce(p.display_name, 'İsimsiz Kahraman'), w.gold
+    from public.wallets w
+    join public.players p on p.id = w.player_id
+    order by w.gold desc
+    limit greatest(1, least(limit_count, 50));
+$$;
+
+grant execute on function public.get_leaderboard(integer) to authenticated, anon;

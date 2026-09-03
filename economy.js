@@ -152,6 +152,59 @@ function setShopStatus(text) {
     if (el) el.innerText = text;
 }
 
+// Top players by gold, via the get_leaderboard security definer function
+// (see supabase/schema.sql) - RLS alone would only ever let a client read
+// its OWN wallet, so comparing across players needs that one trusted,
+// narrowly-scoped read path (display name + gold only, nothing else).
+async function fetchLeaderboard(limit) {
+    const { data, error } = await sb.rpc('get_leaderboard', { limit_count: limit || 10 });
+    if (error) { console.error('Leaderboard fetch failed:', error.message); return []; }
+    return data;
+}
+
+// players.display_name is nullable and defaults to null (shown as
+// "İsimsiz Kahraman" on the leaderboard) - RLS's existing "update own player
+// row" policy already covers this, no new policy or RPC needed.
+async function setDisplayName(name) {
+    const trimmed = (name || '').trim().slice(0, 24);
+    if (!trimmed) return false;
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await sb.from('players').update({ display_name: trimmed }).eq('id', user.id);
+    if (error) { console.error('Display name update failed:', error.message); return false; }
+    return true;
+}
+
+async function renderLeaderboard() {
+    let container = document.getElementById('leaderboard-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let rows = await fetchLeaderboard(10);
+    if (rows.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz kimse altın kazanmadı.</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    rows.forEach((row, i) => {
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}</span><span class="history-stats">🪙 ${row.gold}</span>`;
+        container.appendChild(div);
+    });
+}
+
+async function submitDisplayName() {
+    let input = document.getElementById('display-name-input');
+    if (!input) return;
+    let ok = await setDisplayName(input.value);
+    let status = document.getElementById('leaderboard-name-status');
+    if (status) status.innerText = ok ? 'Kaydedildi!' : 'Kaydedilemedi.';
+    if (ok) renderLeaderboard();
+}
+
 function updateWalletUI() {
     if (!currentWallet) return;
     // Two separate displays (Loot/Stats modal, Shop modal) show the same
