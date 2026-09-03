@@ -83,15 +83,50 @@ drop policy if exists "update own wallet" on public.wallets;
 create policy "update own wallet" on public.wallets
     for update using (auth.uid() = player_id);
 
--- NOTE - security boundary for later:
--- These policies let a player update their OWN gold/materials directly. That's
--- fine for "read my balance, spend at the shop" but NOT safe once the
--- betrayal PvP steals currency FROM the loser's wallet - a client should never
--- be able to write to someone else's row, which these policies correctly
--- block, but it also means the WINNER'S client can't be the one applying the
--- steal either. That transfer needs a single trusted place to happen -
--- almost certainly a Postgres function (security definer) called "resolve_pvp"
--- or similar that both clients invoke and Supabase runs with elevated rights,
--- rather than two clients each updating their own row and hoping they agree.
--- Left as a follow-up once the PvP screen itself exists (see the design doc's
--- "Sırada Ne Var" list) - flagging now so it isn't forgotten.
+-- NOTE - security boundary, resolved below:
+-- The policies above let a player update their OWN gold/materials directly.
+-- That's fine for "read my balance, spend at the shop" but not safe for the
+-- betrayal PvP currency steal, where the WINNER'S client would otherwise need
+-- to write to the LOSER'S row - which these policies correctly block. See
+-- resolve_betrayal() below: a single trusted place (security definer) for
+-- that specific transfer, instead of two clients each updating their own row
+-- and hoping they agree.
+
+-- 6. betrayal currency transfer ------------------------------------------------
+-- Called by the WINNING client only (see coop.js/pvp.js - the loser's client
+-- never calls this, it just observes the resulting balance next time it
+-- fetches its own wallet). Moves loss_percent of the loser's gold+materials
+-- to the winner. security definer is what lets this one function touch a
+-- row that isn't the caller's own, despite the RLS policies above - every
+-- other write path in this schema still goes through auth.uid() as normal.
+create or replace function public.resolve_betrayal(winner_id uuid, loser_id uuid, loss_percent numeric)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    lost_gold integer;
+    lost_materials integer;
+begin
+    if auth.uid() is null or auth.uid() <> winner_id then
+        raise exception 'only the winner can resolve a betrayal payout';
+    end if;
+    if winner_id = loser_id then
+        raise exception 'winner and loser must differ';
+    end if;
+    if loss_percent <= 0 or loss_percent > 1 then
+        raise exception 'loss_percent must be between 0 and 1';
+    end if;
+
+    select floor(gold * loss_percent), floor(materials * loss_percent)
+        into lost_gold, lost_materials
+        from public.wallets where player_id = loser_id;
+
+    update public.wallets set gold = gold - lost_gold, materials = materials - lost_materials
+        where player_id = loser_id;
+    update public.wallets set gold = gold + lost_gold, materials = materials + lost_materials
+        where player_id = winner_id;
+end;
+$$;
+
+grant execute on function public.resolve_betrayal(uuid, uuid, numeric) to authenticated, anon;

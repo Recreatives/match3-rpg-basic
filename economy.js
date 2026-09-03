@@ -83,6 +83,20 @@ async function adjustWallet(goldDelta, materialsDelta) {
     return data;
 }
 
+// Betrayal PvP currency steal (see supabase/schema.sql's resolve_betrayal).
+// Called ONLY by the winning client - the loser's client never calls this,
+// it just sees the resulting balance next time it fetches its own wallet.
+// A security definer Postgres function does the actual transfer since RLS
+// correctly blocks a client from writing to someone else's wallet row.
+async function resolveBetrayal(winnerId, loserId, lossPercent) {
+    const { error } = await sb.rpc('resolve_betrayal', {
+        winner_id: winnerId, loser_id: loserId, loss_percent: lossPercent
+    });
+    if (error) { console.error('resolve_betrayal failed:', error.message); return false; }
+    await fetchWallet();
+    return true;
+}
+
 function updateWalletUI() {
     let goldEl = document.getElementById('wallet-gold');
     let matEl = document.getElementById('wallet-materials');

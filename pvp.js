@@ -1,11 +1,13 @@
-// --- PVP PROTOTYPE (real-time 1v1) ---
-// This validates the hardest technical piece of the betrayal system - two
-// real browsers seeing each other's moves live - before the betrayal vote,
-// Kibir Laneti, and currency stakes get layered on top (see the "İhanet
-// Protokolü" design doc). It has its own state and its own board, entirely
-// separate from game.js's single-player globals (isPlayerTurn, currentState,
-// etc.) - the two modes never touch the same variables, so nothing here can
-// destabilize the existing single-player game.
+// --- PVP (real-time 1v1) ---
+// Started as a prototype validating the hardest technical piece of the
+// betrayal system - two real browsers seeing each other's moves live -
+// before the betrayal vote, Kibir Laneti, and currency stakes got layered on
+// top (see the "İhanet Protokolü" design doc). Those are all here now, gated
+// behind pvpBetrayalMode (see "BETRAYAL MODE" below) - manually joining a
+// room via "PvP Test" leaves that null and behaves exactly as before. It has
+// its own state and its own board, entirely separate from game.js's single-
+// player globals (isPlayerTurn, currentState, etc.) - the two modes never
+// touch the same variables, so nothing here can destabilize single-player.
 //
 // Match detection, the multiplier/extra-turn/ult-charge rules per match
 // size, class passives, and ultimates are all the SAME code single-player
@@ -24,7 +26,10 @@
 // vulnerability) and reports back if it died. Nobody's client ever has to
 // trust or replicate the other's board.
 //
-// Turn order: whoever's presence timestamp is earliest goes first.
+// Turn order: whoever's presence timestamp is earliest goes first - UNLESS
+// coop.js started this match as a betrayal duel, in which case it forces the
+// betrayer to move first (pvpForcedFirstMoverId) instead. See "BETRAYAL MODE"
+// below for that and the rest of what coop.js's hidden vote can trigger.
 
 const PVP_WIDTH = 8;
 const PVP_MAX_HP = 100;
@@ -32,6 +37,7 @@ const PVP_MAX_HP = 100;
 let pvpChannel = null;
 let pvpRoomCode = null;
 let pvpMyId = null;
+let pvpOpponentId = null;
 let pvpTiles = [];
 let pvpStarted = false;
 let pvpMyTurn = false;
@@ -43,6 +49,17 @@ let pvpMatchOver = false;
 let pvpThinkingInterval = null;
 let pvpUltCharge = 0;
 let pvpExtraTurnTriggered = false;
+
+// --- BETRAYAL MODE ------------------------------------------------------------
+// Set only when coop.js routes a betrayal-vote outcome into a PvP duel
+// (pvpJoinBetrayalRoom) - null for every ordinary "PvP Test" match, which
+// keeps all of this completely inert for manual testing.
+//   isBetrayer: am I the one who chose ihanet (only meaningful when !isMutual)
+//   isMutual:   both players chose ihanet - fair fight, no curse, higher stakes
+let pvpBetrayalMode = null;
+let pvpForcedFirstMoverId = null; // betrayer's uid, one-sided betrayal only
+let pvpCurseTurnCount = 0; // counts MY OWN turns; Kibir Laneti bites from turn 2
+let pvpBetrayalResolved = false; // guards the currency RPC against double-firing
 
 // Effects accumulate here across a whole turn (including any cascade) and
 // get flushed as ONE log line when the turn actually ends, instead of one
@@ -89,10 +106,29 @@ async function pvpJoinRoom() {
     let code = input ? input.value.trim().toUpperCase() : '';
     if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
 
+    pvpBetrayalMode = null;
+    pvpForcedFirstMoverId = null;
+    await pvpConnectChannel(code);
+    pvpSetStatus(`Oda "${pvpRoomCode}" - rakip bekleniyor…`);
+}
+
+// Entry point coop.js calls once its hidden betrayal vote resolves to
+// anything other than both-loyal - skips the manual room-code screen
+// entirely since both players already know the room (derived from the
+// co-op room they're already in) and each other's identity.
+async function pvpJoinBetrayalRoom(code, opts) {
+    pvpBetrayalMode = { isBetrayer: !!opts.isBetrayer, isMutual: !!opts.isMutual };
+    pvpForcedFirstMoverId = opts.firstMoverId || null;
+    await pvpConnectChannel(code);
+    pvpSetStatus(pvpBetrayalMode.isMutual ? 'İhanet düellosu hazırlanıyor…' : (pvpBetrayalMode.isBetrayer ? 'İlk vuruş senin - düello hazırlanıyor…' : 'İhanete uğradın - düello hazırlanıyor…'));
+}
+
+async function pvpConnectChannel(code) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { pvpSetStatus('Giriş yapılamadı, sayfayı yenile.'); return; }
     pvpMyId = user.id;
     pvpRoomCode = code;
+    pvpStarted = false;
 
     if (pvpChannel) await pvpChannel.unsubscribe();
 
@@ -105,11 +141,13 @@ async function pvpJoinRoom() {
     pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
     pvpChannel.on('presence', { event: 'sync' }, () => pvpCheckPresence());
 
-    pvpChannel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-            await pvpChannel.track({ joined_at: Date.now() });
-            pvpSetStatus(`Oda "${pvpRoomCode}" - rakip bekleniyor…`);
-        }
+    await new Promise(resolve => {
+        pvpChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await pvpChannel.track({ joined_at: Date.now() });
+                resolve();
+            }
+        });
     });
 }
 
@@ -121,9 +159,11 @@ function pvpCheckPresence() {
 
     let entries = keys.map(k => ({ key: k, joinedAt: state[k][0].joined_at }));
     entries.sort((a, b) => a.joinedAt - b.joinedAt);
+    let opponent = entries.find(e => e.key !== pvpMyId);
+    pvpOpponentId = opponent ? opponent.key : null;
 
     pvpStarted = true;
-    pvpMyTurn = entries[0].key === pvpMyId;
+    pvpMyTurn = pvpForcedFirstMoverId ? (pvpForcedFirstMoverId === pvpMyId) : (entries[0].key === pvpMyId);
     pvpStartMatch();
 }
 
@@ -136,6 +176,8 @@ function pvpStartMatch() {
     pvpExtraTurnTriggered = false;
     pvpMatchOver = false;
     pvpProcessing = false;
+    pvpCurseTurnCount = 0;
+    pvpBetrayalResolved = false;
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
     pvpIncomingStats = { damage: 0 };
 
@@ -144,9 +186,41 @@ function pvpStartMatch() {
 
     pvpCreateBoard();
     pvpUpdateUI();
-    pvpLog('🟢 Rakip bağlı - eşleşme başladı.');
-    if (pvpMyTurn) { pvpStopThinkingAnimation(); pvpSetStatus('Senin sıran!'); }
-    else pvpStartThinkingAnimation();
+    pvpLog(pvpBetrayalMode ? '⚔️ İhanet düellosu başladı.' : '🟢 Rakip bağlı - eşleşme başladı.');
+    if (pvpMyTurn) {
+        pvpStopThinkingAnimation();
+        pvpSetStatus('Senin sıran!');
+        pvpBeginMyTurn(); // counts as my turn 1 - Kibir Laneti only bites from turn 2
+    } else pvpStartThinkingAnimation();
+}
+
+// Kibir Laneti: only the betrayer in a one-sided duel carries this. Their
+// free first strike is turn 1 (no curse); from turn 2 on, self-damage that
+// ignores armor escalates fast enough to force them to end things quickly
+// rather than coast on the first-strike advantage forever.
+const PVP_CURSE_PERCENTS = [3, 5, 8, 13, 21, 34];
+
+function pvpBeginMyTurn() {
+    pvpCurseTurnCount++;
+    if (!pvpBetrayalMode || pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer) return;
+    if (pvpCurseTurnCount < 2) return;
+
+    let pct = PVP_CURSE_PERCENTS[Math.min(pvpCurseTurnCount - 2, PVP_CURSE_PERCENTS.length - 1)];
+    let dmg = Math.max(1, Math.round(PVP_MAX_HP * pct / 100));
+    pvpMyHP -= dmg; // ignores armor - Kibir Laneti punishes arrogance directly
+    pvpLog(`Kibir Laneti: kendine %${pct} (${dmg}) hasar verdin.`);
+    showFloatingText(`-${dmg}`, document.getElementById('pvp-my-hp-bar'), '#9b59b6');
+    pvpUpdateUI();
+
+    if (pvpMyHP <= 0 && !pvpMatchOver) {
+        pvpMatchOver = true;
+        pvpStopThinkingAnimation();
+        pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
+        pvpSetStatus('KAYBETTİN');
+        pvpLog('Kibir Laneti seni yendi.');
+        pvpLogBetrayalLossIfNeeded();
+        pvpUpdateUI();
+    }
 }
 
 // Applies an incoming hit to MY OWN hp/armor - used both for regular tile
@@ -183,6 +257,7 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
+        pvpLogBetrayalLossIfNeeded();
     }
 }
 
@@ -206,6 +281,7 @@ function pvpReceiveTurnEnd() {
     pvpMyTurn = true;
     pvpSetStatus('Senin sıran!');
     pvpUpdateUI();
+    pvpBeginMyTurn();
 }
 
 function pvpOnOpponentDefeated() {
@@ -215,6 +291,47 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
     pvpUpdateUI();
+    pvpResolveBetrayalPayoutIfNeeded();
+}
+
+// --- BETRAYAL CURRENCY STAKES --------------------------------------------------
+// Only the WINNING client ever calls the RPC (resolveBetrayal, economy.js) -
+// the loser's client just observes the resulting balance next time it fetches
+// its own wallet, same "one authoritative caller" rule the rest of this file
+// uses for shared state. See supabase/schema.sql's resolve_betrayal for why a
+// client can't just write the other player's wallet row directly.
+function pvpBetrayalLossPercent() {
+    if (!pvpBetrayalMode) return 0;
+    return pvpBetrayalMode.isMutual ? 0.25 : 0.15;
+}
+
+function pvpResolveBetrayalPayoutIfNeeded() {
+    if (!pvpBetrayalMode || pvpBetrayalResolved) return;
+    pvpBetrayalResolved = true;
+
+    if (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer) {
+        // Mutual winner either way, or the betrayer winning their one-sided
+        // duel: steal currency from the loser.
+        let pct = pvpBetrayalLossPercent();
+        resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(ok => {
+            pvpLog(ok ? `Rakibinden %${Math.round(pct * 100)} çaldın.` : 'Ödül aktarımı başarısız oldu.');
+        });
+    } else {
+        // The loyal player winning against a betrayer - deliberately tiny,
+        // no steal from the betrayer's wallet (see the design doc: this
+        // reward is intentionally small so loyalty isn't a free win).
+        adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
+    }
+}
+
+function pvpLogBetrayalLossIfNeeded() {
+    if (!pvpBetrayalMode) return;
+    if (pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer) {
+        let pct = pvpBetrayalLossPercent();
+        pvpLog(`Cüzdanının %${Math.round(pct * 100)}'i rakibine geçti.`);
+    } else {
+        pvpLog('İhanetin sana kazandırmadı ama cüzdanın güvende.');
+    }
 }
 
 // --- ULTIMATE ----------------------------------------------------------------
@@ -253,6 +370,7 @@ function pvpUseUltimate() {
         pvpMatchOver = true;
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
+        pvpLogBetrayalLossIfNeeded();
         pvpUpdateUI();
         return;
     }
@@ -411,6 +529,7 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpSetStatus('KAYBETTİN');
         pvpLogTurnSummary();
         pvpLog('Kendi hasarınla yenildin.');
+        pvpLogBetrayalLossIfNeeded();
     }
 }
 

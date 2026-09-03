@@ -4,9 +4,13 @@
 // fixed boss fight into an actual level-by-level dungeon run: minions on
 // most levels, a boss every 5th, healing between levels - the same shape
 // single-player's own run already has (see game.js's startLevel/winLevel).
-// The hidden betrayal vote, Kibir Laneti and currency stakes from the
-// "İhanet Protokolü" design doc are still NOT here - this only proves two
-// players can run an open-ended shared dungeon together.
+// Right before every boss level (5, 10, 15...), a hidden vote decides what
+// happens next - see "BETRAYAL VOTE" below. Answer loyal/loyal and the co-op
+// boss fight above proceeds exactly as always. Answer anything else and the
+// boss is skipped entirely: both players get routed into a real-time PvP
+// duel instead (pvp.js's pvpJoinBetrayalRoom), and the run ends once that
+// resolves - win or lose. That's the actual "İhanet Protokolü" the whole
+// multiplayer side of this project was built toward.
 //
 // Reuses the exact same match rules single-player and PvP already share
 // (findMatchGroups, getMatchShapeInfo, applyDefensiveTraits, CLASSES) via
@@ -44,6 +48,7 @@ const COOP_DIFFICULTY_MULT = 1.5;
 let coopChannel = null;
 let coopRoomCode = null;
 let coopMyId = null;
+let coopAllyId = null;
 let coopIsHost = false;
 let coopRole = null; // 'host' | 'guest'
 let coopTiles = [];
@@ -69,6 +74,12 @@ let coopExtraTurnTriggered = false;
 let coopPendingResolution = null;
 
 let coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+
+// --- BETRAYAL VOTE STATE -------------------------------------------------------
+let coopVoteChoice = null; // my own answer for the CURRENT boss gate, until resolved
+let coopVotes = {}; // {host, guest} choices - only ever fully populated on the host
+let coopPendingBossLevel = null; // the boss level this vote is gating
+let coopPendingContinuingRole = null; // whoever's turn carries in if the vote is loyal/loyal
 
 function coopLog(msg) {
     let el = document.getElementById('coop-log');
@@ -135,6 +146,9 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
+    coopChannel.on('broadcast', { event: 'betrayal-vote-open' }, ({ payload }) => coopOpenBetrayalVote(payload));
+    coopChannel.on('broadcast', { event: 'betrayal-vote' }, ({ payload }) => coopOnAllyVote(payload));
+    coopChannel.on('broadcast', { event: 'betrayal-result' }, ({ payload }) => coopApplyBetrayalResult(payload));
     coopChannel.on('presence', { event: 'sync' }, () => coopCheckPresence());
 
     coopChannel.subscribe(async (status) => {
@@ -153,6 +167,8 @@ function coopCheckPresence() {
 
     let entries = keys.map(k => ({ key: k, joinedAt: state[k][0].joined_at }));
     entries.sort((a, b) => a.joinedAt - b.joinedAt);
+    let ally = entries.find(e => e.key !== coopMyId);
+    coopAllyId = ally ? ally.key : null;
 
     coopStarted = true;
     coopIsHost = entries[0].key === coopMyId;
@@ -313,7 +329,9 @@ function coopApplyEnemyDamage(amount, fromRole) {
 
 // A killing blow isn't countered - the player who landed it carries their
 // turn straight into the next level, same as single-player always handing
-// the very next turn back to the player after a win.
+// the very next turn back to the player after a win. Unless the level that
+// unlocks is a boss level, in which case the hidden betrayal vote gates it
+// first - see coopOpenBetrayalVote below.
 function coopBeginLevelTransition(continuingRole) {
     coopMatchOver = true; // pause all board interaction until the next level-start
     coopStopThinkingAnimation();
@@ -323,11 +341,100 @@ function coopBeginLevelTransition(continuingRole) {
     coopChannel.send({ type: 'broadcast', event: 'enemy-defeated', payload: { level: clearedLevel, isBoss: clearedIsBoss } });
     coopOnEnemyDefeated({ level: clearedLevel, isBoss: clearedIsBoss });
 
+    let nextLevel = clearedLevel + 1;
     setTimeout(() => {
-        let payload = coopBuildLevelPayload(clearedLevel + 1, continuingRole);
-        coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
-        coopOnLevelStart(payload);
+        if (coopIsBoss(nextLevel)) {
+            let votePayload = { level: nextLevel, continuingRole };
+            coopChannel.send({ type: 'broadcast', event: 'betrayal-vote-open', payload: votePayload });
+            coopOpenBetrayalVote(votePayload);
+        } else {
+            let payload = coopBuildLevelPayload(nextLevel, continuingRole);
+            coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+            coopOnLevelStart(payload);
+        }
     }, 1500);
+}
+
+// --- BETRAYAL VOTE -------------------------------------------------------------
+// Both players answer without seeing the other's choice until both are in -
+// see coopMaybeResolveVotes. Loyal/loyal proceeds into the co-op boss fight
+// exactly as before; anything else skips the boss and routes both players
+// into a real PvP duel instead (pvp.js's pvpJoinBetrayalRoom). The run ends
+// once that resolves, win or lose - only the loyal/loyal path continues the
+// dungeon.
+function coopOpenBetrayalVote(payload) {
+    coopPendingBossLevel = payload.level;
+    coopPendingContinuingRole = payload.continuingRole;
+    coopVoteChoice = null;
+    coopVotes = {};
+
+    document.getElementById('coop-battle').style.display = 'none';
+    document.getElementById('betrayal-vote-modal').style.display = 'flex';
+    document.getElementById('betrayal-vote-status').innerText = '';
+    document.querySelectorAll('#betrayal-vote-modal button').forEach(b => b.disabled = false);
+    coopLog(`⚠️ Lvl ${payload.level} BOSS öncesi gizli oy zamanı!`);
+}
+
+function coopSubmitBetrayalVote(choice) {
+    if (coopVoteChoice) return;
+    coopVoteChoice = choice;
+    coopVotes[coopRole] = choice;
+    document.getElementById('betrayal-vote-status').innerText = 'Cevabın gönderildi. Takım arkadaşın bekleniyor…';
+    document.querySelectorAll('#betrayal-vote-modal button').forEach(b => b.disabled = true);
+    coopChannel.send({ type: 'broadcast', event: 'betrayal-vote', payload: { role: coopRole, choice } });
+    coopMaybeResolveVotes();
+}
+
+function coopOnAllyVote(payload) {
+    coopVotes[payload.role] = payload.choice;
+    coopMaybeResolveVotes();
+}
+
+// Only the host ever actually decides/broadcasts the outcome, same "one
+// authoritative caller" rule the rest of this file uses - otherwise both
+// clients might independently compute and broadcast the same result.
+function coopMaybeResolveVotes() {
+    if (!coopIsHost) return;
+    if (!coopVotes.host || !coopVotes.guest) return;
+    let result = { hostChoice: coopVotes.host, guestChoice: coopVotes.guest, level: coopPendingBossLevel, continuingRole: coopPendingContinuingRole };
+    coopChannel.send({ type: 'broadcast', event: 'betrayal-result', payload: result });
+    coopApplyBetrayalResult(result);
+}
+
+function coopApplyBetrayalResult(result) {
+    document.getElementById('betrayal-vote-modal').style.display = 'none';
+    coopVotes = {};
+
+    let bothLoyal = (result.hostChoice === 'loyal' && result.guestChoice === 'loyal');
+    if (bothLoyal) {
+        document.getElementById('coop-battle').style.display = 'block';
+        coopLog('İkiniz de sadık kaldınız - boss karşınızda!');
+        if (coopIsHost) {
+            let payload = coopBuildLevelPayload(result.level, result.continuingRole);
+            coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+            coopOnLevelStart(payload);
+        }
+        return;
+    }
+
+    let isMutual = (result.hostChoice === 'betray' && result.guestChoice === 'betray');
+    let betrayerRole = isMutual ? null : (result.hostChoice === 'betray' ? 'host' : 'guest');
+    let iAmBetrayer = (betrayerRole === coopRole);
+
+    coopLog(isMutual ? '💀 İKİNİZ DE İHANET ETTİNİZ! 1v1 düellosu başlıyor…'
+        : (iAmBetrayer ? '🗡️ İHANET ETTİN! İlk vuruş senin, ama Kibir Laneti seni bekliyor.'
+        : '🗡️ TAKIM ARKADAŞIN İHANET ETTİ! 1v1 düellosuna sürükleniyorsun…'));
+
+    // Each client derives host/guest uids from its OWN coopIsHost/coopMyId/
+    // coopAllyId, so this comes out identical on both machines without any
+    // extra round trip.
+    let hostId = coopIsHost ? coopMyId : coopAllyId;
+    let guestId = coopIsHost ? coopAllyId : coopMyId;
+    let firstMoverId = isMutual ? null : (betrayerRole === 'host' ? hostId : guestId);
+
+    toggleModal('coop-modal');
+    toggleModal('pvp-modal');
+    pvpJoinBetrayalRoom(`${coopRoomCode}-B${result.level}`, { isBetrayer: iAmBetrayer, isMutual, firstMoverId });
 }
 
 // Called (host only) once a player's turn (theirs or the remote player's)
