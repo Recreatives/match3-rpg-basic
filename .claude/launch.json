@@ -4,8 +4,8 @@
     {
       "name": "static-server",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8173"],
-      "port": 8173
+      "runtimeArgs": ["-m", "http.server", "8184"],
+      "port": 8184
     }
   ]
 }
