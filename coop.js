@@ -45,6 +45,27 @@ const COOP_REVIVE_PCT = 0.3;
 // in game.js) so two players sharing one enemy pool don't trivialize it.
 const COOP_DIFFICULTY_MULT = 1.5;
 
+// Minion variety: every non-boss level cycles through these four flavors
+// (by level number, so it's always the same for a given level - both
+// players derive the same type without the host needing to randomize and
+// broadcast a choice). Boss levels always stay 'boss' - untouched by any of
+// these gimmicks.
+const COOP_MINION_TYPES = ['normal', 'armored', 'swift', 'drain'];
+const COOP_ARMORED_PCT = 0.3; // starting armor as a fraction of the level's max HP
+const COOP_DRAIN_AMOUNT = 15; // flat ult-charge % stolen per drain hit
+
+function coopMinionTypeForLevel(level) {
+    return coopIsBoss(level) ? 'boss' : COOP_MINION_TYPES[(level - 1) % COOP_MINION_TYPES.length];
+}
+
+const COOP_MINION_ICON = { normal: '👾', armored: '🛡️', swift: '⚡', drain: '🌀', boss: '👹' };
+const COOP_MINION_LOG = {
+    normal: '',
+    armored: '🛡️ Zırhlı düşman - önce zırhını kırman gerekiyor.',
+    swift: '⚡ Hızlı düşman - karşı saldırısı iki kat sert vuruyor.',
+    drain: '🌀 Enerji emen düşman - saldırısı ult şarjını da çalıyor.'
+};
+
 let coopChannel = null;
 let coopRoomCode = null;
 let coopMyId = null;
@@ -67,6 +88,7 @@ let coopMyHP = COOP_MAX_HP, coopMyArmor = 0, coopMyDown = false;
 let coopAllyHP = COOP_MAX_HP, coopAllyArmor = 0, coopAllyDown = false;
 let coopLevel = 1, coopIsBossLevel = false;
 let coopEnemyHP = 0, coopEnemyMaxHP = 0, coopEnemyStats = null;
+let coopMinionType = 'normal', coopEnemyArmor = 0;
 let coopUltCharge = 0;
 let coopExtraTurnTriggered = false;
 // Set by the host between firing an enemy-attack at the remote player and
@@ -140,6 +162,7 @@ function coopResetSessionState() {
     coopAllyHP = COOP_MAX_HP; coopAllyArmor = 0; coopAllyDown = false;
     coopLevel = 1; coopIsBossLevel = false;
     coopEnemyHP = 0; coopEnemyMaxHP = 0; coopEnemyStats = null;
+    coopMinionType = 'normal'; coopEnemyArmor = 0;
     coopUltCharge = 0;
     coopExtraTurnTriggered = false;
     coopPendingResolution = null;
@@ -173,7 +196,7 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'level-start' }, ({ payload }) => coopOnLevelStart(payload));
     coopChannel.on('broadcast', { event: 'enemy-defeated' }, ({ payload }) => coopOnEnemyDefeated(payload));
     coopChannel.on('broadcast', { event: 'enemy-damage' }, ({ payload }) => { if (coopIsHost) coopApplyEnemyDamage(payload.amount || 0, payload.from); });
-    coopChannel.on('broadcast', { event: 'enemy-hp-sync' }, ({ payload }) => { coopEnemyHP = payload.hp; coopUpdateUI(); });
+    coopChannel.on('broadcast', { event: 'enemy-hp-sync' }, ({ payload }) => { coopEnemyHP = payload.hp; coopEnemyArmor = payload.armor || 0; coopUpdateUI(); });
     coopChannel.on('broadcast', { event: 'enemy-attack' }, ({ payload }) => coopOnEnemyAttack(payload));
     coopChannel.on('broadcast', { event: 'hp-sync' }, ({ payload }) => coopOnAllyHpSync(payload));
     coopChannel.on('broadcast', { event: 'turn-set' }, ({ payload }) => coopOnTurnSet(payload));
@@ -237,7 +260,13 @@ function coopComputeEnemyMaxHP(level, isBoss) {
 function coopBuildLevelPayload(level, continuingRole) {
     let isBoss = coopIsBoss(level);
     let maxHP = coopComputeEnemyMaxHP(level, isBoss);
-    return { level, isBoss, enemyHP: maxHP, enemyMaxHP: maxHP, enemyStats: coopComputeEnemyStats(level, isBoss), continuingRole };
+    let minionType = coopMinionTypeForLevel(level);
+    let startingArmor = minionType === 'armored' ? Math.round(maxHP * COOP_ARMORED_PCT) : 0;
+    return {
+        level, isBoss, minionType,
+        enemyHP: maxHP, enemyMaxHP: maxHP, enemyArmor: startingArmor,
+        enemyStats: coopComputeEnemyStats(level, isBoss), continuingRole
+    };
 }
 
 // --- RUN / LEVEL LIFECYCLE ----------------------------------------------------
@@ -282,14 +311,16 @@ function coopOnLevelStart(payload) {
     coopIsBossLevel = payload.isBoss;
     coopEnemyHP = payload.enemyHP;
     coopEnemyMaxHP = payload.enemyMaxHP;
+    coopEnemyArmor = payload.enemyArmor || 0;
     coopEnemyStats = payload.enemyStats;
+    coopMinionType = payload.minionType || 'normal';
     coopMatchOver = false;
     coopProcessing = false;
     coopMyTurn = (payload.continuingRole === coopRole);
 
     coopCreateBoard();
     coopUpdateUI();
-    coopLog(payload.isBoss ? `⚠️ BOSS - Lvl ${payload.level} başlıyor!` : `Lvl ${payload.level} başlıyor.`);
+    coopLog(payload.isBoss ? `⚠️ BOSS - Lvl ${payload.level} başlıyor!` : `Lvl ${payload.level} başlıyor. ${COOP_MINION_LOG[coopMinionType]}`);
     if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); }
     else coopStartThinkingAnimation();
 }
@@ -315,11 +346,21 @@ function coopSyncSelfState() {
 }
 
 // Applies an incoming hit to MY OWN hp/armor (enemy attack aimed at me).
-function coopApplyIncomingDamage(amount) {
+// drainUlt (only ever set by a 'drain'-type minion, see COOP_MINION_TYPES)
+// also steals a flat chunk of my ult charge - still applies even on a
+// dodge, since dodging is about the hit itself, not whatever's siphoning
+// energy alongside it.
+function coopApplyIncomingDamage(amount, drainUlt) {
+    if (drainUlt) {
+        coopUltCharge = Math.max(0, coopUltCharge - drainUlt);
+        coopLog(`Enerjini emdi: ult -%${drainUlt}`);
+    }
+
     let afterDefense = applyDefensiveTraits(amount);
     if (afterDefense === null) {
         showFloatingText("DODGE!", document.getElementById('coop-my-hp-bar'), "#2ecc71");
         coopLog('Saldırıyı savuşturdun!');
+        coopUpdateUI();
         return;
     }
     amount = afterDefense;
@@ -334,7 +375,7 @@ function coopApplyIncomingDamage(amount) {
 
 function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
-    if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0);
+    if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0, payload.drainUlt || 0);
     else coopLog(`Düşman takım arkadaşına ${payload.amount} hasar verdi.`);
 }
 
@@ -355,8 +396,12 @@ function coopOnAllyHpSync(payload) {
 
 function coopApplyEnemyDamage(amount, fromRole) {
     if (coopMatchOver) return;
-    coopEnemyHP = Math.max(0, coopEnemyHP - amount);
-    coopChannel.send({ type: 'broadcast', event: 'enemy-hp-sync', payload: { hp: coopEnemyHP } });
+    // Armored minions (see COOP_MINION_TYPES) start a level with a chunk of
+    // armor that has to be broken through first - same absorb-then-hp order
+    // every armor pool in this game uses.
+    if (coopEnemyArmor >= amount) coopEnemyArmor -= amount;
+    else { coopEnemyHP = Math.max(0, coopEnemyHP - (amount - coopEnemyArmor)); coopEnemyArmor = 0; }
+    coopChannel.send({ type: 'broadcast', event: 'enemy-hp-sync', payload: { hp: coopEnemyHP, armor: coopEnemyArmor } });
     coopUpdateUI();
     if (coopEnemyHP <= 0) coopBeginLevelTransition(fromRole || coopRole);
 }
@@ -559,15 +604,21 @@ function coopHostResolveTurnEnd(moverRole) {
         return;
     }
 
-    let dmg = Math.round(coopEnemyStats.sword * (1 + Math.random() * 0.6));
+    let rollHit = () => Math.round(coopEnemyStats.sword * (1 + Math.random() * 0.6));
+    // Swift minions (see COOP_MINION_TYPES) hit twice as often as they get a
+    // turn - modeled as two independent rolls summed into one attack message
+    // rather than two separate ones, so the remote-target wait below still
+    // only ever has to happen once per turn.
+    let dmg = coopMinionType === 'swift' ? rollHit() + rollHit() : rollHit();
+    let drainUlt = coopMinionType === 'drain' ? COOP_DRAIN_AMOUNT : 0;
 
     if (moverRole === coopRole) {
-        coopApplyIncomingDamage(dmg);
-        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg } });
+        coopApplyIncomingDamage(dmg, drainUlt);
+        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg, drainUlt } });
         coopFinishHostTurnResolution(moverRole);
     } else {
         coopPendingResolution = { moverRole };
-        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg } });
+        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg, drainUlt } });
         // Waits for that player's own hp-sync (see coopOnAllyHpSync) before continuing.
     }
 }
@@ -888,10 +939,12 @@ function coopUpdateUI() {
     let enemyBar = document.getElementById('coop-boss-hp-bar');
     let enemyText = document.getElementById('coop-boss-hp-text');
     if (enemyBar) enemyBar.style.width = enemyPct + '%';
-    if (enemyText) enemyText.innerText = `${Math.max(0, Math.floor(coopEnemyHP))}/${coopEnemyMaxHP}`;
+    if (enemyText) enemyText.innerText = `${Math.max(0, Math.floor(coopEnemyHP))}/${coopEnemyMaxHP}` + (coopEnemyArmor > 0 ? ` [+${coopEnemyArmor}]` : '');
 
     let levelLabel = document.getElementById('coop-level-label');
-    if (levelLabel) levelLabel.innerText = coopIsBossLevel ? `Lvl ${coopLevel} 👹 BOSS` : `Lvl ${coopLevel}`;
+    if (levelLabel) levelLabel.innerText = coopIsBossLevel
+        ? `Lvl ${coopLevel} 👹 BOSS`
+        : `Lvl ${coopLevel} ${COOP_MINION_ICON[coopMinionType] || ''}`;
 
     let ultBar = document.getElementById('coop-ult-bar');
     let ultText = document.getElementById('coop-ult-text');
