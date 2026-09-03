@@ -640,50 +640,71 @@ function mergeIntersectingMatches(hRuns, vRuns) {
     return allMatches;
 }
 
-function checkForMatches(isInitial) {
-    if (!isInitial && currentState !== STATE.PLAYING) return false;
-    let matchesFound = false;
+// --- SHARED CORE LOGIC ---
+// findMatchGroups and getMatchShapeInfo are pure (no game-state globals) so
+// PvP mode (pvp.js) can call the exact same match-detection and multiplier
+// rules on its own separate board, instead of maintaining a second,
+// inevitably-diverging copy of these rules.
+
+// Scans a tile-element array (anything with .dataset.type, any width x width
+// board) for horizontal/vertical runs of 3+ and merges any that intersect
+// into cross (L/T) shapes. Returns the final list of match groups.
+function findMatchGroups(tileArray, w) {
     let hRuns = [], vRuns = [];
 
-    // Horizontal
-    for (let r = 0; r < width; r++) {
+    for (let r = 0; r < w; r++) {
         let count = 1;
-        for (let c = 0; c < width; c++) {
-            let i = r * width + c;
-            if (c < width-1 && tiles[i].dataset.type !== '' && tiles[i].dataset.type === tiles[i+1].dataset.type) {
+        for (let c = 0; c < w; c++) {
+            let i = r * w + c;
+            if (c < w - 1 && tileArray[i].dataset.type !== '' && tileArray[i].dataset.type === tileArray[i + 1].dataset.type) {
                 count++;
             } else {
                 if (count >= 3) {
                     let indices = [];
-                    for(let k=0; k<count; k++) indices.push(i-k);
-                    hRuns.push({indices: indices, type: tiles[i].dataset.type});
-                    matchesFound = true;
+                    for (let k = 0; k < count; k++) indices.push(i - k);
+                    hRuns.push({ indices: indices, type: tileArray[i].dataset.type });
                 }
                 count = 1;
             }
         }
     }
-    // Vertical
-    for (let c = 0; c < width; c++) {
+    for (let c = 0; c < w; c++) {
         let count = 1;
-        for (let r = 0; r < width; r++) {
-            let i = r * width + c;
-            if (r < width-1 && tiles[i].dataset.type !== '' && tiles[i].dataset.type === tiles[i+width].dataset.type) {
+        for (let r = 0; r < w; r++) {
+            let i = r * w + c;
+            if (r < w - 1 && tileArray[i].dataset.type !== '' && tileArray[i].dataset.type === tileArray[i + w].dataset.type) {
                 count++;
             } else {
                 if (count >= 3) {
                     let indices = [];
-                    for(let k=0; k<count; k++) indices.push(i-(k*width));
-                    vRuns.push({indices: indices, type: tiles[i].dataset.type});
-                    matchesFound = true;
+                    for (let k = 0; k < count; k++) indices.push(i - (k * w));
+                    vRuns.push({ indices: indices, type: tileArray[i].dataset.type });
                 }
                 count = 1;
             }
         }
     }
 
-    // NEW: Merge intersections
-    let finalGroups = mergeIntersectingMatches(hRuns, vRuns);
+    return mergeIntersectingMatches(hRuns, vRuns);
+}
+
+// Given a match's tile count and whether it's a merged cross shape, returns
+// the shape label, effect multiplier, whether it grants an extra turn, and
+// how much ult charge it grants (before the isPlayerTurn/speed-bonus scaling
+// that callers apply on top). Priority order matters: a >=7 or ===6 run
+// always outranks a same-sized cross, checked in this exact order.
+function getMatchShapeInfo(count, isCross) {
+    if (count >= 7) return { shapeLabel: '7!!', multiplier: 4, extraTurn: true, ultBonus: 90 };
+    if (count === 6) return { shapeLabel: '6!', multiplier: 3.5, extraTurn: true, ultBonus: 60 };
+    if (count === 5 && !isCross) return { shapeLabel: '5', multiplier: 3, extraTurn: true, ultBonus: 30 };
+    if (isCross) return { shapeLabel: 'CROSS', multiplier: 2.5, extraTurn: true, ultBonus: 0 };
+    if (count === 4) return { shapeLabel: '4', multiplier: 2, extraTurn: true, ultBonus: 0 };
+    return { shapeLabel: '3', multiplier: 1, extraTurn: false, ultBonus: 0 };
+}
+
+function checkForMatches(isInitial) {
+    if (!isInitial && currentState !== STATE.PLAYING) return false;
+    let finalGroups = findMatchGroups(tiles, width);
 
     if (finalGroups.length > 0) {
         finalGroups.forEach(group => processMatch(group, isInitial));
@@ -701,48 +722,11 @@ function processMatch(group, isInitial) {
     if (currentState !== STATE.PLAYING && !isInitial) return;
 
     let count = group.indices.length;
-    let shapeLabel = '3';
-    let multiplier = 1;
     let isCross = (group.subShape === 'cross');
+    let { shapeLabel, multiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
 
-    // --- FIXED PRIORITY LOGIC ---
-
-    // 1. Check for Massive Matches FIRST (Rare & Powerful)
-    if (count >= 7) {
-        shapeLabel = '7!!';
-        multiplier = 4;
-        if (isPlayerTurn) ultCharge += 90;
-        extraTurnTriggered = true;
-    }
-    else if (count === 6) {
-        shapeLabel = '6!';
-        multiplier = 3.5;
-        if (isPlayerTurn) ultCharge += 60;
-        extraTurnTriggered = true;
-    }
-    // 2. Then check for 5 (Straight Line usually beats Cross in Match-3 logic)
-    else if (count === 5 && !isCross) {
-        shapeLabel = '5';
-        multiplier = 3;
-        if(isPlayerTurn) ultCharge += 30;
-        extraTurnTriggered = true;
-    }
-    // 3. Then check for Crosses (L / T Shapes of 5 tiles)
-    else if (isCross) {
-        shapeLabel = 'CROSS';
-        multiplier = 2.5;
-        extraTurnTriggered = true;
-    }
-    // 4. Finally, standard matches
-    else if (count === 4) {
-        shapeLabel = '4';
-        multiplier = 2;
-        extraTurnTriggered = true;
-    }
-    else {
-        // Default Match 3
-        multiplier = 1;
-    }
+    if (extraTurn) extraTurnTriggered = true;
+    if (ultBonus > 0 && isPlayerTurn) ultCharge += ultBonus;
 
     // Speed Bonus: the player's own moves (and any chain reaction they
     // trigger) are further scaled by how fast the swap was made.
