@@ -161,7 +161,34 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('history-modal')">×</span>
             <div class="modal-section">
-                <h2 class="modal-title">🎒 LOOT HISTORY</h2>
+                <h2 class="modal-title">📊 STATS & LOOT</h2>
+
+                <h4>YOUR STATS</h4>
+                <div class="stats-bar">
+                    <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
+                    <div class="stat-item" title="Shield Gain"><span>🛡️</span><span id="stat-shield" class="stat-val">5</span></div>
+                    <div class="stat-item" title="Heal Amount"><span>💖</span><span id="stat-heart" class="stat-val">4</span></div>
+                    <div class="stat-item" title="Energy Gain"><span>⚡</span><span id="stat-energy" class="stat-val">12</span></div>
+
+                    <div class="stat-item" title="Skull Damage"><span>💀</span><span id="stat-skull" class="stat-val">25</span></div>
+                    <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
+                    <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
+                    <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
+                </div>
+
+                <h4 style="color:#c0665f;">ENEMY STATS</h4>
+                <div class="stats-bar enemy-stats-bar">
+                    <div class="stat-item" title="Enemy Sword Damage"><span>⚔️</span><span id="enemy-stat-sword" class="stat-val">4</span></div>
+                    <div class="stat-item" title="Enemy Shield Gain"><span>🛡️</span><span id="enemy-stat-shield" class="stat-val">4</span></div>
+                    <div class="stat-item" title="Enemy Heal Amount"><span>💖</span><span id="enemy-stat-heart" class="stat-val">3</span></div>
+                    <div class="stat-item" title="Enemy Energy Absorb"><span>⚡</span><span id="enemy-stat-energy" class="stat-val">10</span></div>
+
+                    <div class="stat-item" title="Enemy Skull Damage"><span>💀</span><span id="enemy-stat-skull" class="stat-val">15</span></div>
+                    <div class="stat-item" title="Enemy Self Damage"><span>☠️</span><span id="enemy-stat-self-dmg" class="stat-val">8</span></div>
+                </div>
+            </div>
+            <div class="modal-section">
+                <h4>🎒 LOOT HISTORY</h4>
                 <p>Total stats gained from items this run:</p>
                 <div id="total-stats-summary" class="history-summary">
                     </div>
@@ -174,18 +201,23 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.33 Fixed class-select text clipping and stray hover scrollbar, added visible Enemy Stats panel, smoother tile animations</div>
+        <div class="version">v0.34 Redesigned layout to fit small phone screens - stats moved to a modal, log collapsible, compact header</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
         </div>
     </div>
 
-    <div class="enemy-display" id="enemy-sprite">👾</div>
-    <div id="enemy-name">Slime Lvl 1</div>
-
-    <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
-    <div id="speed-bonus" class="speed-bonus">⚡ SPEED BONUS x2.0</div>
+    <div class="battle-header">
+        <div class="enemy-info">
+            <span class="enemy-display" id="enemy-sprite">👾</span>
+            <span id="enemy-name">Slime Lvl 1</span>
+        </div>
+        <div class="turn-status">
+            <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
+            <div id="speed-bonus" class="speed-bonus">⚡x2.0</div>
+        </div>
+    </div>
 
     <div class="hud">
         <div class="stat-box">
@@ -209,30 +241,6 @@
         </div>
     </div>
 
-    <div class="stats-label">YOUR STATS</div>
-    <div class="stats-bar">
-        <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
-        <div class="stat-item" title="Shield Gain"><span>🛡️</span><span id="stat-shield" class="stat-val">5</span></div>
-        <div class="stat-item" title="Heal Amount"><span>💖</span><span id="stat-heart" class="stat-val">4</span></div>
-        <div class="stat-item" title="Energy Gain"><span>⚡</span><span id="stat-energy" class="stat-val">12</span></div>
-
-        <div class="stat-item" title="Skull Damage"><span>💀</span><span id="stat-skull" class="stat-val">25</span></div>
-        <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
-        <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
-        <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
-    </div>
-
-    <div class="stats-label enemy-label">ENEMY STATS</div>
-    <div class="stats-bar enemy-stats-bar">
-        <div class="stat-item" title="Enemy Sword Damage"><span>⚔️</span><span id="enemy-stat-sword" class="stat-val">4</span></div>
-        <div class="stat-item" title="Enemy Shield Gain"><span>🛡️</span><span id="enemy-stat-shield" class="stat-val">4</span></div>
-        <div class="stat-item" title="Enemy Heal Amount"><span>💖</span><span id="enemy-stat-heart" class="stat-val">3</span></div>
-        <div class="stat-item" title="Enemy Energy Absorb"><span>⚡</span><span id="enemy-stat-energy" class="stat-val">10</span></div>
-
-        <div class="stat-item" title="Enemy Skull Damage"><span>💀</span><span id="enemy-stat-skull" class="stat-val">15</span></div>
-        <div class="stat-item" title="Enemy Self Damage"><span>☠️</span><span id="enemy-stat-self-dmg" class="stat-val">8</span></div>
-    </div>
-
     <div class="grid" id="grid">
         <div class="ai-cursor" id="ai-cursor"></div>
         <div id="game-overlay" class="game-overlay visible">
@@ -244,6 +252,11 @@
         </div>
     </div>
 
+    <div id="log-toggle" class="log-toggle" onclick="toggleLog()">
+        <span>📜</span>
+        <span id="log-latest">Waiting...</span>
+        <span class="log-chevron">▼</span>
+    </div>
     <div id="log"></div>
     <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>USE ULTIMATE (Requires 100%)</button>
     </div>

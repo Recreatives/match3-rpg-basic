@@ -64,7 +64,7 @@ function updateSpeedBonusUI() {
         return;
     }
     el.style.display = 'block';
-    el.innerText = `⚡ SPEED BONUS x${mult.toFixed(1)}`;
+    el.innerText = `⚡x${mult.toFixed(1)}`;
 }
 
 function startPlayerTimer() {
@@ -1212,6 +1212,17 @@ function log(msg, cls) {
     while (logDisplay.children.length > LOG_MAX_ENTRIES) {
         logDisplay.removeChild(logDisplay.lastChild);
     }
+
+    // The log panel is collapsed by default (see toggleLog) - keep a
+    // one-line "latest event" ticker updated so there's still live feedback
+    // without permanently costing the screen space of the full history.
+    let latestEl = document.getElementById('log-latest');
+    if (latestEl) latestEl.innerText = msg;
+}
+
+function toggleLog() {
+    logDisplay.classList.toggle('expanded');
+    document.getElementById('log-toggle').classList.toggle('open');
 }
 
 createBoard();
