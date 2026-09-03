@@ -599,3 +599,27 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
 }
 .history-name { font-weight: bold; }
 .history-stats { font-size: 0.75rem; color: #aaa; text-align: right; }
+
+/* ACHIEVEMENT TOAST */
+.achievement-toast {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translate(-50%, -20px);
+    background: #2c3e50;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 18px;
+    color: #fff;
+    font-size: 0.85rem;
+    text-align: center;
+    z-index: 300;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    pointer-events: none;
+}
+.achievement-toast.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

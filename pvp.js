@@ -332,6 +332,14 @@ function pvpResolveBetrayalPayoutIfNeeded() {
     if (!pvpBetrayalMode || pvpBetrayalResolved) return Promise.resolve();
     pvpBetrayalResolved = true;
 
+    if (pvpBetrayalMode.isMutual) {
+        unlockAchievement('mutual_destruction');
+    } else if (pvpBetrayalMode.isBetrayer) {
+        unlockAchievement('cursed_but_victorious');
+    } else {
+        unlockAchievement('loyal_survivor');
+    }
+
     if (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer) {
         // Mutual winner either way, or the betrayer winning their one-sided
         // duel: steal currency from the loser.

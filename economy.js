@@ -171,6 +171,7 @@ async function initEconomy() {
     if (!session) return;
     await fetchWallet();
     await fetchOwnedItems();
+    if (typeof fetchAchievements === 'function') await fetchAchievements();
 }
 
 initEconomy();

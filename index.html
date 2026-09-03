@@ -222,6 +222,17 @@
         </div>
     </div>
 
+    <div id="achievements-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 420px;">
+            <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🏆 BAŞARIMLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Solo, PvP ve co-op'ta kazanılan kalıcı rozetler.</p>
+                <div id="achievement-list"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="pvp-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('pvp-modal')">×</span>
@@ -327,8 +338,9 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.41 Item/set shop - permanent gear bought with the persistent wallet, felt in solo, PvP and co-op alike</div>
+        <div class="version">v0.42 Achievements - 8 permanent milestones across solo, PvP and co-op</div>
         <div>
+            <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>
             <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP Test</button>
@@ -393,6 +405,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="economy.js"></script>
     <script src="items.js"></script>
+    <script src="achievements.js"></script>
     <script src="game.js"></script>
     <script src="pvp.js"></script>
     <script src="coop.js"></script>

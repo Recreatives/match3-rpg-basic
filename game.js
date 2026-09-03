@@ -342,9 +342,11 @@ function winLevel() {
     let hpPercent = (playerHP / maxPlayerHP);
     if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
     else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
-    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 3 Rewards!", "log-hit"); }
+    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 3 Rewards!", "log-hit"); unlockAchievement('flawless_victory'); }
     else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log("DECENT WIN! Pick 2 Rewards!", "log-match"); }
     else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
+
+    if (level % 5 === 0) unlockAchievement('boss_slayer');
 
     // Boss Bonus: an extra pick for clearing a boss level (Lvl 5, 10...)
     if (level % 5 === 0) {
@@ -1167,6 +1169,9 @@ function toggleModal(modalId) {
         if (modalId === 'shop-modal') {
             if (typeof fetchWallet === 'function') fetchWallet();
             if (typeof renderShop === 'function') renderShop();
+        }
+        if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
+            renderAchievements();
         }
     }
 }

@@ -327,6 +327,9 @@ function coopOnLevelStart(payload) {
 
 function coopOnEnemyDefeated(payload) {
     coopLog(payload.isBoss ? `Boss (Lvl ${payload.level}) yenildi!` : `Minion (Lvl ${payload.level}) yenildi!`);
+    // Only ever reached via the loyal path (a betrayal vote skips the boss
+    // fight entirely), so this always means it was won together.
+    if (payload.isBoss) unlockAchievement('dungeon_boss_5');
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------
@@ -573,6 +576,7 @@ function coopApplyBetrayalResult(result) {
     let isMutual = (result.hostChoice === 'betray' && result.guestChoice === 'betray');
     let betrayerRole = isMutual ? null : (result.hostChoice === 'betray' ? 'host' : 'guest');
     let iAmBetrayer = (betrayerRole === coopRole);
+    if (iAmBetrayer || isMutual) unlockAchievement('first_betrayal');
 
     coopLog(isMutual ? '💀 İKİNİZ DE İHANET ETTİNİZ! 1v1 düellosu başlıyor…'
         : (iAmBetrayer ? '🗡️ İHANET ETTİN! İlk vuruş senin, ama Kibir Laneti seni bekliyor.'
@@ -647,6 +651,7 @@ function coopReviveRole(role) {
     if (role === coopRole) {
         coopMyHP = reviveHP; coopMyArmor = 0; coopMyDown = false;
         coopLog('Takım arkadaşın seni ayağa kaldırdı!');
+        unlockAchievement('down_and_up');
     } else {
         coopAllyHP = reviveHP; coopAllyArmor = 0; coopAllyDown = false;
         coopLog('Takım arkadaşını ayağa kaldırdın!');
@@ -661,6 +666,7 @@ function coopOnRevive(payload) {
         coopMyHP = reviveHP; coopMyArmor = 0; coopMyDown = false;
         coopLog('Takım arkadaşın seni ayağa kaldırdı!');
         coopChannel.send({ type: 'broadcast', event: 'hp-sync', payload: { role: coopRole, hp: coopMyHP, armor: coopMyArmor, down: false } });
+        unlockAchievement('down_and_up');
     } else {
         coopAllyHP = reviveHP; coopAllyArmor = 0; coopAllyDown = false;
         coopLog('Takım arkadaşını ayağa kaldırdın!');

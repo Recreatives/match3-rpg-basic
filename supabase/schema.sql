@@ -157,3 +157,25 @@ create policy "read own items" on public.player_items
 drop policy if exists "insert own items" on public.player_items;
 create policy "insert own items" on public.player_items
     for insert with check (auth.uid() = player_id);
+
+-- 8. achievements ------------------------------------------------------------
+-- Same shape as player_items above: a permanent (player, achievement) flag,
+-- no update/delete path. The catalog (name, description, what unlocks it)
+-- lives client-side in achievements.js - this table only stores WHICH
+-- achievement ids a player has unlocked.
+create table if not exists public.player_achievements (
+    player_id       uuid not null references public.players(id) on delete cascade,
+    achievement_id  text not null,
+    unlocked_at     timestamptz not null default now(),
+    primary key (player_id, achievement_id)
+);
+
+alter table public.player_achievements enable row level security;
+
+drop policy if exists "read own achievements" on public.player_achievements;
+create policy "read own achievements" on public.player_achievements
+    for select using (auth.uid() = player_id);
+
+drop policy if exists "insert own achievements" on public.player_achievements;
+create policy "insert own achievements" on public.player_achievements
+    for insert with check (auth.uid() = player_id);
