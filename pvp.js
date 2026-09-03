@@ -123,12 +123,35 @@ async function pvpJoinBetrayalRoom(code, opts) {
     pvpSetStatus(pvpBetrayalMode.isMutual ? 'İhanet düellosu hazırlanıyor…' : (pvpBetrayalMode.isBetrayer ? 'İlk vuruş senin - düello hazırlanıyor…' : 'İhanete uğradın - düello hazırlanıyor…'));
 }
 
+// Rejoining a different room code in the same tab without reloading the
+// page used to leave every flag below at whatever a PREVIOUS match had set
+// it to (pvpMatchOver stuck true silently blocked all interaction, a stale
+// pvpBetrayalMode/pvpForcedFirstMoverId could leak into what should be a
+// plain manual test match, etc.) - this is the fix.
+function pvpResetSessionState() {
+    pvpStarted = false;
+    pvpMyTurn = false;
+    pvpProcessing = false;
+    pvpSelectedTile = null;
+    pvpMyHP = PVP_MAX_HP;
+    pvpMyArmor = 0;
+    pvpMatchOver = false;
+    pvpStopThinkingAnimation();
+    pvpUltCharge = 0;
+    pvpExtraTurnTriggered = false;
+    pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    pvpIncomingStats = { damage: 0 };
+    pvpOpponentId = null;
+    pvpCurseTurnCount = 0;
+    pvpBetrayalResolved = false;
+}
+
 async function pvpConnectChannel(code) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { pvpSetStatus('Giriş yapılamadı, sayfayı yenile.'); return; }
     pvpMyId = user.id;
     pvpRoomCode = code;
-    pvpStarted = false;
+    pvpResetSessionState();
 
     if (pvpChannel) await pvpChannel.unsubscribe();
 

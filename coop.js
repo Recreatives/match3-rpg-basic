@@ -118,6 +118,37 @@ function coopIsBoss(level) {
     return level % 5 === 0;
 }
 
+// Rejoining a different room code in the same tab without reloading the
+// page used to leave every flag below at whatever a PREVIOUS match had set
+// it to (coopStarted stuck true blocked presence detection from ever
+// running again, coopMatchOver stuck true silently blocked all board
+// interaction, etc.) - this is the fix, called at the very start of joining
+// any room so a fresh room code always starts from a truly clean slate.
+function coopResetSessionState() {
+    coopIsHost = false;
+    coopRole = null;
+    coopAllyId = null;
+    coopStarted = false;
+    coopRunBegun = false;
+    coopMyTurn = false;
+    coopProcessing = false;
+    coopSelectedTile = null;
+    coopMatchOver = false;
+    coopStopThinkingAnimation();
+    coopMyHP = COOP_MAX_HP; coopMyArmor = 0; coopMyDown = false;
+    coopAllyHP = COOP_MAX_HP; coopAllyArmor = 0; coopAllyDown = false;
+    coopLevel = 1; coopIsBossLevel = false;
+    coopEnemyHP = 0; coopEnemyMaxHP = 0; coopEnemyStats = null;
+    coopUltCharge = 0;
+    coopExtraTurnTriggered = false;
+    coopPendingResolution = null;
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopVoteChoice = null;
+    coopVotes = {};
+    coopPendingBossLevel = null;
+    coopPendingContinuingRole = null;
+}
+
 // --- ROOM JOINING ------------------------------------------------------------
 
 async function coopJoinRoom() {
@@ -129,6 +160,7 @@ async function coopJoinRoom() {
     if (!user) { coopSetStatus('Giriş yapılamadı, sayfayı yenile.'); return; }
     coopMyId = user.id;
     coopRoomCode = code;
+    coopResetSessionState();
 
     if (coopChannel) await coopChannel.unsubscribe();
 
