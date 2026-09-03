@@ -108,6 +108,15 @@
         .turn-player { background: #2ecc71; color: #fff; box-shadow: 0 0 10px #2ecc71; }
         .turn-enemy { background: #e74c3c; color: #fff; box-shadow: 0 0 10px #e74c3c; }
 
+        .speed-bonus {
+            display: none;
+            font-size: 0.85rem; font-weight: bold; color: var(--accent);
+            background: rgba(241, 196, 15, 0.12);
+            border: 1px solid var(--accent);
+            padding: 3px 14px; border-radius: 12px;
+            margin-bottom: 5px;
+        }
+
         .hud {
             width: 340px; display: flex; justify-content: space-between;
             margin-bottom: 5px; background: rgba(0,0,0,0.2);
@@ -532,10 +541,19 @@
             </div>
 
             <div class="modal-section">
+                <h4>⚡ SPEED BONUS</h4>
+                <p>On your turn, a countdown starts the moment you regain control. The faster you make your swap, the bigger the multiplier on that move's effect (and any chain reaction it causes) - up to <b>x2.0</b>.</p>
+                <div class="tip-box">
+                    <b>No Pressure:</b> Letting the window run out never costs your turn - the bonus just fades back to a neutral x1. Play fast for bigger hits, or take your time. This bonus is yours only; enemies don't get it.
+                </div>
+            </div>
+
+            <div class="modal-section">
                 <h4>🧠 ENEMY AI</h4>
                 <ul>
                     <li><b>Minions:</b> Make random moves. 30% chance to miss a good move.</li>
                     <li><b>Bosses (Lvl 5, 10...):</b> Highly intelligent. They prioritize Match-4s and Skulls.</li>
+                    <li><b>Independent Stats:</b> Enemies have their own Sword/Shield/Heal/Energy/Skull stats that scale up with level (and spike further on bosses) - your own loot upgrades only make you stronger, not them.</li>
                     <li><b>Armor:</b> If an enemy has Armor (Grey bar), you must break it before you can hurt their HP (Red bar).</li>
                     <li><b>Energy Denial:</b> Enemies CANNOT use Ultimates. If they match ⚡ Energy, they <b>Heal</b> instead. Don't leave Energy for them!</li>
                 </ul>
@@ -554,6 +572,9 @@
                 </ul>
                 <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;">
                     <b>Rarities:</b> <span style="color:#95a5a6">Common</span>, <span style="color:#2ecc71">Uncommon</span>, <span style="color:#3498db">Rare</span>, <span style="color:#9b59b6">Epic</span>, <span style="color:#e67e22">Legendary</span>.
+                </div>
+                <div class="tip-box" style="margin-top:5px;">
+                    <b>Rest:</b> Before each new level you recover 50% of your missing HP.
                 </div>
             </div>
         </div>
@@ -576,7 +597,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.31 Fixed diagonal tile-swap bug, boss reward bonus added, reward tier order fixed, Archer dodge text fixed</div>
+        <div class="version">v0.32 Added partial HP rest between levels, independent enemy stats, and a player-only speed bonus multiplier</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
@@ -587,6 +608,7 @@
     <div id="enemy-name">Slime Lvl 1</div>
     
     <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
+    <div id="speed-bonus" class="speed-bonus">⚡ SPEED BONUS x2.0</div>
 
     <div class="hud">
         <div class="stat-box">
@@ -656,6 +678,70 @@
             sword: 6, heart: 4, shield: 5, energy: 12,
             skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0
         };
+
+        // Enemies used to read the player's own TILE_STATS, so every reward the
+        // player picked up also buffed enemy tile-match damage/healing. Enemies
+        // now have their own stat pool that scales with level/boss independently.
+        let ENEMY_TILE_STATS = { sword: 4, heart: 3, shield: 4, energy: 10, skull_dmg: 15, skull_self_dmg: 8 };
+        function getEnemyStatsForLevel(lvl, isBoss) {
+            let scale = 1 + (lvl - 1) * 0.15;
+            if (isBoss) scale *= 1.3;
+            return {
+                sword: Math.round(4 * scale),
+                heart: Math.round(3 * scale),
+                shield: Math.round(4 * scale),
+                energy: Math.round(10 * scale),
+                skull_dmg: Math.round(15 * scale),
+                skull_self_dmg: Math.round(8 * scale)
+            };
+        }
+
+        // Fraction of missing HP restored when moving on to the next level.
+        const LEVEL_CLEAR_HEAL_PERCENT = 0.5;
+
+        // --- SPEED BONUS (TIME MULTIPLIER) ---
+        // Only applies to the player's own moves. The faster you swap after
+        // regaining control, the bigger the multiplier on that move's effect
+        // (and any chain reaction it causes). Letting the window expire never
+        // costs a turn - the bonus just decays back down to a neutral x1.
+        const SPEED_BONUS_WINDOW_MS = 8000;
+        const SPEED_BONUS_MAX_MULT = 2.0;
+        let turnStartTime = null;
+        let currentMoveTimeMultiplier = 1;
+        let speedBonusInterval = null;
+
+        function getTimeMultiplier() {
+            if (!turnStartTime) return 1;
+            let elapsed = Date.now() - turnStartTime;
+            let ratio = Math.max(0, 1 - elapsed / SPEED_BONUS_WINDOW_MS);
+            return 1 + ratio * (SPEED_BONUS_MAX_MULT - 1);
+        }
+
+        function updateSpeedBonusUI() {
+            let el = document.getElementById('speed-bonus');
+            let mult = getTimeMultiplier();
+            if (!turnStartTime || mult <= 1.02) {
+                el.style.display = 'none';
+                return;
+            }
+            el.style.display = 'block';
+            el.innerText = `⚡ SPEED BONUS x${mult.toFixed(1)}`;
+        }
+
+        function startPlayerTimer() {
+            if (currentState !== STATE.PLAYING || !isPlayerTurn) return;
+            turnStartTime = Date.now();
+            clearInterval(speedBonusInterval);
+            speedBonusInterval = setInterval(updateSpeedBonusUI, 100);
+            updateSpeedBonusUI();
+        }
+
+        function stopPlayerTimer() {
+            clearInterval(speedBonusInterval);
+            speedBonusInterval = null;
+            turnStartTime = null;
+            document.getElementById('speed-bonus').style.display = 'none';
+        }
 
         // --- HISTORY TRACKING ---
         let pickedRewards = [];
@@ -817,7 +903,8 @@
             playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
             level = 1; logCounter = 1;
             TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0 };
-            
+            ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
+
             // Reset History
             pickedRewards = [];
             totalStatsGained = {
@@ -850,7 +937,8 @@
             let name = isBoss ? `BOSS Lvl ${level}` : `Minion Lvl ${level}`;
             document.getElementById('enemy-name').innerText = name;
             document.getElementById('enemy-sprite').innerText = isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4];
-            
+            ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
+
             if(isBoss) log("WARNING: BOSS BATTLE!", "log-crit");
 
             turnBanner.innerText = "PLAYER TURN";
@@ -858,9 +946,10 @@
             isPlayerTurn = true;
             isProcessing = false;
             extraTurnTriggered = false;
-            
+
             createBoard();
             updateUI();
+            startPlayerTimer();
             log(`LEVEL ${level} START`, "log-turn");
         }
 
@@ -872,7 +961,8 @@
 
         function triggerDeathSequence(who) {
             currentState = STATE.GAMEOVER;
-            isProcessing = true; 
+            isProcessing = true;
+            stopPlayerTimer();
             if (who === 'enemy') {
                 enemySprite.classList.remove('enemy-display'); 
                 enemySprite.classList.add('dying'); 
@@ -921,7 +1011,12 @@
                 overlayBtn.innerText = "START NEXT LEVEL";
                 overlayBtn.style.display = 'block';
                 overlayBtn.onclick = () => {
-                    playerHP = Math.min(playerHP + 10, maxPlayerHP);
+                    let missingHP = maxPlayerHP - playerHP;
+                    let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
+                    if (healed > 0) {
+                        playerHP = Math.min(playerHP + healed, maxPlayerHP);
+                        log(`Rest before battle: +${healed} HP`, 'log-heal');
+                    }
                     level++;
                     startLevel();
                 };
@@ -1125,18 +1220,28 @@
         }
 
         function attemptSwap(tile1, tile2) {
+            // Lock in the speed bonus for this move (player only) before anything
+            // else happens - the countdown is about how fast the decision was made.
+            if (isPlayerTurn) {
+                currentMoveTimeMultiplier = getTimeMultiplier();
+                stopPlayerTimer();
+            }
+
             isProcessing = true;
             let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
             tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
             tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
 
-            let hasMatch = checkForMatches(false); 
+            let hasMatch = checkForMatches(false);
             if (!hasMatch) {
                 setTimeout(() => {
                     let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
                     tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
                     tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
-                    isProcessing = false; 
+                    isProcessing = false;
+                    // Invalid swap didn't cost the turn, so give the player a
+                    // fresh speed-bonus window for their next attempt.
+                    if (isPlayerTurn) startPlayerTimer();
                 }, 200);
             }
         }
@@ -1289,30 +1394,34 @@
                 multiplier = 1;
             }
 
+            // Speed Bonus: the player's own moves (and any chain reaction they
+            // trigger) are further scaled by how fast the swap was made.
+            let finalMultiplier = isPlayerTurn ? multiplier * currentMoveTimeMultiplier : multiplier;
+
             // --- VISUALS & LOGS ---
-            if (!isInitial && multiplier > 1) { // Only log if it's special
-                let typeInfo = tileTypes.find(t => t.type === group.type);
+            if (!isInitial && finalMultiplier > 1) { // Only log if it's special
                 let user = isPlayerTurn ? "Player" : "Enemy";
-                
-                log(`${user}: ${shapeLabel} Match! (x${multiplier})`, "log-match");
+                let displayMult = Math.round(finalMultiplier * 10) / 10;
+
+                log(`${user}: ${shapeLabel} Match! (x${displayMult})`, "log-match");
 
                 let centerTile = tiles[group.indices[1]];
-                let color = (multiplier >= 3) ? "#f1c40f" : "#e74c3c";
-                showFloatingText(`${shapeLabel}x${multiplier}`, centerTile, color);
+                let color = (finalMultiplier >= 3) ? "#f1c40f" : "#e74c3c";
+                showFloatingText(`${shapeLabel}x${displayMult}`, centerTile, color);
             }
 
             let validTiles = 0;
             group.indices.forEach(index => {
                 if (tiles[index].dataset.type !== '') {
                     if (!isInitial) tiles[index].classList.add('matched');
-                    else tiles[index].innerHTML = ''; 
+                    else tiles[index].innerHTML = '';
                     tiles[index].dataset.type = '';
                     validTiles++;
                 }
             });
 
             if (validTiles > 0 && !isInitial) {
-                applyRPGEffects(group.type, multiplier);
+                applyRPGEffects(group.type, finalMultiplier);
             }
         }
         
@@ -1330,29 +1439,30 @@
 
         function applyRPGEffects(type, multiplier) {
             if (currentState !== STATE.PLAYING) return;
-            
+
             let user = isPlayerTurn ? "Player" : "Enemy";
             let target = isPlayerTurn ? 'enemy' : 'player';
-            
+            let stats = isPlayerTurn ? TILE_STATS : ENEMY_TILE_STATS;
+
             if (type === 'sword') {
-                let baseVal = Math.floor(TILE_STATS.sword * multiplier);
+                let baseVal = Math.floor(stats.sword * multiplier);
                 inflictDamage(target, baseVal);
                 log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
 
             } else if (type === 'heart') {
-                let baseVal = Math.floor(TILE_STATS.heart * multiplier);
+                let baseVal = Math.floor(stats.heart * multiplier);
                 if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
                 else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
                 log(`${user} Heal +${baseVal}`, 'log-heal');
 
             } else if (type === 'shield') {
-                let baseVal = Math.floor(TILE_STATS.shield * multiplier);
+                let baseVal = Math.floor(stats.shield * multiplier);
                 if (isPlayerTurn) playerArmor += baseVal;
                 else enemyArmor += baseVal;
                 log(`${user} Armor +${baseVal}`, 'log-armor');
 
             } else if (type === 'energy') {
-                let baseVal = Math.floor(TILE_STATS.energy * multiplier);
+                let baseVal = Math.floor(stats.energy * multiplier);
                 if (isPlayerTurn) {
                     ultCharge = Math.min(ultCharge + baseVal, 100);
                     log(`Ult +${baseVal}%`, 'log-hit');
@@ -1363,9 +1473,9 @@
                 }
 
             } else if (type === 'skull') {
-                let dmgToOpponent = Math.floor(TILE_STATS.skull_dmg * multiplier);
-                let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
-                
+                let dmgToOpponent = Math.floor(stats.skull_dmg * multiplier);
+                let recoil = Math.floor(stats.skull_self_dmg * multiplier);
+
                 let self = isPlayerTurn ? 'player' : 'enemy';
                 inflictDamage(target, dmgToOpponent);
                 inflictDamage(self, recoil);
@@ -1466,18 +1576,19 @@
                 extraTurnTriggered = false;
                 isProcessing = false;
                 updateUI();
-                if (!isPlayerTurn) setTimeout(enemyPlayTurn, 1000); 
-                else gridDisplay.classList.remove('locked'); 
+                if (!isPlayerTurn) setTimeout(enemyPlayTurn, 1000);
+                else { gridDisplay.classList.remove('locked'); startPlayerTimer(); }
             } else {
                 isPlayerTurn = !isPlayerTurn;
                 updateTurnBanner();
                 updateUI();
                 if (!isPlayerTurn) {
-                    gridDisplay.classList.add('locked'); 
+                    gridDisplay.classList.add('locked');
                     setTimeout(enemyPlayTurn, 1500);
                 } else {
                     gridDisplay.classList.remove('locked');
                     isProcessing = false;
+                    startPlayerTimer();
                 }
             }
         }
@@ -1518,6 +1629,7 @@
                 updateUI();
                 gridDisplay.classList.remove('locked');
                 isProcessing = false;
+                startPlayerTimer();
             }
         }
 
