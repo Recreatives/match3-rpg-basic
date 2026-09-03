@@ -1146,7 +1146,10 @@ function toggleModal(modalId) {
     } else {
         m.style.display = 'flex';
         // Only render history if opening history modal
-        if(modalId === 'history-modal') renderHistory();
+        if(modalId === 'history-modal') {
+            renderHistory();
+            if (typeof fetchWallet === 'function') fetchWallet();
+        }
     }
 }
 

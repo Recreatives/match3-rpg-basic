@@ -163,6 +163,12 @@
             <div class="modal-section">
                 <h2 class="modal-title">📊 STATS & LOOT</h2>
 
+                <h4>CÜZDAN <span id="wallet-status" style="font-weight:normal; color:#7f8c8d; font-size:0.75rem;"></span></h4>
+                <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold" class="stat-val">–</span></div>
+                    <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials" class="stat-val">–</span></div>
+                </div>
+
                 <h4>YOUR STATS</h4>
                 <div class="stats-bar">
                     <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
@@ -201,7 +207,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.34 Redesigned layout to fit small phone screens - stats moved to a modal, log collapsible, compact header</div>
+        <div class="version">v0.35 Added persistent wallet (Supabase) - anonymous identity, gold & materials survive between sessions</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
@@ -261,6 +267,8 @@
     <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>USE ULTIMATE (Requires 100%)</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="economy.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
