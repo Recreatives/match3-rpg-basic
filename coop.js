@@ -75,11 +75,12 @@ let coopPendingResolution = null;
 
 let coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 
-// --- BETRAYAL VOTE STATE -------------------------------------------------------
-let coopVoteChoice = null; // my own answer for the CURRENT boss gate, until resolved
+// --- HIDDEN VOTE STATE -----------------------------------------------------------
+let coopVoteKind = null; // 'betrayal' | 'exit' - which question is currently open
+let coopVoteOpen = false; // true strictly between coopOpenVote and coopApplyVoteResult
+let coopVoteChoice = null; // my own answer for the CURRENT vote, until resolved
 let coopVotes = {}; // {host, guest} choices - only ever fully populated on the host
-let coopPendingBossLevel = null; // the boss level this vote is gating
-let coopPendingContinuingRole = null; // whoever's turn carries in if the vote is loyal/loyal
+let coopPendingVoteContext = null; // kind-specific data threaded through to resolution
 
 function coopLog(msg) {
     let el = document.getElementById('coop-log');
@@ -143,10 +144,11 @@ function coopResetSessionState() {
     coopExtraTurnTriggered = false;
     coopPendingResolution = null;
     coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopVoteKind = null;
+    coopVoteOpen = false;
     coopVoteChoice = null;
     coopVotes = {};
-    coopPendingBossLevel = null;
-    coopPendingContinuingRole = null;
+    coopPendingVoteContext = null;
 }
 
 // --- ROOM JOINING ------------------------------------------------------------
@@ -178,9 +180,9 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
-    coopChannel.on('broadcast', { event: 'betrayal-vote-open' }, ({ payload }) => coopOpenBetrayalVote(payload));
-    coopChannel.on('broadcast', { event: 'betrayal-vote' }, ({ payload }) => coopOnAllyVote(payload));
-    coopChannel.on('broadcast', { event: 'betrayal-result' }, ({ payload }) => coopApplyBetrayalResult(payload));
+    coopChannel.on('broadcast', { event: 'vote-open' }, ({ payload }) => coopOpenVote(payload.kind, payload.context));
+    coopChannel.on('broadcast', { event: 'vote-choice' }, ({ payload }) => coopOnAllyVote(payload));
+    coopChannel.on('broadcast', { event: 'vote-result' }, ({ payload }) => coopApplyVoteResult(payload));
     coopChannel.on('presence', { event: 'sync' }, () => coopCheckPresence());
 
     coopChannel.subscribe(async (status) => {
@@ -361,9 +363,10 @@ function coopApplyEnemyDamage(amount, fromRole) {
 
 // A killing blow isn't countered - the player who landed it carries their
 // turn straight into the next level, same as single-player always handing
-// the very next turn back to the player after a win. Unless the level that
-// unlocks is a boss level, in which case the hidden betrayal vote gates it
-// first - see coopOpenBetrayalVote below.
+// the very next turn back to the player after a win. Two hidden votes can
+// gate what happens next - see "HIDDEN VOTES" below: a boss just cleared
+// asks "continue or leave"; the level right before the NEXT boss asks
+// "loyal or betray".
 function coopBeginLevelTransition(continuingRole) {
     coopMatchOver = true; // pause all board interaction until the next level-start
     coopStopThinkingAnimation();
@@ -375,10 +378,13 @@ function coopBeginLevelTransition(continuingRole) {
 
     let nextLevel = clearedLevel + 1;
     setTimeout(() => {
-        if (coopIsBoss(nextLevel)) {
-            let votePayload = { level: nextLevel, continuingRole };
-            coopChannel.send({ type: 'broadcast', event: 'betrayal-vote-open', payload: votePayload });
-            coopOpenBetrayalVote(votePayload);
+        if (clearedIsBoss) {
+            // Only reachable via the loyal path - a betrayal vote skips the
+            // boss fight entirely, so clearing one always means it was won
+            // together. Ask whether to keep going before revealing what's next.
+            coopOpenVoteAndBroadcast('exit', { level: clearedLevel, nextLevel, continuingRole });
+        } else if (coopIsBoss(nextLevel)) {
+            coopOpenVoteAndBroadcast('betrayal', { level: nextLevel, continuingRole });
         } else {
             let payload = coopBuildLevelPayload(nextLevel, continuingRole);
             coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
@@ -387,33 +393,69 @@ function coopBeginLevelTransition(continuingRole) {
     }, 1500);
 }
 
-// --- BETRAYAL VOTE -------------------------------------------------------------
-// Both players answer without seeing the other's choice until both are in -
-// see coopMaybeResolveVotes. Loyal/loyal proceeds into the co-op boss fight
-// exactly as before; anything else skips the boss and routes both players
-// into a real PvP duel instead (pvp.js's pvpJoinBetrayalRoom). The run ends
-// once that resolves, win or lose - only the loyal/loyal path continues the
-// dungeon.
-function coopOpenBetrayalVote(payload) {
-    coopPendingBossLevel = payload.level;
-    coopPendingContinuingRole = payload.continuingRole;
+// --- HIDDEN VOTES ---------------------------------------------------------------
+// One generic mechanism backs both hidden votes in the game: both players
+// answer without seeing the other's choice until both are in (see
+// coopMaybeResolveVotes - only the host ever actually decides/broadcasts the
+// outcome, same "one authoritative caller" rule used everywhere in this
+// file). What a given answer MEANS is entirely up to coopApplyVoteResult's
+// per-kind branch below.
+function coopOpenVoteAndBroadcast(kind, context) {
+    coopChannel.send({ type: 'broadcast', event: 'vote-open', payload: { kind, context } });
+    coopOpenVote(kind, context);
+}
+
+const COOP_VOTE_COPY = {
+    betrayal: {
+        title: '🗳️ GİZLİ OY',
+        desc: "Boss'a girmeden önce: yoldaşına sadık mı kalacaksın, yoksa ilk vuruşu sen yapıp anlaşmayı mı bozacaksın? Cevabın, karşı taraf cevaplayana kadar gizli kalır.",
+        choiceA: 'loyal', labelA: '🤝 SADIK KAL', colorA: '#2ecc71',
+        choiceB: 'betray', labelB: '🗡️ İHANET ET', colorB: '#c0392b'
+    },
+    exit: {
+        title: '🗳️ GİZLİ OY',
+        desc: 'Boss düştü! Zindanda devam mı edeceksin, yoksa burada mı bırakacaksın?  Cevabın, karşı taraf cevaplayana kadar gizli kalır.',
+        choiceA: 'continue', labelA: '⚔️ DEVAM ET', colorA: '#2ecc71',
+        choiceB: 'leave', labelB: '🚪 ÇIK', colorB: '#7f8c8d'
+    }
+};
+
+function coopOpenVote(kind, context) {
+    coopVoteKind = kind;
+    coopVoteOpen = true;
+    coopPendingVoteContext = context;
     coopVoteChoice = null;
     coopVotes = {};
 
+    let copy = COOP_VOTE_COPY[kind];
+    document.getElementById('hidden-vote-title').innerText = copy.title;
+    document.getElementById('hidden-vote-desc').innerText = copy.desc;
+    let btnA = document.getElementById('hidden-vote-btn-a');
+    let btnB = document.getElementById('hidden-vote-btn-b');
+    btnA.innerText = copy.labelA; btnA.dataset.choice = copy.choiceA; btnA.style.background = copy.colorA; btnA.style.color = '';
+    btnB.innerText = copy.labelB; btnB.dataset.choice = copy.choiceB; btnB.style.background = copy.colorB; btnB.style.color = '#fff';
+    [btnA, btnB].forEach(b => b.disabled = false);
+    document.getElementById('hidden-vote-status').innerText = '';
+
     document.getElementById('coop-battle').style.display = 'none';
-    document.getElementById('betrayal-vote-modal').style.display = 'flex';
-    document.getElementById('betrayal-vote-status').innerText = '';
-    document.querySelectorAll('#betrayal-vote-modal button').forEach(b => b.disabled = false);
-    coopLog(`⚠️ Lvl ${payload.level} BOSS öncesi gizli oy zamanı!`);
+    document.getElementById('hidden-vote-modal').style.display = 'flex';
+
+    coopLog(kind === 'betrayal'
+        ? `⚠️ Lvl ${context.level} BOSS öncesi gizli oy zamanı!`
+        : `🏁 Lvl ${context.level} boss'u yenildi - devam/çık oyu zamanı!`);
 }
 
-function coopSubmitBetrayalVote(choice) {
-    if (coopVoteChoice) return;
+function coopSubmitVote(choice) {
+    // Guards against more than just a genuine double-click: without
+    // coopVoteOpen, a call arriving in the gap between one vote resolving
+    // and the next one opening (both momentarily leave coopVoteChoice
+    // falsy) would silently corrupt whichever vote opens next.
+    if (!coopVoteOpen || coopVoteChoice) return;
     coopVoteChoice = choice;
     coopVotes[coopRole] = choice;
-    document.getElementById('betrayal-vote-status').innerText = 'Cevabın gönderildi. Takım arkadaşın bekleniyor…';
-    document.querySelectorAll('#betrayal-vote-modal button').forEach(b => b.disabled = true);
-    coopChannel.send({ type: 'broadcast', event: 'betrayal-vote', payload: { role: coopRole, choice } });
+    document.getElementById('hidden-vote-status').innerText = 'Cevabın gönderildi. Takım arkadaşın bekleniyor…';
+    document.querySelectorAll('#hidden-vote-modal button').forEach(b => b.disabled = true);
+    coopChannel.send({ type: 'broadcast', event: 'vote-choice', payload: { role: coopRole, choice } });
     coopMaybeResolveVotes();
 }
 
@@ -422,27 +464,61 @@ function coopOnAllyVote(payload) {
     coopMaybeResolveVotes();
 }
 
-// Only the host ever actually decides/broadcasts the outcome, same "one
-// authoritative caller" rule the rest of this file uses - otherwise both
-// clients might independently compute and broadcast the same result.
 function coopMaybeResolveVotes() {
     if (!coopIsHost) return;
     if (!coopVotes.host || !coopVotes.guest) return;
-    let result = { hostChoice: coopVotes.host, guestChoice: coopVotes.guest, level: coopPendingBossLevel, continuingRole: coopPendingContinuingRole };
-    coopChannel.send({ type: 'broadcast', event: 'betrayal-result', payload: result });
-    coopApplyBetrayalResult(result);
+    let result = { kind: coopVoteKind, hostChoice: coopVotes.host, guestChoice: coopVotes.guest, context: coopPendingVoteContext };
+    coopChannel.send({ type: 'broadcast', event: 'vote-result', payload: result });
+    coopApplyVoteResult(result);
+}
+
+function coopApplyVoteResult(result) {
+    document.getElementById('hidden-vote-modal').style.display = 'none';
+    coopVoteOpen = false;
+    coopVotes = {};
+    if (result.kind === 'exit') coopApplyExitVoteResult(result);
+    else coopApplyBetrayalResult(result);
+}
+
+// Both continue -> the dungeon proceeds exactly as it always has. Both
+// leave -> the run ends cleanly, nothing lost (no run-completion currency
+// exists yet to protect). A mismatch is simplified from the design doc's
+// literal rule (the one wanting to leave must solo one more boss to
+// actually exit) to "keep going together for now" - a true solo-splinter
+// continuation would need an entirely separate single-player-style co-op
+// engine, which felt like the wrong scope to bolt on here; the same
+// question gets asked again at the next boss instead of leaving a
+// leave-leaning player stuck forever.
+function coopApplyExitVoteResult(result) {
+    let { level, nextLevel, continuingRole } = result.context;
+    let bothLeave = (result.hostChoice === 'leave' && result.guestChoice === 'leave');
+
+    if (bothLeave) {
+        coopMatchOver = true;
+        coopLog(`🏁 İkiniz de zindandan çıkmayı seçtiniz. Lvl ${level}'e kadar temiz bir koşu!`);
+        coopSetStatus(`ZİNDANDAN ÇIKTINIZ - Lvl ${level}`);
+        return;
+    }
+
+    let bothContinue = (result.hostChoice === 'continue' && result.guestChoice === 'continue');
+    coopLog(bothContinue ? '🏁 İkiniz de devam kararı verdiniz!' : '🏁 Biri çıkmak istedi, diğeri devam - şimdilik birlikte bir tur daha gidiyorsunuz.');
+
+    document.getElementById('coop-battle').style.display = 'block';
+    if (coopIsHost) {
+        let payload = coopBuildLevelPayload(nextLevel, continuingRole);
+        coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+        coopOnLevelStart(payload);
+    }
 }
 
 function coopApplyBetrayalResult(result) {
-    document.getElementById('betrayal-vote-modal').style.display = 'none';
-    coopVotes = {};
-
+    let { level, continuingRole } = result.context;
     let bothLoyal = (result.hostChoice === 'loyal' && result.guestChoice === 'loyal');
     if (bothLoyal) {
         document.getElementById('coop-battle').style.display = 'block';
         coopLog('İkiniz de sadık kaldınız - boss karşınızda!');
         if (coopIsHost) {
-            let payload = coopBuildLevelPayload(result.level, result.continuingRole);
+            let payload = coopBuildLevelPayload(level, continuingRole);
             coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
             coopOnLevelStart(payload);
         }
@@ -466,7 +542,7 @@ function coopApplyBetrayalResult(result) {
 
     toggleModal('coop-modal');
     toggleModal('pvp-modal');
-    pvpJoinBetrayalRoom(`${coopRoomCode}-B${result.level}`, { isBetrayer: iAmBetrayer, isMutual, firstMoverId });
+    pvpJoinBetrayalRoom(`${coopRoomCode}-B${level}`, { isBetrayer: iAmBetrayer, isMutual, firstMoverId });
 }
 
 // Called (host only) once a player's turn (theirs or the remote player's)

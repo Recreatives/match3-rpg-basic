@@ -286,14 +286,14 @@
         </div>
     </div>
 
-    <div id="betrayal-vote-modal" class="modal-overlay" style="z-index:200;">
+    <div id="hidden-vote-modal" class="modal-overlay" style="z-index:200;">
         <div class="modal-content" style="max-width: 360px; text-align:center;">
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🗳️ GİZLİ OY</h2>
-                <p style="font-size:0.9rem; color:#bdc3c7;">Boss'a girmeden önce: yoldaşına sadık mı kalacaksın, yoksa ilk vuruşu sen yapıp anlaşmayı mı bozacaksın? Cevabın, karşı taraf cevaplayana kadar gizli kalır.</p>
-                <button class="overlay-btn" style="width:100%; margin:6px 0; background:#2ecc71;" onclick="coopSubmitBetrayalVote('loyal')">🤝 SADIK KAL</button>
-                <button class="overlay-btn" style="width:100%; margin:6px 0; background:#c0392b; color:#fff;" onclick="coopSubmitBetrayalVote('betray')">🗡️ İHANET ET</button>
-                <p id="betrayal-vote-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px; min-height:1.2em;"></p>
+                <h2 class="modal-title" id="hidden-vote-title">🗳️ GİZLİ OY</h2>
+                <p id="hidden-vote-desc" style="font-size:0.9rem; color:#bdc3c7;"></p>
+                <button id="hidden-vote-btn-a" class="overlay-btn" style="width:100%; margin:6px 0;" onclick="coopSubmitVote(this.dataset.choice)"></button>
+                <button id="hidden-vote-btn-b" class="overlay-btn" style="width:100%; margin:6px 0;" onclick="coopSubmitVote(this.dataset.choice)"></button>
+                <p id="hidden-vote-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px; min-height:1.2em;"></p>
             </div>
         </div>
     </div>
