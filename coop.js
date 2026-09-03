@@ -148,6 +148,7 @@ function coopIsBoss(level) {
 // interaction, etc.) - this is the fix, called at the very start of joining
 // any room so a fresh room code always starts from a truly clean slate.
 function coopResetSessionState() {
+    clearTimeout(coopSessionSaveTimer);
     coopIsHost = false;
     coopRole = null;
     coopAllyId = null;
@@ -206,6 +207,7 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'vote-open' }, ({ payload }) => coopOpenVote(payload.kind, payload.context));
     coopChannel.on('broadcast', { event: 'vote-choice' }, ({ payload }) => coopOnAllyVote(payload));
     coopChannel.on('broadcast', { event: 'vote-result' }, ({ payload }) => coopApplyVoteResult(payload));
+    coopChannel.on('broadcast', { event: 'session-resume' }, ({ payload }) => coopApplySessionResume(payload));
     coopChannel.on('presence', { event: 'sync' }, () => coopCheckPresence());
 
     coopChannel.subscribe(async (status) => {
@@ -216,7 +218,7 @@ async function coopJoinRoom() {
     });
 }
 
-function coopCheckPresence() {
+async function coopCheckPresence() {
     if (coopStarted) return;
     const state = coopChannel.presenceState();
     const keys = Object.keys(state);
@@ -232,10 +234,20 @@ function coopCheckPresence() {
     coopRole = coopIsHost ? 'host' : 'guest';
 
     if (coopIsHost) {
-        coopBeginRun();
-        let payload = coopBuildLevelPayload(1, 'host');
-        coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
-        coopOnLevelStart(payload);
+        // Same room code as an earlier, unfinished run? Resume it instead of
+        // starting over - see "RECONNECTION" below. Only the host looks this
+        // up and tells the guest what it found, same "one authoritative
+        // decision-maker" rule everything else in this file follows.
+        let resumeState = await coopTryResumeSession();
+        if (resumeState) {
+            coopChannel.send({ type: 'broadcast', event: 'session-resume', payload: resumeState });
+            coopApplySessionResume(resumeState);
+        } else {
+            coopBeginRun();
+            let payload = coopBuildLevelPayload(1, 'host');
+            coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+            coopOnLevelStart(payload);
+        }
     } else {
         coopSetStatus('Takım arkadaşın bulundu, savaş hazırlanıyor…');
     }
@@ -323,6 +335,97 @@ function coopOnLevelStart(payload) {
     coopLog(payload.isBoss ? `⚠️ BOSS - Lvl ${payload.level} başlıyor!` : `Lvl ${payload.level} başlıyor. ${COOP_MINION_LOG[coopMinionType]}`);
     if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); }
     else coopStartThinkingAnimation();
+    coopSaveSessionSnapshot();
+}
+
+// --- RECONNECTION (co-op only - see schema.sql's coop_sessions table) --------
+// Deliberately narrow: persists level/enemy/hp state so reloading the page
+// or a dropped connection can resume roughly where it left off, NOT mid-
+// turn/mid-cascade detail, the betrayal vote, or PvP duels (those are short
+// enough that losing one to a disconnect costs far less than losing a co-op
+// run that might be many levels deep). A save is fire-and-forget and
+// debounced - losing the very last save to a crash just means resuming one
+// step earlier, never anything worse.
+let coopSessionSaveTimer = null;
+
+function coopSaveSessionSnapshot() {
+    // Nothing worth persisting while paused for a vote or after the run's
+    // already over - coopMarkSessionFinished (not this) owns that case.
+    if (!coopChannel || !coopRoomCode || coopMatchOver) return;
+    clearTimeout(coopSessionSaveTimer);
+    coopSessionSaveTimer = setTimeout(async () => {
+        let hostId = coopIsHost ? coopMyId : coopAllyId;
+        let guestId = coopIsHost ? coopAllyId : coopMyId;
+        let mySlot = { hp: coopMyHP, armor: coopMyArmor, down: coopMyDown };
+        let allySlot = { hp: coopAllyHP, armor: coopAllyArmor, down: coopAllyDown };
+        let state = {
+            level: coopLevel, isBossLevel: coopIsBossLevel, minionType: coopMinionType,
+            enemyHP: coopEnemyHP, enemyMaxHP: coopEnemyMaxHP, enemyArmor: coopEnemyArmor, enemyStats: coopEnemyStats,
+            hostId, guestId,
+            host: coopIsHost ? mySlot : allySlot,
+            guest: coopIsHost ? allySlot : mySlot,
+            finished: false
+        };
+        const { error } = await sb.from('coop_sessions').upsert({ room_code: coopRoomCode, state });
+        if (error) console.error('Co-op session save failed:', error.message);
+    }, 400);
+}
+
+function coopMarkSessionFinished() {
+    if (!coopRoomCode) return;
+    clearTimeout(coopSessionSaveTimer);
+    sb.from('coop_sessions').update({ state: { finished: true } }).eq('room_code', coopRoomCode).then(({ error }) => {
+        if (error) console.error('Co-op session finish-mark failed:', error.message);
+    });
+}
+
+async function coopTryResumeSession() {
+    const { data, error } = await sb.from('coop_sessions').select('state').eq('room_code', coopRoomCode).maybeSingle();
+    if (error) { console.error('Co-op session lookup failed:', error.message); return null; }
+    if (!data || !data.state || data.state.finished) return null;
+    return data.state;
+}
+
+function coopApplySessionResume(state) {
+    coopRunBegun = true; // skip coopBeginRun's full fresh reset
+    coopMatchOver = false;
+    coopProcessing = false;
+    coopUltCharge = 0; // not persisted (see file header) - a neutral, safe default
+    coopExtraTurnTriggered = false;
+    coopPendingResolution = null;
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+
+    coopLevel = state.level;
+    coopIsBossLevel = state.isBossLevel;
+    coopMinionType = state.minionType;
+    coopEnemyHP = state.enemyHP;
+    coopEnemyMaxHP = state.enemyMaxHP;
+    coopEnemyArmor = state.enemyArmor;
+    coopEnemyStats = state.enemyStats;
+
+    // Matched by uid, not by "am I host now" - a reconnect can land either
+    // player in either role depending on who tracks presence first this
+    // time, so the saved host/guest slot has to be resolved back to a
+    // specific PERSON, not whichever role they happen to hold now.
+    let mySlot = (state.hostId === coopMyId) ? state.host : state.guest;
+    let allySlot = (state.hostId === coopMyId) ? state.guest : state.host;
+    coopMyHP = mySlot.hp; coopMyArmor = mySlot.armor; coopMyDown = mySlot.down;
+    coopAllyHP = allySlot.hp; coopAllyArmor = allySlot.armor; coopAllyDown = allySlot.down;
+
+    document.getElementById('coop-setup').style.display = 'none';
+    document.getElementById('coop-battle').style.display = 'block';
+    coopLog('🔄 Kaldığınız yerden devam ediyorsunuz!');
+
+    coopCreateBoard();
+    // Whose turn it was isn't persisted (see file header) - the host simply
+    // takes the next turn after a resume, the same simple default this file
+    // already uses whenever turn continuity doesn't matter enough to track.
+    coopMyTurn = coopIsHost;
+    coopUpdateUI();
+    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); }
+    else coopStartThinkingAnimation();
+
+    coopSaveSessionSnapshot();
 }
 
 function coopOnEnemyDefeated(payload) {
@@ -346,6 +449,7 @@ function coopSyncSelfState() {
     }
     coopChannel.send({ type: 'broadcast', event: 'hp-sync', payload: { role: coopRole, hp: coopMyHP, armor: coopMyArmor, down: coopMyDown } });
     coopUpdateUI();
+    coopSaveSessionSnapshot();
 }
 
 // Applies an incoming hit to MY OWN hp/armor (enemy attack aimed at me).
@@ -387,6 +491,7 @@ function coopOnAllyHpSync(payload) {
     coopAllyArmor = payload.armor;
     coopAllyDown = payload.down;
     coopUpdateUI();
+    if (coopIsHost) coopSaveSessionSnapshot(); // only the host's snapshot is ever read back on resume
 
     if (coopIsHost && coopPendingResolution && payload.role !== coopRole) {
         let { moverRole } = coopPendingResolution;
@@ -407,6 +512,7 @@ function coopApplyEnemyDamage(amount, fromRole) {
     coopChannel.send({ type: 'broadcast', event: 'enemy-hp-sync', payload: { hp: coopEnemyHP, armor: coopEnemyArmor } });
     coopUpdateUI();
     if (coopEnemyHP <= 0) coopBeginLevelTransition(fromRole || coopRole);
+    else coopSaveSessionSnapshot();
 }
 
 // A killing blow isn't countered - the player who landed it carries their
@@ -545,6 +651,7 @@ function coopApplyExitVoteResult(result) {
         coopMatchOver = true;
         coopLog(`🏁 İkiniz de zindandan çıkmayı seçtiniz. Lvl ${level}'e kadar temiz bir koşu!`);
         coopSetStatus(`ZİNDANDAN ÇIKTINIZ - Lvl ${level}`);
+        coopMarkSessionFinished();
         return;
     }
 
@@ -589,6 +696,8 @@ function coopApplyBetrayalResult(result) {
     let guestId = coopIsHost ? coopAllyId : coopMyId;
     let firstMoverId = isMutual ? null : (betrayerRole === 'host' ? hostId : guestId);
 
+    coopMatchOver = true;
+    coopMarkSessionFinished();
     toggleModal('coop-modal');
     toggleModal('pvp-modal');
     pvpJoinBetrayalRoom(`${coopRoomCode}-B${level}`, { isBetrayer: iAmBetrayer, isMutual, firstMoverId });
@@ -692,6 +801,7 @@ function coopOnPartyWiped() {
     coopSetStatus(`İKİNİZ DE DÜŞTÜNÜZ - Lvl ${coopLevel}'de YENİLGİ`);
     coopLog('İkiniz de aynı anda düştünüz. Zindan yürüyüşü bitti.');
     coopUpdateUI();
+    coopMarkSessionFinished();
 }
 
 // --- ULTIMATE ------------------------------------------------------------------

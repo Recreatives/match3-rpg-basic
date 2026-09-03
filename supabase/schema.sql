@@ -205,3 +205,43 @@ as $$
 $$;
 
 grant execute on function public.get_leaderboard(integer) to authenticated, anon;
+
+-- 10. co-op session snapshots (reconnection support) --------------------------
+-- Lets a player who reloads the page (or whose tab/connection drops) rejoin
+-- the SAME room code and resume roughly where they left off, instead of the
+-- whole run being lost. Scoped deliberately narrow: only the co-op dungeon
+-- loop's level/enemy/hp state is saved - not mid-turn/mid-cascade detail,
+-- not the betrayal vote, not PvP duels (those are short-lived enough that
+-- losing one to a disconnect is a much smaller cost than losing a co-op run
+-- that might be 20 levels deep).
+--
+-- Deliberate RLS exception: every other table in this file scopes access to
+-- auth.uid() because each row belongs to one specific player. A co-op
+-- session row belongs to a ROOM CODE that two arbitrary anonymous players
+-- agreed on out of band (the same way joining the Realtime channel itself
+-- already works) - there is no per-player ownership to check, and knowing
+-- the room code is already this whole feature's access model. So: any
+-- signed-in user (anonymous auth included) may read or write any row here.
+-- This table intentionally holds nothing sensitive - no currency, no
+-- identity beyond the two participants' own auth ids, which they already
+-- know from being in the room's presence list.
+create table if not exists public.coop_sessions (
+    room_code  text primary key,
+    state      jsonb not null,
+    updated_at timestamptz not null default now()
+);
+
+alter table public.coop_sessions enable row level security;
+
+drop policy if exists "read any coop session" on public.coop_sessions;
+create policy "read any coop session" on public.coop_sessions
+    for select using (true);
+
+drop policy if exists "write any coop session" on public.coop_sessions;
+create policy "write any coop session" on public.coop_sessions
+    for all using (true) with check (true);
+
+drop trigger if exists coop_sessions_touch_updated_at on public.coop_sessions;
+create trigger coop_sessions_touch_updated_at
+    before update on public.coop_sessions
+    for each row execute procedure public.touch_updated_at();
