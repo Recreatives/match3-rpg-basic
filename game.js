@@ -183,6 +183,7 @@ let isPlayerTurn = true;
 let extraTurnTriggered = false;
 let isMouseDown = false;
 let selectedTile = null;
+let touchMoveScheduled = false;
 
 // Without these, isMouseDown never resets after an invalid tap/drag,
 // which permanently disabled the "reselect on invalid move" behavior.
@@ -508,9 +509,19 @@ function createBoard() {
         tile.addEventListener('mouseenter', (e) => { e.preventDefault(); handleInputEnter(tile); });
         tile.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            // touchmove can fire much faster than the screen can redraw,
+            // especially while it's also busy animating the board. Doing a
+            // fresh elementFromPoint() hit-test and swap check on every
+            // single one of those events adds up on a slower device -
+            // coalesce to at most once per animation frame instead.
+            if (touchMoveScheduled) return;
+            touchMoveScheduled = true;
             let t = e.touches[0];
-            let target = document.elementFromPoint(t.clientX, t.clientY);
-            if (target && target.classList.contains('tile')) handleInputEnter(target);
+            requestAnimationFrame(() => {
+                touchMoveScheduled = false;
+                let target = document.elementFromPoint(t.clientX, t.clientY);
+                if (target && target.classList.contains('tile')) handleInputEnter(target);
+            });
         }, {passive: false});
     }
     resolveMatches(true);
@@ -1187,11 +1198,20 @@ function renderHistory() {
     });
 }
 
+const LOG_MAX_ENTRIES = 60;
+
 function log(msg, cls) {
     let div = document.createElement('div');
     div.innerText = `#${logCounter++} > ${msg}`;
     if(cls) div.classList.add(cls);
     logDisplay.prepend(div);
+    // Without a cap, a long session leaves thousands of log divs in the DOM
+    // (nothing ever removed old ones), which gets slower to lay out/paint
+    // the longer you play. logDisplay.lastChild is always the oldest entry
+    // here since new ones are always prepended.
+    while (logDisplay.children.length > LOG_MAX_ENTRIES) {
+        logDisplay.removeChild(logDisplay.lastChild);
+    }
 }
 
 createBoard();
