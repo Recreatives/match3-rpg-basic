@@ -206,9 +206,38 @@
         </div>
     </div>
 
+    <div id="pvp-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('pvp-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🗡️ PVP TEST (prototip)</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;">Gerçek zamanlı 1v1 çekirdek mekaniğinin ilk denemesi. Sınıf/ult yok, sadece kılıç/kalp/kalkan/kafatası eşleşmeleri gerçek hasar olarak karşı tarafa gidiyor. Rakibin canı bilerek gizli.</p>
+
+                <div id="pvp-setup">
+                    <input id="pvp-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
+                    <button class="overlay-btn" style="width:100%; margin:0;" onclick="pvpJoinRoom()">Odaya Katıl</button>
+                    <p id="pvp-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px;"></p>
+                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar.</p>
+                </div>
+
+                <div id="pvp-battle" style="display:none;">
+                    <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <div>SEN</div>
+                        <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
+                        <span id="pvp-my-hp-text" class="hp-text">100/100</span>
+                    </div>
+                    <p id="pvp-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
+                    <div class="grid" id="pvp-grid" style="margin: 0 auto 10px;"></div>
+                    <div id="pvp-log" style="width:100%; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:6px; padding:8px; font-size:0.75rem; display:flex; flex-direction:column-reverse; box-sizing:border-box;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="top-bar">
-        <div class="version">v0.35 Added persistent wallet (Supabase) - anonymous identity, gold & materials survive between sessions</div>
+        <div class="version">v0.36 PvP prototype - real-time 1v1 board sync over Supabase Realtime (no classes/ults yet)</div>
         <div>
+            <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP Test</button>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
         </div>
@@ -270,5 +299,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="economy.js"></script>
     <script src="game.js"></script>
+    <script src="pvp.js"></script>
 </body>
 </html>
