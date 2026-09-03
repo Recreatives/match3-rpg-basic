@@ -246,7 +246,7 @@
             <span class="close-modal" onclick="toggleModal('coop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
                 <h2 class="modal-title">🤝 CO-OP TEST (prototip)</h2>
-                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu aynı boss'a karşı sırayla oynar. Boss canı ortak. Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
+                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu sırayla aynı düşmana karşı oynayarak zindanda ilerler (her 5 levelde bir boss). Düşman canı ortak. Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
 
                 <div id="coop-setup">
                     <input id="coop-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
@@ -256,8 +256,9 @@
                 </div>
 
                 <div id="coop-battle" style="display:none;">
+                    <p id="coop-level-label" style="text-align:center; font-size:0.85rem; color:#bdc3c7; margin:0 0 6px;">Lvl 1</p>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
-                        <div>BOSS</div>
+                        <div>DÜŞMAN</div>
                         <div class="bar-container"><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
                         <span id="coop-boss-hp-text" class="hp-text">0/0</span>
                     </div>
@@ -286,7 +287,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.38 Co-op prototype - 2 players vs. a shared boss, down/revive mechanic</div>
+        <div class="version">v0.39 Co-op dungeon - shared minion/boss levels, down/revive, rest-heal between levels</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>
             <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP Test</button>

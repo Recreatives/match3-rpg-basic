@@ -1,35 +1,45 @@
-// --- CO-OP PROTOTYPE (2 real players vs. 1 shared boss) ---
-// Validates the piece the full "İhanet Protokolü" co-op dungeon will need
-// most: two real browsers fighting the SAME enemy HP pool, with one player
-// able to go down and get rescued by the other, before minions, multiple
-// levels, the hidden betrayal vote and Kibir Laneti get layered on top.
+// --- CO-OP DUNGEON (2 real players vs. shared minions/bosses) ---
+// Builds on the co-op prototype (which proved two real browsers can fight
+// the SAME enemy HP pool with a down/revive mechanic) by turning that one
+// fixed boss fight into an actual level-by-level dungeon run: minions on
+// most levels, a boss every 5th, healing between levels - the same shape
+// single-player's own run already has (see game.js's startLevel/winLevel).
+// The hidden betrayal vote, Kibir Laneti and currency stakes from the
+// "İhanet Protokolü" design doc are still NOT here - this only proves two
+// players can run an open-ended shared dungeon together.
 //
 // Reuses the exact same match rules single-player and PvP already share
 // (findMatchGroups, getMatchShapeInfo, applyDefensiveTraits, CLASSES) via
-// its own combat context, same as pvp.js.
+// its own combat context.
 //
 // Networking model: each player is authoritative for their OWN hp/armor/
-// down-state (same rule PvP uses). The shared boss HP is different - it has
-// no single "owner" client by default, so whichever player joins the room
-// FIRST becomes the "host" and is the one authoritative source for boss HP.
-// A non-host player's damage is broadcast to the host ("boss-damage"); the
-// host applies it and broadcasts the resulting HP back out ("boss-hp-sync").
+// down-state (same rule PvP uses). The shared enemy HP has no single
+// natural owner, so whichever player joins the room FIRST becomes "host"
+// and is the one authoritative source for it - a non-host player's damage
+// is broadcast to the host ("enemy-damage"); the host applies it and
+// broadcasts the result back out ("enemy-hp-sync"). The host also decides
+// when a level is cleared and what the next one looks like ("level-start").
 //
-// Turn order: player A moves -> boss counter-attacks A -> player B moves ->
-// boss counter-attacks B -> repeat (mirrors single-player's player-then-
-// enemy rhythm, just with two players sharing the "player" seat). Only the
-// HOST decides turn order and boss attacks, since only the host can see
-// both players' down-state reliably. When the boss's target is the host's
-// own player, the outcome is known synchronously; when the target is the
-// remote player, the host must wait for that player's own hp-sync (armor/
-// dodge is THEIRS to resolve) before deciding what happens next - see
-// coopPendingResolution below. Skipping that wait was the PvP turn-deadlock
-// bug's cousin and is guarded against on purpose.
+// Turn order: player A moves -> enemy counter-attacks A -> player B moves
+// -> enemy counter-attacks B -> repeat (mirrors single-player's player-
+// then-enemy rhythm). The one exception: a killing blow does NOT get
+// countered - the player who landed it keeps the turn into the next level,
+// same as single-player always handing the very next turn back to the
+// player after a win. Only the HOST decides turn order and enemy attacks,
+// since only the host can see both players' down-state reliably. When the
+// enemy's target is the host's own player, the outcome is known
+// synchronously; when the target is the remote player, the host must wait
+// for that player's own hp-sync (armor/dodge is THEIRS to resolve) before
+// deciding what happens next - see coopPendingResolution below. Skipping
+// that wait was the PvP turn-deadlock bug's cousin and is guarded against
+// on purpose.
 
 const COOP_WIDTH = 8;
 const COOP_MAX_HP = 100;
 const COOP_REVIVE_PCT = 0.3;
-const COOP_BOSS_DIFFICULTY_MULT = 1.5;
+// Applied on top of single-player's own level scaling (getEnemyStatsForLevel
+// in game.js) so two players sharing one enemy pool don't trivialize it.
+const COOP_DIFFICULTY_MULT = 1.5;
 
 let coopChannel = null;
 let coopRoomCode = null;
@@ -37,19 +47,24 @@ let coopMyId = null;
 let coopIsHost = false;
 let coopRole = null; // 'host' | 'guest'
 let coopTiles = [];
-let coopStarted = false;
+let coopStarted = false; // presence/role already resolved for this room
+let coopRunBegun = false; // the very first level-start has been applied
 let coopMyTurn = false;
 let coopProcessing = false;
 let coopSelectedTile = null;
+// True while no board interaction should happen: either the whole run has
+// ended (party wipe) or a level is mid-transition (enemy just died, next
+// level hasn't started yet).
 let coopMatchOver = false;
 let coopThinkingInterval = null;
 
 let coopMyHP = COOP_MAX_HP, coopMyArmor = 0, coopMyDown = false;
 let coopAllyHP = COOP_MAX_HP, coopAllyArmor = 0, coopAllyDown = false;
-let coopBossHP = 0, coopBossMaxHP = 0, coopBossStats = null;
+let coopLevel = 1, coopIsBossLevel = false;
+let coopEnemyHP = 0, coopEnemyMaxHP = 0, coopEnemyStats = null;
 let coopUltCharge = 0;
 let coopExtraTurnTriggered = false;
-// Set by the host between firing a boss-attack at the remote player and
+// Set by the host between firing an enemy-attack at the remote player and
 // hearing that player's own hp-sync report back - see file header.
 let coopPendingResolution = null;
 
@@ -88,6 +103,10 @@ function coopIsRoleDown(role) {
     return role === coopRole ? coopMyDown : coopAllyDown;
 }
 
+function coopIsBoss(level) {
+    return level % 5 === 0;
+}
+
 // --- ROOM JOINING ------------------------------------------------------------
 
 async function coopJoinRoom() {
@@ -106,15 +125,15 @@ async function coopJoinRoom() {
         config: { presence: { key: coopMyId }, broadcast: { self: false } }
     });
 
-    coopChannel.on('broadcast', { event: 'match-start' }, ({ payload }) => coopOnMatchStart(payload));
-    coopChannel.on('broadcast', { event: 'boss-damage' }, ({ payload }) => { if (coopIsHost) coopApplyBossDamage(payload.amount || 0); });
-    coopChannel.on('broadcast', { event: 'boss-hp-sync' }, ({ payload }) => { coopBossHP = payload.hp; coopUpdateUI(); });
-    coopChannel.on('broadcast', { event: 'boss-attack' }, ({ payload }) => coopOnBossAttack(payload));
+    coopChannel.on('broadcast', { event: 'level-start' }, ({ payload }) => coopOnLevelStart(payload));
+    coopChannel.on('broadcast', { event: 'enemy-defeated' }, ({ payload }) => coopOnEnemyDefeated(payload));
+    coopChannel.on('broadcast', { event: 'enemy-damage' }, ({ payload }) => { if (coopIsHost) coopApplyEnemyDamage(payload.amount || 0, payload.from); });
+    coopChannel.on('broadcast', { event: 'enemy-hp-sync' }, ({ payload }) => { coopEnemyHP = payload.hp; coopUpdateUI(); });
+    coopChannel.on('broadcast', { event: 'enemy-attack' }, ({ payload }) => coopOnEnemyAttack(payload));
     coopChannel.on('broadcast', { event: 'hp-sync' }, ({ payload }) => coopOnAllyHpSync(payload));
     coopChannel.on('broadcast', { event: 'turn-set' }, ({ payload }) => coopOnTurnSet(payload));
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
-    coopChannel.on('broadcast', { event: 'boss-defeated' }, () => coopOnBossDefeated());
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
     coopChannel.on('presence', { event: 'sync' }, () => coopCheckPresence());
 
@@ -140,40 +159,42 @@ function coopCheckPresence() {
     coopRole = coopIsHost ? 'host' : 'guest';
 
     if (coopIsHost) {
-        coopBossStats = coopComputeBossStats();
-        coopBossMaxHP = coopComputeBossMaxHP();
-        coopBossHP = coopBossMaxHP;
-        coopChannel.send({ type: 'broadcast', event: 'match-start', payload: { bossHP: coopBossHP, bossMaxHP: coopBossMaxHP, bossStats: coopBossStats } });
-        coopBeginMatch('host');
+        coopBeginRun();
+        let payload = coopBuildLevelPayload(1, 'host');
+        coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+        coopOnLevelStart(payload);
     } else {
         coopSetStatus('Takım arkadaşın bulundu, savaş hazırlanıyor…');
     }
 }
 
-// --- BOSS CONFIG (prototype: a single fixed boss-level encounter) -----------
+// --- ENEMY CONFIG (scales exactly like single-player, plus a co-op tax) -----
 
-function coopComputeBossStats() {
-    let stats = getEnemyStatsForLevel(5, true);
-    Object.keys(stats).forEach(k => stats[k] = Math.round(stats[k] * COOP_BOSS_DIFFICULTY_MULT));
+function coopComputeEnemyStats(level, isBoss) {
+    let stats = getEnemyStatsForLevel(level, isBoss);
+    Object.keys(stats).forEach(k => stats[k] = Math.round(stats[k] * COOP_DIFFICULTY_MULT));
     return stats;
 }
 
-function coopComputeBossMaxHP() {
-    return Math.round((50 + (5 - 1) * 20) * 1.3 * COOP_BOSS_DIFFICULTY_MULT);
+function coopComputeEnemyMaxHP(level, isBoss) {
+    let base = 50 + (level - 1) * 20;
+    if (isBoss) base *= 1.3;
+    return Math.round(base * COOP_DIFFICULTY_MULT);
 }
 
-function coopOnMatchStart(payload) {
-    if (coopStarted && coopRole === 'host') return; // host already started itself
-    coopStarted = true;
-    coopBossHP = payload.bossHP;
-    coopBossMaxHP = payload.bossMaxHP;
-    coopBossStats = payload.bossStats;
-    coopBeginMatch('host'); // host always moves first
+// Host-only: packages up everything the guest needs to render a level
+// without computing it independently (guest never calls this itself).
+function coopBuildLevelPayload(level, continuingRole) {
+    let isBoss = coopIsBoss(level);
+    let maxHP = coopComputeEnemyMaxHP(level, isBoss);
+    return { level, isBoss, enemyHP: maxHP, enemyMaxHP: maxHP, enemyStats: coopComputeEnemyStats(level, isBoss), continuingRole };
 }
 
-// --- MATCH LIFECYCLE ----------------------------------------------------------
+// --- RUN / LEVEL LIFECYCLE ----------------------------------------------------
 
-function coopBeginMatch(firstRole) {
+// Full reset - only ever runs once, right before level 1 starts.
+function coopBeginRun() {
+    coopRunBegun = true;
     coopMyHP = COOP_MAX_HP; coopMyArmor = 0; coopMyDown = false;
     coopAllyHP = COOP_MAX_HP; coopAllyArmor = 0; coopAllyDown = false;
     coopUltCharge = 0;
@@ -182,16 +203,49 @@ function coopBeginMatch(firstRole) {
     coopProcessing = false;
     coopPendingResolution = null;
     coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
-    coopMyTurn = (coopRole === firstRole);
 
     document.getElementById('coop-setup').style.display = 'none';
     document.getElementById('coop-battle').style.display = 'block';
+    coopLog('🐉 Takım tamamlandı - zindan yürüyüşü başladı.');
+}
+
+// Reused between EVERY level after the first: the "rest before battle" heal
+// single-player applies in winLevel() (LEVEL_CLEAR_HEAL_PERCENT lives in
+// game.js), extended so a downed player instead gets back on their feet.
+function coopApplyLevelClearHeal() {
+    let wasDown = coopMyDown;
+    let missing = wasDown ? COOP_MAX_HP : (COOP_MAX_HP - coopMyHP);
+    let healed = Math.ceil(missing * LEVEL_CLEAR_HEAL_PERCENT);
+    if (wasDown) { coopMyHP = 0; coopMyDown = false; }
+    if (healed > 0) {
+        coopMyHP = Math.min(coopMyHP + healed, COOP_MAX_HP);
+        coopLog(wasDown ? `Ayağa kalktın: +${healed} HP` : `Dinlenme: +${healed} HP`);
+    }
+    coopSyncSelfState();
+}
+
+function coopOnLevelStart(payload) {
+    if (!coopRunBegun) coopBeginRun();
+    else coopApplyLevelClearHeal();
+
+    coopLevel = payload.level;
+    coopIsBossLevel = payload.isBoss;
+    coopEnemyHP = payload.enemyHP;
+    coopEnemyMaxHP = payload.enemyMaxHP;
+    coopEnemyStats = payload.enemyStats;
+    coopMatchOver = false;
+    coopProcessing = false;
+    coopMyTurn = (payload.continuingRole === coopRole);
 
     coopCreateBoard();
     coopUpdateUI();
-    coopLog('🐉 Takım tamamlandı - boss karşılaşması başladı.');
+    coopLog(payload.isBoss ? `⚠️ BOSS - Lvl ${payload.level} başlıyor!` : `Lvl ${payload.level} başlıyor.`);
     if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); }
     else coopStartThinkingAnimation();
+}
+
+function coopOnEnemyDefeated(payload) {
+    coopLog(payload.isBoss ? `Boss (Lvl ${payload.level}) yenildi!` : `Minion (Lvl ${payload.level}) yenildi!`);
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------
@@ -210,12 +264,12 @@ function coopSyncSelfState() {
     coopUpdateUI();
 }
 
-// Applies an incoming hit to MY OWN hp/armor (boss attack aimed at me).
+// Applies an incoming hit to MY OWN hp/armor (enemy attack aimed at me).
 function coopApplyIncomingDamage(amount) {
     let afterDefense = applyDefensiveTraits(amount);
     if (afterDefense === null) {
         showFloatingText("DODGE!", document.getElementById('coop-my-hp-bar'), "#2ecc71");
-        coopLog('Boss saldırısını savuşturdun!');
+        coopLog('Saldırıyı savuşturdun!');
         return;
     }
     amount = afterDefense;
@@ -224,14 +278,14 @@ function coopApplyIncomingDamage(amount) {
     else { coopMyHP -= (amount - coopMyArmor); coopMyArmor = 0; }
 
     showFloatingText(`-${amount}`, document.getElementById('coop-my-hp-bar'), '#e74c3c');
-    coopLog(`Boss sana ${amount} hasar verdi.`);
+    coopLog(`Düşman sana ${amount} hasar verdi.`);
     coopSyncSelfState();
 }
 
-function coopOnBossAttack(payload) {
+function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
     if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0);
-    else coopLog(`Boss takım arkadaşına ${payload.amount} hasar verdi.`);
+    else coopLog(`Düşman takım arkadaşına ${payload.amount} hasar verdi.`);
 }
 
 function coopOnAllyHpSync(payload) {
@@ -247,46 +301,58 @@ function coopOnAllyHpSync(payload) {
     }
 }
 
-// --- HOST-ONLY: BOSS BRAIN -----------------------------------------------------
+// --- HOST-ONLY: ENEMY BRAIN ----------------------------------------------------
 
-function coopApplyBossDamage(amount) {
+function coopApplyEnemyDamage(amount, fromRole) {
     if (coopMatchOver) return;
-    coopBossHP = Math.max(0, coopBossHP - amount);
-    coopChannel.send({ type: 'broadcast', event: 'boss-hp-sync', payload: { hp: coopBossHP } });
+    coopEnemyHP = Math.max(0, coopEnemyHP - amount);
+    coopChannel.send({ type: 'broadcast', event: 'enemy-hp-sync', payload: { hp: coopEnemyHP } });
     coopUpdateUI();
-    if (coopBossHP <= 0) {
-        coopMatchOver = true;
-        coopChannel.send({ type: 'broadcast', event: 'boss-defeated', payload: {} });
-        coopOnBossDefeated();
-    }
+    if (coopEnemyHP <= 0) coopBeginLevelTransition(fromRole || coopRole);
+}
+
+// A killing blow isn't countered - the player who landed it carries their
+// turn straight into the next level, same as single-player always handing
+// the very next turn back to the player after a win.
+function coopBeginLevelTransition(continuingRole) {
+    coopMatchOver = true; // pause all board interaction until the next level-start
+    coopStopThinkingAnimation();
+    if (continuingRole === coopRole) coopLogTurnSummary();
+
+    let clearedLevel = coopLevel, clearedIsBoss = coopIsBossLevel;
+    coopChannel.send({ type: 'broadcast', event: 'enemy-defeated', payload: { level: clearedLevel, isBoss: clearedIsBoss } });
+    coopOnEnemyDefeated({ level: clearedLevel, isBoss: clearedIsBoss });
+
+    setTimeout(() => {
+        let payload = coopBuildLevelPayload(clearedLevel + 1, continuingRole);
+        coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
+        coopOnLevelStart(payload);
+    }, 1500);
 }
 
 // Called (host only) once a player's turn (theirs or the remote player's)
-// has fully resolved: boss counter-attacks the mover, then turn/revival is
-// decided. See file header for why the remote-target case has to wait.
+// has fully resolved: the enemy counter-attacks the mover, then turn/
+// revival is decided. See file header for why the remote-target case has
+// to wait. Never runs for a killing blow - see coopBeginLevelTransition.
 function coopHostResolveTurnEnd(moverRole) {
     if (coopMatchOver) return;
 
     if (coopIsRoleDown(moverRole)) {
-        // Downed themselves with their own move (e.g. ult recoil) - boss has
-        // nothing left to hit, skip straight to revival/next-turn.
+        // Downed themselves with their own move (e.g. ult recoil) - the
+        // enemy has nothing left to hit, skip straight to revival/next-turn.
         coopFinishHostTurnResolution(moverRole);
         return;
     }
 
-    let dmg = Math.round(coopBossStats.sword * (1 + Math.random() * 0.6));
+    let dmg = Math.round(coopEnemyStats.sword * (1 + Math.random() * 0.6));
 
     if (moverRole === coopRole) {
         coopApplyIncomingDamage(dmg);
-        coopChannel.send({ type: 'broadcast', event: 'boss-attack', payload: { role: moverRole, amount: dmg } });
+        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg } });
         coopFinishHostTurnResolution(moverRole);
     } else {
         coopPendingResolution = { moverRole };
-        coopChannel.send({ type: 'broadcast', event: 'boss-attack', payload: { role: moverRole, amount: dmg } });
-        // broadcast self:false means the host - the sender here - never gets
-        // its own message back, so it has to log this locally instead of
-        // relying on coopOnBossAttack's observer branch to fire for it.
-        coopLog(`Boss takım arkadaşına ${dmg} hasar verdi.`);
+        coopChannel.send({ type: 'broadcast', event: 'enemy-attack', payload: { role: moverRole, amount: dmg } });
         // Waits for that player's own hp-sync (see coopOnAllyHpSync) before continuing.
     }
 }
@@ -348,19 +414,11 @@ function coopApplyTurnSet(role) {
     coopUpdateUI();
 }
 
-function coopOnBossDefeated() {
-    coopMatchOver = true;
-    coopStopThinkingAnimation();
-    coopSetStatus('ZAFER!');
-    coopLog('Boss yenildi - takım kazandı!');
-    coopUpdateUI();
-}
-
 function coopOnPartyWiped() {
     coopMatchOver = true;
     coopStopThinkingAnimation();
-    coopSetStatus('İKİNİZ DE DÜŞTÜNÜZ - YENİLGİ');
-    coopLog('İkiniz de aynı anda düştünüz. Takım yenildi.');
+    coopSetStatus(`İKİNİZ DE DÜŞTÜNÜZ - Lvl ${coopLevel}'de YENİLGİ`);
+    coopLog('İkiniz de aynı anda düştünüz. Zindan yürüyüşü bitti.');
     coopUpdateUI();
 }
 
@@ -368,8 +426,8 @@ function coopOnPartyWiped() {
 
 function makeCoopCombatContext() {
     return {
-        dealDamageToOpponent(amount) { coopApplyDamageToBoss(amount); },
-        dealDirectDamageToOpponent(amount) { coopApplyDamageToBoss(amount); },
+        dealDamageToOpponent(amount) { coopApplyDamageToEnemy(amount); },
+        dealDirectDamageToOpponent(amount) { coopApplyDamageToEnemy(amount); },
         dealDirectDamageToSelf(amount) {
             coopMyHP -= amount;
             coopMyTurnStats.selfDamage += amount;
@@ -381,10 +439,10 @@ function makeCoopCombatContext() {
     };
 }
 
-function coopApplyDamageToBoss(amount) {
+function coopApplyDamageToEnemy(amount) {
     coopMyTurnStats.damage += amount;
-    if (coopIsHost) coopApplyBossDamage(amount);
-    else coopChannel.send({ type: 'broadcast', event: 'boss-damage', payload: { amount } });
+    if (coopIsHost) coopApplyEnemyDamage(amount, coopRole);
+    else coopChannel.send({ type: 'broadcast', event: 'enemy-damage', payload: { amount, from: coopRole } });
 }
 
 function coopUseUltimate() {
@@ -506,7 +564,7 @@ function coopApplyGroupEffect(group, isInitial) {
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);
-        coopApplyDamageToBoss(amount);
+        coopApplyDamageToEnemy(amount);
         if (group.type === 'skull') {
             let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
@@ -534,7 +592,7 @@ function coopApplyGroupEffect(group, isInitial) {
 
 function coopLogTurnSummary() {
     let parts = [];
-    if (coopMyTurnStats.damage > 0) parts.push(`boss'a ${coopMyTurnStats.damage} hasar verdin`);
+    if (coopMyTurnStats.damage > 0) parts.push(`düşmana ${coopMyTurnStats.damage} hasar verdin`);
     if (coopMyTurnStats.heal > 0) parts.push(`${coopMyTurnStats.heal} can iyileştin`);
     if (coopMyTurnStats.armor > 0) parts.push(`${coopMyTurnStats.armor} zırh kazandın`);
     if (coopMyTurnStats.ultGain > 0) parts.push(`ult +%${coopMyTurnStats.ultGain}`);
@@ -571,7 +629,9 @@ function coopDropAndRefill(isInitial) {
 }
 
 // Common "my move is fully done" tail, reached both from a normal cascade
-// settling and from finishing an ultimate.
+// settling and from finishing an ultimate. A no-op if the move that just
+// finished was a killing blow - coopBeginLevelTransition already owns what
+// happens next in that case (coopMatchOver guards it out below).
 function coopEndOwnTurn() {
     if (coopMatchOver) return;
 
@@ -609,11 +669,14 @@ function coopUpdateUI() {
         ? 'BAYILDI - KURTAR!'
         : `${Math.max(0, Math.floor(coopAllyHP))}/${COOP_MAX_HP}` + (coopAllyArmor > 0 ? ` [+${coopAllyArmor}]` : '');
 
-    let bossPct = coopBossMaxHP > 0 ? Math.max(0, (coopBossHP / coopBossMaxHP) * 100) : 0;
-    let bossBar = document.getElementById('coop-boss-hp-bar');
-    let bossText = document.getElementById('coop-boss-hp-text');
-    if (bossBar) bossBar.style.width = bossPct + '%';
-    if (bossText) bossText.innerText = `${Math.max(0, Math.floor(coopBossHP))}/${coopBossMaxHP}`;
+    let enemyPct = coopEnemyMaxHP > 0 ? Math.max(0, (coopEnemyHP / coopEnemyMaxHP) * 100) : 0;
+    let enemyBar = document.getElementById('coop-boss-hp-bar');
+    let enemyText = document.getElementById('coop-boss-hp-text');
+    if (enemyBar) enemyBar.style.width = enemyPct + '%';
+    if (enemyText) enemyText.innerText = `${Math.max(0, Math.floor(coopEnemyHP))}/${coopEnemyMaxHP}`;
+
+    let levelLabel = document.getElementById('coop-level-label');
+    if (levelLabel) levelLabel.innerText = coopIsBossLevel ? `Lvl ${coopLevel} 👹 BOSS` : `Lvl ${coopLevel}`;
 
     let ultBar = document.getElementById('coop-ult-bar');
     let ultText = document.getElementById('coop-ult-text');
