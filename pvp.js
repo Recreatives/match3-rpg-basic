@@ -31,6 +31,14 @@ let pvpSelectedTile = null;
 let pvpMyHP = PVP_MAX_HP;
 let pvpMyArmor = 0;
 let pvpMatchOver = false;
+let pvpThinkingInterval = null;
+
+// Effects accumulate here across a whole turn (including any cascade) and
+// get flushed as ONE log line when the turn actually ends, instead of one
+// line per individual match - with a big cascade the old per-match logging
+// scrolled by too fast to read.
+let pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0 };
+let pvpIncomingStats = { damage: 0 };
 
 function pvpLog(msg) {
     let el = document.getElementById('pvp-log');
@@ -45,6 +53,22 @@ function pvpSetStatus(text) {
     let el2 = document.getElementById('pvp-status-battle');
     if (el1) el1.innerText = text;
     if (el2) el2.innerText = text;
+}
+
+// A static "Rakibin sırası…" gave no sense that a real person was on the
+// other end - this keeps the status line visibly alive while waiting.
+function pvpStartThinkingAnimation() {
+    let dots = 0;
+    clearInterval(pvpThinkingInterval);
+    pvpThinkingInterval = setInterval(() => {
+        dots = (dots + 1) % 4;
+        pvpSetStatus('Rakip oynuyor' + '.'.repeat(dots));
+    }, 400);
+}
+
+function pvpStopThinkingAnimation() {
+    clearInterval(pvpThinkingInterval);
+    pvpThinkingInterval = null;
 }
 
 // --- ROOM JOINING -----------------------------------------------------------
@@ -105,8 +129,9 @@ function pvpStartMatch() {
 
     pvpCreateBoard();
     pvpUpdateUI();
-    pvpSetStatus(pvpMyTurn ? 'Senin sıran!' : 'Rakibin sırası…');
-    pvpLog('Eşleşme başladı.');
+    pvpLog('🟢 Rakip bağlı - eşleşme başladı.');
+    if (pvpMyTurn) { pvpStopThinkingAnimation(); pvpSetStatus('Senin sıran!'); }
+    else pvpStartThinkingAnimation();
 }
 
 function pvpReceiveAttack(payload) {
@@ -120,24 +145,34 @@ function pvpReceiveAttack(payload) {
         pvpMyArmor = 0;
         pvpMyHP -= remainder;
     }
-    pvpLog(`Rakip ${payload.type || 'saldırı'} ile ${amount} hasar verdi.`);
+    pvpIncomingStats.damage += amount;
+    // Immediate visceral feedback that a real opponent just did something,
+    // even though their board/HP stay hidden - the full summary line still
+    // comes at the end of their turn (see pvpReceiveTurnEnd).
+    showFloatingText(`-${amount}`, document.getElementById('pvp-my-hp-bar'), '#e74c3c');
     pvpUpdateUI();
 
     if (pvpMyHP <= 0 && before > 0) {
         pvpMatchOver = true;
+        pvpStopThinkingAnimation();
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
-        pvpLog('Yenildin.');
+        pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
     }
-    // Turn handoff does NOT happen here anymore - see pvpReceiveTurnEnd.
-    // It used to be granted on taking damage, which meant a turn that only
-    // matched shield/heart (no attack broadcast at all) never told the
-    // opponent it was over - both sides ended up stuck waiting on each
-    // other. Turn passing is now its own explicit, unconditional message.
+    // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
+    // be granted on taking damage, which meant a turn that only matched
+    // shield/heart (no attack broadcast at all) never told the opponent it
+    // was over - both sides ended up stuck waiting on each other. Turn
+    // passing is now its own explicit, unconditional message.
 }
 
 function pvpReceiveTurnEnd() {
     if (pvpMatchOver) return;
+    pvpStopThinkingAnimation();
+    if (pvpIncomingStats.damage > 0) pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi.`);
+    else pvpLog('Rakip bu tur hasar vermedi.');
+    pvpIncomingStats = { damage: 0 };
+
     pvpMyTurn = true;
     pvpSetStatus('Senin sıran!');
     pvpUpdateUI();
@@ -146,6 +181,7 @@ function pvpReceiveTurnEnd() {
 function pvpOnOpponentDefeated() {
     if (pvpMatchOver) return;
     pvpMatchOver = true;
+    pvpStopThinkingAnimation();
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
     pvpUpdateUI();
@@ -276,21 +312,21 @@ function pvpApplyGroupEffect(group, isInitial) {
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);
-        pvpLog(`${group.type === 'sword' ? 'Kılıç' : 'Kafatası'} eşleşti - rakibe ${amount} hasar.`);
+        pvpMyTurnStats.damage += amount;
         pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
         if (group.type === 'skull') {
             let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
-            pvpLog(`Kafatası geri tepmesi: kendine ${recoil} hasar.`);
+            pvpMyTurnStats.selfDamage += recoil;
         }
     } else if (group.type === 'heart') {
         let heal = Math.floor(TILE_STATS.heart * multiplier);
         pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
-        pvpLog(`Kalp eşleşti - +${heal} can.`);
+        pvpMyTurnStats.heal += heal;
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
-        pvpLog(`Kalkan eşleşti - +${gain} zırh.`);
+        pvpMyTurnStats.armor += gain;
     }
     // energy: no effect yet in the prototype - ult mechanics land in a later pass.
 
@@ -298,10 +334,22 @@ function pvpApplyGroupEffect(group, isInitial) {
 
     if (pvpMyHP <= 0) {
         pvpMatchOver = true;
+        pvpStopThinkingAnimation();
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
+        pvpLogTurnSummary();
         pvpLog('Kendi hasarınla yenildin.');
     }
+}
+
+function pvpLogTurnSummary() {
+    let parts = [];
+    if (pvpMyTurnStats.damage > 0) parts.push(`${pvpMyTurnStats.damage} hasar verdin`);
+    if (pvpMyTurnStats.heal > 0) parts.push(`${pvpMyTurnStats.heal} can iyileştin`);
+    if (pvpMyTurnStats.armor > 0) parts.push(`${pvpMyTurnStats.armor} zırh kazandın`);
+    if (pvpMyTurnStats.selfDamage > 0) parts.push(`kendine ${pvpMyTurnStats.selfDamage} hasar verdin`);
+    pvpLog(parts.length > 0 ? `Hamlen: ${parts.join(', ')}.` : 'Hamlen bir etki yaratmadı.');
+    pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0 };
 }
 
 function pvpDropAndRefill(isInitial) {
@@ -325,9 +373,10 @@ function pvpDropAndRefill(isInitial) {
     }
     let chained = pvpResolveMatches(isInitial);
     if (!chained && !isInitial && !pvpMatchOver) {
+        pvpLogTurnSummary();
         pvpMyTurn = false;
         pvpProcessing = false;
-        pvpSetStatus('Rakibin sırası…');
+        pvpStartThinkingAnimation();
         pvpUpdateUI();
         // Unconditional - sent whether or not this turn dealt any damage, so
         // a shield/heart-only turn still hands control back to the opponent.
