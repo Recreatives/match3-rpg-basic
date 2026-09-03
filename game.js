@@ -874,6 +874,12 @@ function inflictDamage(targetStr, amount) {
 
 function fillBoard(isInitial) {
     if (!isInitial && currentState !== STATE.PLAYING) return;
+    // Tiles that need their fall-in animation restarted this pass. Collected
+    // and reflowed once at the end instead of once per tile - triggering a
+    // forced synchronous layout inside this loop (as this used to do) is
+    // "layout thrashing" and is exactly the kind of thing that makes a board
+    // full of falling tiles feel janky instead of silky smooth.
+    let tilesToAnimate = [];
     for (let col = 0; col < width; col++) {
         let columnTiles = [];
         for (let row = 0; row < width; row++) {
@@ -896,11 +902,14 @@ function fillBoard(isInitial) {
                 tiles[index].classList.remove('matched');
                 if (!isInitial) {
                     tiles[index].classList.remove('falling');
-                    void tiles[index].offsetWidth;
-                    tiles[index].classList.add('falling');
+                    tilesToAnimate.push(tiles[index]);
                 }
             }
         }
+    }
+    if (tilesToAnimate.length > 0) {
+        void gridDisplay.offsetWidth; // one batched reflow instead of one per tile
+        tilesToAnimate.forEach(t => t.classList.add('falling'));
     }
     let chainReaction = checkForMatches(isInitial);
     if (!chainReaction && !isInitial) endTurnLogic();
@@ -1109,6 +1118,14 @@ function updateUI() {
     document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
     document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
+
+    // Enemy Stats Display (separate pool - see ENEMY_TILE_STATS)
+    document.getElementById('enemy-stat-sword').innerText = ENEMY_TILE_STATS.sword;
+    document.getElementById('enemy-stat-shield').innerText = ENEMY_TILE_STATS.shield;
+    document.getElementById('enemy-stat-heart').innerText = ENEMY_TILE_STATS.heart;
+    document.getElementById('enemy-stat-energy').innerText = ENEMY_TILE_STATS.energy;
+    document.getElementById('enemy-stat-skull').innerText = ENEMY_TILE_STATS.skull_dmg;
+    document.getElementById('enemy-stat-self-dmg').innerText = ENEMY_TILE_STATS.skull_self_dmg;
 }
 
 function toggleModal(modalId) {

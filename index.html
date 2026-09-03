@@ -173,7 +173,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.32 Added partial HP rest between levels, independent enemy stats, and a player-only speed bonus multiplier</div>
+        <div class="version">v0.33 Fixed class-select text clipping and stray hover scrollbar, added visible Enemy Stats panel, smoother tile animations</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
@@ -208,6 +208,7 @@
         </div>
     </div>
 
+    <div class="stats-label">YOUR STATS</div>
     <div class="stats-bar">
         <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
         <div class="stat-item" title="Shield Gain"><span>🛡️</span><span id="stat-shield" class="stat-val">5</span></div>
@@ -218,6 +219,17 @@
         <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
         <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
         <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
+    </div>
+
+    <div class="stats-label enemy-label">ENEMY STATS</div>
+    <div class="stats-bar enemy-stats-bar">
+        <div class="stat-item" title="Enemy Sword Damage"><span>⚔️</span><span id="enemy-stat-sword" class="stat-val">4</span></div>
+        <div class="stat-item" title="Enemy Shield Gain"><span>🛡️</span><span id="enemy-stat-shield" class="stat-val">4</span></div>
+        <div class="stat-item" title="Enemy Heal Amount"><span>💖</span><span id="enemy-stat-heart" class="stat-val">3</span></div>
+        <div class="stat-item" title="Enemy Energy Absorb"><span>⚡</span><span id="enemy-stat-energy" class="stat-val">10</span></div>
+
+        <div class="stat-item" title="Enemy Skull Damage"><span>💀</span><span id="enemy-stat-skull" class="stat-val">15</span></div>
+        <div class="stat-item" title="Enemy Self Damage"><span>☠️</span><span id="enemy-stat-self-dmg" class="stat-val">8</span></div>
     </div>
 
     <div class="grid" id="grid">
