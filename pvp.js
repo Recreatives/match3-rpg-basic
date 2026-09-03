@@ -67,6 +67,7 @@ async function pvpJoinRoom() {
 
     pvpChannel.on('broadcast', { event: 'attack' }, ({ payload }) => pvpReceiveAttack(payload));
     pvpChannel.on('broadcast', { event: 'defeated' }, () => pvpOnOpponentDefeated());
+    pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
     pvpChannel.on('presence', { event: 'sync' }, () => pvpCheckPresence());
 
     pvpChannel.subscribe(async (status) => {
@@ -127,12 +128,19 @@ function pvpReceiveAttack(payload) {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog('Yenildin.');
-    } else {
-        // Turn passes back to me after taking a hit.
-        pvpMyTurn = true;
-        pvpSetStatus('Senin sıran!');
-        pvpUpdateUI();
     }
+    // Turn handoff does NOT happen here anymore - see pvpReceiveTurnEnd.
+    // It used to be granted on taking damage, which meant a turn that only
+    // matched shield/heart (no attack broadcast at all) never told the
+    // opponent it was over - both sides ended up stuck waiting on each
+    // other. Turn passing is now its own explicit, unconditional message.
+}
+
+function pvpReceiveTurnEnd() {
+    if (pvpMatchOver) return;
+    pvpMyTurn = true;
+    pvpSetStatus('Senin sıran!');
+    pvpUpdateUI();
 }
 
 function pvpOnOpponentDefeated() {
@@ -321,6 +329,9 @@ function pvpDropAndRefill(isInitial) {
         pvpProcessing = false;
         pvpSetStatus('Rakibin sırası…');
         pvpUpdateUI();
+        // Unconditional - sent whether or not this turn dealt any damage, so
+        // a shield/heart-only turn still hands control back to the opponent.
+        pvpChannel.send({ type: 'broadcast', event: 'turn-end', payload: {} });
     }
 }
 
