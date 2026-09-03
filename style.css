@@ -481,18 +481,19 @@ body {
     font-size: 0.9rem;
 }
 
-/* The PvP board lives inside this narrow modal, not the full page, so it
-   can't use --board-size (that's sized off the whole viewport via dvmin -
-   fine for the main board, but wider than this modal on most screens,
-   which is exactly what forced the horizontal scrollbar). Sized as a
-   percentage of the modal's own content width instead. */
-#pvp-grid {
+/* Shared by every multiplayer board (PvP, co-op, ...) - each lives inside a
+   narrow modal, not the full page, so it can't use --board-size (that's
+   sized off the whole viewport via dvmin - fine for the main board, but
+   wider than these modals on most screens, which is exactly what forced the
+   horizontal scrollbar). Sized as a percentage of the modal's own content
+   width instead. */
+.mp-grid {
     width: 100%;
     height: auto;
     aspect-ratio: 1 / 1;
     box-sizing: border-box;
 }
-#pvp-grid .tile {
+.mp-grid .tile {
     width: 12.5%;
     height: 12.5%;
     font-size: clamp(14px, 4.5vw, 22px);

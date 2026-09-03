@@ -233,7 +233,7 @@
                         <span id="pvp-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
                         <div class="bar-container"><div id="pvp-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
                     </div>
-                    <div class="grid" id="pvp-grid" style="margin: 0 auto 10px;"></div>
+                    <div class="grid mp-grid" id="pvp-grid" style="margin: 0 auto 10px;"></div>
                     <button id="pvp-ult-btn" class="action-btn" style="width:100%; margin:0 0 10px;" disabled onclick="pvpUseUltimate()">ULT (sınıf seçilmedi)</button>
                     <div id="pvp-log" style="width:100%; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:6px; padding:8px; font-size:0.75rem; display:flex; flex-direction:column-reverse; box-sizing:border-box;"></div>
                 </div>
@@ -241,9 +241,54 @@
         </div>
     </div>
 
+    <div id="coop-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('coop-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🤝 CO-OP TEST (prototip)</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu aynı boss'a karşı sırayla oynar. Boss canı ortak. Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
+
+                <div id="coop-setup">
+                    <input id="coop-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
+                    <button class="overlay-btn" style="width:100%; margin:0;" onclick="coopJoinRoom()">Odaya Katıl</button>
+                    <p id="coop-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px;"></p>
+                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar.</p>
+                </div>
+
+                <div id="coop-battle" style="display:none;">
+                    <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <div>BOSS</div>
+                        <div class="bar-container"><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
+                        <span id="coop-boss-hp-text" class="hp-text">0/0</span>
+                    </div>
+                    <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <div>SEN</div>
+                        <div class="bar-container"><div id="coop-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
+                        <span id="coop-my-hp-text" class="hp-text">100/100</span>
+                    </div>
+                    <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <div>TAKIM ARKADAŞI</div>
+                        <div class="bar-container"><div id="coop-ally-hp-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
+                        <span id="coop-ally-hp-text" class="hp-text">100/100</span>
+                    </div>
+                    <p id="coop-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
+                    <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <div>ULT</div>
+                        <span id="coop-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
+                        <div class="bar-container"><div id="coop-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
+                    </div>
+                    <div class="grid mp-grid" id="coop-grid" style="margin: 0 auto 10px;"></div>
+                    <button id="coop-ult-btn" class="action-btn" style="width:100%; margin:0 0 10px;" disabled onclick="coopUseUltimate()">ULT (sınıf seçilmedi)</button>
+                    <div id="coop-log" style="width:100%; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:6px; padding:8px; font-size:0.75rem; display:flex; flex-direction:column-reverse; box-sizing:border-box;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="top-bar">
-        <div class="version">v0.37 Unified engine - PvP now shares single-player's match rules, cross-shapes, extra turns and class ultimates</div>
+        <div class="version">v0.38 Co-op prototype - 2 players vs. a shared boss, down/revive mechanic</div>
         <div>
+            <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>
             <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP Test</button>
             <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
@@ -307,5 +352,6 @@
     <script src="economy.js"></script>
     <script src="game.js"></script>
     <script src="pvp.js"></script>
+    <script src="coop.js"></script>
 </body>
 </html>
