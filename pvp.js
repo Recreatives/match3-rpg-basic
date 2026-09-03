@@ -2,18 +2,27 @@
 // This validates the hardest technical piece of the betrayal system - two
 // real browsers seeing each other's moves live - before the betrayal vote,
 // Kibir Laneti, and currency stakes get layered on top (see the "İhanet
-// Protokolü" design doc). Deliberately simpler than the single-player
-// engine for now: no classes, no ultimates, no cascades beyond one resolve
-// pass, no L/T-shape bonus. It has its own state and its own board,
-// entirely separate from game.js's single-player globals - the two modes
-// never touch the same variables, so nothing here can destabilize the
-// existing single-player game.
+// Protokolü" design doc). It has its own state and its own board, entirely
+// separate from game.js's single-player globals (isPlayerTurn, currentState,
+// etc.) - the two modes never touch the same variables, so nothing here can
+// destabilize the existing single-player game.
+//
+// Match detection, the multiplier/extra-turn/ult-charge rules per match
+// size, class passives, and ultimates are all the SAME code single-player
+// uses (findMatchGroups, getMatchShapeInfo, applyDefensiveTraits, the
+// CLASSES definitions) - only reached through a "combat context"
+// (makePvpCombatContext) instead of game.js's single-player one, so an
+// ultimate doesn't need to know whether it's fighting an AI or a real
+// networked opponent. Keeping one copy of these rules is the whole point:
+// two independently-maintained copies already found a way to disagree once
+// (the turn-deadlock bug from the first real test).
 //
 // Networking model: each client is authoritative for its OWN hp/armor.
 // "I matched sword tiles, here's how much damage that is" gets broadcast to
 // the opponent; the RECEIVING client applies that amount to its own local
-// hp/armor (using its own armor-absorption math) and reports back if it
-// died. Nobody's client ever has to trust or replicate the other's board.
+// hp/armor (using its own armor-absorption math and its own class's dodge/
+// vulnerability) and reports back if it died. Nobody's client ever has to
+// trust or replicate the other's board.
 //
 // Turn order: whoever's presence timestamp is earliest goes first.
 
@@ -32,12 +41,14 @@ let pvpMyHP = PVP_MAX_HP;
 let pvpMyArmor = 0;
 let pvpMatchOver = false;
 let pvpThinkingInterval = null;
+let pvpUltCharge = 0;
+let pvpExtraTurnTriggered = false;
 
 // Effects accumulate here across a whole turn (including any cascade) and
 // get flushed as ONE log line when the turn actually ends, instead of one
 // line per individual match - with a big cascade the old per-match logging
 // scrolled by too fast to read.
-let pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0 };
+let pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 let pvpIncomingStats = { damage: 0 };
 
 function pvpLog(msg) {
@@ -121,8 +132,12 @@ function pvpCheckPresence() {
 function pvpStartMatch() {
     pvpMyHP = PVP_MAX_HP;
     pvpMyArmor = 0;
+    pvpUltCharge = 0;
+    pvpExtraTurnTriggered = false;
     pvpMatchOver = false;
     pvpProcessing = false;
+    pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    pvpIncomingStats = { damage: 0 };
 
     document.getElementById('pvp-setup').style.display = 'none';
     document.getElementById('pvp-battle').style.display = 'block';
@@ -134,11 +149,24 @@ function pvpStartMatch() {
     else pvpStartThinkingAnimation();
 }
 
-function pvpReceiveAttack(payload) {
-    if (pvpMatchOver) return;
-    let amount = payload.amount || 0;
+// Applies an incoming hit to MY OWN hp/armor - used both for regular tile
+// damage and for ultimate damage aimed at me. `direct` bypasses armor
+// (an ability that "ignores armor" still respects dodge, since dodge and
+// armor are different defensive layers - only armor is what "ignores armor"
+// refers to).
+function pvpApplyIncomingDamage(amount, direct) {
+    let afterDefense = applyDefensiveTraits(amount);
+    if (afterDefense === null) {
+        showFloatingText("DODGE!", document.getElementById('pvp-my-hp-bar'), "#2ecc71");
+        pvpLog('Rakibin saldırısını savuşturdun!');
+        return;
+    }
+    amount = afterDefense;
+
     let before = pvpMyHP;
-    if (pvpMyArmor >= amount) {
+    if (direct) {
+        pvpMyHP -= amount;
+    } else if (pvpMyArmor >= amount) {
         pvpMyArmor -= amount;
     } else {
         let remainder = amount - pvpMyArmor;
@@ -146,9 +174,6 @@ function pvpReceiveAttack(payload) {
         pvpMyHP -= remainder;
     }
     pvpIncomingStats.damage += amount;
-    // Immediate visceral feedback that a real opponent just did something,
-    // even though their board/HP stay hidden - the full summary line still
-    // comes at the end of their turn (see pvpReceiveTurnEnd).
     showFloatingText(`-${amount}`, document.getElementById('pvp-my-hp-bar'), '#e74c3c');
     pvpUpdateUI();
 
@@ -159,6 +184,11 @@ function pvpReceiveAttack(payload) {
         pvpSetStatus('KAYBETTİN');
         pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
     }
+}
+
+function pvpReceiveAttack(payload) {
+    if (pvpMatchOver) return;
+    pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
     // be granted on taking damage, which meant a turn that only matched
     // shield/heart (no attack broadcast at all) never told the opponent it
@@ -187,7 +217,63 @@ function pvpOnOpponentDefeated() {
     pvpUpdateUI();
 }
 
-// --- BOARD (simplified: match-3/4/5+, no shapes, no cascades beyond one pass) ---
+// --- ULTIMATE ----------------------------------------------------------------
+// PvP's implementation of the same combat-context interface game.js's
+// makeSinglePlayerCombatContext implements - the CLASSES ultEffect
+// definitions are unaware which one they're given.
+function makePvpCombatContext() {
+    return {
+        dealDamageToOpponent(amount) {
+            pvpMyTurnStats.damage += amount;
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: 'ult' } });
+        },
+        dealDirectDamageToOpponent(amount) {
+            pvpMyTurnStats.damage += amount;
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: 'ult', direct: true } });
+        },
+        dealDirectDamageToSelf(amount) {
+            pvpMyHP -= amount;
+            pvpMyTurnStats.selfDamage += amount;
+        },
+        getSelfArmor() { return pvpMyArmor; },
+        grantExtraTurn() { pvpExtraTurnTriggered = true; },
+        log(msg) { pvpLog(msg); }
+    };
+}
+
+function pvpUseUltimate() {
+    if (pvpMatchOver || pvpProcessing || !pvpMyTurn || pvpUltCharge < 100 || !selectedClass) return;
+
+    pvpProcessing = true;
+    selectedClass.ultEffect(makePvpCombatContext());
+    pvpUltCharge = 0;
+    pvpUpdateUI();
+
+    if (pvpMyHP <= 0) {
+        pvpMatchOver = true;
+        pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
+        pvpSetStatus('KAYBETTİN');
+        pvpUpdateUI();
+        return;
+    }
+
+    // Mirrors single-player's useUltimate(): using the ult ends your turn
+    // unless it granted an extra one (Rogue).
+    setTimeout(() => {
+        pvpProcessing = false;
+        if (pvpExtraTurnTriggered) {
+            pvpExtraTurnTriggered = false;
+            pvpLog('>> Ekstra tur!');
+        } else {
+            pvpMyTurn = false;
+            pvpStartThinkingAnimation();
+            pvpChannel.send({ type: 'broadcast', event: 'turn-end', payload: {} });
+        }
+        pvpUpdateUI();
+    }, 500);
+}
+
+// --- BOARD -------------------------------------------------------------------
 
 function pvpCreateBoard() {
     let grid = document.getElementById('pvp-grid');
@@ -258,8 +344,9 @@ function pvpAttemptSwap(tile1, tile2) {
 }
 
 function pvpResolveMatches(isInitial) {
-    let types = pvpTiles.map(t => t.dataset.type);
-    let groups = pvpFindMatchGroups(types);
+    // Same match-detection (including L/T cross-shapes) single-player uses,
+    // just pointed at pvpTiles instead of the single-player `tiles` array.
+    let groups = findMatchGroups(pvpTiles, PVP_WIDTH);
     if (groups.length === 0) {
         if (!isInitial) pvpProcessing = false;
         return false;
@@ -270,36 +357,12 @@ function pvpResolveMatches(isInitial) {
     return true;
 }
 
-function pvpFindMatchGroups(types) {
-    let groups = [];
-    for (let r = 0; r < PVP_WIDTH; r++) {
-        let count = 1;
-        for (let c = 0; c < PVP_WIDTH; c++) {
-            let i = r * PVP_WIDTH + c;
-            if (c < PVP_WIDTH - 1 && types[i] !== '' && types[i] === types[i + 1]) count++;
-            else {
-                if (count >= 3) groups.push({ type: types[i], indices: Array.from({length: count}, (_, k) => i - k) });
-                count = 1;
-            }
-        }
-    }
-    for (let c = 0; c < PVP_WIDTH; c++) {
-        let count = 1;
-        for (let r = 0; r < PVP_WIDTH; r++) {
-            let i = r * PVP_WIDTH + c;
-            if (r < PVP_WIDTH - 1 && types[i] !== '' && types[i] === types[i + PVP_WIDTH]) count++;
-            else {
-                if (count >= 3) groups.push({ type: types[i], indices: Array.from({length: count}, (_, k) => i - k * PVP_WIDTH) });
-                count = 1;
-            }
-        }
-    }
-    return groups;
-}
-
 function pvpApplyGroupEffect(group, isInitial) {
     let count = group.indices.length;
-    let multiplier = count >= 5 ? 3 : count === 4 ? 2 : 1;
+    let isCross = (group.subShape === 'cross');
+    // Same size/shape -> multiplier/extra-turn/ult-charge priority rules as
+    // single-player (getMatchShapeInfo lives in game.js).
+    let { multiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
 
     group.indices.forEach(i => {
         if (!isInitial) pvpTiles[i].classList.add('matched');
@@ -308,6 +371,12 @@ function pvpApplyGroupEffect(group, isInitial) {
     });
 
     if (isInitial) return;
+
+    if (extraTurn) pvpExtraTurnTriggered = true;
+    if (ultBonus > 0) {
+        pvpUltCharge = Math.min(pvpUltCharge + ultBonus, 100);
+        pvpMyTurnStats.ultGain += ultBonus;
+    }
 
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
@@ -327,8 +396,11 @@ function pvpApplyGroupEffect(group, isInitial) {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
         pvpMyTurnStats.armor += gain;
+    } else if (group.type === 'energy') {
+        let gain = Math.floor(TILE_STATS.energy * multiplier);
+        pvpUltCharge = Math.min(pvpUltCharge + gain, 100);
+        pvpMyTurnStats.ultGain += gain;
     }
-    // energy: no effect yet in the prototype - ult mechanics land in a later pass.
 
     pvpUpdateUI();
 
@@ -347,9 +419,10 @@ function pvpLogTurnSummary() {
     if (pvpMyTurnStats.damage > 0) parts.push(`${pvpMyTurnStats.damage} hasar verdin`);
     if (pvpMyTurnStats.heal > 0) parts.push(`${pvpMyTurnStats.heal} can iyileştin`);
     if (pvpMyTurnStats.armor > 0) parts.push(`${pvpMyTurnStats.armor} zırh kazandın`);
+    if (pvpMyTurnStats.ultGain > 0) parts.push(`ult +%${pvpMyTurnStats.ultGain}`);
     if (pvpMyTurnStats.selfDamage > 0) parts.push(`kendine ${pvpMyTurnStats.selfDamage} hasar verdin`);
     pvpLog(parts.length > 0 ? `Hamlen: ${parts.join(', ')}.` : 'Hamlen bir etki yaratmadı.');
-    pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0 };
+    pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 }
 
 function pvpDropAndRefill(isInitial) {
@@ -372,10 +445,19 @@ function pvpDropAndRefill(isInitial) {
         }
     }
     let chained = pvpResolveMatches(isInitial);
-    if (!chained && !isInitial && !pvpMatchOver) {
-        pvpLogTurnSummary();
+    if (chained || isInitial || pvpMatchOver) return;
+
+    pvpLogTurnSummary();
+    pvpProcessing = false;
+
+    if (pvpExtraTurnTriggered) {
+        // A 4+/cross match grants another turn immediately, same as
+        // single-player - stay pvpMyTurn=true, no turn-end broadcast.
+        pvpExtraTurnTriggered = false;
+        pvpLog('>> Ekstra tur!');
+        pvpUpdateUI();
+    } else {
         pvpMyTurn = false;
-        pvpProcessing = false;
         pvpStartThinkingAnimation();
         pvpUpdateUI();
         // Unconditional - sent whether or not this turn dealt any damage, so
@@ -390,6 +472,18 @@ function pvpUpdateUI() {
     let hpText = document.getElementById('pvp-my-hp-text');
     if (hpBar) hpBar.style.width = hpPct + '%';
     if (hpText) hpText.innerText = `${Math.max(0, Math.floor(pvpMyHP))}/${PVP_MAX_HP}` + (pvpMyArmor > 0 ? ` [+${pvpMyArmor}]` : '');
+
+    let ultBar = document.getElementById('pvp-ult-bar');
+    let ultText = document.getElementById('pvp-ult-text');
+    if (ultBar) ultBar.style.width = pvpUltCharge + '%';
+    if (ultText) ultText.innerText = `${Math.floor(pvpUltCharge)}%`;
+
+    let ultBtn = document.getElementById('pvp-ult-btn');
+    if (ultBtn) {
+        ultBtn.disabled = pvpUltCharge < 100 || !pvpMyTurn || pvpMatchOver || pvpProcessing || !selectedClass;
+        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(pvpUltCharge)}%)` : 'ULT (sınıf seçilmedi)';
+    }
+
     let grid = document.getElementById('pvp-grid');
     if (grid) grid.classList.toggle('locked', !pvpMyTurn || pvpMatchOver);
 }
