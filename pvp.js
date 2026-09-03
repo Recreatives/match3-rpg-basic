@@ -314,7 +314,7 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
     pvpUpdateUI();
-    pvpResolveBetrayalPayoutIfNeeded();
+    if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
 }
 
 // --- BETRAYAL CURRENCY STAKES --------------------------------------------------
@@ -329,21 +329,21 @@ function pvpBetrayalLossPercent() {
 }
 
 function pvpResolveBetrayalPayoutIfNeeded() {
-    if (!pvpBetrayalMode || pvpBetrayalResolved) return;
+    if (!pvpBetrayalMode || pvpBetrayalResolved) return Promise.resolve();
     pvpBetrayalResolved = true;
 
     if (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer) {
         // Mutual winner either way, or the betrayer winning their one-sided
         // duel: steal currency from the loser.
         let pct = pvpBetrayalLossPercent();
-        resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(ok => {
+        return resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(ok => {
             pvpLog(ok ? `Rakibinden %${Math.round(pct * 100)} çaldın.` : 'Ödül aktarımı başarısız oldu.');
         });
     } else {
         // The loyal player winning against a betrayer - deliberately tiny,
         // no steal from the betrayer's wallet (see the design doc: this
         // reward is intentionally small so loyalty isn't a free win).
-        adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
+        return adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
     }
 }
 
@@ -355,6 +355,51 @@ function pvpLogBetrayalLossIfNeeded() {
     } else {
         pvpLog('İhanetin sana kazandırmadı ama cüzdanın güvende.');
     }
+    // Give the WINNER's resolve_betrayal RPC a moment to actually land server-
+    // side before we fetch our own wallet for the summary screen - I have no
+    // way to await it directly since I (the loser) never call it myself.
+    setTimeout(() => pvpShowBetrayalSummary(false), 1200);
+}
+
+// --- BETRAYAL RESULT SCREEN -----------------------------------------------------
+// A recap replacing the plain "KAZANDIN!"/"KAYBETTİN" text with the context
+// that actually made a betrayal duel dramatic: who broke the deal, what it
+// cost, and (since PvP intentionally hides your opponent's hp for the whole
+// fight) the first real look at how the currency stakes landed.
+async function pvpShowBetrayalSummary(iWon) {
+    if (!pvpBetrayalMode) return;
+
+    let title = pvpBetrayalMode.isMutual ? '💀 KARŞILIKLI İHANET'
+        : (pvpBetrayalMode.isBetrayer ? '🗡️ İHANET ETTİN' : '🩹 İHANETE UĞRADIN');
+
+    let detail;
+    if (iWon) {
+        detail = (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer)
+            ? `Rakibinin cüzdanının %${Math.round(pvpBetrayalLossPercent() * 100)}'ini çaldın.`
+            : 'Sadakatinin küçük bir ödülünü aldın (+10 altın, +5 hammadde) - rakibinin cüzdanına dokunmadın.';
+    } else {
+        detail = (pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer)
+            ? `Cüzdanının %${Math.round(pvpBetrayalLossPercent() * 100)}'i rakibine geçti.`
+            : 'İhanetin sana kazandırmadı ama cüzdanın güvende kaldı.';
+    }
+
+    await fetchWallet();
+    let walletLine = currentWallet ? `Güncel cüzdanın: 🪙 ${currentWallet.gold}  🪨 ${currentWallet.materials}` : '';
+
+    document.getElementById('betrayal-summary-title').innerText = title;
+    let outcomeEl = document.getElementById('betrayal-summary-outcome');
+    outcomeEl.innerText = iWon ? 'KAZANDIN' : 'KAYBETTİN';
+    outcomeEl.style.color = iWon ? '#2ecc71' : '#e74c3c';
+    document.getElementById('betrayal-summary-detail').innerText = detail;
+    document.getElementById('betrayal-summary-wallet').innerText = walletLine;
+    document.getElementById('betrayal-summary-modal').style.display = 'flex';
+}
+
+function pvpCloseBetrayalSummary() {
+    document.getElementById('betrayal-summary-modal').style.display = 'none';
+    document.getElementById('pvp-modal').style.display = 'none';
+    pvpBetrayalMode = null;
+    pvpForcedFirstMoverId = null;
 }
 
 // --- ULTIMATE ----------------------------------------------------------------
