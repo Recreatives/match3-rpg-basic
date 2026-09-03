@@ -94,6 +94,13 @@ let currentState = STATE.START;
 let rewardPicksLeft = 1;
 
 // --- CLASS DEFINITIONS ---
+// Each ultEffect takes a "combat context" (ctx) instead of touching
+// playerHP/enemyHP/inflictDamage/log directly, so the exact same class
+// definitions work whether the opponent is the local AI (single-player,
+// makeSinglePlayerCombatContext) or a real networked player (PvP,
+// makePvpCombatContext in pvp.js) - the class doesn't need to know which.
+// useUltimate() already handles the post-ult win-check for every class
+// uniformly, so no ultEffect needs to call anything win-related itself.
 const CLASSES = {
     WARRIOR: {
         name: "Warrior", emoji: "🛡️",
@@ -101,10 +108,10 @@ const CLASSES = {
         passive: (stats) => { stats.shield += 2; },
         dodgeChance: 0, incomingDmgMult: 1.0,
         ultName: "SHIELD SLAM",
-        ultEffect: () => {
-            let dmg = TILE_STATS.ult_dmg + playerArmor;
-            inflictDamage('enemy', dmg);
-            log(`ULT: Shield Slam deals ${dmg} damage!`, "log-hit");
+        ultEffect: (ctx) => {
+            let dmg = TILE_STATS.ult_dmg + ctx.getSelfArmor();
+            ctx.dealDamageToOpponent(dmg);
+            ctx.log(`ULT: Shield Slam deals ${dmg} damage!`, "log-hit");
         }
     },
     BERSERKER: {
@@ -113,10 +120,10 @@ const CLASSES = {
         passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
         dodgeChance: 0, incomingDmgMult: 1.25,
         ultName: "BLOOD LUST",
-        ultEffect: () => {
-            playerHP -= 10;
-            inflictDamage('enemy', TILE_STATS.ult_dmg * 2);
-            log(`ULT: Blood Lust deals double damage!`, "log-crit");
+        ultEffect: (ctx) => {
+            ctx.dealDirectDamageToSelf(10);
+            ctx.dealDamageToOpponent(TILE_STATS.ult_dmg * 2);
+            ctx.log(`ULT: Blood Lust deals double damage!`, "log-crit");
         }
     },
     ROGUE: {
@@ -125,10 +132,10 @@ const CLASSES = {
         passive: (stats) => { stats.energy += 5; },
         dodgeChance: 0.1, incomingDmgMult: 1.0,
         ultName: "ASSASSINATE",
-        ultEffect: () => {
-            inflictDamage('enemy', TILE_STATS.ult_dmg);
-            extraTurnTriggered = true;
-            log(`ULT: Assassinate! Extra Turn!`, "log-match");
+        ultEffect: (ctx) => {
+            ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
+            ctx.grantExtraTurn();
+            ctx.log(`ULT: Assassinate! Extra Turn!`, "log-match");
         }
     },
     ARCHER: {
@@ -137,26 +144,10 @@ const CLASSES = {
         passive: (stats) => {},
         dodgeChance: 0.2, incomingDmgMult: 1.0,
         ultName: "PIERCING SHOT",
-        ultEffect: () => {
-            // Calculate damage: Base Ult Damage + your Sword Stat
+        ultEffect: (ctx) => {
             let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
-
-            // Direct HP modification (Bypassing inflictDamage function to skip armor logic)
-            if (enemyHP > 0) {
-                enemyHP -= pierceDmg;
-
-                // Visuals
-                log(`ULT: Piercing Shot ignored Armor! -${pierceDmg} HP`, "log-crit");
-                showFloatingText(`-${pierceDmg}`, document.getElementById('enemy-hp-bar'), "#e74c3c");
-
-                // Shake effect
-                const grid = document.querySelector('.grid');
-                grid.classList.remove('shake');
-                void grid.offsetWidth;
-                grid.classList.add('shake');
-
-                checkWinCondition();
-            }
+            ctx.dealDirectDamageToOpponent(pierceDmg);
+            ctx.log(`ULT: Piercing Shot ignored Armor! -${pierceDmg} HP`, "log-crit");
         }
     },
     MAGE: {
@@ -165,14 +156,34 @@ const CLASSES = {
         passive: (stats) => { stats.energy += 10; stats.sword -= 2; },
         dodgeChance: 0, incomingDmgMult: 1.0,
         ultName: "ARCANE BLAST",
-        ultEffect: () => {
-            inflictDamage('enemy', TILE_STATS.ult_dmg);
+        ultEffect: (ctx) => {
+            ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             TILE_STATS.ult_dmg += 10;
-            log(`ULT: Power increased to ${TILE_STATS.ult_dmg}!`, "log-match");
+            ctx.log(`ULT: Power increased to ${TILE_STATS.ult_dmg}!`, "log-match");
         }
     }
 };
 let selectedClass = null;
+
+// The single-player implementation of the combat context described above.
+function makeSinglePlayerCombatContext() {
+    return {
+        dealDamageToOpponent(amount) { inflictDamage('enemy', amount); },
+        dealDirectDamageToOpponent(amount) {
+            if (enemyHP > 0) {
+                enemyHP -= amount;
+                showFloatingText(`-${amount}`, document.getElementById('enemy-hp-bar'), "#e74c3c");
+                gridDisplay.classList.remove('shake');
+                void gridDisplay.offsetWidth;
+                gridDisplay.classList.add('shake');
+            }
+        },
+        dealDirectDamageToSelf(amount) { playerHP -= amount; },
+        getSelfArmor() { return playerArmor; },
+        grantExtraTurn() { extraTurnTriggered = true; },
+        log(msg, cls) { log(msg, cls); }
+    };
+}
 
 let playerHP = 100, maxPlayerHP = 100, playerArmor = 0, ultCharge = 0;
 let level = 1, enemyHP = 50, maxEnemyHP = 50, enemyArmor = 0;
@@ -820,18 +831,31 @@ function applyRPGEffects(type, multiplier) {
     updateUI();
 }
 
+// Shared with PvP (pvp.js): rolls the local player's class-specific defense
+// (dodge chance, incoming-damage multiplier) against a hit about to land on
+// THEM. Returns null if fully dodged, otherwise the (possibly scaled)
+// amount. Only ever applies to damage the local player is receiving - in
+// PvP each client is authoritative for its own hp, so this always runs on
+// the receiving side, never the attacker's.
+function applyDefensiveTraits(amount) {
+    if (selectedClass && selectedClass.dodgeChance > 0 && Math.random() < selectedClass.dodgeChance) {
+        return null;
+    }
+    if (selectedClass && selectedClass.incomingDmgMult) {
+        amount = Math.floor(amount * selectedClass.incomingDmgMult);
+    }
+    return amount;
+}
+
 function inflictDamage(targetStr, amount) {
-    // Dodge
-    if (targetStr === 'player' && selectedClass && selectedClass.dodgeChance > 0) {
-        if (Math.random() < selectedClass.dodgeChance) {
+    if (targetStr === 'player') {
+        let afterDefense = applyDefensiveTraits(amount);
+        if (afterDefense === null) {
             showFloatingText("DODGE!", document.getElementById('player-hp-bar'), "#2ecc71");
             log("DODGED!", "log-heal");
             return;
         }
-    }
-    // Vulnerability
-    if (targetStr === 'player' && selectedClass && selectedClass.incomingDmgMult) {
-        amount = Math.floor(amount * selectedClass.incomingDmgMult);
+        amount = afterDefense;
     }
 
     // Life Steal
@@ -1061,7 +1085,7 @@ function useUltimate() {
         isProcessing = true;
 
         // 2. Apply Effect
-        selectedClass.ultEffect();
+        selectedClass.ultEffect(makeSinglePlayerCombatContext());
         ultCharge = 0;
 
         // 3. Visuals
