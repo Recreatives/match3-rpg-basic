@@ -130,3 +130,30 @@ end;
 $$;
 
 grant execute on function public.resolve_betrayal(uuid, uuid, numeric) to authenticated, anon;
+
+-- 7. owned items (item/set system) -----------------------------------------
+-- What a player owns, bought with the persistent wallet above. No "sell"
+-- path for v1 - items are permanent once bought, so this is just a set of
+-- (player, item) rows, no quantity/equip state needed yet. The actual item
+-- catalog (costs, stat bonuses, which items form a set) lives client-side in
+-- items.js, not in the database - this table only ever stores WHICH item ids
+-- a player owns, nothing about what those ids mean.
+create table if not exists public.player_items (
+    player_id uuid not null references public.players(id) on delete cascade,
+    item_id   text not null,
+    bought_at timestamptz not null default now(),
+    primary key (player_id, item_id)
+);
+
+alter table public.player_items enable row level security;
+
+drop policy if exists "read own items" on public.player_items;
+create policy "read own items" on public.player_items
+    for select using (auth.uid() = player_id);
+
+-- No update/delete policy on purpose - nothing in this schema ever needs to
+-- change or remove an owned item yet. A player buying something only ever
+-- needs to insert a new row for themselves.
+drop policy if exists "insert own items" on public.player_items;
+create policy "insert own items" on public.player_items
+    for insert with check (auth.uid() = player_id);

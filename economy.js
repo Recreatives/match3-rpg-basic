@@ -18,6 +18,7 @@ const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yZKlVLpQq41mWwiLdSadgw_xtgqBe36
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 let currentWallet = null; // { gold, materials } once loaded
+let currentOwnedItems = []; // array of item ids, see items.js for what they mean
 
 async function ensureSession() {
     const { data: { session } } = await sb.auth.getSession();
@@ -97,12 +98,66 @@ async function resolveBetrayal(winnerId, loserId, lossPercent) {
     return true;
 }
 
+async function fetchOwnedItems() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await sb.from('player_items').select('item_id').eq('player_id', user.id);
+    if (error) { console.error('Owned items fetch failed:', error.message); return currentOwnedItems; }
+
+    currentOwnedItems = data.map(row => row.item_id);
+    if (typeof renderShop === 'function') renderShop();
+    return currentOwnedItems;
+}
+
+// Not atomic against buying the same item twice from two tabs at once (the
+// wallet debit and the item insert are two separate round trips) - an
+// acceptable gap for a prototype shop, same rigor level as adjustWallet
+// above. player_items' primary key (player_id, item_id) at least guarantees
+// a double-insert can't duplicate the item itself.
+async function purchaseItem(itemId) {
+    let item = ITEM_CATALOG[itemId];
+    if (!item) return false;
+    if (currentOwnedItems.includes(itemId)) return false;
+    if (!currentWallet) await fetchWallet();
+    if ((currentWallet?.gold || 0) < item.cost.gold || (currentWallet?.materials || 0) < item.cost.materials) {
+        setShopStatus('Yeterli altının/hammadden yok.');
+        return false;
+    }
+
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return false;
+
+    let updatedWallet = await adjustWallet(-item.cost.gold, -item.cost.materials);
+    if (!updatedWallet) { setShopStatus('Satın alma başarısız oldu.'); return false; }
+
+    const { error } = await sb.from('player_items').insert({ player_id: user.id, item_id: itemId });
+    if (error) {
+        console.error('Item purchase insert failed:', error.message);
+        // Wallet was already charged - refund locally so the player isn't
+        // left worse off by a failed insert (fetchWallet re-syncs after).
+        await adjustWallet(item.cost.gold, item.cost.materials);
+        setShopStatus('Satın alma başarısız oldu, ücret iade edildi.');
+        return false;
+    }
+
+    currentOwnedItems.push(itemId);
+    setShopStatus(`${item.emoji} ${item.name} satın alındı!`);
+    if (typeof renderShop === 'function') renderShop();
+    return true;
+}
+
+function setShopStatus(text) {
+    let el = document.getElementById('shop-status');
+    if (el) el.innerText = text;
+}
+
 function updateWalletUI() {
-    let goldEl = document.getElementById('wallet-gold');
-    let matEl = document.getElementById('wallet-materials');
-    if (!currentWallet || !goldEl || !matEl) return;
-    goldEl.innerText = currentWallet.gold;
-    matEl.innerText = currentWallet.materials;
+    if (!currentWallet) return;
+    // Two separate displays (Loot/Stats modal, Shop modal) show the same
+    // numbers under different element ids - update whichever are present.
+    ['wallet-gold', 'wallet-gold-shop'].forEach(id => { let el = document.getElementById(id); if (el) el.innerText = currentWallet.gold; });
+    ['wallet-materials', 'wallet-materials-shop'].forEach(id => { let el = document.getElementById(id); if (el) el.innerText = currentWallet.materials; });
 }
 
 function setWalletStatus(text) {
@@ -115,6 +170,7 @@ async function initEconomy() {
     const session = await ensureSession();
     if (!session) return;
     await fetchWallet();
+    await fetchOwnedItems();
 }
 
 initEconomy();

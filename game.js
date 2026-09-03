@@ -228,6 +228,11 @@ function renderClassButtons() {
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
             selectedClass.passive(TILE_STATS);
+            // PvP and co-op never call resetGame() (that's solo's "START
+            // BATTLE" path) - they just read whatever TILE_STATS looks like
+            // the moment a class is picked, so owned-item bonuses need to
+            // land here too, not only in resetGame().
+            applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
@@ -264,6 +269,7 @@ function resetGame() {
     };
 
     if (selectedClass) selectedClass.passive(TILE_STATS);
+    applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
     isProcessing = false;
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
@@ -1157,6 +1163,10 @@ function toggleModal(modalId) {
         if(modalId === 'history-modal') {
             renderHistory();
             if (typeof fetchWallet === 'function') fetchWallet();
+        }
+        if (modalId === 'shop-modal') {
+            if (typeof fetchWallet === 'function') fetchWallet();
+            if (typeof renderShop === 'function') renderShop();
         }
     }
 }
