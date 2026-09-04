@@ -1,4 +1,9 @@
-const gridDisplay = document.querySelector('.grid');
+// getElementById, not querySelector('.grid') - pvp-grid/coop-grid share the
+// same "grid" class for sizing and both appear earlier in the DOM than the
+// solo #grid, so the class selector was silently grabbing pvp-grid instead:
+// createBoard() would append the class-selection overlay and all 64 tiles
+// into the (hidden, zero-size) PvP modal instead of the visible board.
+const gridDisplay = document.getElementById('grid');
 const logDisplay = document.getElementById('log');
 const turnBanner = document.getElementById('turn-banner');
 const aiCursor = document.getElementById('ai-cursor');
