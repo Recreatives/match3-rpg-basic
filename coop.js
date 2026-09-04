@@ -512,6 +512,10 @@ function coopOnEnemyDefeated(payload) {
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
+    // Fires identically on BOTH clients (host calls this directly, the
+    // guest via the 'enemy-defeated' broadcast) - each player rolls their
+    // OWN drop against their OWN wallet/inventory, not a shared roll.
+    if (typeof awardLootDrop === 'function') awardLootDrop();
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------

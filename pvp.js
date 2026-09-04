@@ -381,6 +381,10 @@ function pvpOnOpponentDefeated() {
     pvpLog('Rakip yenildi - kazandın!');
     pvpUpdateUI();
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
+    // Betrayal duels already have their own currency-stakes reward (steal %
+    // or the small loyal-survivor bonus) - loot drops are only for a
+    // straightforward "PvP Test" win, to keep that reward model unmuddied.
+    else if (typeof awardLootDrop === 'function') awardLootDrop();
 }
 
 // --- BETRAYAL CURRENCY STAKES --------------------------------------------------

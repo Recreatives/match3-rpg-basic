@@ -211,14 +211,19 @@
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('shop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🛒 DÜKKAN</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Kalıcı cüzdanınla eşya satın al. Satın aldığın her eşya her rundan itibaren kalıcı - hem solo hem PvP hem co-op'ta geçerli. Bir setin parçalarını tamamlayınca ekstra bir set bonusu açılır.</p>
+                <h2 class="modal-title">🛒 DÜKKAN & ENVANTER</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Sadece KUŞANILAN eşyaların statları geçerli - sahip olmak yetmez. Bir setin tüm parçalarını kuşanınca ekstra set bonusu açılır. Grey/White/Blue dükkandan alınabilir; Yellow/Green/Orange/Red/Teal sadece savaş sonrası şansla düşer.</p>
                 <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr); margin-bottom:10px;">
                     <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold-shop" class="stat-val">–</span></div>
                     <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
                 </div>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button id="shop-tab-btn" class="action-btn" style="margin:0;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
+                    <button id="inventory-tab-btn" class="action-btn" style="margin:0; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                </div>
                 <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em;"></p>
                 <div id="shop-items"></div>
+                <div id="inventory-list" style="display:none;"></div>
             </div>
         </div>
     </div>

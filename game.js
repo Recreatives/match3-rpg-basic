@@ -235,7 +235,7 @@ function renderClassButtons() {
             // BATTLE" path) - they just read whatever TILE_STATS looks like
             // the moment a class is picked, so owned-item bonuses need to
             // land here too, not only in resetGame().
-            applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
+            applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
@@ -272,7 +272,7 @@ function resetGame() {
     };
 
     if (selectedClass) selectedClass.passive(TILE_STATS);
-    applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
+    applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
     isProcessing = false;
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
@@ -338,6 +338,7 @@ function triggerDeathSequence(who) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
+    if (typeof awardLootDrop === 'function') awardLootDrop();
 
     // Calculate Reward Picks
     // NOTE: order matters here - the <=0.01 case must be checked before
@@ -1173,6 +1174,7 @@ function toggleModal(modalId) {
         if (modalId === 'shop-modal') {
             if (typeof fetchWallet === 'function') fetchWallet();
             if (typeof renderShop === 'function') renderShop();
+            if (typeof renderInventory === 'function') renderInventory();
         }
         if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
             renderAchievements();

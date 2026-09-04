@@ -131,18 +131,34 @@ $$;
 
 grant execute on function public.resolve_betrayal(uuid, uuid, numeric) to authenticated, anon;
 
--- 7. owned items (item/set system) -----------------------------------------
--- What a player owns, bought with the persistent wallet above. No "sell"
--- path for v1 - items are permanent once bought, so this is just a set of
--- (player, item) rows, no quantity/equip state needed yet. The actual item
--- catalog (costs, stat bonuses, which items form a set) lives client-side in
--- items.js, not in the database - this table only ever stores WHICH item ids
--- a player owns, nothing about what those ids mean.
-create table if not exists public.player_items (
-    player_id uuid not null references public.players(id) on delete cascade,
-    item_id   text not null,
-    bought_at timestamptz not null default now(),
-    primary key (player_id, item_id)
+-- 7. owned items (rarity/loot system) -----------------------------------------
+-- Superseded shape: each row is one item INSTANCE (rolled stats and all),
+-- not just "which item id a player owns" - a rarity/loot system means two
+-- Blue swords can have completely different rolled stats, which a simple
+-- (player_id, item_id) key can't represent. No real purchases exist yet
+-- (this table was never live-used under its old shape), so this is a clean
+-- replace rather than a column migration.
+--
+-- rolled_stats/base_id/set_key/rarity all come from items.js at the moment
+-- the item is generated (shop purchase or a post-battle drop) - this table
+-- just stores the result, same "database stores facts, items.js defines
+-- what they mean" split every other table in this file follows.
+--
+-- equipped_slot (null | 'weapon' | 'armor' | 'trinket'): an item's stats
+-- only apply while it's sitting in this slot - see items.js's
+-- applyEquippedItemBonuses. Owning a pile of unequipped loot does nothing,
+-- which is what keeps a growing item pool from letting stats climb forever.
+drop table if exists public.player_items cascade;
+create table public.player_items (
+    id            uuid primary key default gen_random_uuid(),
+    player_id     uuid not null references public.players(id) on delete cascade,
+    base_id       text not null,
+    slot          text not null check (slot in ('weapon', 'armor', 'trinket')),
+    rarity        text not null,
+    rolled_stats  jsonb not null default '{}'::jsonb,
+    set_key       text,
+    equipped_slot text check (equipped_slot in ('weapon', 'armor', 'trinket')),
+    acquired_at   timestamptz not null default now()
 );
 
 alter table public.player_items enable row level security;
@@ -151,12 +167,16 @@ drop policy if exists "read own items" on public.player_items;
 create policy "read own items" on public.player_items
     for select using (auth.uid() = player_id);
 
--- No update/delete policy on purpose - nothing in this schema ever needs to
--- change or remove an owned item yet. A player buying something only ever
--- needs to insert a new row for themselves.
 drop policy if exists "insert own items" on public.player_items;
 create policy "insert own items" on public.player_items
     for insert with check (auth.uid() = player_id);
+
+-- Equipping/unequipping updates a row the player already owns - the one
+-- update path this table needs, still always scoped to the caller's own
+-- items only.
+drop policy if exists "update own items" on public.player_items;
+create policy "update own items" on public.player_items
+    for update using (auth.uid() = player_id) with check (auth.uid() = player_id);
 
 -- 8. achievements ------------------------------------------------------------
 -- Same shape as player_items above: a permanent (player, achievement) flag,
