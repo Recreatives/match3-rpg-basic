@@ -23,8 +23,16 @@
 // "I matched sword tiles, here's how much damage that is" gets broadcast to
 // the opponent; the RECEIVING client applies that amount to its own local
 // hp/armor (using its own armor-absorption math and its own class's dodge/
-// vulnerability) and reports back if it died. Nobody's client ever has to
-// trust or replicate the other's board.
+// vulnerability) and reports back if it died.
+//
+// The BOARD, unlike hp, is a single shared thing both players look at (see
+// sharedboard.js) - not two independently-randomized copies. Since only one
+// player can ever act at a time, only the active mover's client ever runs
+// match-detection or touches randomness; every visual step of their turn
+// gets broadcast as a full tile snapshot and the opponent's client just
+// paints it. Board-creation authority is a one-time question per match -
+// whoever moves first (pvpMyTurn at pvpStartMatch) randomizes and resolves
+// the very first board; the other side just waits for that broadcast.
 //
 // Turn order: whoever's presence timestamp is earliest goes first - UNLESS
 // coop.js started this match as a betrayal duel, in which case it forces the
@@ -49,6 +57,54 @@ let pvpMatchOver = false;
 let pvpThinkingInterval = null;
 let pvpUltCharge = 0;
 let pvpExtraTurnTriggered = false;
+// Last condition tier (see sbHealthTier, sharedboard.js) broadcast to the
+// opponent - dedups pvpUpdateUI()'s status-update send so it only actually
+// goes out when the tier itself changes, not on every UI refresh (ult
+// charge ticking up, etc. call pvpUpdateUI() far more often than pvpMyHP
+// actually changes).
+let pvpLastBroadcastTier = null;
+
+// --- SPEED BONUS (TIME MULTIPLIER) ---
+// Same mechanic single-player uses (game.js's SPEED_BONUS_WINDOW_MS/
+// SPEED_BONUS_MAX_MULT, reused here rather than redeclared) - the faster you
+// swap after regaining control, the bigger the multiplier on that move (and
+// any chain it causes). Only ever runs while it's MY turn; letting the
+// window expire never costs the turn, the bonus just decays to a neutral x1.
+let pvpTurnStartTime = null;
+let pvpMoveTimeMultiplier = 1;
+let pvpSpeedBonusInterval = null;
+
+function pvpGetTimeMultiplier() {
+    if (!pvpTurnStartTime) return 1;
+    let elapsed = Date.now() - pvpTurnStartTime;
+    let ratio = Math.max(0, 1 - elapsed / SPEED_BONUS_WINDOW_MS);
+    return 1 + ratio * (SPEED_BONUS_MAX_MULT - 1);
+}
+
+function pvpUpdateSpeedBonusUI() {
+    let el = document.getElementById('pvp-speed-bonus');
+    if (!el) return;
+    let mult = pvpGetTimeMultiplier();
+    if (!pvpTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerText = `⚡x${mult.toFixed(1)}`;
+}
+
+function pvpStartSpeedTimer() {
+    if (!pvpMyTurn || pvpMatchOver) return;
+    pvpTurnStartTime = Date.now();
+    clearInterval(pvpSpeedBonusInterval);
+    pvpSpeedBonusInterval = setInterval(pvpUpdateSpeedBonusUI, 100);
+    pvpUpdateSpeedBonusUI();
+}
+
+function pvpStopSpeedTimer() {
+    clearInterval(pvpSpeedBonusInterval);
+    pvpSpeedBonusInterval = null;
+    pvpTurnStartTime = null;
+    let el = document.getElementById('pvp-speed-bonus');
+    if (el) el.style.display = 'none';
+}
 
 // --- BETRAYAL MODE ------------------------------------------------------------
 // Set only when coop.js routes a betrayal-vote outcome into a PvP duel
@@ -102,6 +158,7 @@ function pvpStopThinkingAnimation() {
 // --- ROOM JOINING -----------------------------------------------------------
 
 async function pvpJoinRoom() {
+    if (!selectedClass) { pvpSetStatus('Önce ana menüden bir sınıf seç.'); return; }
     let input = document.getElementById('pvp-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
     if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
@@ -137,6 +194,8 @@ function pvpResetSessionState() {
     pvpMyArmor = 0;
     pvpMatchOver = false;
     pvpStopThinkingAnimation();
+    pvpStopSpeedTimer();
+    pvpMoveTimeMultiplier = 1;
     pvpUltCharge = 0;
     pvpExtraTurnTriggered = false;
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
@@ -162,6 +221,11 @@ async function pvpConnectChannel(code) {
     pvpChannel.on('broadcast', { event: 'attack' }, ({ payload }) => pvpReceiveAttack(payload));
     pvpChannel.on('broadcast', { event: 'defeated' }, () => pvpOnOpponentDefeated());
     pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
+    pvpChannel.on('broadcast', { event: 'status-update' }, ({ payload }) => pvpApplyOpponentStatus(payload));
+    // One shared board now (sharedboard.js) - this only ever fires on the
+    // PASSIVE side, since broadcast self:false means the active mover never
+    // gets its own step back.
+    pvpChannel.on('broadcast', { event: 'board-sync' }, ({ payload }) => sbApplySnapshot(pvpTiles, payload));
     pvpChannel.on('presence', { event: 'sync' }, () => pvpCheckPresence());
 
     await new Promise(resolve => {
@@ -193,6 +257,14 @@ function pvpCheckPresence() {
 // --- MATCH LIFECYCLE ---------------------------------------------------------
 
 function pvpStartMatch() {
+    // A previous run's temporary reward picks must never leak into a FRESH
+    // match - rebuilt clean (base + class passive + equipped items + active
+    // achievements), same as every other mode's own run-start. NOT for a
+    // betrayal duel though (pvpBetrayalMode already set by the time this
+    // runs) - that's a continuation of the co-op run already in progress,
+    // and should keep whatever temporary power-ups that run has earned so
+    // far, not reset them the moment a betrayal vote fires.
+    if (!pvpBetrayalMode) rebuildTileStats();
     pvpMyHP = PVP_MAX_HP;
     pvpMyArmor = 0;
     pvpUltCharge = 0;
@@ -206,8 +278,19 @@ function pvpStartMatch() {
 
     document.getElementById('pvp-setup').style.display = 'none';
     document.getElementById('pvp-battle').style.display = 'block';
+    pvpLastBroadcastTier = null; // fresh match, fresh dedup - re-sends SAĞLAM even on a rematch
+    pvpApplyOpponentStatus(sbHealthTier(100));
 
-    pvpCreateBoard();
+    // One shared board for the whole duel - whoever moves first is also the
+    // one-time authority for its very first state (randomizes + resolves any
+    // initial matches + broadcasts the result). The other side just builds
+    // the same empty grid and waits for that broadcast - see sharedboard.js.
+    sbCreateBoardDOM('pvp-grid', 'pvp-tile-', pvpTiles, pvpHandleTap);
+    pvpSelectedTile = null;
+    if (pvpMyTurn) {
+        sbRandomizeBoard(pvpTiles);
+        pvpResolveMatches(true);
+    }
     pvpUpdateUI();
     pvpLog(pvpBetrayalMode ? '⚔️ İhanet düellosu başladı.' : '🟢 Rakip bağlı - eşleşme başladı.');
     if (pvpMyTurn) {
@@ -225,6 +308,7 @@ const PVP_CURSE_PERCENTS = [3, 5, 8, 13, 21, 34];
 
 function pvpBeginMyTurn() {
     pvpCurseTurnCount++;
+    pvpStartSpeedTimer(); // a fresh speed-bonus window for every new turn, curse or not
     if (!pvpBetrayalMode || pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer) return;
     if (pvpCurseTurnCount < 2) return;
 
@@ -241,7 +325,7 @@ function pvpBeginMyTurn() {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog('Kibir Laneti seni yendi.');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
         pvpUpdateUI();
     }
 }
@@ -280,7 +364,7 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
     }
 }
 
@@ -313,8 +397,17 @@ function pvpOnOpponentDefeated() {
     pvpStopThinkingAnimation();
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
+    // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
+    // via pvpUpdateUI() the instant their HP hits 0 (before they send this
+    // 'defeated' event), but force it here too in case that status-update
+    // message got reordered or dropped.
+    pvpApplyOpponentStatus(sbHealthTier(0));
     pvpUpdateUI();
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
+    // Betrayal duels already have their own currency-stakes reward (steal %
+    // or the small loyal-survivor bonus) - loot drops are only for a
+    // straightforward "PvP Test" win, to keep that reward model unmuddied.
+    else if (typeof awardLootDrop === 'function') awardLootDrop();
 }
 
 // --- BETRAYAL CURRENCY STAKES --------------------------------------------------
@@ -353,6 +446,15 @@ function pvpResolveBetrayalPayoutIfNeeded() {
         // reward is intentionally small so loyalty isn't a free win).
         return adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
     }
+}
+
+// Called from every "I lost this duel" path - betrayal-specific bookkeeping
+// plus the one thing every defeat has in common regardless of mode: this
+// run's achievement buffs are gone (see achievements.js's "ACTIVE" vs
+// "lifetime" split).
+function pvpOnDefeat() {
+    if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
+    pvpLogBetrayalLossIfNeeded();
 }
 
 function pvpLogBetrayalLossIfNeeded() {
@@ -446,7 +548,7 @@ function pvpUseUltimate() {
         pvpMatchOver = true;
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
         pvpUpdateUI();
         return;
     }
@@ -468,28 +570,6 @@ function pvpUseUltimate() {
 }
 
 // --- BOARD -------------------------------------------------------------------
-
-function pvpCreateBoard() {
-    let grid = document.getElementById('pvp-grid');
-    grid.innerHTML = '';
-    pvpTiles.length = 0;
-    pvpSelectedTile = null;
-
-    for (let i = 0; i < PVP_WIDTH * PVP_WIDTH; i++) {
-        const tile = document.createElement('div');
-        tile.setAttribute('id', 'pvp-tile-' + i);
-        tile.className = 'tile';
-        let randomType = Math.floor(Math.random() * tileTypes.length);
-        tile.dataset.type = tileTypes[randomType].type;
-        tile.innerHTML = tileTypes[randomType].symbol;
-        grid.appendChild(tile);
-        pvpTiles.push(tile);
-
-        tile.addEventListener('mousedown', () => pvpHandleTap(tile));
-        tile.addEventListener('touchstart', (e) => { e.preventDefault(); pvpHandleTap(tile); }, { passive: false });
-    }
-    pvpResolveMatches(true);
-}
 
 function pvpHandleTap(tile) {
     if (pvpMatchOver || pvpProcessing || !pvpMyTurn) return;
@@ -521,10 +601,16 @@ function pvpHandleTap(tile) {
 }
 
 function pvpAttemptSwap(tile1, tile2) {
+    // Lock in the speed bonus for this move before anything else happens -
+    // the countdown is about how fast the decision was made.
+    pvpMoveTimeMultiplier = pvpGetTimeMultiplier();
+    pvpStopSpeedTimer();
+
     pvpProcessing = true;
     let t = tile1.dataset.type, h = tile1.innerHTML;
     tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
     tile2.dataset.type = t; tile2.innerHTML = h;
+    sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // opponent sees the swap as it happens
 
     let matched = pvpResolveMatches(false);
     if (!matched) {
@@ -533,6 +619,9 @@ function pvpAttemptSwap(tile1, tile2) {
             tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
             tile2.dataset.type = t2; tile2.innerHTML = h2;
             pvpProcessing = false;
+            sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // ...and the revert too, if it wasn't a match
+            // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
+            pvpStartSpeedTimer();
         }, 150);
     }
 }
@@ -547,6 +636,7 @@ function pvpResolveMatches(isInitial) {
     }
 
     groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
+    sbBroadcastStep(pvpChannel, pvpTiles, 'clear'); // opponent sees the matched tiles clear
     setTimeout(() => pvpDropAndRefill(isInitial), isInitial ? 0 : 350);
     return true;
 }
@@ -555,8 +645,11 @@ function pvpApplyGroupEffect(group, isInitial) {
     let count = group.indices.length;
     let isCross = (group.subShape === 'cross');
     // Same size/shape -> multiplier/extra-turn/ult-charge priority rules as
-    // single-player (getMatchShapeInfo lives in game.js).
-    let { multiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
+    // single-player (getMatchShapeInfo lives in game.js). The speed bonus
+    // scales the tile EFFECT the same way single-player does - ultBonus
+    // stays a flat add, not scaled by it (matching game.js's processMatch).
+    let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
+    let multiplier = shapeMultiplier * pvpMoveTimeMultiplier;
 
     group.indices.forEach(i => {
         if (!isInitial) pvpTiles[i].classList.add('matched');
@@ -605,7 +698,7 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpSetStatus('KAYBETTİN');
         pvpLogTurnSummary();
         pvpLog('Kendi hasarınla yenildin.');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
     }
 }
 
@@ -639,7 +732,14 @@ function pvpDropAndRefill(isInitial) {
             pvpTiles[i].classList.remove('matched');
         }
     }
+    sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle
     let chained = pvpResolveMatches(isInitial);
+    if (!chained && !pvpMatchOver && !boardHasValidMove(pvpTiles, PVP_WIDTH)) {
+        reshuffleBoard(pvpTiles, PVP_WIDTH, tileTypes);
+        sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the reshuffled board too
+        pvpLog('Hiç hamle kalmamıştı, tahta karıştırıldı!');
+        chained = pvpResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
+    }
     if (chained || isInitial || pvpMatchOver) return;
 
     pvpLogTurnSummary();
@@ -651,6 +751,7 @@ function pvpDropAndRefill(isInitial) {
         pvpExtraTurnTriggered = false;
         pvpLog('>> Ekstra tur!');
         pvpUpdateUI();
+        pvpStartSpeedTimer(); // fresh speed-bonus window for the extra turn
     } else {
         pvpMyTurn = false;
         pvpStartThinkingAnimation();
@@ -661,12 +762,33 @@ function pvpDropAndRefill(isInitial) {
     }
 }
 
+// Renders the opponent's self-reported condition tier (see pvpUpdateUI's
+// status-update send and sbHealthTier in sharedboard.js) - never an exact
+// number, just a 5-step read of how banged-up they look.
+function pvpApplyOpponentStatus(tier) {
+    let oppBar = document.getElementById('pvp-opp-status-bar');
+    let oppText = document.getElementById('pvp-opp-status-text');
+    if (oppBar) { oppBar.style.width = tier.barPct + '%'; oppBar.style.backgroundColor = tier.color; }
+    if (oppText) oppText.innerText = tier.text;
+}
+
 function pvpUpdateUI() {
     let hpPct = Math.max(0, (pvpMyHP / PVP_MAX_HP) * 100);
     let hpBar = document.getElementById('pvp-my-hp-bar');
     let hpText = document.getElementById('pvp-my-hp-text');
     if (hpBar) hpBar.style.width = hpPct + '%';
     if (hpText) hpText.innerText = `${Math.max(0, Math.floor(pvpMyHP))}/${PVP_MAX_HP}` + (pvpMyArmor > 0 ? ` [+${pvpMyArmor}]` : '');
+
+    // Tell the opponent how banged-up I am (see sbHealthTier) - my own HP
+    // never gets shared as a number, only this coarse condition, and only
+    // when it actually changes tier (a heal can walk it back down in
+    // severity just as damage walks it up, same as sizing someone up in
+    // person would).
+    let myTier = sbHealthTier(hpPct);
+    if (pvpChannel && myTier.text !== pvpLastBroadcastTier) {
+        pvpLastBroadcastTier = myTier.text;
+        pvpChannel.send({ type: 'broadcast', event: 'status-update', payload: myTier });
+    }
 
     let ultBar = document.getElementById('pvp-ult-bar');
     let ultText = document.getElementById('pvp-ult-text');

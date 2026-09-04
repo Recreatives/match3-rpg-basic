@@ -1,4 +1,9 @@
-const gridDisplay = document.querySelector('.grid');
+// getElementById, not querySelector('.grid') - pvp-grid/coop-grid share the
+// same "grid" class for sizing and both appear earlier in the DOM than the
+// solo #grid, so the class selector was silently grabbing pvp-grid instead:
+// createBoard() would append the class-selection overlay and all 64 tiles
+// into the (hidden, zero-size) PvP modal instead of the visible board.
+const gridDisplay = document.getElementById('grid');
 const logDisplay = document.getElementById('log');
 const turnBanner = document.getElementById('turn-banner');
 const aiCursor = document.getElementById('ai-cursor');
@@ -13,10 +18,29 @@ const width = 8;
 const tiles = [];
 
 // --- STATS ---
+// teamHeal only ever matters in co-op (coop.js's teamheal tile, never
+// spawned in solo or PvP) - kept here anyway since this is the one shared
+// stat pool every mode reads, same as every other stat.
 let TILE_STATS = {
     sword: 6, heart: 4, shield: 5, energy: 12,
-    skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0
+    skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6
 };
+
+// Rebuilds TILE_STATS from scratch: base numbers, then the selected class's
+// passive, then permanent equipped-item bonuses, then this-run-only active
+// achievement bonuses. Called at the start of every mode's actual run/match
+// (solo's resetGame, the class-selection handler, pvp.js's pvpStartMatch,
+// coop.js's coopBeginRun) so a previous run's temporary reward picks
+// (REWARD_POOL, further down this file) can never leak into a new one,
+// regardless of which mode that new one is - TILE_STATS is one shared pool
+// every mode reads, so "the run is over" has to mean the same clean slate
+// everywhere, not just in whichever mode happened to build it last.
+function rebuildTileStats() {
+    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
+    if (selectedClass) selectedClass.passive(TILE_STATS);
+    applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
+    applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
+}
 
 // Enemies used to read the player's own TILE_STATS, so every reward the
 // player picked up also buffed enemy tile-match damage/healing. Enemies
@@ -224,21 +248,48 @@ function renderClassButtons() {
         btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${c.desc}</small>`;
         btn.onclick = () => {
             selectedClass = c;
-            const playerBox = document.querySelector('.stat-box div:first-child');
+            // getElementById, not querySelector('.stat-box div:first-child') -
+            // pvp-modal/coop-modal have their own .stat-box elements earlier in
+            // the DOM than the solo HUD, so the class selector was silently
+            // writing the class name into a hidden modal instead of the
+            // visible "YOU" label (the same class of bug as gridDisplay above).
+            const playerBox = document.getElementById('player-class-label');
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
-            selectedClass.passive(TILE_STATS);
-            // PvP and co-op never call resetGame() (that's solo's "START
-            // BATTLE" path) - they just read whatever TILE_STATS looks like
-            // the moment a class is picked, so owned-item bonuses need to
-            // land here too, not only in resetGame().
-            applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
+            // Picking a class is also PvP/co-op's own "start of run" moment
+            // (they never call resetGame() - that's solo's own start path),
+            // so this needs the exact same clean-slate rebuild.
+            rebuildTileStats();
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
-            overlayTitle.innerText = `READY, ${c.name.toUpperCase()}?`;
-            overlayBtn.style.display = 'block';
+            renderModeButtons();
         };
+        container.appendChild(btn);
+    });
+}
+
+// Shown right after a class is picked, before anything actually starts -
+// class selection used to fall straight into solo's "READY, X? / START
+// BATTLE" prompt, so the only way to reach co-op/PvP was to ignore that
+// prompt and dig for the top-bar buttons instead. Now class pick always
+// leads here, and this is the one place that decides which mode begins.
+function renderModeButtons() {
+    const container = document.getElementById('mode-selection');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    overlayTitle.innerText = 'NASIL OYNAMAK İSTİYORSUN?';
+
+    const modes = [
+        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); } },
+        { emoji: '🤝', label: 'Co-op', desc: 'Bir arkadaşınla aynı zindanda, paylaşımlı tahtada savaş.', action: () => { overlay.classList.remove('visible'); toggleModal('coop-modal'); } },
+        { emoji: '🗡️', label: 'PvP', desc: 'Gerçek zamanlı 1v1 düello.', action: () => { overlay.classList.remove('visible'); toggleModal('pvp-modal'); } }
+    ];
+    modes.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'reward-btn rarity-rare';
+        btn.innerHTML = `<b>${m.emoji} ${m.label}</b><small>${m.desc}</small>`;
+        btn.onclick = m.action;
         container.appendChild(btn);
     });
 }
@@ -258,7 +309,7 @@ function handleOverlayClick() {
 function resetGame() {
     playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
-    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0 };
+    rebuildTileStats();
     ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
 
     // Reset History
@@ -268,8 +319,6 @@ function resetGame() {
         skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, maxHP: 0
     };
 
-    if (selectedClass) selectedClass.passive(TILE_STATS);
-    applyOwnedItemBonuses(TILE_STATS, currentOwnedItems);
     isProcessing = false;
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
@@ -335,6 +384,7 @@ function triggerDeathSequence(who) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
+    if (typeof awardLootDrop === 'function') awardLootDrop();
 
     // Calculate Reward Picks
     // NOTE: order matters here - the <=0.01 case must be checked before
@@ -382,11 +432,12 @@ function updateRewardTitle() {
     }
 }
 
-function generateRewards() {
-    rewardArea.innerHTML = '';
-
-    const REWARDS = [
-        // === COMMON (40%) - 1 Stat ===
+// Shared by solo's between-level reward screen (generateRewards, 3 picks at
+// once) and co-op's smaller per-player version (coopShowRewardPick, one at
+// a time) - one pool, one tier-weighting rule, instead of two copies that
+// could quietly drift apart.
+const REWARD_POOL = [
+    // === COMMON (40%) - 1 Stat ===
         { tier: 'common', name: 'Whetstone', desc: 'Sword +1', fn: () => TILE_STATS.sword += 1 },
         { tier: 'common', name: 'Leather Patch', desc: 'Shield +1', fn: () => TILE_STATS.shield += 1 },
         { tier: 'common', name: 'Herb Mix', desc: 'Heal +1', fn: () => TILE_STATS.heart += 1 },
@@ -434,51 +485,52 @@ function generateRewards() {
         { tier: 'legendary', name: 'Trinity', desc: 'Sword +3, Shield +3, Heal +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
         { tier: 'legendary', name: 'Titan Blood', desc: 'Max HP +40, Heal +4, Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
         { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull Dmg +20(Self Dmg +10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.energy += 3; } },
-        { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
-    ];
+    { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
+];
+
+function rollOneReward() {
+    let rand = Math.random();
+    let chosenTier = 'common';
+
+    if (rand < 0.05) chosenTier = 'legendary';
+    else if (rand < 0.15) chosenTier = 'epic';
+    else if (rand < 0.30) chosenTier = 'rare';
+    else if (rand < 0.60) chosenTier = 'uncommon';
+
+    let pool = REWARD_POOL.filter(r => r.tier === chosenTier);
+    if (pool.length === 0) pool = REWARD_POOL.filter(r => r.tier === 'common');
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Applies one reward's stat bonus and records it in solo's Loot History -
+// shared by solo's own reward buttons and (for the TILE_STATS/history side
+// of it - co-op keeps its own separate log line) coop.js's per-player picks.
+function applyReward(reward) {
+    let prevStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+    reward.fn();
+    let newStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+
+    let diff = {};
+    for (let key in newStats) {
+        let d = newStats[key] - prevStats[key];
+        if (d !== 0) diff[key] = d;
+    }
+
+    pickedRewards.push({ name: reward.name, tier: reward.tier, desc: reward.desc, diff: diff });
+    for (let key in diff) totalStatsGained[key] = (totalStatsGained[key] || 0) + diff[key];
+}
+
+function generateRewards() {
+    rewardArea.innerHTML = '';
 
     for (let i = 0; i < 3; i++) {
-        let rand = Math.random();
-        let chosenTier = 'common';
-
-        if (rand < 0.05) chosenTier = 'legendary';
-        else if (rand < 0.15) chosenTier = 'epic';
-        else if (rand < 0.30) chosenTier = 'rare';
-        else if (rand < 0.60) chosenTier = 'uncommon';
-
-        let pool = REWARDS.filter(r => r.tier === chosenTier);
-        if(pool.length === 0) pool = REWARDS.filter(r => r.tier === 'common');
-
-        let reward = pool[Math.floor(Math.random() * pool.length)];
+        let reward = rollOneReward();
 
         let btn = document.createElement('button');
         btn.className = `reward-btn rarity-${reward.tier}`;
         btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
-            // --- SNAPSHOT STATS BEFORE ---
-            let prevStats = { ...TILE_STATS, maxHP: maxPlayerHP };
-
-            // Apply Reward
-            reward.fn();
-
-            // --- SNAPSHOT STATS AFTER ---
-            let newStats = { ...TILE_STATS, maxHP: maxPlayerHP };
-
-            // Calculate Difference for History
-            let diff = {};
-            for(let key in newStats) {
-                let d = newStats[key] - prevStats[key];
-                if(d !== 0) diff[key] = d;
-            }
-
-            // Save to History
-            pickedRewards.push({ name: reward.name, tier: reward.tier, desc: reward.desc, diff: diff });
-
-            // Update Global Total Stats
-            for(let key in diff) {
-                totalStatsGained[key] = (totalStatsGained[key] || 0) + diff[key];
-            }
-
+            applyReward(reward);
             log(`Picked: ${reward.name}`, "log-heal");
             rewardPicksLeft--;
 
@@ -497,6 +549,7 @@ function generateRewards() {
 }
 
 function gameOver() {
+    if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = "GAME OVER";
     overlayBtn.innerText = "TRY AGAIN";
@@ -668,6 +721,55 @@ function mergeIntersectingMatches(hRuns, vRuns) {
 // Scans a tile-element array (anything with .dataset.type, any width x width
 // board) for horizontal/vertical runs of 3+ and merges any that intersect
 // into cross (L/T) shapes. Returns the final list of match groups.
+// Shared by every mode (solo, PvP, co-op) - true if ANY adjacent swap on
+// this board would produce a match. Checked after every settle (initial
+// deal, every refill) so a "stuck" board with no possible move never
+// leaves a player unable to act - see reshuffleBoard below for what
+// happens when this comes back false. Only ever touches dataset.type
+// (never innerHTML), so the temporary swap-and-revert below never causes
+// a visible flicker - nothing repaints mid-synchronous-execution.
+function boardHasValidMove(tileArray, w) {
+    for (let i = 0; i < tileArray.length; i++) {
+        let r = Math.floor(i / w), c = i % w;
+        let neighbors = [];
+        if (c < w - 1) neighbors.push(i + 1);
+        if (r < w - 1) neighbors.push(i + w);
+        for (let j of neighbors) {
+            let t1 = tileArray[i].dataset.type, t2 = tileArray[j].dataset.type;
+            tileArray[i].dataset.type = t2; tileArray[j].dataset.type = t1;
+            let hasMatch = findMatchGroups(tileArray, w).length > 0;
+            tileArray[i].dataset.type = t1; tileArray[j].dataset.type = t2;
+            if (hasMatch) return true;
+        }
+    }
+    return false;
+}
+
+// Re-randomizes every tile until the result has at least one valid move.
+// `pool` defaults to the base tileTypes - co-op passes COOP_TILE_TYPES so a
+// reshuffle can still deal its teamheal tile. Doesn't bother rejecting a
+// reshuffle that happens to ALSO land some free matches on it - insisting on
+// zero matches turned out to need many hundreds of random tries to satisfy
+// on a 64-cell board with this few tile types (confirmed while testing:
+// even 50 tries reliably wasn't enough), while "at least one valid move"
+// is satisfied almost immediately. Any matches the reshuffle happens to
+// create just get resolved by the normal match-check pipeline right after
+// this returns - the exact same way createBoard()'s own initial random
+// fill already lets checkForMatches(true) clean up whatever it landed on,
+// instead of trying to avoid matches during generation.
+function reshuffleBoard(tileArray, w, pool) {
+    pool = pool || tileTypes;
+    let attempts = 0;
+    do {
+        tileArray.forEach(tile => {
+            let t = pool[Math.floor(Math.random() * pool.length)];
+            tile.dataset.type = t.type;
+            tile.innerHTML = t.symbol;
+        });
+        attempts++;
+    } while (!boardHasValidMove(tileArray, w) && attempts < 200);
+}
+
 function findMatchGroups(tileArray, w) {
     let hRuns = [], vRuns = [];
 
@@ -939,6 +1041,11 @@ function fillBoard(isInitial) {
         tilesToAnimate.forEach(t => t.classList.add('falling'));
     }
     let chainReaction = checkForMatches(isInitial);
+    if (!chainReaction && !boardHasValidMove(tiles, width)) {
+        reshuffleBoard(tiles, width, tileTypes);
+        log("Hiç hamle kalmamıştı, tahta karıştırıldı!", "log-turn");
+        chainReaction = checkForMatches(isInitial); // resolve any matches the reshuffle happened to land
+    }
     if (!chainReaction && !isInitial) endTurnLogic();
 }
 
@@ -986,17 +1093,28 @@ function enemyPlayTurn() {
     if (move) {
         let t1 = tiles[move.index];
         let t2 = tiles[move.target];
+        // .ai-target outlines both tiles directly (brightness boosted so it
+        // still reads clearly through .grid.locked's dimming, which the
+        // moving .ai-cursor circle alone doesn't escape - opacity on a
+        // parent dims every descendant regardless of the child's own
+        // opacity). Slowed to 3 distinct beats (settle on t1, slide to t2,
+        // hold before the swap actually lands) instead of one quick blur.
+        log(`Enemy is targeting ${t1.innerHTML} ↔ ${t2.innerHTML}...`, "log-enemy");
+        t1.classList.add('ai-target');
+        t2.classList.add('ai-target');
         aiCursor.style.display = 'block';
         aiCursor.style.left = (t1.offsetLeft) + 'px';
         aiCursor.style.top = (t1.offsetTop) + 'px';
         setTimeout(() => {
             aiCursor.style.left = (t2.offsetLeft) + 'px';
             aiCursor.style.top = (t2.offsetTop) + 'px';
-        }, 500);
+        }, 700);
         setTimeout(() => {
             aiCursor.style.display = 'none';
+            t1.classList.remove('ai-target');
+            t2.classList.remove('ai-target');
             attemptSwap(t1, t2);
-        }, 1000);
+        }, 1600);
     } else {
         log("Enemy found no moves. Passing...", "log-enemy");
         isPlayerTurn = true;
@@ -1144,6 +1262,7 @@ function updateUI() {
     document.getElementById('stat-self-dmg').innerText = TILE_STATS.skull_self_dmg
     document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
     document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
+    document.getElementById('stat-teamheal').innerText = TILE_STATS.teamHeal;
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
 
     // Enemy Stats Display (separate pool - see ENEMY_TILE_STATS)
@@ -1169,6 +1288,7 @@ function toggleModal(modalId) {
         if (modalId === 'shop-modal') {
             if (typeof fetchWallet === 'function') fetchWallet();
             if (typeof renderShop === 'function') renderShop();
+            if (typeof renderInventory === 'function') renderInventory();
         }
         if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
             renderAchievements();
@@ -1177,6 +1297,33 @@ function toggleModal(modalId) {
             renderLeaderboard();
         }
     }
+}
+
+// Live, absolute TILE_STATS readout - unlike renderHistory()'s "what have I
+// gained this run" deltas, this is "what are my numbers right now" (base +
+// class passive + equipped items + active achievements, already folded
+// together by rebuildTileStats()). TILE_STATS is the one pool solo, PvP and
+// co-op all read, so this same function/modal is reused from all three -
+// see the 📊 buttons in the battle header and in pvp-battle/coop-battle.
+const STAT_DISPLAY_LABELS = {
+    sword: '⚔️ Sword Dmg', heart: '💖 Heal', shield: '🛡️ Shield', energy: '⚡ Ult Charge',
+    skull_dmg: '💀 Skull Dmg', skull_self_dmg: '💀 Skull Self-Dmg', ult_dmg: '✨ Ult Dmg',
+    lifeSteal: '🩸 Life Steal %', teamHeal: '💚 Team Heal'
+};
+
+function openLiveStats() {
+    renderLiveStats();
+    toggleModal('live-stats-modal');
+}
+
+function renderLiveStats() {
+    const container = document.getElementById('live-stats-content');
+    container.innerHTML = '';
+    Object.keys(STAT_DISPLAY_LABELS).forEach(key => {
+        let div = document.createElement('div');
+        div.innerHTML = `${STAT_DISPLAY_LABELS[key]}: <b>${TILE_STATS[key]}</b>`;
+        container.appendChild(div);
+    });
 }
 
 function renderHistory() {

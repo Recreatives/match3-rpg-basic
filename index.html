@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pixel Dungeon (MUB) - Match-3 & Be Free</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=0.50">
 </head>
 <body>
     <div id="app">
@@ -180,6 +180,7 @@
                     <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
                     <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
                     <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
+                    <div class="stat-item" title="Team Heal Power (co-op only)"><span>💚</span><span id="stat-teamheal" class="stat-val">6</span></div>
                 </div>
 
                 <h4 style="color:#c0665f;">ENEMY STATS</h4>
@@ -210,14 +211,19 @@
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('shop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🛒 DÜKKAN</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Kalıcı cüzdanınla eşya satın al. Satın aldığın her eşya her rundan itibaren kalıcı - hem solo hem PvP hem co-op'ta geçerli. Bir setin parçalarını tamamlayınca ekstra bir set bonusu açılır.</p>
+                <h2 class="modal-title">🛒 DÜKKAN & ENVANTER</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Sadece KUŞANILAN eşyaların statları geçerli - sahip olmak yetmez. Bir setin tüm parçalarını kuşanınca ekstra set bonusu açılır. Grey/White/Blue dükkandan alınabilir; Yellow/Green/Orange/Red/Teal sadece savaş sonrası şansla düşer.</p>
                 <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr); margin-bottom:10px;">
                     <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold-shop" class="stat-val">–</span></div>
                     <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
                 </div>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button id="shop-tab-btn" class="action-btn" style="margin:0;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
+                    <button id="inventory-tab-btn" class="action-btn" style="margin:0; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                </div>
                 <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em;"></p>
                 <div id="shop-items"></div>
+                <div id="inventory-list" style="display:none;"></div>
             </div>
         </div>
     </div>
@@ -243,7 +249,7 @@
             <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
                 <h2 class="modal-title">🏆 BAŞARIMLAR</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Solo, PvP ve co-op'ta kazanılan kalıcı rozetler.</p>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Bir kez kazanılan rozet listende kalıcı kalır, ama stat bonusu sadece AKTİFKEN geçerli - öldüğünde/kaybettiğinde bonuslar sıfırlanır, aynı anı tekrar yaşayarak yeniden aktif etmen gerekir.</p>
                 <div id="achievement-list"></div>
             </div>
         </div>
@@ -270,7 +276,16 @@
                         <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="pvp-my-hp-text" class="hp-text">100/100</span>
                     </div>
+                    <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <div>RAKİP</div>
+                        <div class="bar-container"><div id="pvp-opp-status-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
+                        <span id="pvp-opp-status-text" class="hp-text">AYAKTA</span>
+                    </div>
                     <p id="pvp-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
+                    <div style="text-align:center; margin-bottom:6px;">
+                        <div id="pvp-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
+                        <button class="stats-peek-btn" onclick="openLiveStats()">📊 Statların</button>
+                    </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="pvp-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
@@ -289,7 +304,7 @@
             <span class="close-modal" onclick="toggleModal('coop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
                 <h2 class="modal-title">🤝 CO-OP TEST (prototip)</h2>
-                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu sırayla aynı düşmana karşı oynayarak zindanda ilerler (her 5 levelde bir boss). Düşman canı ortak. Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
+                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu aynı tahta üzerinde sırayla oynayarak zindanda ilerler (her 5 levelde bir boss) - hamlelerin karşılıklı canlı görünür. Düşman canı ortak, takım arkadaşının canı ise gizli (sadece bayılıp bayılmadığı görünür). Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
 
                 <div id="coop-setup">
                     <input id="coop-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
@@ -313,9 +328,13 @@
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
                         <div>TAKIM ARKADAŞI</div>
                         <div class="bar-container"><div id="coop-ally-hp-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
-                        <span id="coop-ally-hp-text" class="hp-text">100/100</span>
+                        <span id="coop-ally-hp-text" class="hp-text">AYAKTA</span>
                     </div>
                     <p id="coop-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
+                    <div style="text-align:center; margin-bottom:6px;">
+                        <div id="coop-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
+                        <button class="stats-peek-btn" onclick="openLiveStats()">📊 Statların</button>
+                    </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="coop-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
@@ -341,6 +360,27 @@
         </div>
     </div>
 
+    <div id="live-stats-modal" class="modal-overlay" style="z-index:220;">
+        <div class="modal-content" style="max-width: 360px;">
+            <span class="close-modal" onclick="toggleModal('live-stats-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">📊 STATLARIN</h2>
+                <p style="font-size:0.8rem; color:#7f8c8d;">Şu anki eşya + başarım + ödül bonuslarıyla toplam güncel değerlerin.</p>
+                <div id="live-stats-content" class="history-summary"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="coop-reward-modal" class="modal-overlay" style="z-index:150;">
+        <div class="modal-content" style="max-width: 400px; text-align:center;">
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">✨ BİR GÜÇ SEÇ</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;">Sadece bu run için geçerli - zindan bitince sıfırlanır. Takım arkadaşın kendi seçimini kendi ekranında yapıyor.</p>
+                <div id="coop-reward-options" class="reward-container"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="hidden-vote-modal" class="modal-overlay" style="z-index:200;">
         <div class="modal-content" style="max-width: 360px; text-align:center;">
             <div class="modal-section" style="border-bottom:none;">
@@ -354,7 +394,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.44 Co-op reconnection - resume a dropped run's level/enemy/hp state</div>
+        <div class="version">v0.50 5-tier injury status for PvP opponent & co-op ally</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -374,12 +414,13 @@
         <div class="turn-status">
             <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
             <div id="speed-bonus" class="speed-bonus">⚡x2.0</div>
+            <button class="stats-peek-btn" onclick="openLiveStats()">📊</button>
         </div>
     </div>
 
     <div class="hud">
         <div class="stat-box">
-            <div>YOU</div>
+            <div id="player-class-label">YOU</div>
             <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
             <span id="hp-text" class="hp-text">100/100</span>
@@ -404,6 +445,7 @@
         <div id="game-overlay" class="game-overlay visible">
             <h1 id="overlay-title" class="overlay-title">SELECT YOUR HERO</h1>
             <div id="class-selection" class="reward-container"></div>
+            <div id="mode-selection" class="reward-container" style="display:none;"></div>
 
             <div id="reward-area" class="reward-container" style="display:none;"></div>
             <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">START BATTLE</button>
@@ -420,11 +462,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js"></script>
-    <script src="items.js"></script>
-    <script src="achievements.js"></script>
-    <script src="game.js"></script>
-    <script src="pvp.js"></script>
-    <script src="coop.js"></script>
+    <script src="economy.js?v=0.50"></script>
+    <script src="items.js?v=0.50"></script>
+    <script src="achievements.js?v=0.50"></script>
+    <script src="game.js?v=0.50"></script>
+    <script src="sharedboard.js?v=0.50"></script>
+    <script src="pvp.js?v=0.50"></script>
+    <script src="coop.js?v=0.50"></script>
 </body>
 </html>
