@@ -67,6 +67,13 @@ function coopMinionTypeForLevel(level) {
     return coopIsBoss(level) ? 'boss' : COOP_MINION_TYPES[(level - 1) % COOP_MINION_TYPES.length];
 }
 
+// Co-op's tile pool adds one tile solo/PvP never see: a heal-your-TEAMMATE
+// tile. Doesn't belong in tileTypes (game.js) itself since it would make no
+// sense on a solo board or in a 1v1 duel where there's no teammate to heal -
+// kept as co-op's own extended pool instead, passed explicitly to
+// sbRandomizeBoard/used for refills so solo and PvP are entirely unaffected.
+const COOP_TILE_TYPES = tileTypes.concat([{ type: 'teamheal', symbol: '💚' }]);
+
 const COOP_MINION_ICON = { normal: '👾', armored: '🛡️', swift: '⚡', drain: '🌀', boss: '👹' };
 const COOP_MINION_LOG = {
     normal: '',
@@ -104,7 +111,7 @@ let coopExtraTurnTriggered = false;
 // hearing that player's own hp-sync report back - see file header.
 let coopPendingResolution = null;
 
-let coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+let coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
 
 // --- SPEED BONUS (TIME MULTIPLIER) -----------------------------------------------
 // Same mechanic single-player and pvp.js use (game.js's SPEED_BONUS_WINDOW_MS/
@@ -217,7 +224,7 @@ function coopResetSessionState() {
     coopUltCharge = 0;
     coopExtraTurnTriggered = false;
     coopPendingResolution = null;
-    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
     coopVoteKind = null;
     coopVoteOpen = false;
     coopVoteChoice = null;
@@ -253,6 +260,7 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'turn-set' }, ({ payload }) => coopOnTurnSet(payload));
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
+    coopChannel.on('broadcast', { event: 'ally-heal' }, ({ payload }) => coopOnAllyHeal(payload));
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
     coopChannel.on('broadcast', { event: 'vote-open' }, ({ payload }) => coopOpenVote(payload.kind, payload.context));
     coopChannel.on('broadcast', { event: 'vote-choice' }, ({ payload }) => coopOnAllyVote(payload));
@@ -347,7 +355,7 @@ function coopBeginRun() {
     coopMatchOver = false;
     coopProcessing = false;
     coopPendingResolution = null;
-    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
 
     document.getElementById('coop-setup').style.display = 'none';
     document.getElementById('coop-battle').style.display = 'block';
@@ -392,7 +400,7 @@ function coopOnLevelStart(payload) {
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
     if (coopIsHost) {
-        sbRandomizeBoard(coopTiles);
+        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
         coopResolveMatches(true);
     }
     coopUpdateUI();
@@ -457,7 +465,7 @@ function coopApplySessionResume(state) {
     coopUltCharge = 0; // not persisted (see file header) - a neutral, safe default
     coopExtraTurnTriggered = false;
     coopPendingResolution = null;
-    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
 
     coopLevel = state.level;
     coopIsBossLevel = state.isBossLevel;
@@ -485,7 +493,7 @@ function coopApplySessionResume(state) {
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
     if (coopIsHost) {
-        sbRandomizeBoard(coopTiles);
+        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
         coopResolveMatches(true);
     }
     // Whose turn it was isn't persisted either - the host simply takes the
@@ -1029,9 +1037,26 @@ function coopApplyGroupEffect(group, isInitial) {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         coopUltCharge = Math.min(coopUltCharge + gain, 100);
         coopMyTurnStats.ultGain += gain;
+    } else if (group.type === 'teamheal') {
+        // Heals the ALLY, not me - only ever appears on a co-op board
+        // (COOP_TILE_TYPES). I'm authoritative for MY OWN hp, not theirs, so
+        // this is a request they apply to themselves, same pattern
+        // enemy-attack already uses for "here's what happens to you."
+        let heal = Math.floor(TILE_STATS.teamHeal * multiplier);
+        let allyRole = coopRole === 'host' ? 'guest' : 'host';
+        coopChannel.send({ type: 'broadcast', event: 'ally-heal', payload: { targetRole: allyRole, amount: heal } });
+        coopMyTurnStats.teamHeal += heal;
+        coopLog(`Takım arkadaşını ${heal} can iyileştirdin.`);
     }
 
     coopUpdateUI();
+}
+
+function coopOnAllyHeal(payload) {
+    if (payload.targetRole !== coopRole) return; // only the target applies this
+    coopMyHP = Math.min(coopMyHP + payload.amount, COOP_MAX_HP);
+    coopLog(`Takım arkadaşın seni ${payload.amount} can iyileştirdi!`);
+    coopSyncSelfState();
 }
 
 function coopLogTurnSummary() {
@@ -1041,8 +1066,9 @@ function coopLogTurnSummary() {
     if (coopMyTurnStats.armor > 0) parts.push(`${coopMyTurnStats.armor} zırh kazandın`);
     if (coopMyTurnStats.ultGain > 0) parts.push(`ult +%${coopMyTurnStats.ultGain}`);
     if (coopMyTurnStats.selfDamage > 0) parts.push(`kendine ${coopMyTurnStats.selfDamage} hasar verdin`);
+    if (coopMyTurnStats.teamHeal > 0) parts.push(`takım arkadaşını ${coopMyTurnStats.teamHeal} can iyileştirdin`);
     coopLog(parts.length > 0 ? `Hamlen: ${parts.join(', ')}.` : 'Hamlen bir etki yaratmadı.');
-    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
+    coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
 }
 
 function coopDropAndRefill(isInitial) {
@@ -1054,7 +1080,7 @@ function coopDropAndRefill(isInitial) {
         }
         let missing = COOP_WIDTH - colTiles.length;
         for (let i = 0; i < missing; i++) {
-            let rt = tileTypes[Math.floor(Math.random() * tileTypes.length)];
+            let rt = COOP_TILE_TYPES[Math.floor(Math.random() * COOP_TILE_TYPES.length)];
             colTiles.unshift({ type: rt.type, html: rt.symbol });
         }
         for (let row = 0; row < COOP_WIDTH; row++) {

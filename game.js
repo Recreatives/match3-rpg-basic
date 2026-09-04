@@ -13,9 +13,12 @@ const width = 8;
 const tiles = [];
 
 // --- STATS ---
+// teamHeal only ever matters in co-op (coop.js's teamheal tile, never
+// spawned in solo or PvP) - kept here anyway since this is the one shared
+// stat pool every mode reads, same as every other stat.
 let TILE_STATS = {
     sword: 6, heart: 4, shield: 5, energy: 12,
-    skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0
+    skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6
 };
 
 // Enemies used to read the player's own TILE_STATS, so every reward the
@@ -258,7 +261,7 @@ function handleOverlayClick() {
 function resetGame() {
     playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
-    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0 };
+    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
     ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
 
     // Reset History
@@ -1144,6 +1147,7 @@ function updateUI() {
     document.getElementById('stat-self-dmg').innerText = TILE_STATS.skull_self_dmg
     document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
     document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
+    document.getElementById('stat-teamheal').innerText = TILE_STATS.teamHeal;
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
 
     // Enemy Stats Display (separate pool - see ENEMY_TILE_STATS)

@@ -33,10 +33,14 @@ function sbCreateBoardDOM(gridId, idPrefix, tilesArray, tapHandler) {
 }
 
 // Only ever called by whichever side is authoritative for a board's very
-// first state - see each file's "who creates the board" comment.
-function sbRandomizeBoard(tilesArray) {
+// first state - see each file's "who creates the board" comment. `pool`
+// defaults to the base tileTypes (game.js) - co-op passes its own extended
+// pool (COOP_TILE_TYPES) so its teammate-heal tile never appears on a solo
+// or PvP board.
+function sbRandomizeBoard(tilesArray, pool) {
+    pool = pool || tileTypes;
     tilesArray.forEach(tile => {
-        let t = tileTypes[Math.floor(Math.random() * tileTypes.length)];
+        let t = pool[Math.floor(Math.random() * pool.length)];
         tile.dataset.type = t.type;
         tile.innerHTML = t.symbol;
     });
