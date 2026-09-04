@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pixel Dungeon (MUB) - Match-3 & Be Free</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=0.48">
 </head>
 <body>
     <div id="app">
@@ -372,7 +372,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.47 Playtest fixes - board reshuffle, readable shared-board pacing, class-select guard, co-op reward picks</div>
+        <div class="version">v0.48 Class then mode selection, cache-busted assets, board-render fix</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -422,6 +422,7 @@
         <div id="game-overlay" class="game-overlay visible">
             <h1 id="overlay-title" class="overlay-title">SELECT YOUR HERO</h1>
             <div id="class-selection" class="reward-container"></div>
+            <div id="mode-selection" class="reward-container" style="display:none;"></div>
 
             <div id="reward-area" class="reward-container" style="display:none;"></div>
             <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">START BATTLE</button>
@@ -438,12 +439,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js"></script>
-    <script src="items.js"></script>
-    <script src="achievements.js"></script>
-    <script src="game.js"></script>
-    <script src="sharedboard.js"></script>
-    <script src="pvp.js"></script>
-    <script src="coop.js"></script>
+    <script src="economy.js?v=0.48"></script>
+    <script src="items.js?v=0.48"></script>
+    <script src="achievements.js?v=0.48"></script>
+    <script src="game.js?v=0.48"></script>
+    <script src="sharedboard.js?v=0.48"></script>
+    <script src="pvp.js?v=0.48"></script>
+    <script src="coop.js?v=0.48"></script>
 </body>
 </html>

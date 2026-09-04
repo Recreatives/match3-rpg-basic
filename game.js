@@ -252,15 +252,39 @@ function renderClassButtons() {
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
             // Picking a class is also PvP/co-op's own "start of run" moment
-            // (they never call resetGame() - that's solo's "START BATTLE"
-            // path), so this needs the exact same clean-slate rebuild.
+            // (they never call resetGame() - that's solo's own start path),
+            // so this needs the exact same clean-slate rebuild.
             rebuildTileStats();
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
-            overlayTitle.innerText = `READY, ${c.name.toUpperCase()}?`;
-            overlayBtn.style.display = 'block';
+            renderModeButtons();
         };
+        container.appendChild(btn);
+    });
+}
+
+// Shown right after a class is picked, before anything actually starts -
+// class selection used to fall straight into solo's "READY, X? / START
+// BATTLE" prompt, so the only way to reach co-op/PvP was to ignore that
+// prompt and dig for the top-bar buttons instead. Now class pick always
+// leads here, and this is the one place that decides which mode begins.
+function renderModeButtons() {
+    const container = document.getElementById('mode-selection');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    overlayTitle.innerText = 'NASIL OYNAMAK İSTİYORSUN?';
+
+    const modes = [
+        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); } },
+        { emoji: '🤝', label: 'Co-op', desc: 'Bir arkadaşınla aynı zindanda, paylaşımlı tahtada savaş.', action: () => { overlay.classList.remove('visible'); toggleModal('coop-modal'); } },
+        { emoji: '🗡️', label: 'PvP', desc: 'Gerçek zamanlı 1v1 düello.', action: () => { overlay.classList.remove('visible'); toggleModal('pvp-modal'); } }
+    ];
+    modes.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'reward-btn rarity-rare';
+        btn.innerHTML = `<b>${m.emoji} ${m.label}</b><small>${m.desc}</small>`;
+        btn.onclick = m.action;
         container.appendChild(btn);
     });
 }
