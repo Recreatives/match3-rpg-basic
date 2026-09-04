@@ -21,6 +21,22 @@ let TILE_STATS = {
     skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6
 };
 
+// Rebuilds TILE_STATS from scratch: base numbers, then the selected class's
+// passive, then permanent equipped-item bonuses, then this-run-only active
+// achievement bonuses. Called at the start of every mode's actual run/match
+// (solo's resetGame, the class-selection handler, pvp.js's pvpStartMatch,
+// coop.js's coopBeginRun) so a previous run's temporary reward picks
+// (REWARD_POOL, further down this file) can never leak into a new one,
+// regardless of which mode that new one is - TILE_STATS is one shared pool
+// every mode reads, so "the run is over" has to mean the same clean slate
+// everywhere, not just in whichever mode happened to build it last.
+function rebuildTileStats() {
+    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
+    if (selectedClass) selectedClass.passive(TILE_STATS);
+    applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
+    applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
+}
+
 // Enemies used to read the player's own TILE_STATS, so every reward the
 // player picked up also buffed enemy tile-match damage/healing. Enemies
 // now have their own stat pool that scales with level/boss independently.
@@ -230,13 +246,10 @@ function renderClassButtons() {
             const playerBox = document.querySelector('.stat-box div:first-child');
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
-            selectedClass.passive(TILE_STATS);
-            // PvP and co-op never call resetGame() (that's solo's "START
-            // BATTLE" path) - they just read whatever TILE_STATS looks like
-            // the moment a class is picked, so owned-item bonuses need to
-            // land here too, not only in resetGame().
-            applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
-            applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
+            // Picking a class is also PvP/co-op's own "start of run" moment
+            // (they never call resetGame() - that's solo's "START BATTLE"
+            // path), so this needs the exact same clean-slate rebuild.
+            rebuildTileStats();
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
@@ -262,7 +275,7 @@ function handleOverlayClick() {
 function resetGame() {
     playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
-    TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
+    rebuildTileStats();
     ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
 
     // Reset History
@@ -272,9 +285,6 @@ function resetGame() {
         skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, maxHP: 0
     };
 
-    if (selectedClass) selectedClass.passive(TILE_STATS);
-    applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
-    applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
     isProcessing = false;
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
@@ -388,11 +398,12 @@ function updateRewardTitle() {
     }
 }
 
-function generateRewards() {
-    rewardArea.innerHTML = '';
-
-    const REWARDS = [
-        // === COMMON (40%) - 1 Stat ===
+// Shared by solo's between-level reward screen (generateRewards, 3 picks at
+// once) and co-op's smaller per-player version (coopShowRewardPick, one at
+// a time) - one pool, one tier-weighting rule, instead of two copies that
+// could quietly drift apart.
+const REWARD_POOL = [
+    // === COMMON (40%) - 1 Stat ===
         { tier: 'common', name: 'Whetstone', desc: 'Sword +1', fn: () => TILE_STATS.sword += 1 },
         { tier: 'common', name: 'Leather Patch', desc: 'Shield +1', fn: () => TILE_STATS.shield += 1 },
         { tier: 'common', name: 'Herb Mix', desc: 'Heal +1', fn: () => TILE_STATS.heart += 1 },
@@ -440,51 +451,52 @@ function generateRewards() {
         { tier: 'legendary', name: 'Trinity', desc: 'Sword +3, Shield +3, Heal +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
         { tier: 'legendary', name: 'Titan Blood', desc: 'Max HP +40, Heal +4, Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
         { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull Dmg +20(Self Dmg +10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.energy += 3; } },
-        { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
-    ];
+    { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
+];
+
+function rollOneReward() {
+    let rand = Math.random();
+    let chosenTier = 'common';
+
+    if (rand < 0.05) chosenTier = 'legendary';
+    else if (rand < 0.15) chosenTier = 'epic';
+    else if (rand < 0.30) chosenTier = 'rare';
+    else if (rand < 0.60) chosenTier = 'uncommon';
+
+    let pool = REWARD_POOL.filter(r => r.tier === chosenTier);
+    if (pool.length === 0) pool = REWARD_POOL.filter(r => r.tier === 'common');
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Applies one reward's stat bonus and records it in solo's Loot History -
+// shared by solo's own reward buttons and (for the TILE_STATS/history side
+// of it - co-op keeps its own separate log line) coop.js's per-player picks.
+function applyReward(reward) {
+    let prevStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+    reward.fn();
+    let newStats = { ...TILE_STATS, maxHP: maxPlayerHP };
+
+    let diff = {};
+    for (let key in newStats) {
+        let d = newStats[key] - prevStats[key];
+        if (d !== 0) diff[key] = d;
+    }
+
+    pickedRewards.push({ name: reward.name, tier: reward.tier, desc: reward.desc, diff: diff });
+    for (let key in diff) totalStatsGained[key] = (totalStatsGained[key] || 0) + diff[key];
+}
+
+function generateRewards() {
+    rewardArea.innerHTML = '';
 
     for (let i = 0; i < 3; i++) {
-        let rand = Math.random();
-        let chosenTier = 'common';
-
-        if (rand < 0.05) chosenTier = 'legendary';
-        else if (rand < 0.15) chosenTier = 'epic';
-        else if (rand < 0.30) chosenTier = 'rare';
-        else if (rand < 0.60) chosenTier = 'uncommon';
-
-        let pool = REWARDS.filter(r => r.tier === chosenTier);
-        if(pool.length === 0) pool = REWARDS.filter(r => r.tier === 'common');
-
-        let reward = pool[Math.floor(Math.random() * pool.length)];
+        let reward = rollOneReward();
 
         let btn = document.createElement('button');
         btn.className = `reward-btn rarity-${reward.tier}`;
         btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
-            // --- SNAPSHOT STATS BEFORE ---
-            let prevStats = { ...TILE_STATS, maxHP: maxPlayerHP };
-
-            // Apply Reward
-            reward.fn();
-
-            // --- SNAPSHOT STATS AFTER ---
-            let newStats = { ...TILE_STATS, maxHP: maxPlayerHP };
-
-            // Calculate Difference for History
-            let diff = {};
-            for(let key in newStats) {
-                let d = newStats[key] - prevStats[key];
-                if(d !== 0) diff[key] = d;
-            }
-
-            // Save to History
-            pickedRewards.push({ name: reward.name, tier: reward.tier, desc: reward.desc, diff: diff });
-
-            // Update Global Total Stats
-            for(let key in diff) {
-                totalStatsGained[key] = (totalStatsGained[key] || 0) + diff[key];
-            }
-
+            applyReward(reward);
             log(`Picked: ${reward.name}`, "log-heal");
             rewardPicksLeft--;
 
@@ -675,6 +687,55 @@ function mergeIntersectingMatches(hRuns, vRuns) {
 // Scans a tile-element array (anything with .dataset.type, any width x width
 // board) for horizontal/vertical runs of 3+ and merges any that intersect
 // into cross (L/T) shapes. Returns the final list of match groups.
+// Shared by every mode (solo, PvP, co-op) - true if ANY adjacent swap on
+// this board would produce a match. Checked after every settle (initial
+// deal, every refill) so a "stuck" board with no possible move never
+// leaves a player unable to act - see reshuffleBoard below for what
+// happens when this comes back false. Only ever touches dataset.type
+// (never innerHTML), so the temporary swap-and-revert below never causes
+// a visible flicker - nothing repaints mid-synchronous-execution.
+function boardHasValidMove(tileArray, w) {
+    for (let i = 0; i < tileArray.length; i++) {
+        let r = Math.floor(i / w), c = i % w;
+        let neighbors = [];
+        if (c < w - 1) neighbors.push(i + 1);
+        if (r < w - 1) neighbors.push(i + w);
+        for (let j of neighbors) {
+            let t1 = tileArray[i].dataset.type, t2 = tileArray[j].dataset.type;
+            tileArray[i].dataset.type = t2; tileArray[j].dataset.type = t1;
+            let hasMatch = findMatchGroups(tileArray, w).length > 0;
+            tileArray[i].dataset.type = t1; tileArray[j].dataset.type = t2;
+            if (hasMatch) return true;
+        }
+    }
+    return false;
+}
+
+// Re-randomizes every tile until the result has at least one valid move.
+// `pool` defaults to the base tileTypes - co-op passes COOP_TILE_TYPES so a
+// reshuffle can still deal its teamheal tile. Doesn't bother rejecting a
+// reshuffle that happens to ALSO land some free matches on it - insisting on
+// zero matches turned out to need many hundreds of random tries to satisfy
+// on a 64-cell board with this few tile types (confirmed while testing:
+// even 50 tries reliably wasn't enough), while "at least one valid move"
+// is satisfied almost immediately. Any matches the reshuffle happens to
+// create just get resolved by the normal match-check pipeline right after
+// this returns - the exact same way createBoard()'s own initial random
+// fill already lets checkForMatches(true) clean up whatever it landed on,
+// instead of trying to avoid matches during generation.
+function reshuffleBoard(tileArray, w, pool) {
+    pool = pool || tileTypes;
+    let attempts = 0;
+    do {
+        tileArray.forEach(tile => {
+            let t = pool[Math.floor(Math.random() * pool.length)];
+            tile.dataset.type = t.type;
+            tile.innerHTML = t.symbol;
+        });
+        attempts++;
+    } while (!boardHasValidMove(tileArray, w) && attempts < 200);
+}
+
 function findMatchGroups(tileArray, w) {
     let hRuns = [], vRuns = [];
 
@@ -946,6 +1007,11 @@ function fillBoard(isInitial) {
         tilesToAnimate.forEach(t => t.classList.add('falling'));
     }
     let chainReaction = checkForMatches(isInitial);
+    if (!chainReaction && !boardHasValidMove(tiles, width)) {
+        reshuffleBoard(tiles, width, tileTypes);
+        log("Hiç hamle kalmamıştı, tahta karıştırıldı!", "log-turn");
+        chainReaction = checkForMatches(isInitial); // resolve any matches the reshuffle happened to land
+    }
     if (!chainReaction && !isInitial) endTurnLogic();
 }
 

@@ -235,6 +235,7 @@ function coopResetSessionState() {
 // --- ROOM JOINING ------------------------------------------------------------
 
 async function coopJoinRoom() {
+    if (!selectedClass) { coopSetStatus('Önce ana menüden bir sınıf seç.'); return; }
     let input = document.getElementById('coop-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
     if (!code) { coopSetStatus('Önce bir oda kodu yaz.'); return; }
@@ -348,6 +349,9 @@ function coopBuildLevelPayload(level, continuingRole) {
 // Full reset - only ever runs once, right before level 1 starts.
 function coopBeginRun() {
     coopRunBegun = true;
+    // A previous run's temporary reward picks (this run's own coopShowRewardPick
+    // choices, or a leftover solo pick) must never leak into a new co-op run.
+    rebuildTileStats();
     coopMyHP = COOP_MAX_HP; coopMyArmor = 0; coopMyDown = false;
     coopAllyHP = COOP_MAX_HP; coopAllyArmor = 0; coopAllyDown = false;
     coopUltCharge = 0;
@@ -516,6 +520,37 @@ function coopOnEnemyDefeated(payload) {
     // guest via the 'enemy-defeated' broadcast) - each player rolls their
     // OWN drop against their OWN wallet/inventory, not a shared roll.
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    // Same for the between-level power pick (solo's REWARD_POOL, game.js) -
+    // purely local, no networking needed: each player picks their own boost
+    // for their own TILE_STATS, so there's nothing to coordinate with the
+    // other player or wait on.
+    coopShowRewardPick();
+}
+
+// One personal, temporary stat boost per level clear - same pool and tier
+// odds solo's own reward screen uses (REWARD_POOL/rollOneReward, game.js),
+// just one pick instead of three. Temporary on purpose: rebuildTileStats()
+// wipes it the moment a NEW co-op run begins (coopBeginRun), so it can never
+// make a fresh run's early levels trivially easy.
+function coopShowRewardPick() {
+    let modal = document.getElementById('coop-reward-modal');
+    let container = document.getElementById('coop-reward-options');
+    if (!modal || !container) return;
+    container.innerHTML = '';
+
+    for (let i = 0; i < 3; i++) {
+        let reward = rollOneReward();
+        let btn = document.createElement('button');
+        btn.className = `reward-btn rarity-${reward.tier}`;
+        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
+        btn.onclick = () => {
+            applyReward(reward);
+            coopLog(`Güç seçildi: ${reward.name} (${reward.desc}) - sadece bu run için.`);
+            modal.style.display = 'none';
+        };
+        container.appendChild(btn);
+    }
+    modal.style.display = 'flex';
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------
@@ -966,7 +1001,7 @@ function coopAttemptSwap(tile1, tile2) {
     let t = tile1.dataset.type, h = tile1.innerHTML;
     tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
     tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(coopChannel, coopTiles); // teammate sees the swap as it happens
+    sbBroadcastStep(coopChannel, coopTiles, 'swap'); // teammate sees the swap as it happens
 
     let matched = coopResolveMatches(false);
     if (!matched) {
@@ -975,7 +1010,7 @@ function coopAttemptSwap(tile1, tile2) {
             tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
             tile2.dataset.type = t2; tile2.innerHTML = h2;
             coopProcessing = false;
-            sbBroadcastStep(coopChannel, coopTiles); // ...and the revert too, if it wasn't a match
+            sbBroadcastStep(coopChannel, coopTiles, 'swap'); // ...and the revert too, if it wasn't a match
             // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
             coopStartSpeedTimer();
         }, 150);
@@ -990,7 +1025,7 @@ function coopResolveMatches(isInitial) {
     }
 
     groups.forEach(g => coopApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(coopChannel, coopTiles); // teammate sees the matched tiles clear
+    sbBroadcastStep(coopChannel, coopTiles, 'clear'); // teammate sees the matched tiles clear
     setTimeout(() => coopDropAndRefill(isInitial), isInitial ? 0 : 350);
     return true;
 }
@@ -1095,8 +1130,14 @@ function coopDropAndRefill(isInitial) {
             coopTiles[i].classList.remove('matched');
         }
     }
-    sbBroadcastStep(coopChannel, coopTiles); // teammate sees the refilled board settle
+    sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the refilled board settle
     let chained = coopResolveMatches(isInitial);
+    if (!chained && !coopMatchOver && !boardHasValidMove(coopTiles, COOP_WIDTH)) {
+        reshuffleBoard(coopTiles, COOP_WIDTH, COOP_TILE_TYPES);
+        sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the reshuffled board too
+        coopLog('Hiç hamle kalmamıştı, tahta karıştırıldı!');
+        chained = coopResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
+    }
     if (chained || isInitial || coopMatchOver) return;
 
     coopLogTurnSummary();

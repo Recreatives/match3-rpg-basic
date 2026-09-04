@@ -46,19 +46,37 @@ function sbRandomizeBoard(tilesArray, pool) {
     });
 }
 
-function sbBroadcastStep(channel, tilesArray) {
+// `action` says what kind of step this is - 'swap' | 'clear' | 'refill' -
+// so the passive side can give it the same visual treatment the active
+// side's own screen already has (see sbApplySnapshot), instead of every
+// step just instantly overwriting the whole board with no transition at
+// all, which is what made watching a teammate/opponent play feel like an
+// unreadable blur of symbols.
+function sbBroadcastStep(channel, tilesArray, action) {
     channel.send({
         type: 'broadcast', event: 'board-sync',
-        payload: { types: tilesArray.map(t => t.dataset.type), symbols: tilesArray.map(t => t.innerHTML) }
+        payload: { action, types: tilesArray.map(t => t.dataset.type), symbols: tilesArray.map(t => t.innerHTML) }
     });
 }
 
 // Applies a received snapshot to MY OWN board - only ever reached on the
 // PASSIVE side (broadcast self:false means the sender never gets this back),
 // which never runs its own match-detection for the turn in progress.
+//
+// A 'clear' step only adds the same .matched pulse (style.css) the active
+// side's own tiles play at this exact moment - it deliberately does NOT
+// blank the tile yet, so there's something to actually watch pulse before
+// it disappears. The empty type/symbol arrives moments later in the
+// 'refill' step that always follows, timed by the same delay the active
+// side already waits on its own screen (pvpDropAndRefill/coopDropAndRefill).
 function sbApplySnapshot(tilesArray, payload) {
+    if (payload.action === 'clear') {
+        payload.types.forEach((type, i) => { if (type === '') tilesArray[i].classList.add('matched'); });
+        return;
+    }
     payload.types.forEach((type, i) => {
         tilesArray[i].dataset.type = type;
         tilesArray[i].innerHTML = payload.symbols[i];
+        tilesArray[i].classList.remove('matched');
     });
 }

@@ -152,6 +152,7 @@ function pvpStopThinkingAnimation() {
 // --- ROOM JOINING -----------------------------------------------------------
 
 async function pvpJoinRoom() {
+    if (!selectedClass) { pvpSetStatus('Önce ana menüden bir sınıf seç.'); return; }
     let input = document.getElementById('pvp-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
     if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
@@ -249,6 +250,14 @@ function pvpCheckPresence() {
 // --- MATCH LIFECYCLE ---------------------------------------------------------
 
 function pvpStartMatch() {
+    // A previous run's temporary reward picks must never leak into a FRESH
+    // match - rebuilt clean (base + class passive + equipped items + active
+    // achievements), same as every other mode's own run-start. NOT for a
+    // betrayal duel though (pvpBetrayalMode already set by the time this
+    // runs) - that's a continuation of the co-op run already in progress,
+    // and should keep whatever temporary power-ups that run has earned so
+    // far, not reset them the moment a betrayal vote fires.
+    if (!pvpBetrayalMode) rebuildTileStats();
     pvpMyHP = PVP_MAX_HP;
     pvpMyArmor = 0;
     pvpUltCharge = 0;
@@ -587,7 +596,7 @@ function pvpAttemptSwap(tile1, tile2) {
     let t = tile1.dataset.type, h = tile1.innerHTML;
     tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
     tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(pvpChannel, pvpTiles); // opponent sees the swap as it happens
+    sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // opponent sees the swap as it happens
 
     let matched = pvpResolveMatches(false);
     if (!matched) {
@@ -596,7 +605,7 @@ function pvpAttemptSwap(tile1, tile2) {
             tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
             tile2.dataset.type = t2; tile2.innerHTML = h2;
             pvpProcessing = false;
-            sbBroadcastStep(pvpChannel, pvpTiles); // ...and the revert too, if it wasn't a match
+            sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // ...and the revert too, if it wasn't a match
             // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
             pvpStartSpeedTimer();
         }, 150);
@@ -613,7 +622,7 @@ function pvpResolveMatches(isInitial) {
     }
 
     groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(pvpChannel, pvpTiles); // opponent sees the matched tiles clear
+    sbBroadcastStep(pvpChannel, pvpTiles, 'clear'); // opponent sees the matched tiles clear
     setTimeout(() => pvpDropAndRefill(isInitial), isInitial ? 0 : 350);
     return true;
 }
@@ -709,8 +718,14 @@ function pvpDropAndRefill(isInitial) {
             pvpTiles[i].classList.remove('matched');
         }
     }
-    sbBroadcastStep(pvpChannel, pvpTiles); // opponent sees the refilled board settle
+    sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle
     let chained = pvpResolveMatches(isInitial);
+    if (!chained && !pvpMatchOver && !boardHasValidMove(pvpTiles, PVP_WIDTH)) {
+        reshuffleBoard(pvpTiles, PVP_WIDTH, tileTypes);
+        sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the reshuffled board too
+        pvpLog('Hiç hamle kalmamıştı, tahta karıştırıldı!');
+        chained = pvpResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
+    }
     if (chained || isInitial || pvpMatchOver) return;
 
     pvpLogTurnSummary();
