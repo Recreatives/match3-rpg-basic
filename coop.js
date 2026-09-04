@@ -879,6 +879,7 @@ function coopApplyTurnSet(role) {
 }
 
 function coopOnPartyWiped() {
+    if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     coopMatchOver = true;
     coopStopThinkingAnimation();
     coopSetStatus(`İKİNİZ DE DÜŞTÜNÜZ - Lvl ${coopLevel}'de YENİLGİ`);

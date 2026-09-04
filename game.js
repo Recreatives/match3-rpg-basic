@@ -236,6 +236,7 @@ function renderClassButtons() {
             // the moment a class is picked, so owned-item bonuses need to
             // land here too, not only in resetGame().
             applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
+            applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
             document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
             updateUI();
             container.style.display = 'none';
@@ -273,6 +274,7 @@ function resetGame() {
 
     if (selectedClass) selectedClass.passive(TILE_STATS);
     applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
+    applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
     isProcessing = false;
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
@@ -501,6 +503,7 @@ function generateRewards() {
 }
 
 function gameOver() {
+    if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = "GAME OVER";
     overlayBtn.innerText = "TRY AGAIN";

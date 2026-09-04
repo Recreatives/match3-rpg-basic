@@ -307,7 +307,7 @@ function pvpBeginMyTurn() {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog('Kibir Laneti seni yendi.');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
         pvpUpdateUI();
     }
 }
@@ -346,7 +346,7 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
         pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
     }
 }
 
@@ -423,6 +423,15 @@ function pvpResolveBetrayalPayoutIfNeeded() {
         // reward is intentionally small so loyalty isn't a free win).
         return adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
     }
+}
+
+// Called from every "I lost this duel" path - betrayal-specific bookkeeping
+// plus the one thing every defeat has in common regardless of mode: this
+// run's achievement buffs are gone (see achievements.js's "ACTIVE" vs
+// "lifetime" split).
+function pvpOnDefeat() {
+    if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
+    pvpLogBetrayalLossIfNeeded();
 }
 
 function pvpLogBetrayalLossIfNeeded() {
@@ -516,7 +525,7 @@ function pvpUseUltimate() {
         pvpMatchOver = true;
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
         pvpSetStatus('KAYBETTİN');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
         pvpUpdateUI();
         return;
     }
@@ -666,7 +675,7 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpSetStatus('KAYBETTİN');
         pvpLogTurnSummary();
         pvpLog('Kendi hasarınla yenildin.');
-        pvpLogBetrayalLossIfNeeded();
+        pvpOnDefeat();
     }
 }
 
