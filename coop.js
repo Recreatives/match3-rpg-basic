@@ -1179,13 +1179,16 @@ function coopUpdateUI() {
         ? 'BAYILDIN'
         : `${Math.max(0, Math.floor(coopMyHP))}/${COOP_MAX_HP}` + (coopMyArmor > 0 ? ` [+${coopMyArmor}]` : '');
 
-    // Ally hp is intentionally hidden (see file header) - only a down/alive
-    // indicator shows, no number and no proportional bar fill, so reviving
-    // your teammate stays an instinct call instead of a reaction to a stat.
+    // Ally hp is intentionally never shown as a number or an exact bar fill
+    // (see file header) - but coopAllyHP is already the real, synced value
+    // (coopOnAllyHpSync), so a 5-step condition read (sbHealthTier,
+    // sharedboard.js) is free: reviving stays an instinct call, just informed
+    // by "how badly hurt are they" instead of only "are they down or not".
     let allyBar = document.getElementById('coop-ally-hp-bar');
     let allyText = document.getElementById('coop-ally-hp-text');
-    if (allyBar) allyBar.style.width = coopAllyDown ? '0%' : '100%';
-    if (allyText) allyText.innerText = coopAllyDown ? 'BAYILDI - KURTAR!' : 'AYAKTA';
+    let allyTier = sbHealthTier(coopAllyDown ? 0 : Math.max(0, (coopAllyHP / COOP_MAX_HP) * 100));
+    if (allyBar) { allyBar.style.width = allyTier.barPct + '%'; allyBar.style.backgroundColor = allyTier.color; }
+    if (allyText) allyText.innerText = coopAllyDown ? 'BAYILDI - KURTAR!' : allyTier.text;
 
     let enemyPct = coopEnemyMaxHP > 0 ? Math.max(0, (coopEnemyHP / coopEnemyMaxHP) * 100) : 0;
     let enemyBar = document.getElementById('coop-boss-hp-bar');

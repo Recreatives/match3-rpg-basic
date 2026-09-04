@@ -57,6 +57,12 @@ let pvpMatchOver = false;
 let pvpThinkingInterval = null;
 let pvpUltCharge = 0;
 let pvpExtraTurnTriggered = false;
+// Last condition tier (see sbHealthTier, sharedboard.js) broadcast to the
+// opponent - dedups pvpUpdateUI()'s status-update send so it only actually
+// goes out when the tier itself changes, not on every UI refresh (ult
+// charge ticking up, etc. call pvpUpdateUI() far more often than pvpMyHP
+// actually changes).
+let pvpLastBroadcastTier = null;
 
 // --- SPEED BONUS (TIME MULTIPLIER) ---
 // Same mechanic single-player uses (game.js's SPEED_BONUS_WINDOW_MS/
@@ -215,6 +221,7 @@ async function pvpConnectChannel(code) {
     pvpChannel.on('broadcast', { event: 'attack' }, ({ payload }) => pvpReceiveAttack(payload));
     pvpChannel.on('broadcast', { event: 'defeated' }, () => pvpOnOpponentDefeated());
     pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
+    pvpChannel.on('broadcast', { event: 'status-update' }, ({ payload }) => pvpApplyOpponentStatus(payload));
     // One shared board now (sharedboard.js) - this only ever fires on the
     // PASSIVE side, since broadcast self:false means the active mover never
     // gets its own step back.
@@ -271,10 +278,8 @@ function pvpStartMatch() {
 
     document.getElementById('pvp-setup').style.display = 'none';
     document.getElementById('pvp-battle').style.display = 'block';
-    let oppBar = document.getElementById('pvp-opp-status-bar');
-    let oppText = document.getElementById('pvp-opp-status-text');
-    if (oppBar) oppBar.style.width = '100%';
-    if (oppText) oppText.innerText = 'AYAKTA';
+    pvpLastBroadcastTier = null; // fresh match, fresh dedup - re-sends SAĞLAM even on a rematch
+    pvpApplyOpponentStatus(sbHealthTier(100));
 
     // One shared board for the whole duel - whoever moves first is also the
     // one-time authority for its very first state (randomizes + resolves any
@@ -392,10 +397,11 @@ function pvpOnOpponentDefeated() {
     pvpStopThinkingAnimation();
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
-    let oppBar = document.getElementById('pvp-opp-status-bar');
-    let oppText = document.getElementById('pvp-opp-status-text');
-    if (oppBar) oppBar.style.width = '0%';
-    if (oppText) oppText.innerText = 'BAYILDI';
+    // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
+    // via pvpUpdateUI() the instant their HP hits 0 (before they send this
+    // 'defeated' event), but force it here too in case that status-update
+    // message got reordered or dropped.
+    pvpApplyOpponentStatus(sbHealthTier(0));
     pvpUpdateUI();
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
     // Betrayal duels already have their own currency-stakes reward (steal %
@@ -756,12 +762,33 @@ function pvpDropAndRefill(isInitial) {
     }
 }
 
+// Renders the opponent's self-reported condition tier (see pvpUpdateUI's
+// status-update send and sbHealthTier in sharedboard.js) - never an exact
+// number, just a 5-step read of how banged-up they look.
+function pvpApplyOpponentStatus(tier) {
+    let oppBar = document.getElementById('pvp-opp-status-bar');
+    let oppText = document.getElementById('pvp-opp-status-text');
+    if (oppBar) { oppBar.style.width = tier.barPct + '%'; oppBar.style.backgroundColor = tier.color; }
+    if (oppText) oppText.innerText = tier.text;
+}
+
 function pvpUpdateUI() {
     let hpPct = Math.max(0, (pvpMyHP / PVP_MAX_HP) * 100);
     let hpBar = document.getElementById('pvp-my-hp-bar');
     let hpText = document.getElementById('pvp-my-hp-text');
     if (hpBar) hpBar.style.width = hpPct + '%';
     if (hpText) hpText.innerText = `${Math.max(0, Math.floor(pvpMyHP))}/${PVP_MAX_HP}` + (pvpMyArmor > 0 ? ` [+${pvpMyArmor}]` : '');
+
+    // Tell the opponent how banged-up I am (see sbHealthTier) - my own HP
+    // never gets shared as a number, only this coarse condition, and only
+    // when it actually changes tier (a heal can walk it back down in
+    // severity just as damage walks it up, same as sizing someone up in
+    // person would).
+    let myTier = sbHealthTier(hpPct);
+    if (pvpChannel && myTier.text !== pvpLastBroadcastTier) {
+        pvpLastBroadcastTier = myTier.text;
+        pvpChannel.send({ type: 'broadcast', event: 'status-update', payload: myTier });
+    }
 
     let ultBar = document.getElementById('pvp-ult-bar');
     let ultText = document.getElementById('pvp-ult-text');

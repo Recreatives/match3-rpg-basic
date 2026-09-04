@@ -69,6 +69,21 @@ function sbBroadcastStep(channel, tilesArray, action) {
 // it disappears. The empty type/symbol arrives moments later in the
 // 'refill' step that always follows, timed by the same delay the active
 // side already waits on its own screen (pvpDropAndRefill/coopDropAndRefill).
+// Buckets a 0-100 HP percentage into a coarse, named condition instead of a
+// number - "gizli can" (PvP) and "gizli takım arkadaşı canı" (co-op) were
+// always about not exposing exact HP, not about reducing it to a flat
+// alive/dead switch. Five visually distinct states read the way sizing up
+// someone's condition in person would, without ever handing over the real
+// number: barPct is one of 5 fixed steps (not the real, continuous %) so the
+// bar's width itself can't be reverse-engineered into an exact HP guess.
+function sbHealthTier(pct) {
+    if (pct <= 0) return { text: 'BAYILDI', color: '#7f8c8d', barPct: 0 };
+    if (pct <= 15) return { text: 'AĞIR YARALI', color: '#e74c3c', barPct: 15 };
+    if (pct <= 40) return { text: 'YARALI', color: '#e67e22', barPct: 40 };
+    if (pct <= 75) return { text: 'HAFİF YARALI', color: '#f1c40f', barPct: 75 };
+    return { text: 'SAĞLAM', color: '#2ecc71', barPct: 100 };
+}
+
 function sbApplySnapshot(tilesArray, payload) {
     if (payload.action === 'clear') {
         payload.types.forEach((type, i) => { if (type === '') tilesArray[i].classList.add('matched'); });
