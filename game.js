@@ -381,10 +381,23 @@ function triggerDeathSequence(who) {
     }
 }
 
+// Every kill pays out - a boss pays more, and both scale gently with level
+// so late-run kills aren't worth the same as level 1's. Not tied to reward
+// tier/HP performance (unlike item picks) - gold is just "you fought,
+// here's pay," always earned regardless of how clean the win was.
+function goldRewardForKill(lvl, isBoss) {
+    return isBoss ? (20 + lvl * 4) : (8 + lvl * 2);
+}
+
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
     if (typeof awardLootDrop === 'function') awardLootDrop();
+
+    let goldReward = goldRewardForKill(level, level % 5 === 0);
+    if (typeof adjustWallet === 'function') {
+        adjustWallet(goldReward, 0).then(() => log(`+${goldReward} 🪙 kazandın!`, 'log-hit'));
+    }
 
     // Calculate Reward Picks
     // NOTE: order matters here - the <=0.01 case must be checked before
@@ -414,22 +427,73 @@ function winLevel() {
 function updateRewardTitle() {
     if (rewardPicksLeft > 0) {
         overlayTitle.innerText = `VICTORY! PICK ${rewardPicksLeft}`;
-    } else {
-        overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
-        rewardArea.style.display = 'none';
-        overlayBtn.innerText = "START NEXT LEVEL";
-        overlayBtn.style.display = 'block';
-        overlayBtn.onclick = () => {
-            let missingHP = maxPlayerHP - playerHP;
-            let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
-            if (healed > 0) {
-                playerHP = Math.min(playerHP + healed, maxPlayerHP);
-                log(`Rest before battle: +${healed} HP`, 'log-heal');
-            }
-            level++;
-            startLevel();
-        };
+        return;
     }
+    rewardArea.style.display = 'none';
+    // Every other level auto-continues (you're still mid-dungeon, no safe
+    // moment to shop) - a boss kill is the one checkpoint where continuing
+    // is a real choice, since it's also the only point where leaving to
+    // spend gold/equip loot actually makes sense (see showBossCheckpoint).
+    if (level % 5 === 0) {
+        showBossCheckpoint();
+        return;
+    }
+    overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
+    overlayBtn.innerText = "START NEXT LEVEL";
+    overlayBtn.style.display = 'block';
+    overlayBtn.onclick = () => {
+        let missingHP = maxPlayerHP - playerHP;
+        let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
+        if (healed > 0) {
+            playerHP = Math.min(playerHP + healed, maxPlayerHP);
+            log(`Rest before battle: +${healed} HP`, 'log-heal');
+        }
+        level++;
+        startLevel();
+    };
+}
+
+// The one in-dungeon checkpoint: after every boss kill, offer a real choice
+// instead of silently auto-continuing. Shop/inventory access is blocked
+// everywhere else during a run (see toggleModal's shop-modal guard) - this
+// is deliberately the only door back out to spend gold and equip loot
+// before the level scaling gets ahead of you.
+function showBossCheckpoint() {
+    let container = document.getElementById('boss-checkpoint');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    overlayTitle.innerText = 'BOSS DÜŞTÜ! NE YAPMAK İSTERSİN?';
+    overlayBtn.style.display = 'none';
+
+    let continueBtn = document.createElement('button');
+    continueBtn.className = 'reward-btn rarity-rare';
+    continueBtn.innerHTML = `<b>⚔️ Zindana Devam Et</b><small>Bir sonraki seviyeye geç.</small>`;
+    continueBtn.onclick = () => {
+        container.style.display = 'none';
+        let missingHP = maxPlayerHP - playerHP;
+        let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
+        if (healed > 0) {
+            playerHP = Math.min(playerHP + healed, maxPlayerHP);
+            log(`Rest before battle: +${healed} HP`, 'log-heal');
+        }
+        level++;
+        startLevel();
+    };
+    container.appendChild(continueBtn);
+
+    let returnBtn = document.createElement('button');
+    returnBtn.className = 'reward-btn rarity-epic';
+    returnBtn.innerHTML = `<b>🏠 Ana Menüye Dön</b><small>Zindandan çık - altının ve eşyaların dükkanda seni bekliyor.</small>`;
+    returnBtn.onclick = returnToMainMenu;
+    container.appendChild(returnBtn);
+}
+
+function returnToMainMenu() {
+    document.getElementById('boss-checkpoint').style.display = 'none';
+    currentState = STATE.START;
+    overlay.classList.add('visible');
+    renderModeButtons(); // selectedClass is already set - straight to Solo/Co-op/PvP
+    log('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.', 'log-turn');
 }
 
 // Shared by solo's between-level reward screen (generateRewards, 3 picks at
@@ -1252,26 +1316,9 @@ function updateUI() {
     document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
 
     document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
-
-    // Stats Display
-    document.getElementById('stat-sword').innerText = TILE_STATS.sword;
-    document.getElementById('stat-shield').innerText = TILE_STATS.shield;
-    document.getElementById('stat-heart').innerText = TILE_STATS.heart;
-    document.getElementById('stat-energy').innerText = TILE_STATS.energy;
-    document.getElementById('stat-skull').innerText = TILE_STATS.skull_dmg;
-    document.getElementById('stat-self-dmg').innerText = TILE_STATS.skull_self_dmg
-    document.getElementById('stat-ult').innerText = TILE_STATS.ult_dmg;
-    document.getElementById('stat-lifesteal').innerText = TILE_STATS.lifeSteal + "%";
-    document.getElementById('stat-teamheal').innerText = TILE_STATS.teamHeal;
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
-
-    // Enemy Stats Display (separate pool - see ENEMY_TILE_STATS)
-    document.getElementById('enemy-stat-sword').innerText = ENEMY_TILE_STATS.sword;
-    document.getElementById('enemy-stat-shield').innerText = ENEMY_TILE_STATS.shield;
-    document.getElementById('enemy-stat-heart').innerText = ENEMY_TILE_STATS.heart;
-    document.getElementById('enemy-stat-energy').innerText = ENEMY_TILE_STATS.energy;
-    document.getElementById('enemy-stat-skull').innerText = ENEMY_TILE_STATS.skull_dmg;
-    document.getElementById('enemy-stat-self-dmg').innerText = ENEMY_TILE_STATS.skull_self_dmg;
+    // Stat readout (own + enemy) lives in the hover tooltip now (see
+    // renderStatsTooltip) - rendered on demand, not every UI tick.
 }
 
 function toggleModal(modalId) {
@@ -1279,6 +1326,16 @@ function toggleModal(modalId) {
     if(m.style.display === 'flex') {
         m.style.display = 'none';
     } else {
+        // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
+        // thing - you're supposed to be too busy surviving to shop while
+        // STATE.PLAYING (fighting) or STATE.REWARD (mid reward-pick / at
+        // the boss-checkpoint screen, see showBossCheckpoint). Choosing
+        // "Ana Menüye Dön" there sets currentState back to STATE.START,
+        // which is what actually unblocks this.
+        if (modalId === 'shop-modal' && (currentState === STATE.PLAYING || currentState === STATE.REWARD)) {
+            log('Dükkana sadece zindan dışındayken girebilirsin.', 'log-turn');
+            return;
+        }
         m.style.display = 'flex';
         // Only render history if opening history modal
         if(modalId === 'history-modal') {
@@ -1303,27 +1360,56 @@ function toggleModal(modalId) {
 // gained this run" deltas, this is "what are my numbers right now" (base +
 // class passive + equipped items + active achievements, already folded
 // together by rebuildTileStats()). TILE_STATS is the one pool solo, PvP and
-// co-op all read, so this same function/modal is reused from all three -
-// see the 📊 buttons in the battle header and in pvp-battle/coop-battle.
+// co-op all read, so the same renderer is reused from all three - see the
+// 📊 buttons in the battle header and in pvp-battle/coop-battle.
+//
+// This used to be a click-to-open modal (openLiveStats/live-stats-modal) -
+// switched to a hover tooltip (.stats-peek-wrap's CSS :hover in style.css)
+// after testing showed the deliberate open-read-close cycle was quietly
+// costing the speed bonus window just by existing. A hover (or a tap on
+// touch, see toggleStatsTooltipTouch) costs nothing - the board's still
+// right there the whole time.
 const STAT_DISPLAY_LABELS = {
-    sword: '⚔️ Sword Dmg', heart: '💖 Heal', shield: '🛡️ Shield', energy: '⚡ Ult Charge',
-    skull_dmg: '💀 Skull Dmg', skull_self_dmg: '💀 Skull Self-Dmg', ult_dmg: '✨ Ult Dmg',
-    lifeSteal: '🩸 Life Steal %', teamHeal: '💚 Team Heal'
+    sword: '⚔️ Sword', heart: '💖 Heal', shield: '🛡️ Shield', energy: '⚡ Ult Şarj',
+    skull_dmg: '💀 Skull Dmg', skull_self_dmg: '☠️ Öz Hasar', ult_dmg: '✨ Ult Gücü',
+    lifeSteal: '🩸 Can Çalma%', teamHeal: '💚 Takım Şifa'
+};
+const ENEMY_STAT_DISPLAY_LABELS = {
+    sword: '⚔️ Sword', shield: '🛡️ Shield', heart: '💖 Heal',
+    energy: '⚡ Enerji', skull_dmg: '💀 Skull', skull_self_dmg: '☠️ Öz Hasar'
 };
 
-function openLiveStats() {
-    renderLiveStats();
-    toggleModal('live-stats-modal');
+// `enemyStats` is optional - PvP has no fixed "enemy" stat block (the
+// opponent is a live player using their own hidden TILE_STATS, not a
+// monster), so its tooltip only ever passes SEN.
+function renderStatsTooltip(container, enemyStats) {
+    if (!container) return;
+    let ownRows = Object.keys(STAT_DISPLAY_LABELS)
+        .map(key => `<div>${STAT_DISPLAY_LABELS[key]}: <b>${TILE_STATS[key]}</b></div>`).join('');
+    let html = `<div class="stats-tooltip-col"><h5>SEN</h5>${ownRows}</div>`;
+    if (enemyStats) {
+        let enemyRows = Object.keys(ENEMY_STAT_DISPLAY_LABELS)
+            .map(key => `<div>${ENEMY_STAT_DISPLAY_LABELS[key]}: <b>${enemyStats[key]}</b></div>`).join('');
+        html += `<div class="stats-tooltip-col enemy"><h5>DÜŞMAN</h5>${enemyRows}</div>`;
+    }
+    container.innerHTML = html;
 }
 
-function renderLiveStats() {
-    const container = document.getElementById('live-stats-content');
-    container.innerHTML = '';
-    Object.keys(STAT_DISPLAY_LABELS).forEach(key => {
-        let div = document.createElement('div');
-        div.innerHTML = `${STAT_DISPLAY_LABELS[key]}: <b>${TILE_STATS[key]}</b>`;
-        container.appendChild(div);
-    });
+// Touch devices don't get a real hover state, so a tap toggles the same
+// tooltip open for a few seconds instead - one mechanism, two input types.
+// `getEnemyStats` is a zero-arg function (not the stats object itself) so
+// each tap re-reads whichever mode's enemy pool is current, not a stale
+// snapshot from when the button was first wired up.
+function toggleStatsTooltipTouch(tooltipId, getEnemyStats) {
+    let el = document.getElementById(tooltipId);
+    if (!el) return;
+    let wasOpen = el.classList.contains('touch-open');
+    document.querySelectorAll('.stats-tooltip.touch-open').forEach(t => t.classList.remove('touch-open'));
+    if (!wasOpen) {
+        renderStatsTooltip(el, getEnemyStats ? getEnemyStats() : null);
+        el.classList.add('touch-open');
+        setTimeout(() => el.classList.remove('touch-open'), 4000);
+    }
 }
 
 function renderHistory() {

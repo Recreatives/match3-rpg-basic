@@ -144,20 +144,27 @@ grant execute on function public.resolve_betrayal(uuid, uuid, numeric) to authen
 -- just stores the result, same "database stores facts, items.js defines
 -- what they mean" split every other table in this file follows.
 --
--- equipped_slot (null | 'weapon' | 'armor' | 'trinket'): an item's stats
--- only apply while it's sitting in this slot - see items.js's
+-- equipped_slot (null or one of the 8 slots below): an item's stats only
+-- apply while it's sitting in this slot - see items.js's
 -- applyEquippedItemBonuses. Owning a pile of unequipped loot does nothing,
 -- which is what keeps a growing item pool from letting stats climb forever.
+--
+-- The 8-value list (weapon/shield/helmet/chest/shoulder/gloves/boots/
+-- trinket) replaces an earlier 3-slot version (weapon/armor/trinket) - a
+-- real RPG loadout instead of one vague "armor" bucket. Re-running this
+-- file wipes existing player_items rows the same way every other table
+-- replace here does; there's no migration path for old rows using the
+-- retired 'armor' slot value.
 drop table if exists public.player_items cascade;
 create table public.player_items (
     id            uuid primary key default gen_random_uuid(),
     player_id     uuid not null references public.players(id) on delete cascade,
     base_id       text not null,
-    slot          text not null check (slot in ('weapon', 'armor', 'trinket')),
+    slot          text not null check (slot in ('weapon', 'shield', 'helmet', 'chest', 'shoulder', 'gloves', 'boots', 'trinket')),
     rarity        text not null,
     rolled_stats  jsonb not null default '{}'::jsonb,
     set_key       text,
-    equipped_slot text check (equipped_slot in ('weapon', 'armor', 'trinket')),
+    equipped_slot text check (equipped_slot in ('weapon', 'shield', 'helmet', 'chest', 'shoulder', 'gloves', 'boots', 'trinket')),
     acquired_at   timestamptz not null default now()
 );
 

@@ -518,8 +518,14 @@ function coopOnEnemyDefeated(payload) {
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
     // Fires identically on BOTH clients (host calls this directly, the
     // guest via the 'enemy-defeated' broadcast) - each player rolls their
-    // OWN drop against their OWN wallet/inventory, not a shared roll.
+    // OWN drop against their OWN wallet/inventory, not a shared roll. Same
+    // reasoning for gold (goldRewardForKill, game.js) - each player earns
+    // their own pay for the kill, not a shared pot split between them.
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
+        let goldReward = goldRewardForKill(payload.level, payload.isBoss);
+        adjustWallet(goldReward, 0).then(() => coopLog(`+${goldReward} 🪙 kazandın!`));
+    }
     // Same for the between-level power pick (solo's REWARD_POOL, game.js) -
     // purely local, no networking needed: each player picks their own boost
     // for their own TILE_STATS, so there's nothing to coordinate with the
