@@ -248,7 +248,12 @@ function renderClassButtons() {
         btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${c.desc}</small>`;
         btn.onclick = () => {
             selectedClass = c;
-            const playerBox = document.querySelector('.stat-box div:first-child');
+            // getElementById, not querySelector('.stat-box div:first-child') -
+            // pvp-modal/coop-modal have their own .stat-box elements earlier in
+            // the DOM than the solo HUD, so the class selector was silently
+            // writing the class name into a hidden modal instead of the
+            // visible "YOU" label (the same class of bug as gridDisplay above).
+            const playerBox = document.getElementById('player-class-label');
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
             // Picking a class is also PvP/co-op's own "start of run" moment
@@ -1088,17 +1093,28 @@ function enemyPlayTurn() {
     if (move) {
         let t1 = tiles[move.index];
         let t2 = tiles[move.target];
+        // .ai-target outlines both tiles directly (brightness boosted so it
+        // still reads clearly through .grid.locked's dimming, which the
+        // moving .ai-cursor circle alone doesn't escape - opacity on a
+        // parent dims every descendant regardless of the child's own
+        // opacity). Slowed to 3 distinct beats (settle on t1, slide to t2,
+        // hold before the swap actually lands) instead of one quick blur.
+        log(`Enemy is targeting ${t1.innerHTML} ↔ ${t2.innerHTML}...`, "log-enemy");
+        t1.classList.add('ai-target');
+        t2.classList.add('ai-target');
         aiCursor.style.display = 'block';
         aiCursor.style.left = (t1.offsetLeft) + 'px';
         aiCursor.style.top = (t1.offsetTop) + 'px';
         setTimeout(() => {
             aiCursor.style.left = (t2.offsetLeft) + 'px';
             aiCursor.style.top = (t2.offsetTop) + 'px';
-        }, 500);
+        }, 700);
         setTimeout(() => {
             aiCursor.style.display = 'none';
+            t1.classList.remove('ai-target');
+            t2.classList.remove('ai-target');
             attemptSwap(t1, t2);
-        }, 1000);
+        }, 1600);
     } else {
         log("Enemy found no moves. Passing...", "log-enemy");
         isPlayerTurn = true;
@@ -1281,6 +1297,33 @@ function toggleModal(modalId) {
             renderLeaderboard();
         }
     }
+}
+
+// Live, absolute TILE_STATS readout - unlike renderHistory()'s "what have I
+// gained this run" deltas, this is "what are my numbers right now" (base +
+// class passive + equipped items + active achievements, already folded
+// together by rebuildTileStats()). TILE_STATS is the one pool solo, PvP and
+// co-op all read, so this same function/modal is reused from all three -
+// see the 📊 buttons in the battle header and in pvp-battle/coop-battle.
+const STAT_DISPLAY_LABELS = {
+    sword: '⚔️ Sword Dmg', heart: '💖 Heal', shield: '🛡️ Shield', energy: '⚡ Ult Charge',
+    skull_dmg: '💀 Skull Dmg', skull_self_dmg: '💀 Skull Self-Dmg', ult_dmg: '✨ Ult Dmg',
+    lifeSteal: '🩸 Life Steal %', teamHeal: '💚 Team Heal'
+};
+
+function openLiveStats() {
+    renderLiveStats();
+    toggleModal('live-stats-modal');
+}
+
+function renderLiveStats() {
+    const container = document.getElementById('live-stats-content');
+    container.innerHTML = '';
+    Object.keys(STAT_DISPLAY_LABELS).forEach(key => {
+        let div = document.createElement('div');
+        div.innerHTML = `${STAT_DISPLAY_LABELS[key]}: <b>${TILE_STATS[key]}</b>`;
+        container.appendChild(div);
+    });
 }
 
 function renderHistory() {

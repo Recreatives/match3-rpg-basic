@@ -271,6 +271,10 @@ function pvpStartMatch() {
 
     document.getElementById('pvp-setup').style.display = 'none';
     document.getElementById('pvp-battle').style.display = 'block';
+    let oppBar = document.getElementById('pvp-opp-status-bar');
+    let oppText = document.getElementById('pvp-opp-status-text');
+    if (oppBar) oppBar.style.width = '100%';
+    if (oppText) oppText.innerText = 'AYAKTA';
 
     // One shared board for the whole duel - whoever moves first is also the
     // one-time authority for its very first state (randomizes + resolves any
@@ -388,6 +392,10 @@ function pvpOnOpponentDefeated() {
     pvpStopThinkingAnimation();
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
+    let oppBar = document.getElementById('pvp-opp-status-bar');
+    let oppText = document.getElementById('pvp-opp-status-text');
+    if (oppBar) oppBar.style.width = '0%';
+    if (oppText) oppText.innerText = 'BAYILDI';
     pvpUpdateUI();
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
     // Betrayal duels already have their own currency-stakes reward (steal %

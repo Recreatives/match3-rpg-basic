@@ -388,6 +388,22 @@ body {
     pointer-events: none; box-shadow: 0 0 10px #e74c3c; display: none;
 }
 
+/* Highlights the two tiles the enemy AI is about to swap - the moving
+   .ai-cursor circle alone was easy to miss since .grid.locked (applied for
+   the whole enemy turn) dims everything underneath it, cursor included. */
+.ai-target {
+    outline: 3px solid #e74c3c;
+    outline-offset: -3px;
+    filter: brightness(1.4);
+    z-index: 5;
+}
+
+.stats-peek-btn {
+    background: rgba(241, 196, 15, 0.1); border: 1px solid var(--accent); color: var(--accent);
+    padding: 4px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px;
+    margin-left: 6px;
+}
+
 /* Popups */
 .pop-text {
     position: absolute; font-weight: bold; font-size: 1.4rem;

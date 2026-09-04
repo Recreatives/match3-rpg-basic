@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pixel Dungeon (MUB) - Match-3 & Be Free</title>
-    <link rel="stylesheet" href="style.css?v=0.48">
+    <link rel="stylesheet" href="style.css?v=0.49">
 </head>
 <body>
     <div id="app">
@@ -276,8 +276,16 @@
                         <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="pvp-my-hp-text" class="hp-text">100/100</span>
                     </div>
+                    <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <div>RAKİP</div>
+                        <div class="bar-container"><div id="pvp-opp-status-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
+                        <span id="pvp-opp-status-text" class="hp-text">AYAKTA</span>
+                    </div>
                     <p id="pvp-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
-                    <div style="text-align:center; margin-bottom:6px;"><div id="pvp-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div></div>
+                    <div style="text-align:center; margin-bottom:6px;">
+                        <div id="pvp-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
+                        <button class="stats-peek-btn" onclick="openLiveStats()">📊 Statların</button>
+                    </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="pvp-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
@@ -323,7 +331,10 @@
                         <span id="coop-ally-hp-text" class="hp-text">AYAKTA</span>
                     </div>
                     <p id="coop-status-battle" style="text-align:center; font-weight:bold; color:#f1c40f;"></p>
-                    <div style="text-align:center; margin-bottom:6px;"><div id="coop-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div></div>
+                    <div style="text-align:center; margin-bottom:6px;">
+                        <div id="coop-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
+                        <button class="stats-peek-btn" onclick="openLiveStats()">📊 Statların</button>
+                    </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="coop-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
@@ -345,6 +356,17 @@
                 <p id="betrayal-summary-detail" style="font-size:0.9rem; color:#bdc3c7;"></p>
                 <p id="betrayal-summary-wallet" style="font-size:0.9rem; color:#f1c40f; margin-top:8px;"></p>
                 <button class="overlay-btn" style="width:100%; margin-top:12px;" onclick="pvpCloseBetrayalSummary()">Ana Menüye Dön</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="live-stats-modal" class="modal-overlay" style="z-index:220;">
+        <div class="modal-content" style="max-width: 360px;">
+            <span class="close-modal" onclick="toggleModal('live-stats-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">📊 STATLARIN</h2>
+                <p style="font-size:0.8rem; color:#7f8c8d;">Şu anki eşya + başarım + ödül bonuslarıyla toplam güncel değerlerin.</p>
+                <div id="live-stats-content" class="history-summary"></div>
             </div>
         </div>
     </div>
@@ -372,7 +394,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.48 Class then mode selection, cache-busted assets, board-render fix</div>
+        <div class="version">v0.49 Inventory verified, PvP opponent status, live stats, clearer bot moves</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -392,12 +414,13 @@
         <div class="turn-status">
             <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
             <div id="speed-bonus" class="speed-bonus">⚡x2.0</div>
+            <button class="stats-peek-btn" onclick="openLiveStats()">📊</button>
         </div>
     </div>
 
     <div class="hud">
         <div class="stat-box">
-            <div>YOU</div>
+            <div id="player-class-label">YOU</div>
             <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
             <span id="hp-text" class="hp-text">100/100</span>
@@ -439,12 +462,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js?v=0.48"></script>
-    <script src="items.js?v=0.48"></script>
-    <script src="achievements.js?v=0.48"></script>
-    <script src="game.js?v=0.48"></script>
-    <script src="sharedboard.js?v=0.48"></script>
-    <script src="pvp.js?v=0.48"></script>
-    <script src="coop.js?v=0.48"></script>
+    <script src="economy.js?v=0.49"></script>
+    <script src="items.js?v=0.49"></script>
+    <script src="achievements.js?v=0.49"></script>
+    <script src="game.js?v=0.49"></script>
+    <script src="sharedboard.js?v=0.49"></script>
+    <script src="pvp.js?v=0.49"></script>
+    <script src="coop.js?v=0.49"></script>
 </body>
 </html>
