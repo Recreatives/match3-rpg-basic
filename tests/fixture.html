@@ -378,6 +378,17 @@
         </div>
     </div>
 
+    <div id="talents-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('talents-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🌳 YETENEKLER</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Kalıcı bonuslar - bir kez öğrenilince her koşuda (run) aktif kalır. Puanlar PvP galibiyeti ve tamamlanan günlük görevlerle kazanılır.</p>
+                <div id="talents-list"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="achievements-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
@@ -537,7 +548,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.88 Seasonal events</div>
+        <div class="version">v0.89 Talent tree</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -545,6 +556,7 @@
             <button class="loot-btn" onclick="toggleModal('friends-modal')">👥 Arkadaşlar</button>
             <button class="loot-btn" onclick="toggleModal('guild-modal')">🛡️ Lonca</button>
             <button class="loot-btn" onclick="toggleModal('titles-modal')">🎖️ Unvanlar</button>
+            <button class="loot-btn" onclick="toggleModal('talents-modal')">🌳 Yetenekler</button>
             <button class="loot-btn" onclick="toggleModal('trade-modal')">🔄 Takaslar</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>

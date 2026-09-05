@@ -1884,3 +1884,94 @@ as $$
 $$;
 
 grant execute on function public.get_active_seasonal_events() to authenticated;
+
+-- 26. Talent tree (Phase 1, final item) --------------------------------------------------
+-- Points earned = pvp_ratings.wins + count(daily_quests) - both already
+-- protected by a trusted RPC (resolve_pvp_match / claim_daily_quest), so
+-- there's nothing new to validate here. Deliberately NOT
+-- player_achievements: that table's own insert policy only checks row
+-- ownership, not that the achievement was actually earned (a real,
+-- pre-existing gap, flagged separately rather than built on top of here).
+create table if not exists public.player_talents (
+    player_id  uuid not null references public.players(id) on delete cascade,
+    talent_id  text not null,
+    learned_at timestamptz not null default now(),
+    primary key (player_id, talent_id)
+);
+
+alter table public.player_talents enable row level security;
+
+drop policy if exists "read own talents" on public.player_talents;
+create policy "read own talents" on public.player_talents
+    for select using (auth.uid() = player_id);
+
+-- Mirrors game.js's TALENT_CATALOG keys - same "reference table the client
+-- catalog has to be kept in sync with by hand" tradeoff as item_bases.
+-- learn_talent rejects any id not in here, so a client can't invent one.
+create table if not exists public.talent_defs (
+    id text primary key
+);
+insert into public.talent_defs (id) values
+    ('iron_will'), ('sharp_blade'), ('healing_touch'),
+    ('energy_flow'), ('lethal_strike'), ('ultimate_power')
+on conflict (id) do nothing;
+
+alter table public.talent_defs enable row level security;
+
+drop policy if exists "read talent defs" on public.talent_defs;
+create policy "read talent defs" on public.talent_defs
+    for select using (true);
+
+create or replace function public.get_talent_status()
+returns table(earned_points integer, spent_points integer, learned_ids text[])
+language sql
+security definer set search_path = public
+stable
+as $$
+    select
+        (coalesce((select r.wins from public.pvp_ratings r where r.player_id = auth.uid()), 0)
+            + coalesce((select count(*)::integer from public.daily_quests dq where dq.player_id = auth.uid()), 0)),
+        coalesce((select count(*)::integer from public.player_talents pt where pt.player_id = auth.uid()), 0),
+        coalesce((select array_agg(pt.talent_id) from public.player_talents pt where pt.player_id = auth.uid()), array[]::text[]);
+$$;
+
+grant execute on function public.get_talent_status() to authenticated;
+
+create or replace function public.learn_talent(p_talent_id text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me     uuid := auth.uid();
+    v_earned integer;
+    v_spent  integer;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if not exists (select 1 from public.talent_defs where id = p_talent_id) then
+        raise exception 'unknown talent';
+    end if;
+
+    select
+        (coalesce((select r.wins from public.pvp_ratings r where r.player_id = v_me), 0)
+            + coalesce((select count(*)::integer from public.daily_quests dq where dq.player_id = v_me), 0)),
+        coalesce((select count(*)::integer from public.player_talents pt where pt.player_id = v_me), 0)
+    into v_earned, v_spent;
+
+    if v_spent >= v_earned then
+        raise exception 'not enough talent points';
+    end if;
+
+    insert into public.player_talents (player_id, talent_id) values (v_me, p_talent_id)
+        on conflict (player_id, talent_id) do nothing;
+
+    if not found then
+        raise exception 'talent already learned';
+    end if;
+end;
+$$;
+
+grant execute on function public.learn_talent(text) to authenticated;

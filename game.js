@@ -40,6 +40,31 @@ function rebuildTileStats() {
     if (selectedClass) selectedClass.passive(TILE_STATS);
     applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
     applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
+    applyLearnedTalentBonuses(TILE_STATS, currentLearnedTalents);
+}
+
+// Talent tree (Phase 1) - permanent, run-independent bonuses spent from
+// points earned via PvP wins + daily quests claimed (see
+// supabase/schema.sql's get_talent_status/learn_talent - both already
+// protected by their own trusted RPCs, so there's nothing new to cheat
+// here). Each talent is a single unlock, no multi-rank complexity. Keep
+// this catalog's keys in sync with schema.sql's talent_defs table by hand,
+// same tradeoff as ITEM_BASES/item_bases.
+const TALENT_CATALOG = {
+    iron_will:      { name: 'Demir İrade', emoji: '🛡️', desc: '+2 Kalkan (kalıcı)', bonus: (s) => { s.shield += 2; } },
+    sharp_blade:    { name: 'Keskin Kılıç', emoji: '⚔️', desc: '+2 Kılıç (kalıcı)', bonus: (s) => { s.sword += 2; } },
+    healing_touch:  { name: 'Şifa Dokunuşu', emoji: '💖', desc: '+1 Kalp (kalıcı)', bonus: (s) => { s.heart += 1; } },
+    energy_flow:    { name: 'Enerji Akışı', emoji: '⚡', desc: '+2 Enerji (kalıcı)', bonus: (s) => { s.energy += 2; } },
+    lethal_strike:  { name: 'Öldürücü Vuruş', emoji: '💀', desc: '+5 Kafatası Hasarı (kalıcı)', bonus: (s) => { s.skull_dmg += 5; } },
+    ultimate_power: { name: 'Ultimate Gücü', emoji: '💥', desc: '+5 Ult Gücü (kalıcı)', bonus: (s) => { s.ult_dmg += 5; } }
+};
+let currentLearnedTalents = [];
+
+function applyLearnedTalentBonuses(stats, learnedIds) {
+    (learnedIds || []).forEach(id => {
+        let def = TALENT_CATALOG[id];
+        if (def && def.bonus) def.bonus(stats);
+    });
 }
 
 // Enemies used to read the player's own TILE_STATS, so every reward the
@@ -1510,6 +1535,9 @@ function toggleModal(modalId) {
         }
         if (modalId === 'trade-modal' && typeof renderTradeOffers === 'function') {
             renderTradeOffers();
+        }
+        if (modalId === 'talents-modal' && typeof renderTalentsPanel === 'function') {
+            renderTalentsPanel();
         }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();

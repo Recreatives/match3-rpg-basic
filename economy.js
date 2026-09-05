@@ -1100,5 +1100,59 @@ async function handleClaimSeasonalEvent(eventKey) {
     renderSeasonalEventBanner();
 }
 
+// Talent tree - see supabase/schema.sql's player_talents/talent_defs
+// tables and get_talent_status/learn_talent functions. currentLearnedTalents
+// (game.js) is what rebuildTileStats() actually reads - this fetch is what
+// keeps it in sync with the server.
+async function fetchTalentStatus() {
+    const { data, error } = await sb.rpc('get_talent_status');
+    if (error) { console.error('get_talent_status failed:', error.message); return null; }
+    let row = data[0];
+    if (typeof currentLearnedTalents !== 'undefined') {
+        currentLearnedTalents = row.learned_ids || [];
+        if (typeof rebuildTileStats === 'function') rebuildTileStats();
+    }
+    return row;
+}
+
+async function learnTalent(talentId) {
+    const { error } = await sb.rpc('learn_talent', { p_talent_id: talentId });
+    if (error) { console.error('learn_talent failed:', error.message); return false; }
+    return true;
+}
+
+async function renderTalentsPanel() {
+    let container = document.getElementById('talents-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let status = await fetchTalentStatus();
+    if (!status) { container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yüklenemedi.</p>'; return; }
+
+    let available = status.earned_points - status.spent_points;
+    container.innerHTML = '';
+    let header = document.createElement('p');
+    header.style.cssText = 'font-size:0.85rem; color:#f1c40f; margin-bottom:8px;';
+    header.innerText = `Kullanılabilir Puan: ${available} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)`;
+    container.appendChild(header);
+
+    Object.entries(TALENT_CATALOG).forEach(([id, def]) => {
+        let learned = (status.learned_ids || []).includes(id);
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `<span class="history-name">${def.emoji} ${def.name}${learned ? ' ✅' : ''}</span><span class="history-stats" style="color:#7f8c8d; font-size:0.7rem;">${def.desc}</span>`;
+        if (!learned && available > 0) {
+            let learnBtn = document.createElement('button');
+            learnBtn.className = 'action-btn';
+            learnBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+            learnBtn.innerText = 'Öğren (1 puan)';
+            learnBtn.onclick = () => learnTalent(id).then(ok => { if (ok) renderTalentsPanel(); });
+            div.querySelector('.history-stats').replaceWith(learnBtn);
+        }
+        container.appendChild(div);
+    });
+}
+
 initEconomy();
 if (typeof renderSeasonalEventBanner === 'function') renderSeasonalEventBanner();
+if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
