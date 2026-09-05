@@ -272,6 +272,13 @@ async function setDisplayName(name) {
     return 'ok';
 }
 
+// Shared by every place a player's name is shown alongside their cosmetic
+// title (leaderboard, PvP leaderboard, friends list) - see the titles
+// section further down for how equipped_title actually gets set.
+function titleBadge(equippedTitle) {
+    return equippedTitle ? ` <span style="color:#f1c40f; font-size:0.75rem;">«${equippedTitle}»</span>` : '';
+}
+
 async function renderLeaderboard() {
     let container = document.getElementById('leaderboard-list');
     if (!container) return;
@@ -287,7 +294,7 @@ async function renderLeaderboard() {
     rows.forEach((row, i) => {
         let div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}</span><span class="history-stats">🪙 ${row.gold}</span>`;
+        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats">🪙 ${row.gold}</span>`;
         container.appendChild(div);
     });
 }
@@ -338,7 +345,7 @@ async function renderFriendsList() {
         let div = document.createElement('div');
         div.className = 'history-item';
         if (row.status === 'accepted') {
-            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats"></span>`;
+            div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats"></span>`;
             let chatBtn = document.createElement('button');
             chatBtn.className = 'action-btn';
             chatBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
@@ -346,7 +353,7 @@ async function renderFriendsList() {
             chatBtn.onclick = () => openConversation(row.friend_id, row.display_name);
             div.querySelector('.history-stats').appendChild(chatBtn);
         } else if (row.is_incoming_request) {
-            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats"></span>`;
+            div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats"></span>`;
             let acceptBtn = document.createElement('button');
             acceptBtn.className = 'action-btn';
             acceptBtn.style.cssText = 'width:auto; margin:0 0 0 6px; padding:4px 10px; font-size:0.75rem;';
@@ -360,7 +367,7 @@ async function renderFriendsList() {
             div.querySelector('.history-stats').appendChild(acceptBtn);
             div.querySelector('.history-stats').appendChild(declineBtn);
         } else {
-            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats" style="color:#7f8c8d;">İstek gönderildi…</span>`;
+            div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats" style="color:#7f8c8d;">İstek gönderildi…</span>`;
         }
         container.appendChild(div);
     });
@@ -567,6 +574,64 @@ async function submitChatMessage() {
     if (ok) { input.value = ''; renderConversation(); }
 }
 
+// Cosmetic titles - see supabase/schema.sql's get_available_titles/
+// set_equipped_title functions. Eligibility is computed server-side off
+// data that already exists (PvP rating, gold, friendships, guild
+// ownership) - nothing here tracks "unlocked" state itself, it's always
+// re-derived live, so a title that becomes newly available (or newly
+// unavailable, if that ever mattered) just shows up correctly next time
+// this list is fetched.
+async function fetchAvailableTitles() {
+    const { data, error } = await sb.rpc('get_available_titles');
+    if (error) { console.error('get_available_titles failed:', error.message); return []; }
+    return data;
+}
+
+async function setEquippedTitle(title) {
+    const { error } = await sb.rpc('set_equipped_title', { p_title: title });
+    if (error) { console.error('set_equipped_title failed:', error.message); return false; }
+    return true;
+}
+
+async function renderTitlesPanel() {
+    let container = document.getElementById('titles-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let titles = await fetchAvailableTitles();
+    if (titles.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Unvanlar yüklenemedi.</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    let noneDiv = document.createElement('div');
+    noneDiv.className = 'history-item';
+    noneDiv.innerHTML = `<span class="history-name">Yok (unvansız)</span><span class="history-stats"></span>`;
+    let noneBtn = document.createElement('button');
+    noneBtn.className = 'action-btn';
+    noneBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+    noneBtn.innerText = 'Kaldır';
+    noneBtn.onclick = () => setEquippedTitle(null).then(ok => { if (ok) renderTitlesPanel(); });
+    noneDiv.querySelector('.history-stats').appendChild(noneBtn);
+    container.appendChild(noneDiv);
+
+    titles.forEach(t => {
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `<span class="history-name">${t.unlocked ? t.title : `🔒 ${t.title}`}</span><span class="history-stats" style="color:#7f8c8d; font-size:0.7rem;">${t.description}</span>`;
+        if (t.unlocked) {
+            let equipBtn = document.createElement('button');
+            equipBtn.className = 'action-btn';
+            equipBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+            equipBtn.innerText = 'Kuşan';
+            equipBtn.onclick = () => setEquippedTitle(t.title).then(ok => { if (ok) renderTitlesPanel(); });
+            div.querySelector('.history-stats').replaceWith(equipBtn);
+        }
+        container.appendChild(div);
+    });
+}
+
 async function fetchMyPvpRating() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -606,7 +671,7 @@ async function renderPvpLeaderboard() {
     rows.forEach((row, i) => {
         let div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}</span><span class="history-stats">🎖️ ${row.rating} (${row.wins}G/${row.losses}K)</span>`;
+        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats">🎖️ ${row.rating} (${row.wins}G/${row.losses}K)</span>`;
         container.appendChild(div);
     });
 }

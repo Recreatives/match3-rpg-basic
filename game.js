@@ -1504,6 +1504,9 @@ function toggleModal(modalId) {
         if (modalId === 'guild-modal' && typeof renderGuildPanel === 'function') {
             renderGuildPanel();
         }
+        if (modalId === 'titles-modal' && typeof renderTitlesPanel === 'function') {
+            renderTitlesPanel();
+        }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();
             if (typeof fetchDailyQuestStatus === 'function') fetchDailyQuestStatus();

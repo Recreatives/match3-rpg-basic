@@ -1436,3 +1436,127 @@ as $$
 $$;
 
 grant execute on function public.get_conversation(uuid, integer) to authenticated;
+
+-- 23. Cosmetic titles (Phase 3) --------------------------------------------------------
+-- No dedicated "unlocked titles" tracking table - eligibility is computed
+-- live off data that already exists (pvp_ratings, wallets, friendships,
+-- guild_members), so there's nothing new to keep in sync as a player's
+-- progress changes over time. Only the currently EQUIPPED title is actually
+-- stored, on players itself.
+alter table public.players add column if not exists equipped_title text;
+
+create or replace function public.get_available_titles()
+returns table(title text, description text, unlocked boolean)
+language sql
+security definer set search_path = public
+stable
+as $$
+    with mine as (
+        select
+            coalesce((select r.rating from public.pvp_ratings r where r.player_id = auth.uid()), 0) as pvp_rating,
+            coalesce((select r.wins from public.pvp_ratings r where r.player_id = auth.uid()), 0) as pvp_wins,
+            coalesce((select w.gold from public.wallets w where w.player_id = auth.uid()), 0) as gold,
+            exists(select 1 from public.friendships f where f.status = 'accepted' and (f.requester_id = auth.uid() or f.addressee_id = auth.uid())) as has_friend,
+            exists(select 1 from public.guild_members gm where gm.player_id = auth.uid() and gm.role = 'owner') as is_guild_owner
+    )
+    select 'Şampiyon', 'PvP derecen 1200+ olsun', (pvp_rating >= 1200) from mine
+    union all
+    select 'Gazi', '10+ PvP galibiyeti kazan', (pvp_wins >= 10) from mine
+    union all
+    select 'Zengin', '1000+ altına sahip ol', (gold >= 1000) from mine
+    union all
+    select 'Sadık Dost', 'En az bir arkadaş edin', has_friend from mine
+    union all
+    select 'Lonca Lideri', 'Bir loncanın lideri ol', is_guild_owner from mine;
+$$;
+
+grant execute on function public.get_available_titles() to authenticated;
+
+create or replace function public.set_equipped_title(p_title text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me       uuid := auth.uid();
+    v_unlocked boolean;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if p_title is null then
+        update public.players set equipped_title = null where id = v_me;
+        return;
+    end if;
+
+    select t.unlocked into v_unlocked from public.get_available_titles() t where t.title = p_title;
+
+    if not coalesce(v_unlocked, false) then
+        raise exception 'title not unlocked';
+    end if;
+
+    update public.players set equipped_title = p_title where id = v_me;
+end;
+$$;
+
+grant execute on function public.set_equipped_title(text) to authenticated;
+
+-- Existing leaderboard/friends functions now also surface equipped_title -
+-- Postgres can't change a function's return shape via CREATE OR REPLACE
+-- (errors with "cannot change return type of existing function"), so each
+-- has to be dropped first. Safe to run even on a fresh database where these
+-- don't exist yet, since DROP FUNCTION IF EXISTS is a no-op in that case.
+drop function if exists public.get_leaderboard(integer);
+create or replace function public.get_leaderboard(limit_count integer default 10)
+returns table(display_name text, gold integer, equipped_title text)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select coalesce(p.display_name, 'İsimsiz Kahraman'), w.gold, p.equipped_title
+    from public.wallets w
+    join public.players p on p.id = w.player_id
+    order by w.gold desc
+    limit greatest(1, least(limit_count, 50));
+$$;
+
+grant execute on function public.get_leaderboard(integer) to authenticated, anon;
+
+drop function if exists public.get_pvp_leaderboard(integer);
+create or replace function public.get_pvp_leaderboard(limit_count integer default 10)
+returns table(display_name text, rating integer, wins integer, losses integer, equipped_title text)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select coalesce(p.display_name, 'İsimsiz Kahraman'), r.rating, r.wins, r.losses, p.equipped_title
+    from public.pvp_ratings r
+    join public.players p on p.id = r.player_id
+    order by r.rating desc
+    limit greatest(1, least(limit_count, 50));
+$$;
+
+grant execute on function public.get_pvp_leaderboard(integer) to authenticated, anon;
+
+drop function if exists public.get_friends_list();
+create or replace function public.get_friends_list()
+returns table(friend_id uuid, display_name text, status text, is_incoming_request boolean, equipped_title text)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select
+        case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end,
+        coalesce(p.display_name, 'İsimsiz Kahraman'),
+        f.status,
+        (f.status = 'pending' and f.addressee_id = auth.uid()),
+        p.equipped_title
+    from public.friendships f
+    join public.players p
+        on p.id = case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    where f.requester_id = auth.uid() or f.addressee_id = auth.uid()
+    order by f.status desc, 2 asc;
+$$;
+
+grant execute on function public.get_friends_list() to authenticated;
