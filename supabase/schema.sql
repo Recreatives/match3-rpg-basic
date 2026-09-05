@@ -1359,3 +1359,80 @@ as $$
 $$;
 
 grant execute on function public.get_guild_list(integer) to authenticated, anon;
+
+-- 22. Direct messages (friends only) --------------------------------------------------
+-- Deliberately scoped to accepted friends only, not an open global chat -
+-- an unmoderated public chat between anonymous players is a real abuse
+-- vector (harassment, spam) this project has no moderation tooling for yet;
+-- gating on mutual friendship (already itself a two-sided opt-in) keeps the
+-- blast radius of a bad actor to people who already chose to connect with
+-- them, and gives a target an existing, obvious remedy (remove the friend).
+create table if not exists public.direct_messages (
+    id          uuid primary key default gen_random_uuid(),
+    sender_id   uuid not null references public.players(id) on delete cascade,
+    receiver_id uuid not null references public.players(id) on delete cascade,
+    body        text not null check (char_length(body) between 1 and 500),
+    created_at  timestamptz not null default now()
+);
+
+alter table public.direct_messages enable row level security;
+
+drop policy if exists "read own messages" on public.direct_messages;
+create policy "read own messages" on public.direct_messages
+    for select using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+-- No insert policy for clients - RLS alone can only check row ownership,
+-- never "does a friendship exist between these two", so send_direct_message
+-- (security definer) is the only way a row gets created.
+create or replace function public.send_direct_message(p_receiver_id uuid, p_body text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me   uuid := auth.uid();
+    v_body text := trim(p_body);
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+    if v_body = '' or char_length(v_body) > 500 then
+        raise exception 'invalid message';
+    end if;
+    if v_me = p_receiver_id then
+        raise exception 'cannot message yourself';
+    end if;
+
+    if not exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and ((f.requester_id = v_me and f.addressee_id = p_receiver_id)
+            or (f.requester_id = p_receiver_id and f.addressee_id = v_me))
+    ) then
+        raise exception 'not friends';
+    end if;
+
+    insert into public.direct_messages (sender_id, receiver_id, body) values (v_me, p_receiver_id, v_body);
+end;
+$$;
+
+grant execute on function public.send_direct_message(uuid, text) to authenticated;
+
+-- Plain SECURITY INVOKER (the default - no "security definer" here), unlike
+-- every other cross-player function in this file: "read own messages"
+-- above already scopes this correctly for the calling user, so there's
+-- nothing to bypass and no reason to widen the trusted surface.
+create or replace function public.get_conversation(p_friend_id uuid, limit_count integer default 50)
+returns table(sender_id uuid, body text, created_at timestamptz)
+language sql
+stable
+as $$
+    select dm.sender_id, dm.body, dm.created_at
+    from public.direct_messages dm
+    where (dm.sender_id = auth.uid() and dm.receiver_id = p_friend_id)
+       or (dm.sender_id = p_friend_id and dm.receiver_id = auth.uid())
+    order by dm.created_at desc
+    limit greatest(1, least(limit_count, 200));
+$$;
+
+grant execute on function public.get_conversation(uuid, integer) to authenticated;

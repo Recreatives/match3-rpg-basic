@@ -1466,6 +1466,9 @@ function toggleModal(modalId) {
             if (typeof pvpCancelQuickMatch === 'function') pvpCancelQuickMatch();
             if (typeof pvpStopWatching === 'function') pvpStopWatching();
         }
+        if (modalId === 'friends-modal' && typeof closeConversation === 'function') {
+            closeConversation();
+        }
     } else {
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
         // thing - you're supposed to be too busy surviving to shop while

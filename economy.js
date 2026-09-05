@@ -338,7 +338,13 @@ async function renderFriendsList() {
         let div = document.createElement('div');
         div.className = 'history-item';
         if (row.status === 'accepted') {
-            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats">✅ Arkadaş</span>`;
+            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats"></span>`;
+            let chatBtn = document.createElement('button');
+            chatBtn.className = 'action-btn';
+            chatBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+            chatBtn.innerText = '💬';
+            chatBtn.onclick = () => openConversation(row.friend_id, row.display_name);
+            div.querySelector('.history-stats').appendChild(chatBtn);
         } else if (row.is_incoming_request) {
             div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats"></span>`;
             let acceptBtn = document.createElement('button');
@@ -484,6 +490,81 @@ async function handleCreateGuild() {
 async function handleLeaveGuild() {
     let ok = await leaveGuild();
     if (ok) renderGuildPanel();
+}
+
+// Direct messages, friends-only - see supabase/schema.sql's direct_messages
+// table and send_direct_message/get_conversation functions. Polled every 3s
+// while a conversation is open (same "simple polling over Realtime infra"
+// choice as PvP quick match) rather than a postgres_changes subscription,
+// which would need the user to separately enable replication on this table
+// in the Supabase dashboard - not worth that extra manual step for a first
+// cut.
+let dmActiveFriendId = null;
+let dmPollInterval = null;
+
+async function sendDirectMessage(receiverId, body) {
+    const trimmed = (body || '').trim().slice(0, 500);
+    if (!trimmed) return false;
+    const { error } = await sb.rpc('send_direct_message', { p_receiver_id: receiverId, p_body: trimmed });
+    if (error) { console.error('send_direct_message failed:', error.message); return false; }
+    return true;
+}
+
+async function fetchConversation(friendId) {
+    const { data, error } = await sb.rpc('get_conversation', { p_friend_id: friendId, limit_count: 50 });
+    if (error) { console.error('get_conversation failed:', error.message); return []; }
+    return data;
+}
+
+function openConversation(friendId, displayName) {
+    dmActiveFriendId = friendId;
+    document.getElementById('friends-roster-view').style.display = 'none';
+    document.getElementById('friend-chat-view').style.display = 'block';
+    document.getElementById('friend-chat-name').innerText = displayName;
+
+    renderConversation();
+    if (dmPollInterval) clearInterval(dmPollInterval);
+    dmPollInterval = setInterval(renderConversation, 3000);
+}
+
+function closeConversation() {
+    dmActiveFriendId = null;
+    if (dmPollInterval) { clearInterval(dmPollInterval); dmPollInterval = null; }
+    document.getElementById('friend-chat-view').style.display = 'none';
+    document.getElementById('friends-roster-view').style.display = 'block';
+}
+
+async function renderConversation() {
+    if (!dmActiveFriendId) return;
+    let container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    let { data: { user } } = await sb.auth.getUser();
+    let myId = user ? user.id : null;
+
+    let messages = await fetchConversation(dmActiveFriendId);
+    if (messages.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">Henüz mesaj yok - ilk mesajı sen gönder.</p>';
+        return;
+    }
+
+    // get_conversation returns newest-first (for the limit to keep the most
+    // RECENT 50, not the oldest 50) - reversed here so the chat reads
+    // top-to-bottom in the order it was actually written.
+    container.innerHTML = [...messages].reverse().map(m => {
+        let mine = m.sender_id === myId;
+        return `<div style="text-align:${mine ? 'right' : 'left'}; margin-bottom:6px;">
+            <span style="display:inline-block; max-width:80%; padding:6px 10px; border-radius:10px; font-size:0.85rem; background:${mine ? '#2980b9' : '#444'}; color:#fff;">${m.body.replace(/</g, '&lt;')}</span>
+        </div>`;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+
+async function submitChatMessage() {
+    let input = document.getElementById('chat-input');
+    if (!input || !dmActiveFriendId) return;
+    let ok = await sendDirectMessage(dmActiveFriendId, input.value);
+    if (ok) { input.value = ''; renderConversation(); }
 }
 
 async function fetchMyPvpRating() {
