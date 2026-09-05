@@ -136,7 +136,12 @@ async function purchaseItem(slot, rarityKey) {
     await fetchWallet();
     if (typeof trackEvent === 'function') trackEvent('item_purchased', { slot, rarity: rarityKey });
     let info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(data) : { name: data.base_id, emoji: '' };
-    setShopStatus(`${info.emoji} ${info.name} satın alındı!`);
+    // Says how much gold is left, not just "purchased!" - the balance
+    // display above is sticky now (index.html) so it's always visible too,
+    // but repeating it right in the status line means a player scrolled
+    // deep into a long list doesn't have to look up to confirm it landed.
+    let remainingGold = currentWallet ? currentWallet.gold : '?';
+    setShopStatus(`${info.emoji} ${info.name} satın alındı! Kalan: ${remainingGold} 🪙`);
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
     return true;

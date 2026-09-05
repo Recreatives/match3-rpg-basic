@@ -273,16 +273,26 @@
             <div class="modal-section" style="border-bottom:none;">
                 <h2 class="modal-title">🛒 DÜKKAN & ENVANTER</h2>
                 <p style="font-size:0.8rem; color:#bdc3c7;">Sadece KUŞANILAN eşyaların statları geçerli - sahip olmak yetmez. Bir setin tüm parçalarını kuşanınca ekstra set bonusu açılır. Grey/White/Blue dükkandan alınabilir; Yellow/Green/Orange/Red/Teal sadece savaş sonrası şansla düşer.</p>
-                <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr); margin-bottom:10px;">
-                    <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold-shop" class="stat-val">–</span></div>
-                    <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
+                <!-- Sticky so the gold/materials total and tab switcher stay
+                     visible while scrolled through a long shop/inventory
+                     list - otherwise buying something scrolled far down
+                     left the player with no way to see their new balance
+                     without scrolling all the way back up first. Negative
+                     top + matching padding/margin cancels out
+                     .modal-content's own 20px padding so this sticks flush
+                     to the modal's actual top edge, not 20px below it. -->
+                <div style="position:sticky; top:-20px; z-index:5; background:#34495e; padding-top:20px; margin-top:-20px;">
+                    <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr); margin-bottom:10px;">
+                        <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold-shop" class="stat-val">–</span></div>
+                        <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-bottom:10px;">
+                        <button id="shop-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
+                        <button id="inventory-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                        <button id="prestige-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('prestige')">🌟 Prestij</button>
+                    </div>
+                    <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em; margin:0;"></p>
                 </div>
-                <div style="display:flex; gap:6px; margin-bottom:10px;">
-                    <button id="shop-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
-                    <button id="inventory-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
-                    <button id="prestige-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('prestige')">🌟 Prestij</button>
-                </div>
-                <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em;"></p>
                 <div id="shop-items"></div>
                 <div id="prestige-panel" style="display:none;"></div>
                 <div id="inventory-list" style="display:none;"></div>
@@ -570,7 +580,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.92 Item names/power, inventory & top-bar polish</div>
+        <div class="version">v0.93 Inventory grouping, overflow fix, sticky wallet</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>

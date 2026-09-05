@@ -458,68 +458,94 @@ function renderInventory() {
         listDiv.innerHTML += '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz eşyan yok.</p>';
     }
 
-    let rarityOrder = Object.keys(RARITY_DEFS);
-    currentOwnedItems.slice()
-        .sort((a, b) => rarityOrder.indexOf(b.rarity) - rarityOrder.indexOf(a.rarity))
-        .forEach(item => {
-            let rarity = RARITY_DEFS[item.rarity];
-            let info = itemDisplayInfo(item);
-            let row = document.createElement('div');
-            row.className = 'manual-tile';
-            // Wraps onto its own second row (desc above, buttons below)
-            // instead of overflowing past the modal's edge once an item
-            // picks up its 3rd action button (KUŞAN/ÇIKAR + upgrade +
-            // scrap) - flex's default nowrap let both sides keep their
-            // full natural width and just spill out sideways.
-            row.style.justifyContent = 'space-between';
-            row.style.flexWrap = 'wrap';
-            row.style.rowGap = '6px';
+    function buildInventoryRow(item) {
+        let rarity = RARITY_DEFS[item.rarity];
+        let info = itemDisplayInfo(item);
+        let row = document.createElement('div');
+        row.className = 'manual-tile';
+        // Wraps onto its own second row (desc above, buttons below) instead
+        // of overflowing past the modal's edge once an item picks up its
+        // 3rd action button (KUŞAN/ÇIKAR + upgrade + scrap) - flex's
+        // default nowrap let both sides keep their full natural width and
+        // just spill out sideways.
+        row.style.justifyContent = 'space-between';
+        row.style.flexWrap = 'wrap';
+        row.style.rowGap = '6px';
 
-            let desc = document.createElement('div');
-            desc.className = 'manual-desc';
-            desc.style.color = rarity.color;
-            desc.style.flex = '1 1 180px';
-            desc.style.minWidth = '0';
-            desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
-            row.appendChild(desc);
+        let desc = document.createElement('div');
+        desc.className = 'manual-desc';
+        desc.style.color = rarity.color;
+        // flex-basis:100% (not just a min width) FORCES this onto its own
+        // full-width line whenever the row wraps, rather than leaving it to
+        // flex's default auto-sizing to decide how much of the row each
+        // side gets - that auto-sizing is exactly what let btnWrap keep
+        // claiming its full 3-button width below and spill past the card
+        // edge instead of actually wrapping. Same flex-basis:100% on
+        // btnWrap below for the same reason.
+        desc.style.flex = '1 1 100%';
+        desc.style.minWidth = '0';
+        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
+        row.appendChild(desc);
 
-            let btnWrap = document.createElement('div');
-            btnWrap.style.display = 'flex'; btnWrap.style.gap = '4px'; btnWrap.style.flexShrink = '0'; btnWrap.style.flexWrap = 'wrap';
+        let btnWrap = document.createElement('div');
+        btnWrap.style.display = 'flex'; btnWrap.style.gap = '4px'; btnWrap.style.flexWrap = 'wrap';
+        btnWrap.style.flex = '1 1 100%'; btnWrap.style.minWidth = '0';
 
-            let btn = document.createElement('button');
-            btn.className = 'action-btn';
-            btn.style.width = 'auto'; btn.style.margin = '0';
-            if (item.equipped_slot) { btn.innerText = 'ÇIKAR'; btn.onclick = () => unequipItem(item.id); }
-            else { btn.innerText = 'KUŞAN'; btn.onclick = () => equipItem(item.id); }
-            btnWrap.appendChild(btn);
+        let btn = document.createElement('button');
+        btn.className = 'action-btn';
+        btn.style.width = 'auto'; btn.style.margin = '0';
+        if (item.equipped_slot) { btn.innerText = 'ÇIKAR'; btn.onclick = () => unequipItem(item.id); }
+        else { btn.innerText = 'KUŞAN'; btn.onclick = () => equipItem(item.id); }
+        btnWrap.appendChild(btn);
 
-            // Scrap/upgrade only make sense for an item that's just sitting
-            // in the bag - an equipped item stays put until you take it off
-            // (scrap_item/upgrade_item, supabase/schema.sql, enforce this
-            // server-side too, this just avoids offering a button that
-            // would fail).
-            if (!item.equipped_slot) {
-                if (ITEM_UPGRADE_COSTS[item.rarity]) {
-                    let uc = ITEM_UPGRADE_COSTS[item.rarity];
-                    let upBtn = document.createElement('button');
-                    upBtn.className = 'action-btn';
-                    upBtn.style.width = 'auto'; upBtn.style.margin = '0'; upBtn.style.background = '#8e44ad';
-                    upBtn.innerText = `⬆️ ${uc.gold}🪙 ${uc.materials}🪨`;
-                    upBtn.onclick = () => upgradeItem(item.id);
-                    btnWrap.appendChild(upBtn);
-                }
-                let scrapBtn = document.createElement('button');
-                scrapBtn.className = 'action-btn';
-                scrapBtn.style.width = 'auto'; scrapBtn.style.margin = '0'; scrapBtn.style.background = '#7f8c8d';
-                scrapBtn.innerText = `♻️ +${ITEM_SCRAP_VALUES[item.rarity] || 1}🪨`;
-                scrapBtn.title = 'Hurdaya çevir';
-                scrapBtn.onclick = () => scrapItem(item.id);
-                btnWrap.appendChild(scrapBtn);
+        // Scrap/upgrade only make sense for an item that's just sitting in
+        // the bag - an equipped item stays put until you take it off
+        // (scrap_item/upgrade_item, supabase/schema.sql, enforce this
+        // server-side too, this just avoids offering a button that would
+        // fail).
+        if (!item.equipped_slot) {
+            if (ITEM_UPGRADE_COSTS[item.rarity]) {
+                let uc = ITEM_UPGRADE_COSTS[item.rarity];
+                let upBtn = document.createElement('button');
+                upBtn.className = 'action-btn';
+                upBtn.style.width = 'auto'; upBtn.style.margin = '0'; upBtn.style.background = '#8e44ad';
+                upBtn.innerText = `⬆️ ${uc.gold}🪙 ${uc.materials}🪨`;
+                upBtn.onclick = () => upgradeItem(item.id);
+                btnWrap.appendChild(upBtn);
             }
-            row.appendChild(btnWrap);
+            let scrapBtn = document.createElement('button');
+            scrapBtn.className = 'action-btn';
+            scrapBtn.style.width = 'auto'; scrapBtn.style.margin = '0'; scrapBtn.style.background = '#7f8c8d';
+            scrapBtn.innerText = `♻️ +${ITEM_SCRAP_VALUES[item.rarity] || 1}🪨`;
+            scrapBtn.title = 'Hurdaya çevir';
+            scrapBtn.onclick = () => scrapItem(item.id);
+            btnWrap.appendChild(scrapBtn);
+        }
+        row.appendChild(btnWrap);
+        return row;
+    }
 
-            listDiv.appendChild(row);
-        });
+    // Grouped by slot (Silah/Kalkan/Miğfer/...) instead of one flat list
+    // sorted only by rarity - a bag of 15 mixed items in rarity order made
+    // it hard to find "which shields do I have" at a glance. Within each
+    // slot, still highest rarity first. Slots with nothing in them are
+    // skipped entirely rather than shown empty, unlike the equipped-slots
+    // list above (which always shows all 8 to make gaps in a loadout
+    // obvious) - here an empty section would just be noise.
+    let rarityOrder = Object.keys(RARITY_DEFS);
+    ITEM_SLOTS.forEach(slot => {
+        let itemsInSlot = currentOwnedItems
+            .filter(it => it.slot === slot)
+            .sort((a, b) => rarityOrder.indexOf(b.rarity) - rarityOrder.indexOf(a.rarity));
+        if (itemsInSlot.length === 0) return;
+
+        let slotHeader = document.createElement('div');
+        slotHeader.style.cssText = 'font-size:0.75rem; color:#7f8c8d; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; font-weight:bold;';
+        slotHeader.innerText = `${SLOT_LABELS[slot]} (${itemsInSlot.length})`;
+        listDiv.appendChild(slotHeader);
+
+        itemsInSlot.forEach(item => listDiv.appendChild(buildInventoryRow(item)));
+    });
     container.appendChild(listDiv);
 }
 
