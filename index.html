@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.97">
+    <link rel="stylesheet" href="style.css?v=0.98">
 </head>
 <body>
     <div id="app">
@@ -354,6 +354,62 @@
                     <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('trade-modal')">🔄 Takaslar</button>
                     <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('achievements-modal')">🏆 Başarımlar</button>
                     <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('history-modal')">🎒 Loot / Stats</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('account-modal')">🔑 Hesap</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="account-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('account-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🔑 HESAP</h2>
+                <p id="account-status-msg" style="font-size:0.8rem; color:#bdc3c7; min-height:1.1em;"></p>
+
+                <div id="account-view-status">
+                    <p id="account-status-detail" style="font-size:0.85rem;"></p>
+                    <button class="action-btn" id="account-upgrade-btn" onclick="showAccountView('register')">Hesap Oluştur</button>
+                    <button class="action-btn" id="account-switch-btn" onclick="showAccountView('login')" style="background:#34495e; color:#fff;">Farklı Hesapla Giriş Yap</button>
+                    <button class="action-btn" id="account-logout-btn" onclick="handleAccountLogout()" style="background:#7f2020; color:#fff; display:none;">Çıkış Yap</button>
+                </div>
+
+                <div id="account-view-register" style="display:none;">
+                    <p style="font-size:0.8rem; color:#bdc3c7;">Email ve şifre belirle - ilerlemen (altın, eşyalar, PvP derecesi) aynen korunur.</p>
+                    <input id="account-register-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-register-password" type="password" placeholder="Şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" onclick="handleAccountRegister()">Kod Gönder</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                </div>
+
+                <div id="account-view-verify" style="display:none;">
+                    <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine gönderilen 6 haneli kodu gir.</p>
+                    <input id="account-verify-code" type="text" inputmode="numeric" maxlength="6" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" onclick="handleAccountVerify()">Doğrula</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                </div>
+
+                <div id="account-view-login" style="display:none;">
+                    <input id="account-login-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-login-password" type="password" placeholder="Şifre" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" onclick="handleAccountLogin()">Giriş Yap</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('forgot')">Şifremi Unuttum</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                </div>
+
+                <div id="account-view-forgot" style="display:none;">
+                    <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine bir sıfırlama kodu gönderelim.</p>
+                    <input id="account-forgot-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" onclick="handleAccountForgotPassword()">Kod Gönder</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
+                </div>
+
+                <div id="account-view-reset" style="display:none;">
+                    <p style="font-size:0.8rem; color:#bdc3c7;">Email'ine gelen kodu ve yeni şifreni gir.</p>
+                    <input id="account-reset-code" type="text" inputmode="numeric" maxlength="6" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-reset-password" type="password" placeholder="Yeni şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" onclick="handleAccountResetPassword()">Şifreyi Değiştir</button>
+                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
                 </div>
             </div>
         </div>
@@ -700,7 +756,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.97 All legendary passives + power icon fix</div>
+        <div class="version">v0.98 Email/password accounts</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -774,14 +830,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.97"></script>
-    <script src="economy.js?v=0.97"></script>
-    <script src="items.js?v=0.97"></script>
-    <script src="achievements.js?v=0.97"></script>
-    <script src="game.js?v=0.97"></script>
-    <script src="sharedboard.js?v=0.97"></script>
-    <script src="pvp.js?v=0.97"></script>
-    <script src="coop.js?v=0.97"></script>
+    <script src="sound.js?v=0.98"></script>
+    <script src="economy.js?v=0.98"></script>
+    <script src="items.js?v=0.98"></script>
+    <script src="achievements.js?v=0.98"></script>
+    <script src="game.js?v=0.98"></script>
+    <script src="sharedboard.js?v=0.98"></script>
+    <script src="pvp.js?v=0.98"></script>
+    <script src="coop.js?v=0.98"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

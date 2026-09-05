@@ -1580,6 +1580,9 @@ function toggleModal(modalId) {
             fetchDailyLoginStatus();
             if (typeof fetchDailyQuestStatus === 'function') fetchDailyQuestStatus();
         }
+        if (modalId === 'account-modal' && typeof renderAccountStatus === 'function') {
+            renderAccountStatus();
+        }
     }
 }
 

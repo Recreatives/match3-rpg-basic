@@ -33,6 +33,178 @@ async function ensureSession() {
     return data.session;
 }
 
+// --- ACCOUNT (email/password) -------------------------------------------------
+// Every session still starts anonymous (ensureSession() above, unchanged) -
+// this layer only decides whether that identity LATER gets a real email and
+// password attached. Supabase's own identity-linking is the mechanism:
+// calling auth.updateUser({email, password}) on an anonymous session turns
+// the SAME auth.uid() into a permanent one in place, so every row already
+// written under that id (wallets, player_items, pvp_ratings...) carries over
+// untouched - no manual data migration, no "copy everything to a new row"
+// script. A brand-new auth.signUp() would instead mint a DIFFERENT uid and
+// orphan all of that, which is why upgrade and fresh-signup are NOT the same
+// call below.
+//
+// Email delivery has to be a typed 6-digit CODE, not Supabase's default
+// magic link - this requires manually editing two templates in the Supabase
+// Dashboard (Authentication > Email Templates) to include {{ .Token }}:
+// "Confirm signup" (used for both fresh signups AND anonymous upgrades) and
+// "Reset Password". Without that edit the emails still send, but they only
+// contain a link and verifyOtp() below will never see a valid code.
+
+let pendingAccountEmail = null;
+let pendingAccountIsUpgrade = false;
+let pendingResetEmail = null;
+
+async function accountRegisterOrUpgrade(email, password) {
+    email = (email || '').trim();
+    if (!email || !password || password.length < 6) return { ok: false, reason: 'invalid' };
+
+    const { data: { user } } = await sb.auth.getUser();
+    const isUpgrade = !!(user && user.is_anonymous);
+
+    const { error } = isUpgrade
+        ? await sb.auth.updateUser({ email, password })
+        : await sb.auth.signUp({ email, password });
+
+    if (error) {
+        console.error('Account register/upgrade failed:', error.message);
+        const taken = /already registered|already been registered|already exists/i.test(error.message);
+        return { ok: false, reason: taken ? 'taken' : 'error' };
+    }
+    return { ok: true, isUpgrade };
+}
+
+async function accountVerifySignupCode(email, token, wasUpgrade) {
+    const { error } = await sb.auth.verifyOtp({
+        email: (email || '').trim(), token: (token || '').trim(),
+        type: wasUpgrade ? 'email_change' : 'signup'
+    });
+    if (error) { console.error('verifyOtp (signup) failed:', error.message); return 'error'; }
+    return 'ok';
+}
+
+async function accountLogin(email, password) {
+    const { error } = await sb.auth.signInWithPassword({ email: (email || '').trim(), password });
+    if (error) { console.error('Login failed:', error.message); return 'error'; }
+    return 'ok';
+}
+
+async function accountLogout() {
+    await sb.auth.signOut();
+    // A fresh anonymous session so the player can keep playing immediately -
+    // same bootstrap ensureSession() already does on first-ever load.
+    await ensureSession();
+    return 'ok';
+}
+
+async function accountRequestPasswordReset(email) {
+    const { error } = await sb.auth.resetPasswordForEmail((email || '').trim());
+    if (error) { console.error('resetPasswordForEmail failed:', error.message); return 'error'; }
+    return 'ok';
+}
+
+async function accountConfirmPasswordReset(email, token, newPassword) {
+    if (!newPassword || newPassword.length < 6) return 'invalid';
+    const { error: otpError } = await sb.auth.verifyOtp({ email: (email || '').trim(), token: (token || '').trim(), type: 'recovery' });
+    if (otpError) { console.error('verifyOtp (recovery) failed:', otpError.message); return 'error'; }
+    const { error: pwError } = await sb.auth.updateUser({ password: newPassword });
+    if (pwError) { console.error('password update failed:', pwError.message); return 'error'; }
+    return 'ok';
+}
+
+// --- ACCOUNT UI glue -----------------------------------------------------------
+function showAccountView(view) {
+    ['status', 'register', 'verify', 'login', 'forgot', 'reset'].forEach(v => {
+        let el = document.getElementById('account-view-' + v);
+        if (el) el.style.display = (v === view) ? 'block' : 'none';
+    });
+    let msg = document.getElementById('account-status-msg');
+    if (msg) msg.innerText = '';
+}
+
+async function renderAccountStatus() {
+    const { data: { user } } = await sb.auth.getUser();
+    let detail = document.getElementById('account-status-detail');
+    let upgradeBtn = document.getElementById('account-upgrade-btn');
+    let switchBtn = document.getElementById('account-switch-btn');
+    let logoutBtn = document.getElementById('account-logout-btn');
+    if (!detail) return;
+
+    if (user && !user.is_anonymous) {
+        detail.innerText = `Giriş yapılan email: ${user.email}`;
+        if (upgradeBtn) upgradeBtn.style.display = 'none';
+        if (switchBtn) switchBtn.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'block';
+    } else {
+        detail.innerText = 'Şu an misafir olarak oynuyorsun. İlerlemeni (altın, eşyalar, PvP derecen) kaybetmemek için bir hesap oluştur.';
+        if (upgradeBtn) upgradeBtn.style.display = 'block';
+        if (switchBtn) switchBtn.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+    }
+    showAccountView('status');
+}
+
+async function handleAccountRegister() {
+    let email = document.getElementById('account-register-email').value;
+    let password = document.getElementById('account-register-password').value;
+    let msg = document.getElementById('account-status-msg');
+    let result = await accountRegisterOrUpgrade(email, password);
+    if (!result.ok) {
+        const messages = { invalid: 'Geçerli bir email ve en az 6 karakterli bir şifre gir.', taken: 'Bu email zaten kayıtlı - Giriş Yap\'ı dene.', error: 'Bir şeyler ters gitti, tekrar dene.' };
+        if (msg) msg.innerText = messages[result.reason] || messages.error;
+        return;
+    }
+    pendingAccountEmail = email.trim();
+    pendingAccountIsUpgrade = result.isUpgrade;
+    showAccountView('verify');
+}
+
+async function handleAccountVerify() {
+    let code = document.getElementById('account-verify-code').value;
+    let msg = document.getElementById('account-status-msg');
+    let result = await accountVerifySignupCode(pendingAccountEmail, code, pendingAccountIsUpgrade);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Kod hatalı ya da süresi dolmuş.'; return; }
+    if (msg) msg.innerText = 'Hesap doğrulandı!';
+    renderAccountStatus();
+}
+
+async function handleAccountLogin() {
+    let email = document.getElementById('account-login-email').value;
+    let password = document.getElementById('account-login-password').value;
+    let msg = document.getElementById('account-status-msg');
+    let result = await accountLogin(email, password);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Email veya şifre hatalı.'; return; }
+    renderAccountStatus();
+    if (typeof fetchWallet === 'function') fetchWallet();
+}
+
+async function handleAccountLogout() {
+    await accountLogout();
+    renderAccountStatus();
+    if (typeof fetchWallet === 'function') fetchWallet();
+}
+
+async function handleAccountForgotPassword() {
+    let email = document.getElementById('account-forgot-email').value;
+    let msg = document.getElementById('account-status-msg');
+    let result = await accountRequestPasswordReset(email);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Kod gönderilemedi, email adresini kontrol et.'; return; }
+    pendingResetEmail = email.trim();
+    showAccountView('reset');
+}
+
+async function handleAccountResetPassword() {
+    let code = document.getElementById('account-reset-code').value;
+    let newPassword = document.getElementById('account-reset-password').value;
+    let msg = document.getElementById('account-status-msg');
+    let result = await accountConfirmPasswordReset(pendingResetEmail, code, newPassword);
+    const messages = { invalid: 'Şifre en az 6 karakter olmalı.', error: 'Kod hatalı ya da süresi dolmuş.' };
+    if (result !== 'ok') { if (msg) msg.innerText = messages[result] || messages.error; return; }
+    if (msg) msg.innerText = 'Şifren değişti, giriş yapabilirsin.';
+    showAccountView('login');
+}
+
 async function fetchWallet() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
