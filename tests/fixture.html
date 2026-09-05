@@ -258,11 +258,13 @@
                     <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
                 </div>
                 <div style="display:flex; gap:6px; margin-bottom:10px;">
-                    <button id="shop-tab-btn" class="action-btn" style="margin:0;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
-                    <button id="inventory-tab-btn" class="action-btn" style="margin:0; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                    <button id="shop-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
+                    <button id="inventory-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                    <button id="prestige-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('prestige')">🌟 Prestij</button>
                 </div>
                 <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em;"></p>
                 <div id="shop-items"></div>
+                <div id="prestige-panel" style="display:none;"></div>
                 <div id="inventory-list" style="display:none;"></div>
             </div>
         </div>
@@ -548,7 +550,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.89 Talent tree</div>
+        <div class="version">v0.90 Prestige system</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>

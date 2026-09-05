@@ -299,18 +299,24 @@ function formatRolledStats(stats) {
     return Object.entries(stats || {}).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(' · ');
 }
 
+// 3 tabs as of the prestige panel - each {tab name: [button id, panel id]}.
+// Kept data-driven rather than one if/else per tab so adding a 4th later
+// is a one-line addition here, not another branch to keep in sync.
+const SHOP_TABS = {
+    shop: ['shop-tab-btn', 'shop-items'],
+    inventory: ['inventory-tab-btn', 'inventory-list'],
+    prestige: ['prestige-tab-btn', 'prestige-panel']
+};
+
 function switchShopTab(tab) {
-    let shopBtn = document.getElementById('shop-tab-btn');
-    let invBtn = document.getElementById('inventory-tab-btn');
-    let shopDiv = document.getElementById('shop-items');
-    let invDiv = document.getElementById('inventory-list');
-    let showShop = tab === 'shop';
-    shopDiv.style.display = showShop ? 'block' : 'none';
-    invDiv.style.display = showShop ? 'none' : 'block';
-    shopBtn.style.background = showShop ? '' : '#555';
-    shopBtn.style.color = showShop ? '' : '#ccc';
-    invBtn.style.background = showShop ? '#555' : '';
-    invBtn.style.color = showShop ? '#ccc' : '';
+    Object.entries(SHOP_TABS).forEach(([name, [btnId, panelId]]) => {
+        let btn = document.getElementById(btnId);
+        let panel = document.getElementById(panelId);
+        let active = name === tab;
+        if (panel) panel.style.display = active ? 'block' : 'none';
+        if (btn) { btn.style.background = active ? '' : '#555'; btn.style.color = active ? '' : '#ccc'; }
+    });
+    if (tab === 'prestige' && typeof renderPrestigePanel === 'function') renderPrestigePanel();
 }
 
 // --- SHOP UI (buy a fresh random roll, grey/white/blue only) -------------------

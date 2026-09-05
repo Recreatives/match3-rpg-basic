@@ -1975,3 +1975,44 @@ end;
 $$;
 
 grant execute on function public.learn_talent(text) to authenticated;
+
+-- 27. Prestige (Phase 1, final item) -----------------------------------------------------
+-- Resets gold to 0 (materials and items are untouched - a full wipe would
+-- be needlessly punishing for what's meant as a voluntary, repeatable
+-- choice) in exchange for a permanent +5%/level gold income multiplier,
+-- applied client-side in goldRewardForKill (game.js) - earn_currency's
+-- existing 500-gold-per-call bound is still the hard ceiling no matter how
+-- high this ever grows, so there's no new amount to validate here.
+-- "read own player row" (players' existing policy) already lets a client
+-- read its own prestige_level directly - no new read function needed.
+alter table public.players add column if not exists prestige_level integer not null default 0;
+
+create or replace function public.prestige_reset()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me    uuid := auth.uid();
+    v_gold  integer;
+    v_level integer;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    select w.gold into v_gold from public.wallets w where w.player_id = v_me;
+
+    if coalesce(v_gold, 0) < 1000 then
+        raise exception 'not enough gold to prestige';
+    end if;
+
+    update public.wallets set gold = 0, updated_at = now() where player_id = v_me;
+    update public.players set prestige_level = prestige_level + 1 where id = v_me
+        returning prestige_level into v_level;
+
+    return v_level;
+end;
+$$;
+
+grant execute on function public.prestige_reset() to authenticated;

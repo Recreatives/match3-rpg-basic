@@ -475,8 +475,15 @@ function triggerDeathSequence(who) {
 // so late-run kills aren't worth the same as level 1's. Not tied to reward
 // tier/HP performance (unlike item picks) - gold is just "you fought,
 // here's pay," always earned regardless of how clean the win was.
+// currentPrestigeLevel (economy.js) - a permanent +5%/level bonus from
+// prestige_reset (supabase/schema.sql). Applied here so both solo
+// (winLevel) and co-op (coopOnEnemyDefeated) benefit from a single call
+// site - PvP's small fixed loyalty-bonus payout deliberately does NOT
+// scale with this, that's a flat consolation amount, not a kill reward.
 function goldRewardForKill(lvl, isBoss) {
-    return isBoss ? (20 + lvl * 4) : (8 + lvl * 2);
+    let base = isBoss ? (20 + lvl * 4) : (8 + lvl * 2);
+    let prestigeMult = 1 + (typeof currentPrestigeLevel !== 'undefined' ? currentPrestigeLevel : 0) * 0.05;
+    return Math.round(base * prestigeMult);
 }
 
 function winLevel() {

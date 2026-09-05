@@ -1153,6 +1153,59 @@ async function renderTalentsPanel() {
     });
 }
 
+// Prestige - see supabase/schema.sql's prestige_reset function and
+// players.prestige_level column. currentPrestigeLevel is what
+// goldRewardForKill (game.js) actually reads; "read own player row"
+// (players' existing RLS policy) is enough to fetch it directly, no new
+// RPC needed for that half.
+let currentPrestigeLevel = 0;
+const PRESTIGE_GOLD_THRESHOLD = 1000;
+
+async function fetchPrestigeLevel() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return currentPrestigeLevel;
+    const { data, error } = await sb.from('players').select('prestige_level').eq('id', user.id).maybeSingle();
+    if (error) { console.error('Prestige level fetch failed:', error.message); return currentPrestigeLevel; }
+    currentPrestigeLevel = (data && data.prestige_level) || 0;
+    return currentPrestigeLevel;
+}
+
+async function doPrestige() {
+    const { data, error } = await sb.rpc('prestige_reset');
+    if (error) { console.error('prestige_reset failed:', error.message); return null; }
+    currentPrestigeLevel = data;
+    return data;
+}
+
+async function renderPrestigePanel() {
+    let container = document.getElementById('prestige-panel');
+    if (!container) return;
+
+    await fetchPrestigeLevel();
+    let gold = (currentWallet && currentWallet.gold) || 0;
+    let bonusPct = Math.round(currentPrestigeLevel * 5);
+    let canPrestige = gold >= PRESTIGE_GOLD_THRESHOLD;
+
+    container.innerHTML = `
+        <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;">Prestij Seviyesi: <b style="color:#f1c40f;">${currentPrestigeLevel}</b> (+%${bonusPct} kalıcı altın kazanımı)</p>
+        <p style="font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;">${PRESTIGE_GOLD_THRESHOLD} altına ulaşınca altınını sıfırlayıp kalıcı bir bonus kazanabilirsin.</p>
+        <button class="action-btn" style="width:100%; margin:0;" ${canPrestige ? '' : 'disabled'} onclick="handlePrestige()">🌟 Prestij Yap (${gold}/${PRESTIGE_GOLD_THRESHOLD} 🪙)</button>
+    `;
+}
+
+async function handlePrestige() {
+    if (!confirm(`Prestij yaparsan altının 0'a sıfırlanacak ama kalıcı olarak +%5 daha fazla altın kazanacaksın. Devam etmek istiyor musun?`)) return;
+    let newLevel = await doPrestige();
+    if (newLevel !== null) {
+        if (typeof fetchWallet === 'function') await fetchWallet();
+        if (typeof log === 'function') log(`Prestij ${newLevel}. seviyeye ulaştın! Artık +%${newLevel * 5} kalıcı altın kazanıyorsun.`, 'log-turn');
+        renderPrestigePanel();
+    } else {
+        alert('Prestij yapılamadı - yeterli altının olmayabilir.');
+    }
+}
+
 initEconomy();
 if (typeof renderSeasonalEventBanner === 'function') renderSeasonalEventBanner();
 if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
+if (typeof fetchPrestigeLevel === 'function') fetchPrestigeLevel();
