@@ -133,6 +133,20 @@ async function accountLogout() {
     return 'ok';
 }
 
+// Deletes the CURRENT auth.uid()'s auth.users row via a security-definer RPC
+// (supabase/schema.sql's delete_own_account) - every other table cascades
+// from that one delete (see the schema comment), so nothing else needs
+// cleaning up here. Does not reload the page itself - the caller (UI glue
+// below) does that, since a full reload is the simplest way to reset every
+// piece of in-memory client state (currentWallet, currentOwnedItems, the
+// whole game.js module state) back to a clean slate afterward.
+async function deleteOwnAccount() {
+    const { error } = await sb.rpc('delete_own_account');
+    if (error) { console.error('delete_own_account failed:', error.message); return 'error'; }
+    await sb.auth.signOut();
+    return 'ok';
+}
+
 async function accountRequestPasswordReset(email) {
     const { error } = await sb.auth.resetPasswordForEmail((email || '').trim());
     if (error) { console.error('resetPasswordForEmail failed:', error.message); return 'error'; }
@@ -231,6 +245,17 @@ async function handleAccountLogout() {
     await accountLogout();
     renderAccountStatus();
     if (typeof fetchWallet === 'function') fetchWallet();
+}
+
+async function handleDeleteAccount() {
+    if (!confirm('Hesabını KALICI olarak silmek üzeresin. Altının, eşyaların, arkadaşların, PvP derecen - hepsi geri dönüşsüz şekilde silinecek. Emin misin?')) return;
+    let msg = document.getElementById('account-status-msg');
+    let result = await deleteOwnAccount();
+    if (result !== 'ok') { if (msg) msg.innerText = 'Hesap silinemedi, tekrar dene.'; return; }
+    // Full reload, not just re-rendering - resets every in-memory module's
+    // state (wallet, items, game state...) to a clean slate in one step,
+    // and drops back to the auth gate exactly like a first-ever visit.
+    location.reload();
 }
 
 async function handleAccountForgotPassword() {
@@ -596,7 +621,9 @@ async function setDisplayName(name) {
     const { error } = await sb.from('players').update({ display_name: trimmed }).eq('id', user.id);
     if (error) {
         console.error('Display name update failed:', error.message);
-        return error.code === '23505' ? 'taken' : 'error';
+        if (error.code === '23505') return 'taken';
+        if (error.message.includes('inappropriate')) return 'inappropriate';
+        return 'error';
     }
     return 'ok';
 }
@@ -736,6 +763,7 @@ async function createGuild(name) {
         console.error('create_guild failed:', error.message);
         if (error.code === '23505') return 'name_taken';
         if (error.message.includes('already in a guild')) return 'already_in_guild';
+        if (error.message.includes('inappropriate')) return 'inappropriate';
         return 'error';
     }
     return 'ok';
@@ -823,6 +851,7 @@ async function handleCreateGuild() {
         name_taken: 'Bu isim zaten alınmış.',
         already_in_guild: 'Zaten bir loncadasın.',
         empty: 'Önce bir isim yaz.',
+        inappropriate: 'Bu isim kullanılamaz, başka bir isim dene.',
         error: 'Bir hata oldu, tekrar dene.'
     };
     if (status) status.innerText = messages[result] || messages.error;
@@ -1016,7 +1045,7 @@ async function submitDisplayName() {
     if (!input) return;
     let result = await setDisplayName(input.value);
     let status = document.getElementById('leaderboard-name-status');
-    const messages = { ok: 'Kaydedildi!', taken: 'Bu isim zaten alınmış, başka bir isim dene.', empty: 'Önce bir isim yaz.', error: 'Kaydedilemedi.' };
+    const messages = { ok: 'Kaydedildi!', taken: 'Bu isim zaten alınmış, başka bir isim dene.', empty: 'Önce bir isim yaz.', inappropriate: 'Bu isim kullanılamaz, başka bir isim dene.', error: 'Kaydedilemedi.' };
     if (status) status.innerText = messages[result] || messages.error;
     if (result === 'ok') renderLeaderboard();
 }

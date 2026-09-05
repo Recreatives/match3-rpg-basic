@@ -2016,3 +2016,94 @@ end;
 $$;
 
 grant execute on function public.prestige_reset() to authenticated;
+
+-- 28. Self-service account deletion (privacy) -----------------------------------------
+-- Players can now attach a real email (see the account-upgrade auth work), which makes
+-- "let me delete my account" a real privacy expectation, not just a nice-to-have, before
+-- this project opens to any wider audience. security definer means this runs with the
+-- FUNCTION OWNER's privileges (the project's postgres role, which does have rights on
+-- auth.users) - a regular authenticated client can trigger a delete of their OWN
+-- auth.users row without a service-role key anywhere near the client. Every other table
+-- (players, wallets, player_items, friendships, guild_members, direct_messages,
+-- pvp_ratings, trade_offers, ...) already references players.id - itself referencing
+-- auth.users.id - with `on delete cascade`, so this one delete quietly takes the
+-- player's entire footprint with it; no per-table cleanup needed here.
+--
+-- Caveat worth knowing: this does not invalidate an access token already issued (Supabase
+-- tokens are stateless JWTs) - the client-side call pairs this with an immediate
+-- auth.signOut(), but a token issued earlier in the same session technically remains
+-- valid until it expires (normally well under an hour) even after the row is gone.
+create or replace function public.delete_own_account()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    delete from auth.users where id = v_me;
+end;
+$$;
+
+grant execute on function public.delete_own_account() to authenticated;
+
+-- 29. Basic content filter for public-facing names (display_name, guild name) -----------
+-- Nowhere near a complete profanity filter - a determined bad actor can still get past a
+-- fixed blocklist with l33t-speak or spacing tricks - but it catches the obvious,
+-- unmodified cases for free, at the one layer that actually enforces anything: RLS's
+-- "update own player row" / create_guild only ever check OWNERSHIP, never CONTENT, so
+-- without this a player could set literally any string. economy.js checks the same short
+-- list client-side too, purely so a caught player gets an instant message instead of a
+-- round-trip - the authority is always this trigger, exactly like
+-- validate_player_item_insert above is for item rolls.
+create or replace function public.contains_banned_word(p_text text)
+returns boolean
+language sql
+immutable
+as $$
+    select exists (
+        select 1 from unnest(array[
+            'amk', 'aq', 'oç', 'yavşak', 'piç', 'siktir', 'orospu', 'göt',
+            'fuck', 'shit', 'nigger', 'cunt', 'faggot', 'retard'
+        ]) as banned
+        where lower(p_text) like '%' || banned || '%'
+    );
+$$;
+
+create or replace function public.validate_public_name()
+returns trigger
+language plpgsql
+as $$
+begin
+    if new.display_name is not null and public.contains_banned_word(new.display_name) then
+        raise exception 'inappropriate display name';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists players_validate_display_name on public.players;
+create trigger players_validate_display_name
+    before insert or update of display_name on public.players
+    for each row execute procedure public.validate_public_name();
+
+create or replace function public.validate_guild_name()
+returns trigger
+language plpgsql
+as $$
+begin
+    if public.contains_banned_word(new.name) then
+        raise exception 'inappropriate guild name';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists guilds_validate_name on public.guilds;
+create trigger guilds_validate_name
+    before insert or update of name on public.guilds
+    for each row execute procedure public.validate_guild_name();
