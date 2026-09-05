@@ -169,6 +169,59 @@ async function pvpJoinRoom() {
     pvpSetStatus(`Oda "${pvpRoomCode}" - rakip bekleniyor…`);
 }
 
+// --- QUICK MATCH (matchmaking queue) -----------------------------------------
+// Polls find_pvp_match (supabase/schema.sql) every 2s instead of requiring
+// two players to coordinate a room code out of band. Once matched, both
+// clients independently receive the SAME generated code and each just calls
+// the existing pvpJoinRoom() flow with it - matchmaking only replaces how the
+// code is agreed on, not the connection itself.
+let pvpMatchmakingPoll = null;
+
+async function pvpStartQuickMatch() {
+    if (!selectedClass) { pvpSetStatus('Önce ana menüden bir sınıf seç.'); return; }
+    if (pvpMatchmakingPoll) return;
+
+    document.getElementById('pvp-quickmatch-btn').disabled = true;
+    document.getElementById('pvp-cancel-quickmatch-btn').style.display = 'block';
+    pvpSetStatus('Rakip aranıyor…');
+
+    const poll = async () => {
+        const { data, error } = await sb.rpc('find_pvp_match');
+        if (error) {
+            console.error('find_pvp_match failed:', error.message);
+            pvpCancelQuickMatch();
+            pvpSetStatus('Eşleştirme başarısız oldu, tekrar dene.');
+            return;
+        }
+        if (data) {
+            pvpStopQuickMatchPolling();
+            document.getElementById('pvp-cancel-quickmatch-btn').style.display = 'none';
+            let input = document.getElementById('pvp-room-input');
+            if (input) input.value = data;
+            pvpBetrayalMode = null;
+            pvpForcedFirstMoverId = null;
+            await pvpConnectChannel(data);
+            pvpSetStatus(`Eşleşme bulundu! Oda "${pvpRoomCode}" - rakip bekleniyor…`);
+        }
+    };
+
+    pvpMatchmakingPoll = setInterval(poll, 2000);
+    poll();
+}
+
+function pvpStopQuickMatchPolling() {
+    if (pvpMatchmakingPoll) { clearInterval(pvpMatchmakingPoll); pvpMatchmakingPoll = null; }
+    let btn = document.getElementById('pvp-quickmatch-btn');
+    if (btn) btn.disabled = false;
+}
+
+function pvpCancelQuickMatch() {
+    pvpStopQuickMatchPolling();
+    document.getElementById('pvp-cancel-quickmatch-btn').style.display = 'none';
+    sb.rpc('leave_pvp_queue').then(() => {}, () => {});
+    pvpSetStatus('');
+}
+
 // Entry point coop.js calls once its hidden betrayal vote resolves to
 // anything other than both-loyal - skips the manual room-code screen
 // entirely since both players already know the room (derived from the

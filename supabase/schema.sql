@@ -978,3 +978,94 @@ as $$
 $$;
 
 grant execute on function public.get_pvp_leaderboard(integer) to authenticated, anon;
+
+-- 19. PvP quick-match queue -------------------------------------------------------
+-- Until now, two players had to coordinate a room code out of band (Discord,
+-- shouting across the room) to find each other for a PvP Test match. This
+-- adds a lightweight polling-based matchmaker: a client calls find_pvp_match
+-- every couple seconds; the function either pairs it with another currently-
+-- waiting player (assigning both a freshly generated room code) or reports
+-- "still waiting". No Realtime channel needed for the queue itself - once
+-- matched, both clients join the assigned room exactly like a manually typed
+-- code would, so this only replaces how the code is agreed on, not the
+-- actual match connection (pvpConnectChannel, pvp.js).
+create table if not exists public.pvp_queue (
+    player_id    uuid primary key references public.players(id) on delete cascade,
+    queued_at    timestamptz not null default now(),
+    matched_room text
+);
+
+alter table public.pvp_queue enable row level security;
+
+drop policy if exists "read own queue row" on public.pvp_queue;
+create policy "read own queue row" on public.pvp_queue
+    for select using (auth.uid() = player_id);
+
+-- No insert/update/delete policy for clients - find_pvp_match and
+-- leave_pvp_queue (both security definer) are the only writers, same "RLS
+-- lets you read your own row, a trusted function is the only way to change
+-- it" shape as pvp_ratings above.
+create or replace function public.find_pvp_match()
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me       uuid := auth.uid();
+    v_room     text;
+    v_opponent uuid;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    -- A player who queued then closed the tab (or lost connection) without
+    -- cancelling would otherwise sit in the queue forever, waiting to be
+    -- matched with someone who'll never show up - drop anything stale before
+    -- searching.
+    delete from public.pvp_queue where queued_at < now() - interval '90 seconds';
+
+    -- Someone else's call may have already matched me since my last poll -
+    -- check my own row before doing anything else.
+    select pq.matched_room into v_room from public.pvp_queue pq where pq.player_id = v_me;
+    if v_room is not null then
+        return v_room;
+    end if;
+    if not found then
+        insert into public.pvp_queue (player_id) values (v_me);
+    end if;
+
+    -- "for update skip locked" so two players polling at the same instant
+    -- can never both claim the same waiting opponent - the loser of that
+    -- race just finds no one this poll and tries again next one.
+    select pq.player_id into v_opponent
+        from public.pvp_queue pq
+        where pq.player_id != v_me and pq.matched_room is null
+        order by pq.queued_at asc
+        limit 1
+        for update skip locked;
+
+    if v_opponent is null then
+        return null;
+    end if;
+
+    v_room := 'mm' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
+
+    update public.pvp_queue set matched_room = v_room where player_id = v_me;
+    update public.pvp_queue set matched_room = v_room where player_id = v_opponent;
+
+    return v_room;
+end;
+$$;
+
+grant execute on function public.find_pvp_match() to authenticated;
+
+create or replace function public.leave_pvp_queue()
+returns void
+language sql
+security definer set search_path = public
+as $$
+    delete from public.pvp_queue where player_id = auth.uid();
+$$;
+
+grant execute on function public.leave_pvp_queue() to authenticated;

@@ -1459,6 +1459,12 @@ function toggleModal(modalId) {
     let m = document.getElementById(modalId);
     if(m.style.display === 'flex') {
         m.style.display = 'none';
+        // Closing the PvP modal mid-search shouldn't leave the player sitting
+        // in the matchmaking queue until the server's 90s staleness cleanup
+        // catches up - cancel immediately so a re-open starts fresh.
+        if (modalId === 'pvp-modal' && typeof pvpCancelQuickMatch === 'function') {
+            pvpCancelQuickMatch();
+        }
     } else {
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
         // thing - you're supposed to be too busy surviving to shop while
