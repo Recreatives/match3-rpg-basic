@@ -135,6 +135,16 @@ body {
 }
 .version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; flex: 1 1 180px; min-width: 0; }
 .top-bar > div { flex-shrink: 0; }
+/* Overrides the flex-shrink:0 above (needed on .version so the changelog
+   text never gets squeezed unreadable, wrong here) - this row grew past
+   panel width once enough buttons piled up because a flex-shrink:0 item
+   is sized to its own unwrapped content, ignoring flex-wrap entirely.
+   min-width:0 lets it actually shrink to the container, and its OWN
+   flex-wrap then wraps the buttons inside onto as many rows as needed. */
+.top-bar > .top-bar-buttons {
+    display: flex; flex-wrap: wrap; justify-content: flex-end;
+    gap: 4px; flex-shrink: 1; flex-basis: 0; flex-grow: 1; min-width: 0;
+}
 .help-btn {
     background: none; border: 1px solid #7f8c8d; color: #bdc3c7;
     padding: 4px 10px; font-size: 0.9rem; cursor: pointer; border-radius: 4px;
@@ -342,7 +352,12 @@ body {
     gap: 8px;
     width: 95%;
     box-sizing: border-box;
-    max-height: 400px;
+    /* 400px flat used to cut off after ~2.5 class cards even on a tall
+       desktop window with room to spare - scales with actual viewport
+       height instead (still just a cap, so it never grows past what the
+       content needs), while the 400px floor keeps short/landscape mobile
+       screens exactly as before. */
+    max-height: max(400px, 55vh);
     overflow-y: auto;
     overflow-x: hidden; /* without this, setting overflow-y:auto alone makes
                            the browser compute overflow-x as auto too, so any

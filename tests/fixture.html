@@ -221,6 +221,26 @@
         </div>
     </div>
 
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('profile-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">👤 PROFİL</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Sosyal, ilerleme ve ekonomi ekranların - üst bar kalabalıklaşmasın diye buraya taşındı.</p>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('friends-modal')">👥 Arkadaşlar</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('guild-modal')">🛡️ Lonca</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('titles-modal')">🎖️ Unvanlar</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('talents-modal')">🌳 Yetenekler</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('trade-modal')">🔄 Takaslar</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('achievements-modal')">🏆 Başarımlar</button>
+                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('history-modal')">🎒 Loot / Stats</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="history-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('history-modal')">×</span>
@@ -550,21 +570,14 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.90 Prestige system</div>
-        <div>
+        <div class="version">v0.91 Top bar & class list layout fix</div>
+        <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
-            <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
-            <button class="loot-btn" onclick="toggleModal('friends-modal')">👥 Arkadaşlar</button>
-            <button class="loot-btn" onclick="toggleModal('guild-modal')">🛡️ Lonca</button>
-            <button class="loot-btn" onclick="toggleModal('titles-modal')">🎖️ Unvanlar</button>
-            <button class="loot-btn" onclick="toggleModal('talents-modal')">🌳 Yetenekler</button>
-            <button class="loot-btn" onclick="toggleModal('trade-modal')">🔄 Takaslar</button>
-            <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>
             <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP Test</button>
-            <button class="loot-btn" onclick="toggleModal('history-modal')">🎒 Loot / Stats</button>
+            <button class="loot-btn" onclick="toggleModal('profile-modal')">👤 Profil</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
         </div>
     </div>
