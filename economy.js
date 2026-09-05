@@ -1053,4 +1053,52 @@ async function renderTradeOffers() {
     });
 }
 
+// Seasonal events - see supabase/schema.sql's seasonal_event_claims table
+// and claim_seasonal_event/get_active_seasonal_events functions. An
+// event's actual window is a hardcoded date check server-side (this file
+// has no admin/config mechanism), so this banner is a display convenience
+// only - hiding it a day early or showing it a day late would be a UI bug,
+// never a way to claim outside the real window, since claim_seasonal_event
+// re-checks the same dates itself.
+async function fetchActiveSeasonalEvents() {
+    const { data, error } = await sb.rpc('get_active_seasonal_events');
+    if (error) { console.error('get_active_seasonal_events failed:', error.message); return []; }
+    return data;
+}
+
+async function claimSeasonalEvent(eventKey) {
+    const { data, error } = await sb.rpc('claim_seasonal_event', { p_event_key: eventKey });
+    if (error) { console.error('claim_seasonal_event failed:', error.message); return null; }
+    return data;
+}
+
+async function renderSeasonalEventBanner() {
+    let container = document.getElementById('seasonal-event-banner');
+    if (!container) return;
+
+    let events = await fetchActiveSeasonalEvents();
+    if (events.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
+
+    let ev = events[0];
+    container.style.display = 'flex';
+    if (ev.already_claimed) {
+        container.innerHTML = `<span>🎉 ${ev.name} - katıldın!</span>`;
+    } else {
+        container.innerHTML = `
+            <span>🎉 ${ev.name}: ${ev.description}</span>
+            <button class="action-btn" style="width:auto; margin:0; padding:4px 10px; font-size:0.75rem;" onclick="handleClaimSeasonalEvent('${ev.event_key}')">Katıl</button>
+        `;
+    }
+}
+
+async function handleClaimSeasonalEvent(eventKey) {
+    let gold = await claimSeasonalEvent(eventKey);
+    if (gold !== null) {
+        if (typeof fetchWallet === 'function') await fetchWallet();
+        if (typeof log === 'function') log(`Etkinliğe katıldın! +${gold} altın kazandın.`, 'log-turn');
+    }
+    renderSeasonalEventBanner();
+}
+
 initEconomy();
+if (typeof renderSeasonalEventBanner === 'function') renderSeasonalEventBanner();

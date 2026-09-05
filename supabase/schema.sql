@@ -1457,7 +1457,8 @@ as $$
             coalesce((select r.wins from public.pvp_ratings r where r.player_id = auth.uid()), 0) as pvp_wins,
             coalesce((select w.gold from public.wallets w where w.player_id = auth.uid()), 0) as gold,
             exists(select 1 from public.friendships f where f.status = 'accepted' and (f.requester_id = auth.uid() or f.addressee_id = auth.uid())) as has_friend,
-            exists(select 1 from public.guild_members gm where gm.player_id = auth.uid() and gm.role = 'owner') as is_guild_owner
+            exists(select 1 from public.guild_members gm where gm.player_id = auth.uid() and gm.role = 'owner') as is_guild_owner,
+            exists(select 1 from public.seasonal_event_claims sec where sec.player_id = auth.uid() and sec.event_key = 'pioneer_launch') as claimed_pioneer
     )
     select 'Şampiyon', 'PvP derecen 1200+ olsun', (pvp_rating >= 1200) from mine
     union all
@@ -1467,7 +1468,9 @@ as $$
     union all
     select 'Sadık Dost', 'En az bir arkadaş edin', has_friend from mine
     union all
-    select 'Lonca Lideri', 'Bir loncanın lideri ol', is_guild_owner from mine;
+    select 'Lonca Lideri', 'Bir loncanın lideri ol', is_guild_owner from mine
+    union all
+    select 'Öncü', 'Açılış Kutlaması etkinliğine katıl', claimed_pioneer from mine;
 $$;
 
 grant execute on function public.get_available_titles() to authenticated;
@@ -1804,3 +1807,80 @@ as $$
 $$;
 
 grant execute on function public.get_friend_items(uuid) to authenticated;
+
+-- 25. Seasonal events (Phase 3, third item) ---------------------------------------------
+-- No admin UI exists anywhere in this project (schema.sql IS the only
+-- "config" mechanism), so an event's window is a literal timestamp
+-- constant inside the claim function itself rather than a row in a table
+-- somewhere - to run a second event later, add a new elsif branch here
+-- with its own key and dates, the same way REWARD_POOL entries get added
+-- in game.js.
+create table if not exists public.seasonal_event_claims (
+    player_id  uuid not null references public.players(id) on delete cascade,
+    event_key  text not null,
+    claimed_at timestamptz not null default now(),
+    primary key (player_id, event_key)
+);
+
+alter table public.seasonal_event_claims enable row level security;
+
+drop policy if exists "read own seasonal claims" on public.seasonal_event_claims;
+create policy "read own seasonal claims" on public.seasonal_event_claims
+    for select using (auth.uid() = player_id);
+
+-- Bounded, one-time gold grant per event per player - re-validates the
+-- date window server-side on every call, same "never trust the client's
+-- clock" reasoning as everything else that pays out currency in this file.
+create or replace function public.claim_seasonal_event(p_event_key text)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me    uuid := auth.uid();
+    v_gold  integer;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if p_event_key = 'pioneer_launch' then
+        if now() < timestamptz '2026-09-05 00:00:00+00' or now() > timestamptz '2026-09-19 00:00:00+00' then
+            raise exception 'event not active';
+        end if;
+        v_gold := 100;
+    else
+        raise exception 'unknown event';
+    end if;
+
+    insert into public.seasonal_event_claims (player_id, event_key) values (v_me, p_event_key)
+        on conflict (player_id, event_key) do nothing;
+
+    if not found then
+        raise exception 'already claimed';
+    end if;
+
+    update public.wallets set gold = gold + v_gold, updated_at = now() where player_id = v_me;
+
+    return v_gold;
+end;
+$$;
+
+grant execute on function public.claim_seasonal_event(text) to authenticated;
+
+-- Lets the client show/hide the event banner without hardcoding the dates
+-- twice (once here, once in the UI) - still just a display hint though,
+-- claim_seasonal_event above is what actually enforces the window.
+create or replace function public.get_active_seasonal_events()
+returns table(event_key text, name text, description text, ends_at timestamptz, already_claimed boolean)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select 'pioneer_launch', 'Açılış Kutlaması', 'Bu ilk 2 haftada katıl, +100 altın ve "Öncü" unvanını kazan!',
+        timestamptz '2026-09-19 00:00:00+00',
+        exists(select 1 from public.seasonal_event_claims where player_id = auth.uid() and event_key = 'pioneer_launch')
+    where now() between timestamptz '2026-09-05 00:00:00+00' and timestamptz '2026-09-19 00:00:00+00';
+$$;
+
+grant execute on function public.get_active_seasonal_events() to authenticated;
