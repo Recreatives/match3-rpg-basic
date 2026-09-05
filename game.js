@@ -46,6 +46,30 @@ function rebuildTileStats() {
 // player picked up also buffed enemy tile-match damage/healing. Enemies
 // now have their own stat pool that scales with level/boss independently.
 let ENEMY_TILE_STATS = { sword: 4, heart: 3, shield: 4, energy: 10, skull_dmg: 15, skull_self_dmg: 8 };
+
+// Minion variety, ported from co-op's COOP_MINION_TYPES (coop.js) so solo
+// levels have the same flavor - a minion's actual tile-match damage still
+// comes from ENEMY_TILE_STATS/AI move quality (unchanged), these are
+// additional twists layered on top: armored starts the fight with a shield
+// to break through, swift gets an extra consecutive move each of its turns
+// (reuses the same extraTurnTriggered mechanism a 4-match grants the
+// player, see endTurnLogic), drain chips the player's own ult charge
+// whenever it lands a hit.
+const MINION_TYPES = ['normal', 'armored', 'swift', 'drain'];
+const MINION_ARMORED_PCT = 0.3; // starting armor as a fraction of the level's max HP
+const MINION_DRAIN_AMOUNT = 15; // flat ult-charge % stolen per drain hit
+const MINION_ICON = { normal: null, armored: '🛡️', swift: '⚡', drain: '🌀', boss: '👹' };
+const MINION_LOG = {
+    normal: '', boss: '',
+    armored: '🛡️ Zırhlı düşman - önce zırhını kırman gerekiyor.',
+    swift: '⚡ Hızlı düşman - her turunda bir kez ekstra hamle yapıyor.',
+    drain: '🌀 Enerji emen düşman - saldırısı ult şarjını da çalıyor.'
+};
+function minionTypeForLevel(lvl) {
+    return (lvl % 5 === 0) ? 'boss' : MINION_TYPES[(lvl - 1) % MINION_TYPES.length];
+}
+let currentMinionType = 'normal';
+let swiftBonusUsed = false; // one extra move per enemy turn, not per match
 function getEnemyStatsForLevel(lvl, isBoss) {
     let scale = 1 + (lvl - 1) * 0.15;
     if (isBoss) scale *= 1.3;
@@ -185,6 +209,34 @@ const CLASSES = {
             TILE_STATS.ult_dmg += 10;
             ctx.log(`ULT: Power increased to ${TILE_STATS.ult_dmg}!`, "log-match");
         }
+    },
+    NECROMANCER: {
+        name: "Necromancer", emoji: "🧟",
+        desc: "<b>Life Drain:</b> +3% Life Steal, +8 Skull Dmg. Ult deals damage and heals for half of it.",
+        passive: (stats) => { stats.lifeSteal += 3; stats.skull_dmg += 8; },
+        dodgeChance: 0, incomingDmgMult: 1.0,
+        ultName: "SOUL SIPHON",
+        ultEffect: (ctx) => {
+            let dmg = TILE_STATS.ult_dmg;
+            let heal = Math.floor(dmg * 0.5);
+            ctx.dealDamageToOpponent(dmg);
+            ctx.healSelf(heal);
+            ctx.log(`ULT: Soul Siphon deals ${dmg} and heals ${heal}!`, "log-crit");
+        }
+    },
+    PALADIN: {
+        name: "Paladin", emoji: "⚜️",
+        desc: "<b>Bulwark:</b> +3 Shield, +3 Heal, takes 15% LESS damage. Ult heals big and smites for a bit.",
+        passive: (stats) => { stats.shield += 3; stats.heart += 3; },
+        dodgeChance: 0, incomingDmgMult: 0.85,
+        ultName: "DIVINE JUDGEMENT",
+        ultEffect: (ctx) => {
+            let heal = Math.floor(TILE_STATS.heart * 4);
+            let dmg = Math.floor(TILE_STATS.ult_dmg * 0.6);
+            ctx.healSelf(heal);
+            ctx.dealDamageToOpponent(dmg);
+            ctx.log(`ULT: Divine Judgement heals ${heal} and deals ${dmg}!`, "log-heal");
+        }
     }
 };
 let selectedClass = null;
@@ -203,6 +255,7 @@ function makeSinglePlayerCombatContext() {
             }
         },
         dealDirectDamageToSelf(amount) { playerHP -= amount; },
+        healSelf(amount) { playerHP = Math.min(playerHP + amount, maxPlayerHP); },
         getSelfArmor() { return playerArmor; },
         grantExtraTurn() { extraTurnTriggered = true; },
         log(msg, cls) { log(msg, cls); }
@@ -337,15 +390,21 @@ function startLevel() {
 
     maxEnemyHP = 50 + ((level - 1) * 20);
     enemyHP = maxEnemyHP;
-    enemyArmor = 0;
 
     let isBoss = (level % 5 === 0);
+    currentMinionType = minionTypeForLevel(level);
+    swiftBonusUsed = false;
+    bossEnraged = false;
+    enemySprite.classList.remove('enraged');
+    enemyArmor = currentMinionType === 'armored' ? Math.round(maxEnemyHP * MINION_ARMORED_PCT) : 0;
+
     let name = isBoss ? `BOSS Lvl ${level}` : `Minion Lvl ${level}`;
     document.getElementById('enemy-name').innerText = name;
-    document.getElementById('enemy-sprite').innerText = isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4];
+    document.getElementById('enemy-sprite').innerText = MINION_ICON[currentMinionType] || (isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4]);
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
-    if(isBoss) log("WARNING: BOSS BATTLE!", "log-crit");
+    if (isBoss) log("WARNING: BOSS BATTLE!", "log-crit");
+    else if (MINION_LOG[currentMinionType]) log(MINION_LOG[currentMinionType], "log-enemy");
 
     turnBanner.innerText = "PLAYER TURN";
     turnBanner.className = "turn-indicator turn-player";
@@ -396,7 +455,7 @@ function winLevel() {
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
     if (typeof adjustWallet === 'function') {
-        adjustWallet(goldReward, 0).then(() => log(`+${goldReward} 🪙 kazandın!`, 'log-hit'));
+        adjustWallet(goldReward, 0).then(result => { if (result) log(`+${goldReward} 🪙 kazandın!`, 'log-hit'); });
     }
 
     // Calculate Reward Picks
@@ -967,6 +1026,7 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
         log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+        if (!isPlayerTurn) drainPlayerUltIfNeeded();
 
     } else if (type === 'heart') {
         let baseVal = Math.floor(stats.heart * multiplier);
@@ -999,10 +1059,42 @@ function applyRPGEffects(type, multiplier) {
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
         log(`Skull! Dmg: ${dmgToOpponent} / Self: ${recoil}`, 'log-crit');
+        if (!isPlayerTurn) drainPlayerUltIfNeeded();
     }
 
+    if (isPlayerTurn) checkBossEnrage();
     checkWinCondition();
     updateUI();
+}
+
+// A 'drain' minion (see MINION_TYPES) chips the player's ult charge on
+// every hit it lands, on top of its normal tile damage - never below 0.
+function drainPlayerUltIfNeeded() {
+    if (currentMinionType !== 'drain') return;
+    let before = ultCharge;
+    ultCharge = Math.max(0, ultCharge - MINION_DRAIN_AMOUNT);
+    if (ultCharge < before) log(`Enerjini emdi: ult -%${before - ultCharge}`, 'log-enemy');
+}
+
+// Boss phase mechanic: every boss (level % 5 === 0) permanently hits harder
+// once its own HP drops to half - a one-time, one-way step change (not a
+// gradual scale), so a boss fight has a real "it just got harder" beat
+// instead of feeling identical from 100% to 0%. Checked only on the
+// player's own damaging matches (the moment that could have crossed the
+// threshold) - bossEnraged resets at every startLevel() so each boss fight
+// gets its own single enrage.
+let bossEnraged = false;
+const BOSS_ENRAGE_HP_PCT = 0.5;
+const BOSS_ENRAGE_STAT_MULT = 1.3;
+function checkBossEnrage() {
+    if (level % 5 !== 0 || bossEnraged) return;
+    if (enemyHP > 0 && enemyHP <= maxEnemyHP * BOSS_ENRAGE_HP_PCT) {
+        bossEnraged = true;
+        ENEMY_TILE_STATS.sword = Math.round(ENEMY_TILE_STATS.sword * BOSS_ENRAGE_STAT_MULT);
+        ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
+        enemySprite.classList.add('enraged');
+        log('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!', 'log-crit');
+    }
 }
 
 // Shared with PvP (pvp.js): rolls the local player's class-specific defense
@@ -1117,6 +1209,16 @@ function endTurnLogic() {
     if (currentState !== STATE.PLAYING) return;
     if (enemyHP <= 0 || playerHP <= 0) return;
 
+    // Swift minions get one extra consecutive move per enemy turn - reuses
+    // the same extraTurnTriggered mechanism a real 4-match grants, it's just
+    // forced here instead of earned. swiftBonusUsed keeps this to exactly
+    // once per turn even if the enemy's own move ALSO happens to earn a real
+    // extra turn (both would otherwise stack).
+    if (!isPlayerTurn && currentMinionType === 'swift' && !swiftBonusUsed && !extraTurnTriggered) {
+        swiftBonusUsed = true;
+        extraTurnTriggered = true;
+    }
+
     if (extraTurnTriggered) {
         log(isPlayerTurn ? ">> EXTRA TURN!" : ">> ENEMY EXTRA TURN!", "log-turn");
         extraTurnTriggered = false;
@@ -1129,6 +1231,7 @@ function endTurnLogic() {
         updateTurnBanner();
         updateUI();
         if (!isPlayerTurn) {
+            swiftBonusUsed = false; // fresh enemy turn starting - it earns its one swift bonus again
             gridDisplay.classList.add('locked');
             setTimeout(enemyPlayTurn, 1500);
         } else {

@@ -39,6 +39,14 @@
                         <td class="class-icon">🧙</td>
                         <td><b>Mage (Scaler)</b><br>Ult gains <b>+10 Permanent Power</b> every time you cast it.</td>
                     </tr>
+                    <tr>
+                        <td class="class-icon">🧟</td>
+                        <td><b>Necromancer (Life Drain)</b><br>+3% Life Steal, +8 Skull Dmg. Ult deals damage and <b>heals for half of it</b>.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">⚜️</td>
+                        <td><b>Paladin (Bulwark)</b><br>+3 Shield, +3 Heal, takes <b>15% less damage</b>. Ult heals big and smites for a bit.</td>
+                    </tr>
                 </table>
             </div>
 
@@ -386,7 +394,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.60 Boss checkpoints, gold-per-kill, 8-slot gear, hover stats</div>
+        <div class="version">v0.70 2 new classes, solo minion variety, boss enrage phase</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -466,6 +474,7 @@
     <script src="../pvp.js"></script>
     <script src="../coop.js"></script>
 
+
     <script>
         // Test-only bridge: top-level `const`/`let` in a classic script
         // (unlike `var` or function declarations) never become properties
@@ -479,6 +488,8 @@
         window.ITEM_SETS = ITEM_SETS;
         window.UNIQUE_LEGENDARIES = UNIQUE_LEGENDARIES;
         window.tileTypes = tileTypes;
+        window.CLASSES = CLASSES;
     </script>
+
 </body>
 </html>

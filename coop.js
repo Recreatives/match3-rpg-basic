@@ -524,7 +524,7 @@ function coopOnEnemyDefeated(payload) {
     if (typeof awardLootDrop === 'function') awardLootDrop();
     if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
         let goldReward = goldRewardForKill(payload.level, payload.isBoss);
-        adjustWallet(goldReward, 0).then(() => coopLog(`+${goldReward} 🪙 kazandın!`));
+        adjustWallet(goldReward, 0).then(result => { if (result) coopLog(`+${goldReward} 🪙 kazandın!`); });
     }
     // Same for the between-level power pick (solo's REWARD_POOL, game.js) -
     // purely local, no networking needed: each player picks their own boost
@@ -938,6 +938,10 @@ function makeCoopCombatContext() {
         dealDirectDamageToSelf(amount) {
             coopMyHP -= amount;
             coopMyTurnStats.selfDamage += amount;
+            coopSyncSelfState();
+        },
+        healSelf(amount) {
+            coopMyHP = Math.min(coopMyHP + amount, COOP_MAX_HP);
             coopSyncSelfState();
         },
         getSelfArmor() { return coopMyArmor; },

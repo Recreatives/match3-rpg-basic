@@ -166,6 +166,28 @@ function runTests(win) {
         assert('every orange/red/teal unique generates its exact fixed identity', ok);
     })();
 
+    // --- 7 classes, each with a working combat-context interface ---------
+    (function () {
+        var names = Object.keys(win.CLASSES);
+        assert('7 classes exist', names.length === 7, JSON.stringify(names));
+        names.forEach(function (key) {
+            var c = win.CLASSES[key];
+            assert(key + ' has a passive/ultEffect/ultName', typeof c.passive === 'function' && typeof c.ultEffect === 'function' && !!c.ultName);
+        });
+    })();
+
+    // --- Minion variety cycles correctly and bosses stay 'boss' -----------
+    (function () {
+        assertEqual('level 1 -> normal', win.minionTypeForLevel(1), 'normal');
+        assertEqual('level 2 -> armored', win.minionTypeForLevel(2), 'armored');
+        assertEqual('level 3 -> swift', win.minionTypeForLevel(3), 'swift');
+        assertEqual('level 4 -> drain', win.minionTypeForLevel(4), 'drain');
+        assertEqual('level 5 -> boss (not part of the minion cycle)', win.minionTypeForLevel(5), 'boss');
+        // The cycle runs on (level-1) % 4 continuously - a boss level doesn't
+        // reset it, same as co-op's identical coopMinionTypeForLevel formula.
+        assertEqual('level 6 -> armored (cycle continues past a boss, matching co-op)', win.minionTypeForLevel(6), 'armored');
+    })();
+
     // --- Set completion bonus only applies when every piece is equipped --
     (function () {
         var stats = { sword: 0, heart: 0, shield: 0, energy: 0, skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, teamHeal: 0 };

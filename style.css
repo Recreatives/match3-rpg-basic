@@ -443,6 +443,16 @@ body {
     animation: float 3s ease-in-out infinite;
     transition: transform 0.2s, filter 0.2s;
 }
+/* Boss phase 2 (checkBossEnrage, game.js) - a permanent, visible "this just
+   got more dangerous" cue instead of only a log line. */
+.enemy-display.enraged {
+    filter: drop-shadow(0 0 6px #e74c3c);
+    animation: float 3s ease-in-out infinite, enrage-pulse 1s ease-in-out infinite;
+}
+@keyframes enrage-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
 #enemy-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
 @keyframes float {
     0% { transform: translateY(0px); }

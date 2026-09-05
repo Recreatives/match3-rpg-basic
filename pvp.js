@@ -444,7 +444,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
         // The loyal player winning against a betrayer - deliberately tiny,
         // no steal from the betrayer's wallet (see the design doc: this
         // reward is intentionally small so loyalty isn't a free win).
-        return adjustWallet(10, 5).then(() => pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'));
+        return adjustWallet(10, 5).then(result => { if (result) pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'); });
     }
 }
 
@@ -530,6 +530,7 @@ function makePvpCombatContext() {
             pvpMyHP -= amount;
             pvpMyTurnStats.selfDamage += amount;
         },
+        healSelf(amount) { pvpMyHP = Math.min(pvpMyHP + amount, PVP_MAX_HP); },
         getSelfArmor() { return pvpMyArmor; },
         grantExtraTurn() { pvpExtraTurnTriggered = true; },
         log(msg) { pvpLog(msg); }

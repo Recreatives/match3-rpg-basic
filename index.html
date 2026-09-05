@@ -35,7 +35,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.60">
+    <link rel="stylesheet" href="style.css?v=0.70">
 </head>
 <body>
     <div id="app">
@@ -73,6 +73,14 @@
                     <tr>
                         <td class="class-icon">🧙</td>
                         <td><b>Mage (Scaler)</b><br>Ult gains <b>+10 Permanent Power</b> every time you cast it.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">🧟</td>
+                        <td><b>Necromancer (Life Drain)</b><br>+3% Life Steal, +8 Skull Dmg. Ult deals damage and <b>heals for half of it</b>.</td>
+                    </tr>
+                    <tr>
+                        <td class="class-icon">⚜️</td>
+                        <td><b>Paladin (Bulwark)</b><br>+3 Shield, +3 Heal, takes <b>15% less damage</b>. Ult heals big and smites for a bit.</td>
                     </tr>
                 </table>
             </div>
@@ -421,7 +429,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.60 Boss checkpoints, gold-per-kill, 8-slot gear, hover stats</div>
+        <div class="version">v0.70 2 new classes, solo minion variety, boss enrage phase</div>
         <div>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -493,12 +501,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js?v=0.60"></script>
-    <script src="items.js?v=0.60"></script>
-    <script src="achievements.js?v=0.60"></script>
-    <script src="game.js?v=0.60"></script>
-    <script src="sharedboard.js?v=0.60"></script>
-    <script src="pvp.js?v=0.60"></script>
-    <script src="coop.js?v=0.60"></script>
+    <script src="economy.js?v=0.70"></script>
+    <script src="items.js?v=0.70"></script>
+    <script src="achievements.js?v=0.70"></script>
+    <script src="game.js?v=0.70"></script>
+    <script src="sharedboard.js?v=0.70"></script>
+    <script src="pvp.js?v=0.70"></script>
+    <script src="coop.js?v=0.70"></script>
 </body>
 </html>
