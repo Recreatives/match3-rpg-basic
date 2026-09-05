@@ -222,6 +222,71 @@ function pvpCancelQuickMatch() {
     pvpSetStatus('');
 }
 
+// --- SPECTATOR MODE -----------------------------------------------------------
+// Joins the SAME realtime channel a live match already broadcasts on
+// (board-sync from sbBroadcastStep, status-update from pvpUpdateUI) instead
+// of needing any new backend at all - Realtime broadcasts go to every
+// subscriber of a channel, not just the two players who started it. A
+// spectator never calls .track() on the channel, so it never appears in
+// presenceState() - completely invisible to pvpCheckPresence, which is the
+// only thing that would otherwise get confused by a third participant.
+// Both sides' health tiers are told apart by the `from` field added to
+// status-update above; "OYUNCU 1"/"OYUNCU 2" is just whichever id's tier
+// arrived first, not a real ordering, since a spectator has no presence-
+// based way to know who joined the match first without tracking itself.
+let pvpSpectateChannel = null;
+let pvpSpectateTiles = [];
+let pvpSpectateStatus = {};
+
+async function pvpWatchRoom() {
+    let input = document.getElementById('pvp-room-input');
+    let code = input ? input.value.trim().toUpperCase() : '';
+    if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
+
+    if (pvpSpectateChannel) await pvpSpectateChannel.unsubscribe();
+    pvpSpectateStatus = {};
+
+    document.getElementById('pvp-setup').style.display = 'none';
+    document.getElementById('pvp-spectate-view').style.display = 'block';
+    sbCreateBoardDOM('pvp-spectate-grid', 'pvp-spectate-tile-', pvpSpectateTiles, () => {});
+
+    pvpSpectateChannel = sb.channel(`pvp-room-${code}`, { config: { broadcast: { self: false } } });
+    pvpSpectateChannel.on('broadcast', { event: 'board-sync' }, ({ payload }) => sbApplySnapshot(pvpSpectateTiles, payload));
+    pvpSpectateChannel.on('broadcast', { event: 'status-update' }, ({ payload }) => {
+        pvpSpectateStatus[payload.from] = payload;
+        pvpRenderSpectateStatus();
+    });
+    pvpSpectateChannel.subscribe();
+    pvpRenderSpectateStatus();
+}
+
+function pvpRenderSpectateStatus() {
+    let container = document.getElementById('pvp-spectate-status');
+    if (!container) return;
+    let ids = Object.keys(pvpSpectateStatus);
+    if (ids.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">Maç bekleniyor…</p>';
+        return;
+    }
+    container.innerHTML = ids.map((id, i) => {
+        let tier = pvpSpectateStatus[id];
+        return `<div class="stat-box" style="width:100%; margin-bottom:10px;">
+            <div>OYUNCU ${i + 1}</div>
+            <div class="bar-container"><div class="bar" style="background-color:${tier.color}; width:${tier.barPct}%;"></div></div>
+            <span class="hp-text">${tier.text}</span>
+        </div>`;
+    }).join('');
+}
+
+function pvpStopWatching() {
+    if (pvpSpectateChannel) { pvpSpectateChannel.unsubscribe(); pvpSpectateChannel = null; }
+    pvpSpectateStatus = {};
+    let view = document.getElementById('pvp-spectate-view');
+    let setup = document.getElementById('pvp-setup');
+    if (view) view.style.display = 'none';
+    if (setup) setup.style.display = 'block';
+}
+
 // Entry point coop.js calls once its hidden betrayal vote resolves to
 // anything other than both-loyal - skips the manual room-code screen
 // entirely since both players already know the room (derived from the
@@ -862,7 +927,12 @@ function pvpUpdateUI() {
     let myTier = sbHealthTier(hpPct);
     if (pvpChannel && myTier.text !== pvpLastBroadcastTier) {
         pvpLastBroadcastTier = myTier.text;
-        pvpChannel.send({ type: 'broadcast', event: 'status-update', payload: myTier });
+        // `from` is new but harmless to the other real player -
+        // pvpApplyOpponentStatus only ever reads text/color/barPct off this
+        // object. It exists purely for spectator mode (below), which has no
+        // "my HP" of its own and needs to tell the two sides' broadcasts
+        // apart since both fire the same event shape.
+        pvpChannel.send({ type: 'broadcast', event: 'status-update', payload: { ...myTier, from: pvpMyId } });
     }
 
     let ultBar = document.getElementById('pvp-ult-bar');

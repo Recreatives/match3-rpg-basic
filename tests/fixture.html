@@ -345,9 +345,19 @@
                     <button id="pvp-cancel-quickmatch-btn" class="action-btn" style="width:100%; margin:0 0 10px; display:none;" onclick="pvpCancelQuickMatch()">Aramayı İptal Et</button>
                     <p style="font-size:0.75rem; color:#7f8c8d; text-align:center; margin:0 0 10px;">— veya bir arkadaşınla oda kodu paylaş —</p>
                     <input id="pvp-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
-                    <button class="overlay-btn" style="width:100%; margin:0;" onclick="pvpJoinRoom()">Odaya Katıl</button>
+                    <div style="display:flex; gap:6px;">
+                        <button class="overlay-btn" style="flex:1; margin:0;" onclick="pvpJoinRoom()">Odaya Katıl</button>
+                        <button class="action-btn" style="flex:1; margin:0;" onclick="pvpWatchRoom()">👁️ İzle</button>
+                    </div>
                     <p id="pvp-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px;"></p>
-                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar.</p>
+                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar. Bir maçı sadece izlemek istersen kodu yazıp "İzle"ye bas.</p>
+                </div>
+
+                <div id="pvp-spectate-view" style="display:none;">
+                    <p style="text-align:center; font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;">👁️ İzleyici modu - sadece izliyorsun, oynayamazsın.</p>
+                    <div id="pvp-spectate-status"></div>
+                    <div class="grid mp-grid" id="pvp-spectate-grid" style="margin: 0 auto 10px;"></div>
+                    <button class="action-btn" style="width:100%; margin:0;" onclick="pvpStopWatching()">İzlemeyi Bırak</button>
                 </div>
 
                 <div id="pvp-battle" style="display:none;">
@@ -471,7 +481,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.82 Friends list</div>
+        <div class="version">v0.83 PvP spectator mode</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
