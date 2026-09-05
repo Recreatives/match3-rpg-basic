@@ -668,6 +668,11 @@ function makePvpCombatContext() {
         },
         healSelf(amount) { pvpMyHP = Math.min(pvpMyHP + amount, PVP_MAX_HP); },
         getSelfArmor() { return pvpMyArmor; },
+        // Added for UNIQUE_PASSIVES (items.js) - see game.js's copy for why.
+        getSelfHP() { return pvpMyHP; },
+        getMaxHP() { return PVP_MAX_HP; },
+        addArmor(amount) { pvpMyArmor += amount; },
+        addEnergy(amount) { pvpUltCharge = Math.min(pvpUltCharge + amount, 100); },
         grantExtraTurn() { pvpExtraTurnTriggered = true; },
         log(msg) { pvpLog(msg); }
     };
@@ -677,14 +682,11 @@ function pvpUseUltimate() {
     if (pvpMatchOver || pvpProcessing || !pvpMyTurn || pvpUltCharge < 100 || !selectedClass) return;
 
     pvpProcessing = true;
-    selectedClass.ultEffect(makePvpCombatContext());
+    let ultCtx = makePvpCombatContext();
+    selectedClass.ultEffect(ultCtx);
     pvpUltCharge = 0;
 
-    // Hiçliğin Fısıltısı (flagship legendary passive, items.js).
-    if (typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_whisper_of_the_void')) {
-        let heal = Math.floor(PVP_MAX_HP * 0.1);
-        if (heal > 0) pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
-    }
+    if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
     pvpUpdateUI();
     if (typeof playSound === 'function') playSound('ult');
@@ -812,41 +814,51 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpMyTurnStats.ultGain += ultBonus;
     }
 
+    // Legendary item passives (items.js UNIQUE_PASSIVES) only ever read the
+    // CASTER's own state (own HP, own damage dealt) - PvP deliberately
+    // never reveals an opponent's exact HP, so no passive is allowed to
+    // condition on it - meaning one context safely covers every branch.
+    let passiveCtx = (typeof triggerPassiveHook === 'function') ? makePvpCombatContext() : null;
+
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);
-        // Dünya Yiyen (flagship legendary passive, items.js) - checks
-        // pvpMyHP (own HP, always known) rather than the opponent's, which
-        // PvP deliberately never reveals as an exact number. The boosted
-        // `amount` below is what actually gets broadcast, so the opponent
-        // correctly takes the increased hit on their own side.
-        if (group.type === 'skull' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_world_eater') && pvpMyHP < PVP_MAX_HP * 0.5) {
-            amount = Math.floor(amount * 1.5);
-        }
-        pvpMyTurnStats.damage += amount;
-        pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
-        // Gecenin Ağıtı (flagship legendary passive, items.js).
-        if (group.type === 'sword' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_nights_lament')) {
-            let bonusArmor = Math.floor(amount * 0.2);
-            if (bonusArmor > 0) { pvpMyArmor += bonusArmor; pvpMyTurnStats.armor += bonusArmor; }
-        }
+
         if (group.type === 'skull') {
             let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
+            // The boosted amount/recoil below is what actually gets
+            // broadcast, so the opponent correctly takes the passive-
+            // modified hit on their own side.
+            if (passiveCtx) {
+                let payload = { dmgToOpponent: amount, recoil };
+                triggerPassiveHook('skull', passiveCtx, payload);
+                amount = payload.dmgToOpponent;
+                recoil = payload.recoil;
+            }
+            pvpMyTurnStats.damage += amount;
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
+        } else {
+            pvpMyTurnStats.damage += amount;
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
         let heal = Math.floor(TILE_STATS.heart * multiplier);
         pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
         pvpMyTurnStats.heal += heal;
+        if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
         pvpMyTurnStats.armor += gain;
+        if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         pvpUltCharge = Math.min(pvpUltCharge + gain, 100);
         pvpMyTurnStats.ultGain += gain;
+        if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     }
 
     pvpUpdateUI();

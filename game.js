@@ -282,6 +282,13 @@ function makeSinglePlayerCombatContext() {
         dealDirectDamageToSelf(amount) { playerHP -= amount; },
         healSelf(amount) { playerHP = Math.min(playerHP + amount, maxPlayerHP); },
         getSelfArmor() { return playerArmor; },
+        // Added for UNIQUE_PASSIVES (items.js) - the class-ultEffect
+        // callers above never needed to READ hp or ADD armor/energy
+        // directly, only deal damage/heal, so these didn't exist yet.
+        getSelfHP() { return playerHP; },
+        getMaxHP() { return maxPlayerHP; },
+        addArmor(amount) { playerArmor += amount; },
+        addEnergy(amount) { ultCharge = Math.min(ultCharge + amount, 100); },
         grantExtraTurn() { extraTurnTriggered = true; },
         log(msg, cls) { log(msg, cls); }
     };
@@ -1078,20 +1085,16 @@ function applyRPGEffects(type, multiplier) {
     let target = isPlayerTurn ? 'enemy' : 'player';
     let stats = isPlayerTurn ? TILE_STATS : ENEMY_TILE_STATS;
 
+    // Legendary item passives (items.js UNIQUE_PASSIVES) only ever belong
+    // to the human player, so every triggerPassiveHook call below is
+    // gated on isPlayerTurn - an enemy's own match never checks them.
+    let passiveCtx = (isPlayerTurn && typeof triggerPassiveHook === 'function') ? makeSinglePlayerCombatContext() : null;
+
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
         log(`${user} Saldırı ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
-        // Gecenin Ağıtı (flagship legendary passive, items.js) - only the
-        // player can ever own/equip it, so this never fires for an enemy's
-        // own sword match.
-        if (isPlayerTurn && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_nights_lament')) {
-            let bonusArmor = Math.floor(baseVal * 0.2);
-            if (bonusArmor > 0) {
-                playerArmor += bonusArmor;
-                log(`✨ Kan Zırhı: +${bonusArmor} Zırh`, 'log-armor');
-            }
-        }
+        if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('hit');
 
@@ -1100,6 +1103,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
         log(`${user} İyileşme +${baseVal}`, 'log-heal');
+        if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
 
     } else if (type === 'shield') {
@@ -1107,6 +1111,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
         log(`${user} Zırh +${baseVal}`, 'log-armor');
+        if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
 
     } else if (type === 'energy') {
@@ -1114,6 +1119,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
             log(`Ult +${baseVal}%`, 'log-hit');
+            if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: baseVal });
         } else {
             let absorb = Math.floor(baseVal / 2);
             enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
@@ -1124,14 +1130,15 @@ function applyRPGEffects(type, multiplier) {
         let dmgToOpponent = Math.floor(stats.skull_dmg * multiplier);
         let recoil = Math.floor(stats.skull_self_dmg * multiplier);
 
-        // Dünya Yiyen (flagship legendary passive, items.js) - checks the
-        // PLAYER's own HP, never the enemy's, deliberately: a passive that
-        // read "enemy HP below 25%" would be impossible to replicate
-        // correctly in PvP, where an opponent's exact HP is intentionally
-        // never revealed (see pvp.js) - own-HP conditions work identically
-        // in every mode since a player always knows their own HP.
-        if (isPlayerTurn && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_world_eater') && playerHP < maxPlayerHP * 0.5) {
-            dmgToOpponent = Math.floor(dmgToOpponent * 1.5);
+        // Own-HP/own-damage conditions only (see UNIQUE_PASSIVES in
+        // items.js) - never the opponent's, since PvP intentionally never
+        // reveals an opponent's exact HP (pvp.js), and own-state
+        // conditions work identically in every mode as a result.
+        if (passiveCtx) {
+            let payload = { dmgToOpponent, recoil };
+            triggerPassiveHook('skull', passiveCtx, payload);
+            dmgToOpponent = payload.dmgToOpponent;
+            recoil = payload.recoil;
         }
 
         let self = isPlayerTurn ? 'player' : 'enemy';
@@ -1459,17 +1466,11 @@ function useUltimate() {
         isProcessing = true;
 
         // 2. Apply Effect
-        selectedClass.ultEffect(makeSinglePlayerCombatContext());
+        let ultCtx = makeSinglePlayerCombatContext();
+        selectedClass.ultEffect(ultCtx);
         ultCharge = 0;
 
-        // Hiçliğin Fısıltısı (flagship legendary passive, items.js).
-        if (typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_whisper_of_the_void')) {
-            let heal = Math.floor(maxPlayerHP * 0.1);
-            if (heal > 0) {
-                playerHP = Math.min(playerHP + heal, maxPlayerHP);
-                log(`✨ Boşluk Yankısı: +${heal} can`, 'log-heal');
-            }
-        }
+        if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
         // 3. Visuals
         log(`ULTİMATE! ${selectedClass.ultName} kullanıldı!`, "log-hit");

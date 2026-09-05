@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.96">
+    <link rel="stylesheet" href="style.css?v=0.97">
 </head>
 <body>
     <div id="app">
@@ -217,10 +217,11 @@
                 <ul style="font-size:0.85rem;">
                     <li>8 kuşam yeri var: Silah, Kalkan, Miğfer, Zırh, Omuzluk, Eldiven, Çizme, Takı. <b>Sadece KUŞANDIĞIN</b> eşyaların statları sayılır - envanterinde durması yetmez.</li>
                     <li>İsimler rastgele ama anlamlı seçilir: "Kanlı Balta" gibi önek, eşyanın en güçlü olduğu stat'a göre gelir (kan/hasar temalı önekler hasar eşyalarına, şifa temalı önekler can eşyalarına düşer).</li>
-                    <li>Her eşyanın yanında bir <b>⚡ Güç</b> puanı görürsün - eşyaları hızlıca karşılaştırmanı sağlar. Kuşandıklarının toplamı Envanter ekranının üstünde yazar.</li>
+                    <li>Her eşyanın yanında bir <b>💎 Güç</b> puanı görürsün - eşyaları hızlıca karşılaştırmanı sağlar. Kuşandıklarının toplamı Envanter ekranının üstünde yazar.</li>
                     <li><b>⬆️ Yükselt:</b> Altın + hammadde karşılığında eşyayı bir üst nadirliğe taşır (statları yeniden belirlenir, daha güçlü olur).</li>
                     <li><b>♻️ Hurdaya Çevir:</b> İşine yaramayan bir eşyayi hammaddeye çevirir.</li>
                     <li><b>Set & Efsanevi eşyalar:</b> Sabit isim ve statlara sahip, çok nadir düşerler. Bir setin TÜM parçalarını kuşanınca ekstra bir bonus açılır.</li>
+                    <li><b>✨ Pasifler:</b> Her Efsanevi (turuncu), İlksel Efsanevi (kırmızı) ve Ethereal (turkuaz) eşyanın kendine has, savaş sırasında otomatik tetiklenen özel bir pasif özelliği vardır - açıklaması eşyanın üzerinde ✨ ile gösterilir.</li>
                 </ul>
             </div>
 
@@ -699,7 +700,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.96 Flagship legendary passives</div>
+        <div class="version">v0.97 All legendary passives + power icon fix</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -773,14 +774,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.96"></script>
-    <script src="economy.js?v=0.96"></script>
-    <script src="items.js?v=0.96"></script>
-    <script src="achievements.js?v=0.96"></script>
-    <script src="game.js?v=0.96"></script>
-    <script src="sharedboard.js?v=0.96"></script>
-    <script src="pvp.js?v=0.96"></script>
-    <script src="coop.js?v=0.96"></script>
+    <script src="sound.js?v=0.97"></script>
+    <script src="economy.js?v=0.97"></script>
+    <script src="items.js?v=0.97"></script>
+    <script src="achievements.js?v=0.97"></script>
+    <script src="game.js?v=0.97"></script>
+    <script src="sharedboard.js?v=0.97"></script>
+    <script src="pvp.js?v=0.97"></script>
+    <script src="coop.js?v=0.97"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

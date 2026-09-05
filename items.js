@@ -166,33 +166,33 @@ const ITEM_SETS = {
 const UNIQUE_LEGENDARIES = {
     orange: {
         weapon: { id: 'uniq_nights_lament', name: 'Gecenin Ağıtı', emoji: '⚔️', stats: { sword: 8, lifeSteal: 6 }, passiveDesc: 'Kan Zırhı: Kılıç eşleşmelerinde verdiğin hasarın %20\'si kadar ekstra Zırh kazanırsın.' },
-        shield: { id: 'uniq_shield_of_eternity', name: 'Sonsuzluk Kalkanı', emoji: '🛡️', stats: { shield: 7, heart: 7 } },
-        helmet: { id: 'uniq_oracles_crown', name: 'Kahinin Tacı', emoji: '👑', stats: { ult_dmg: 16, energy: 10 } },
-        chest: { id: 'uniq_dragonheart_plate', name: 'Ejderha Yürek Zırhı', emoji: '🐉', stats: { shield: 7, heart: 7 } },
-        shoulder: { id: 'uniq_storm_eagle_pauldrons', name: 'Fırtına Kartalı Omuzluğu', emoji: '🦅', stats: { energy: 10, sword: 8 } },
-        gloves: { id: 'uniq_butchers_claws', name: 'Kasabın Pençeleri', emoji: '🩸', stats: { skull_dmg: 14, lifeSteal: 6 } },
-        boots: { id: 'uniq_windwalkers', name: 'Rüzgar Yürüyüşü', emoji: '💨', stats: { energy: 10, sword: 8 } },
-        trinket: { id: 'uniq_ring_of_ancient_wisdom', name: 'Kadim Bilgelik Halkası', emoji: '💍', stats: { ult_dmg: 16, teamHeal: 6 } }
+        shield: { id: 'uniq_shield_of_eternity', name: 'Sonsuzluk Kalkanı', emoji: '🛡️', stats: { shield: 7, heart: 7 }, passiveDesc: 'Sonsuz Dayanıklılık: Kalkan eşleşmelerinde kazandığın Zırh\'ın %25\'i kadar da can kazanırsın.' },
+        helmet: { id: 'uniq_oracles_crown', name: 'Kahinin Tacı', emoji: '👑', stats: { ult_dmg: 16, energy: 10 }, passiveDesc: 'Kehanet: Enerji eşleşmelerinde kazandığın ult dolumunun %20\'si kadar ekstra ult dolumu kazanırsın.' },
+        chest: { id: 'uniq_dragonheart_plate', name: 'Ejderha Yürek Zırhı', emoji: '🐉', stats: { shield: 7, heart: 7 }, passiveDesc: 'Ejderha Kalbi: Kalp eşleşmelerinde iyileştiğin canın %20\'si kadar da Zırh kazanırsın.' },
+        shoulder: { id: 'uniq_storm_eagle_pauldrons', name: 'Fırtına Kartalı Omuzluğu', emoji: '🦅', stats: { energy: 10, sword: 8 }, passiveDesc: 'Fırtına Hızı: Kılıç eşleşmelerinde verdiğin hasarın %15\'i kadar ult dolumu kazanırsın.' },
+        gloves: { id: 'uniq_butchers_claws', name: 'Kasabın Pençeleri', emoji: '🩸', stats: { skull_dmg: 14, lifeSteal: 6 }, passiveDesc: 'Kasap İçgüdüsü: Kafatası eşleşmelerinde kendine verdiğin hasarın %50\'si kadar can kazanırsın.' },
+        boots: { id: 'uniq_windwalkers', name: 'Rüzgar Yürüyüşü', emoji: '💨', stats: { energy: 10, sword: 8 }, passiveDesc: 'Rüzgar Adımı: Enerji eşleşmelerinde kazandığın ult dolumunun %15\'i kadar Zırh kazanırsın.' },
+        trinket: { id: 'uniq_ring_of_ancient_wisdom', name: 'Kadim Bilgelik Halkası', emoji: '💍', stats: { ult_dmg: 16, teamHeal: 6 }, passiveDesc: 'Kadim Bilgelik: Ultimate kullandığında ekstra %10 ult dolumu kazanırsın.' }
     },
     red: {
         weapon: { id: 'uniq_world_eater', name: 'Dünya Yiyen', emoji: '⚔️', stats: { sword: 10, skull_dmg: 18, lifeSteal: 8 }, passiveDesc: 'Çaresiz Öfke: Canın %50\'nin altındayken Kafatası hasarın %50 artar.' },
-        shield: { id: 'uniq_the_last_wall', name: 'Son Duvar', emoji: '🛡️', stats: { shield: 9, heart: 9, energy: 13 } },
-        helmet: { id: 'uniq_starfall_helm', name: 'Yıldız Düşüren Miğfer', emoji: '☄️', stats: { ult_dmg: 20, energy: 13, shield: 9 } },
-        chest: { id: 'uniq_titans_hide', name: "Titan'ın Derisi", emoji: '🗿', stats: { shield: 9, heart: 9, sword: 10 } },
-        shoulder: { id: 'uniq_doomwings', name: 'Kıyamet Kanatları', emoji: '🔥', stats: { energy: 13, skull_dmg: 18, sword: 10 } },
-        gloves: { id: 'uniq_the_throatreaver', name: 'Boğazlayıcı', emoji: '☠️', stats: { skull_dmg: 18, lifeSteal: 8, sword: 10 } },
-        boots: { id: 'uniq_timestep_striders', name: 'Zaman Adımı', emoji: '⏳', stats: { energy: 13, sword: 10, ult_dmg: 20 } },
-        trinket: { id: 'uniq_eternity_core', name: 'Sonsuzluk Çekirdeği', emoji: '💠', stats: { ult_dmg: 20, energy: 13, teamHeal: 8 } }
+        shield: { id: 'uniq_the_last_wall', name: 'Son Duvar', emoji: '🛡️', stats: { shield: 9, heart: 9, energy: 13 }, passiveDesc: 'Son Savunma: Canın %30\'un altındayken Kalkan eşleşmelerinden %50 daha fazla Zırh kazanırsın.' },
+        helmet: { id: 'uniq_starfall_helm', name: 'Yıldız Düşüren Miğfer', emoji: '☄️', stats: { ult_dmg: 20, energy: 13, shield: 9 }, passiveDesc: 'Yıldız Yağmuru: Ultimate kullandığında rakibine ekstra doğrudan hasar verirsin.' },
+        chest: { id: 'uniq_titans_hide', name: "Titan'ın Derisi", emoji: '🗿', stats: { shield: 9, heart: 9, sword: 10 }, passiveDesc: 'Titan Zırhı: Kılıç eşleşmelerinde verdiğin hasarın %15\'i kadar can kazanırsın.' },
+        shoulder: { id: 'uniq_doomwings', name: 'Kıyamet Kanatları', emoji: '🔥', stats: { energy: 13, skull_dmg: 18, sword: 10 }, passiveDesc: 'Kıyamet: Kafatası eşleşmelerinde verdiğin hasar her zaman %20 artar.' },
+        gloves: { id: 'uniq_the_throatreaver', name: 'Boğazlayıcı', emoji: '☠️', stats: { skull_dmg: 18, lifeSteal: 8, sword: 10 }, passiveDesc: 'Boğaz Kesen: Kafatası eşleşmelerinde rakibe verdiğin hasarın %25\'i kadar can kazanırsın.' },
+        boots: { id: 'uniq_timestep_striders', name: 'Zaman Adımı', emoji: '⏳', stats: { energy: 13, sword: 10, ult_dmg: 20 }, passiveDesc: 'Zaman Bükümü: Ultimate kullandığında ekstra %20 ult dolumu kazanırsın.' },
+        trinket: { id: 'uniq_eternity_core', name: 'Sonsuzluk Çekirdeği', emoji: '💠', stats: { ult_dmg: 20, energy: 13, teamHeal: 8 }, passiveDesc: 'Sonsuzluk Çekirdeği: Ultimate kullandığında maksimum canının %15\'i kadar iyileşirsin.' }
     },
     teal: {
         weapon: { id: 'uniq_whisper_of_the_void', name: 'Hiçliğin Fısıltısı', emoji: '🌌', stats: { ult_dmg: 18, lifeSteal: 7 }, passiveDesc: 'Boşluk Yankısı: Ultimate kullandığında maksimum canının %10\'u kadar iyileşirsin.' },
-        shield: { id: 'uniq_shattered_time_aegis', name: 'Kırık Zaman Kalkanı', emoji: '⏱️', stats: { shield: 8, energy: 12 } },
-        helmet: { id: 'uniq_astral_sight', name: 'Astral Görüş', emoji: '👁️', stats: { energy: 12, ult_dmg: 18 } },
-        chest: { id: 'uniq_shroud_of_shadows', name: 'Gölge Örtüsü', emoji: '🌑', stats: { shield: 8, lifeSteal: 7 } },
-        shoulder: { id: 'uniq_cosmic_wings', name: 'Kozmik Kanatlar', emoji: '✨', stats: { energy: 12, skull_dmg: 16 } },
-        gloves: { id: 'uniq_soul_rending_claws', name: 'Ruh Emici Pençeler', emoji: '👻', stats: { skull_dmg: 16, lifeSteal: 7 } },
-        boots: { id: 'uniq_voidstep', name: 'Boşluk Adımı', emoji: '🕳️', stats: { energy: 12, sword: 9 } },
-        trinket: { id: 'uniq_eye_of_infinity', name: 'Sonsuzluk Gözü', emoji: '♾️', stats: { ult_dmg: 18, teamHeal: 7 } }
+        shield: { id: 'uniq_shattered_time_aegis', name: 'Kırık Zaman Kalkanı', emoji: '⏱️', stats: { shield: 8, energy: 12 }, passiveDesc: 'Kırık Zaman: Kalkan eşleşmelerinde kazandığın Zırh\'ın %20\'si kadar ult dolumu kazanırsın.' },
+        helmet: { id: 'uniq_astral_sight', name: 'Astral Görüş', emoji: '👁️', stats: { energy: 12, ult_dmg: 18 }, passiveDesc: 'Astral Görüş: Enerji eşleşmelerinde kazandığın ult dolumunun %25\'i kadar ekstra ult dolumu kazanırsın.' },
+        chest: { id: 'uniq_shroud_of_shadows', name: 'Gölge Örtüsü', emoji: '🌑', stats: { shield: 8, lifeSteal: 7 }, passiveDesc: 'Gölge Örtüsü: Kılıç eşleşmelerinde verdiğin hasarın %15\'i kadar can kazanırsın.' },
+        shoulder: { id: 'uniq_cosmic_wings', name: 'Kozmik Kanatlar', emoji: '✨', stats: { energy: 12, skull_dmg: 16 }, passiveDesc: 'Kozmik Rüzgar: Kafatası eşleşmelerinde kendine gelen hasar %30 azalır.' },
+        gloves: { id: 'uniq_soul_rending_claws', name: 'Ruh Emici Pençeler', emoji: '👻', stats: { skull_dmg: 16, lifeSteal: 7 }, passiveDesc: 'Ruh Emme: Kafatası eşleşmelerinde rakibe verdiğin hasarın %20\'si kadar can kazanırsın.' },
+        boots: { id: 'uniq_voidstep', name: 'Boşluk Adımı', emoji: '🕳️', stats: { energy: 12, sword: 9 }, passiveDesc: 'Boşluk Sıçraması: Kılıç eşleşmelerinde verdiğin hasarın %20\'si kadar ult dolumu kazanırsın.' },
+        trinket: { id: 'uniq_eye_of_infinity', name: 'Sonsuzluk Gözü', emoji: '♾️', stats: { ult_dmg: 18, teamHeal: 7 }, passiveDesc: 'Sonsuzluk Gözü: Ultimate kullandığında ekstra %15 ult dolumu kazanırsın.' }
     }
 };
 
@@ -263,6 +263,159 @@ function totalEquippedPower(ownedItems) {
 // in.
 function hasEquippedItem(baseId) {
     return (typeof currentOwnedItems !== 'undefined' ? currentOwnedItems : []).some(it => it.base_id === baseId && it.equipped_slot);
+}
+
+// One passive per Orange/Red/Teal item (24 total) - a Diablo-style "every
+// legendary does something a plain stat roll can't" pass, on top of the
+// flat stats those items already carry. Each entry's own passiveDesc
+// (UNIQUE_LEGENDARIES above) is the single source of truth for the
+// player-facing text; this registry only holds the MECHANIC.
+//
+// `hook` picks which combat moment triggers it - one of:
+//   'sword' / 'shield' / 'heart' / 'energy' - fires right after that tile
+//     type resolves. payload = { amount } (the value just applied).
+//   'skull' - payload = { dmgToOpponent, recoil }, both mutable BEFORE
+//     they're applied (an effect can return early having changed either).
+//   'ultimate' - fires right after the class ultimate itself resolves.
+//     No payload.
+// `ctx` is the same makeSinglePlayerCombatContext()/makeCoopCombatContext()/
+// makePvpCombatContext() every class ultEffect already uses (game.js/
+// coop.js/pvp.js) - reused rather than inventing a second interface, so a
+// passive's own-HP/add-armor/etc calls behave identically in every mode
+// for the exact same reason class ultimates already do.
+//
+// `effect` returns a log string when it wants one printed (armor/heal/
+// energy/direct-damage gains that would otherwise be invisible), or
+// null/undefined when the effect only reshapes a skull payload - those
+// already show up in the normal "Kafatası! Hasar: X / Kendine: Y" line,
+// so a second log line would just be noise.
+const UNIQUE_PASSIVES = {
+    // --- Orange (Efsanevi) ---------------------------------------------------
+    uniq_nights_lament: { // Gecenin Ağıtı - Kan Zırhı
+        hook: 'sword',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return `✨ Kan Zırhı: +${b} Zırh`; }
+    },
+    uniq_shield_of_eternity: { // Sonsuzluk Kalkanı - Sonsuz Dayanıklılık
+        hook: 'shield',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.healSelf(b); return `✨ Sonsuz Dayanıklılık: +${b} can`; }
+    },
+    uniq_oracles_crown: { // Kahinin Tacı - Kehanet
+        hook: 'energy',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Kehanet: +${b}% ult`; }
+    },
+    uniq_dragonheart_plate: { // Ejderha Yürek Zırhı - Ejderha Kalbi
+        hook: 'heart',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return `✨ Ejderha Kalbi: +${b} Zırh`; }
+    },
+    uniq_storm_eagle_pauldrons: { // Fırtına Kartalı Omuzluğu - Fırtına Hızı
+        hook: 'sword',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Fırtına Hızı: +${b}% ult`; }
+    },
+    uniq_butchers_claws: { // Kasabın Pençeleri - Kasap İçgüdüsü
+        hook: 'skull',
+        effect: (ctx, p) => { let b = Math.floor(p.recoil * 0.5); if (b <= 0) return null; ctx.healSelf(b); return `✨ Kasap İçgüdüsü: +${b} can`; }
+    },
+    uniq_windwalkers: { // Rüzgar Yürüyüşü - Rüzgar Adımı
+        hook: 'energy',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addArmor(b); return `✨ Rüzgar Adımı: +${b} Zırh`; }
+    },
+    uniq_ring_of_ancient_wisdom: { // Kadim Bilgelik Halkası - Kadim Bilgelik
+        hook: 'ultimate',
+        effect: (ctx) => { ctx.addEnergy(10); return `✨ Kadim Bilgelik: +10% ult`; }
+    },
+
+    // --- Red (İlksel Efsanevi) ------------------------------------------------
+    uniq_world_eater: { // Dünya Yiyen - Çaresiz Öfke
+        hook: 'skull',
+        effect: (ctx, p) => { if (ctx.getSelfHP() < ctx.getMaxHP() * 0.5) p.dmgToOpponent = Math.floor(p.dmgToOpponent * 1.5); return null; }
+    },
+    uniq_the_last_wall: { // Son Duvar - Son Savunma
+        hook: 'shield',
+        effect: (ctx, p) => {
+            if (ctx.getSelfHP() >= ctx.getMaxHP() * 0.3) return null;
+            let b = Math.floor(p.amount * 0.5); if (b <= 0) return null;
+            ctx.addArmor(b); return `✨ Son Savunma: +${b} Zırh`;
+        }
+    },
+    uniq_starfall_helm: { // Yıldız Düşüren Miğfer - Yıldız Yağmuru
+        hook: 'ultimate',
+        effect: (ctx) => {
+            let dmg = Math.floor((typeof TILE_STATS !== 'undefined' ? TILE_STATS.ult_dmg : 0) * 0.2);
+            if (dmg <= 0) return null;
+            ctx.dealDirectDamageToOpponent(dmg); return `✨ Yıldız Yağmuru: ${dmg} ekstra hasar`;
+        }
+    },
+    uniq_titans_hide: { // Titan'ın Derisi - Titan Zırhı
+        hook: 'sword',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return `✨ Titan Zırhı: +${b} can`; }
+    },
+    uniq_doomwings: { // Kıyamet Kanatları - Kıyamet
+        hook: 'skull',
+        effect: (ctx, p) => { p.dmgToOpponent = Math.floor(p.dmgToOpponent * 1.2); return null; }
+    },
+    uniq_the_throatreaver: { // Boğazlayıcı - Boğaz Kesen
+        hook: 'skull',
+        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.25); if (b <= 0) return null; ctx.healSelf(b); return `✨ Boğaz Kesen: +${b} can`; }
+    },
+    uniq_timestep_striders: { // Zaman Adımı - Zaman Bükümü
+        hook: 'ultimate',
+        effect: (ctx) => { ctx.addEnergy(20); return `✨ Zaman Bükümü: +20% ult`; }
+    },
+    uniq_eternity_core: { // Sonsuzluk Çekirdeği - Sonsuzluk Çekirdeği
+        hook: 'ultimate',
+        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.15); if (heal <= 0) return null; ctx.healSelf(heal); return `✨ Sonsuzluk Çekirdeği: +${heal} can`; }
+    },
+
+    // --- Teal (Ethereal) -------------------------------------------------------
+    uniq_whisper_of_the_void: { // Hiçliğin Fısıltısı - Boşluk Yankısı
+        hook: 'ultimate',
+        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.1); if (heal <= 0) return null; ctx.healSelf(heal); return `✨ Boşluk Yankısı: +${heal} can`; }
+    },
+    uniq_shattered_time_aegis: { // Kırık Zaman Kalkanı - Kırık Zaman
+        hook: 'shield',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Kırık Zaman: +${b}% ult`; }
+    },
+    uniq_astral_sight: { // Astral Görüş - Astral Görüş
+        hook: 'energy',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Astral Görüş: +${b}% ult`; }
+    },
+    uniq_shroud_of_shadows: { // Gölge Örtüsü - Gölge Örtüsü
+        hook: 'sword',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return `✨ Gölge Örtüsü: +${b} can`; }
+    },
+    uniq_cosmic_wings: { // Kozmik Kanatlar - Kozmik Rüzgar
+        hook: 'skull',
+        effect: (ctx, p) => { p.recoil = Math.floor(p.recoil * 0.7); return null; }
+    },
+    uniq_soul_rending_claws: { // Ruh Emici Pençeler - Ruh Emme
+        hook: 'skull',
+        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.2); if (b <= 0) return null; ctx.healSelf(b); return `✨ Ruh Emme: +${b} can`; }
+    },
+    uniq_voidstep: { // Boşluk Adımı - Boşluk Sıçraması
+        hook: 'sword',
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Boşluk Sıçraması: +${b}% ult`; }
+    },
+    uniq_eye_of_infinity: { // Sonsuzluk Gözü - Sonsuzluk Gözü
+        hook: 'ultimate',
+        effect: (ctx) => { ctx.addEnergy(15); return `✨ Sonsuzluk Gözü: +15% ult`; }
+    }
+};
+
+// Called at every relevant combat moment (sword/skull/shield/heart/energy
+// match resolution, and right after a class ultimate resolves) in all
+// three modes - checks every currently EQUIPPED item for a passive
+// matching this hook and runs it, logging whatever message (if any) the
+// effect returns. A player with no legendary equipped (or one whose
+// passive is for a different hook) costs one array scan and nothing else.
+function triggerPassiveHook(hookName, ctx, payload) {
+    (typeof currentOwnedItems !== 'undefined' ? currentOwnedItems : [])
+        .filter(it => it.equipped_slot)
+        .forEach(it => {
+            let passive = UNIQUE_PASSIVES[it.base_id];
+            if (!passive || passive.hook !== hookName) return;
+            let msg = passive.effect(ctx, payload || {});
+            if (msg) ctx.log(msg, 'log-armor');
+        });
 }
 
 function rollAffixValue(stat, mult) {
@@ -480,7 +633,7 @@ function renderEquippedSlotsInto(containerId) {
     }
 
     let header = document.createElement('h4');
-    header.innerHTML = `Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">⚡ Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span>`;
+    header.innerHTML = `Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">💎 Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span>`;
     container.appendChild(header);
 
     ITEM_SLOTS.forEach(slot => {
@@ -492,7 +645,7 @@ function renderEquippedSlotsInto(containerId) {
             let info = itemDisplayInfo(equipped);
             let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
             row.innerHTML = `<span class="manual-icon">${info.emoji}</span>
-                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · ⚡${itemPower(equipped)}${passiveLine}</div>`;
+                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · 💎${itemPower(equipped)}${passiveLine}</div>`;
         } else {
             row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
         }
@@ -556,7 +709,7 @@ function renderInventory() {
             setLine = ` · Set: ${set.name} (${equippedCount}/${totalCount}) → ${set.bonusDesc}`;
         }
         let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
-        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
+        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · 💎${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
         row.appendChild(desc);
 
         let btnWrap = document.createElement('div');
@@ -626,7 +779,7 @@ function showLootToast(item) {
     let el = document.createElement('div');
     el.className = 'achievement-toast';
     el.style.borderColor = rarity.color;
-    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.label} DÜŞTÜ</b><br>${item.name}${item.set_key || (RARITY_DEFS[item.rarity] && RARITY_DEFS[item.rarity].isUnique) ? '' : ` · ⚡${itemPower(item)}`}`;
+    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.label} DÜŞTÜ</b><br>${item.name}${item.set_key || (RARITY_DEFS[item.rarity] && RARITY_DEFS[item.rarity].isUnique) ? '' : ` · 💎${itemPower(item)}`}`;
     document.body.appendChild(el);
     setTimeout(() => el.classList.add('visible'), 10);
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);

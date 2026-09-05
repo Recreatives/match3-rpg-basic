@@ -948,6 +948,11 @@ function makeCoopCombatContext() {
             coopSyncSelfState();
         },
         getSelfArmor() { return coopMyArmor; },
+        // Added for UNIQUE_PASSIVES (items.js) - see game.js's copy for why.
+        getSelfHP() { return coopMyHP; },
+        getMaxHP() { return COOP_MAX_HP; },
+        addArmor(amount) { coopMyArmor += amount; coopSyncSelfState(); },
+        addEnergy(amount) { coopUltCharge = Math.min(coopUltCharge + amount, 100); },
         grantExtraTurn() { coopExtraTurnTriggered = true; },
         log(msg) { coopLog(msg); }
     };
@@ -963,14 +968,11 @@ function coopUseUltimate() {
     if (coopMatchOver || coopProcessing || !coopMyTurn || coopUltCharge < 100 || !selectedClass) return;
 
     coopProcessing = true;
-    selectedClass.ultEffect(makeCoopCombatContext());
+    let ultCtx = makeCoopCombatContext();
+    selectedClass.ultEffect(ultCtx);
     coopUltCharge = 0;
 
-    // Hiçliğin Fısıltısı (flagship legendary passive, items.js).
-    if (typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_whisper_of_the_void')) {
-        let heal = Math.floor(COOP_MAX_HP * 0.1);
-        if (heal > 0) { coopMyHP = Math.min(coopMyHP + heal, COOP_MAX_HP); coopSyncSelfState(); }
-    }
+    if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
     coopUpdateUI();
     if (typeof playSound === 'function') playSound('ult');
@@ -1076,43 +1078,48 @@ function coopApplyGroupEffect(group, isInitial) {
         coopMyTurnStats.ultGain += ultBonus;
     }
 
+    // Legendary item passives (items.js UNIQUE_PASSIVES) act on the
+    // CASTER's own state only (own HP, own damage dealt) - never a
+    // teammate's or the enemy's - so this one context serves every branch.
+    let passiveCtx = (typeof triggerPassiveHook === 'function') ? makeCoopCombatContext() : null;
+
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);
-        // Dünya Yiyen (flagship legendary passive, items.js) - own-HP
-        // check, same reasoning as game.js's copy: works identically in
-        // every mode since a player always knows their own HP, unlike an
-        // opponent's (which co-op doesn't even have - this checks the
-        // caster's own coopMyHP, never a teammate's or the enemy's).
-        if (group.type === 'skull' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_world_eater') && coopMyHP < COOP_MAX_HP * 0.5) {
-            amount = Math.floor(amount * 1.5);
-        }
-        coopApplyDamageToEnemy(amount);
-        // Gecenin Ağıtı (flagship legendary passive, items.js).
-        if (group.type === 'sword' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_nights_lament')) {
-            let bonusArmor = Math.floor(amount * 0.2);
-            if (bonusArmor > 0) { coopMyArmor += bonusArmor; coopSyncSelfState(); }
-        }
+
         if (group.type === 'skull') {
             let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
+            if (passiveCtx) {
+                let payload = { dmgToOpponent: amount, recoil };
+                triggerPassiveHook('skull', passiveCtx, payload);
+                amount = payload.dmgToOpponent;
+                recoil = payload.recoil;
+            }
+            coopApplyDamageToEnemy(amount);
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
             coopMyTurnStats.selfDamage += recoil;
             coopSyncSelfState();
+        } else {
+            coopApplyDamageToEnemy(amount);
+            if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
         let heal = Math.floor(TILE_STATS.heart * multiplier);
         coopMyHP = Math.min(coopMyHP + heal, COOP_MAX_HP);
         coopMyTurnStats.heal += heal;
+        if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
         coopSyncSelfState();
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         coopMyArmor += gain;
         coopMyTurnStats.armor += gain;
+        if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
         coopSyncSelfState();
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         coopUltCharge = Math.min(coopUltCharge + gain, 100);
         coopMyTurnStats.ultGain += gain;
+        if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     } else if (group.type === 'teamheal') {
         // Heals the ALLY, not me - only ever appears on a co-op board
         // (COOP_TILE_TYPES). I'm authoritative for MY OWN hp, not theirs, so
