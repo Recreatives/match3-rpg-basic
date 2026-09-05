@@ -905,7 +905,7 @@ function tradeItemLabel(item) {
     if (!item) return null;
     let info = itemDisplayInfo(item);
     let rarity = RARITY_DEFS[item.rarity];
-    return `${info.emoji} ${info.name} <span style="color:${rarity ? rarity.color : '#fff'}">(${rarity ? rarity.label : item.rarity})</span>`;
+    return `${info.emoji} ${info.name} <span style="color:${rarity ? rarity.color : '#fff'}">(${rarity ? rarity.label : item.rarity})</span> · ⚡${itemPower(item)}`;
 }
 
 async function fetchFriendItems(friendId) {
@@ -964,9 +964,9 @@ async function renderTradeComposer() {
     let theirItems = await fetchFriendItems(tradeTargetFriendId);
 
     let myOptions = '<option value="">— eşya yok, sadece altın —</option>' +
-        myItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity})</option>`).join('');
+        myItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity}) ⚡${itemPower(i)}</option>`).join('');
     let theirOptions = '<option value="">— eşya yok, sadece altın —</option>' +
-        theirItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity})</option>`).join('');
+        theirItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity}) ⚡${itemPower(i)}</option>`).join('');
 
     document.getElementById('trade-my-item-select').innerHTML = myOptions;
     document.getElementById('trade-their-item-select').innerHTML = theirOptions;

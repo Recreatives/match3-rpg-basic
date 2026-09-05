@@ -123,27 +123,27 @@ body {
 }
 
 /* --- STANDARD UI --- */
+/* Column, not a single wrapping row sharing space with .version - sharing
+   a row meant .version's width ate into how much space the buttons had
+   left BEFORE they even started wrapping, so at some widths every button
+   landed alone on its own line, right-aligned into a jagged staircase
+   down the right edge. Stacking them fixes that: .version gets a full-
+   width line to itself, the button row gets its own full width to wrap
+   and center within, so however many fit per row are evenly spread out. */
 .top-bar {
     width: var(--panel-width);
     max-width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     gap: 4px;
     margin-bottom: 5px;
 }
-.version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; flex: 1 1 180px; min-width: 0; }
-.top-bar > div { flex-shrink: 0; }
-/* Overrides the flex-shrink:0 above (needed on .version so the changelog
-   text never gets squeezed unreadable, wrong here) - this row grew past
-   panel width once enough buttons piled up because a flex-shrink:0 item
-   is sized to its own unwrapped content, ignoring flex-wrap entirely.
-   min-width:0 lets it actually shrink to the container, and its OWN
-   flex-wrap then wraps the buttons inside onto as many rows as needed. */
-.top-bar > .top-bar-buttons {
-    display: flex; flex-wrap: wrap; justify-content: flex-end;
-    gap: 4px; flex-shrink: 1; flex-basis: 0; flex-grow: 1; min-width: 0;
+.version { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; }
+.top-bar-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
 }
 .help-btn {
     background: none; border: 1px solid #7f8c8d; color: #bdc3c7;
@@ -159,7 +159,6 @@ body {
    space is scarce) it's more useful reclaimed than read. */
 @media (max-width: 480px) {
     .version { display: none; }
-    .top-bar { justify-content: flex-end; }
 }
 
 /* Enemy name/sprite + turn state used to each be their own stacked row

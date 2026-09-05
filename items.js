@@ -196,6 +196,64 @@ const UNIQUE_LEGENDARIES = {
     }
 };
 
+// Procedural flavor names - a rolled item used to just show up as
+// "{base name} ({rarity})" (e.g. "Balta (Sihirli)"), which reads as
+// exactly what it is under the hood (a base + a rarity multiplier) rather
+// than as loot worth getting excited about. Each base's primaryStat picks
+// which pool its prefix comes from, so the name still hints at what the
+// item is good for ("Cellat Baltası" on a skull_dmg weapon reads right).
+// Multi-word prefixes are deliberately avoided so "{prefix} {base.name}"
+// never reads awkwardly regardless of which base it lands on.
+const ITEM_PREFIXES = {
+    sword:      ['Keskin', 'Kanlı', 'Yırtıcı', 'Vahşi', 'Parlayan', 'Öfkeli'],
+    skull_dmg:  ['Cellat', 'Kasap', 'Kıyıcı', 'Acımasız', 'Vahşet', 'Kanlı'],
+    ult_dmg:    ['Arkane', 'Kadim', 'Büyülü', 'Kozmik', 'Gizemli', 'Ejderha'],
+    lifeSteal:  ['Vampirik', 'Açgözlü', 'Solgun', 'Gölge', 'Karanlık', 'Ruhsuz'],
+    energy:     ['Şimşek', 'Elektrikli', 'Çakan', 'Rüzgar', 'Fırtınalı', 'Volt'],
+    shield:     ['Demir', 'Çelik', 'Sarsılmaz', 'Granit', 'Kale', 'Ejder'],
+    heart:      ['Şifa', 'Yaşam', 'Diriliş', 'Kutsal', 'Işıltılı', 'Umut'],
+    teamHeal:   ['Dost', 'Birlik', 'Kutsanmış', 'Dayanışma', 'Paylaşılan', 'Sadık']
+};
+
+// Deterministic per item INSTANCE (not persisted - re-derived from content
+// that's already stable) so the same item shows the same name on every
+// render, including right after a fresh roll before it has a DB id yet,
+// while two different rolls of the same base+rarity still usually get
+// different prefixes. Not cryptographic, just needs to vary with content.
+function stableItemSeed(item) {
+    let str = (item.base_id || '') + JSON.stringify(item.rolled_stats || {});
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return Math.abs(h);
+}
+
+// Same per-stat baseline rollAffixValue already uses to scale a roll by
+// rarity - reused here to normalize each stat's contribution to "power"
+// (a +5 ult_dmg and a +2 sword roll should count for roughly the same
+// amount, since +5 is a big ult_dmg roll but +2 is a big sword roll).
+const STAT_POWER_BASE = { sword: 2, heart: 2, shield: 2, energy: 3, skull_dmg: 4, ult_dmg: 5, lifeSteal: 2, teamHeal: 2, skull_self_dmg: 2 };
+
+// A single at-a-glance number for "how good is this item" - not used for
+// any game-rule math (equip bonuses always come from rolled_stats
+// directly), purely a display convenience so a player can compare two
+// items or track their own equipped total without reading every stat line.
+function itemPower(item) {
+    let power = 0;
+    Object.entries(item.rolled_stats || {}).forEach(([stat, value]) => {
+        let base = STAT_POWER_BASE[stat] || 2;
+        // skull_self_dmg is a downside stat stored as a negative roll (see
+        // rollAffixValue) - more negative is better, so flip its sign
+        // before normalizing, same as every other (positive-is-better) stat.
+        let magnitude = stat === 'skull_self_dmg' ? -value : value;
+        power += (magnitude / base) * 10;
+    });
+    return Math.max(0, Math.round(power));
+}
+
+function totalEquippedPower(ownedItems) {
+    return (ownedItems || []).filter(it => it.equipped_slot).reduce((sum, it) => sum + itemPower(it), 0);
+}
+
 function rollAffixValue(stat, mult) {
     const baseRange = { sword: 2, heart: 2, shield: 2, energy: 3, skull_dmg: 4, ult_dmg: 5, lifeSteal: 2, teamHeal: 2, skull_self_dmg: 2 };
     let rolled = Math.max(1, Math.round((baseRange[stat] || 2) * mult * (0.8 + Math.random() * 0.4)));
@@ -243,9 +301,15 @@ function generateItem(slot, rarityKey, opts) {
         stats[stat] = (stats[stat] || 0) + rollAffixValue(stat, rarity.statMult * 0.6); // secondary affixes roll a bit weaker
     }
 
+    // itemDisplayInfo needs base_id/rolled_stats/slot to pick the same
+    // prefix this item will show everywhere else - built inline rather
+    // than calling it with the object below, since that object doesn't
+    // exist yet until after this call.
+    let flavorName = itemDisplayInfo({ base_id: base.id, slot, rolled_stats: stats }).name;
+
     return {
         base_id: base.id, slot, rarity: rarityKey,
-        name: `${base.name} (${rarity.label})`, emoji: base.emoji,
+        name: `${flavorName} (${rarity.label})`, emoji: base.emoji,
         rolled_stats: stats, set_key: null,
         cost: rarity.shopAvailable ? Math.round(20 * rarity.costMult) : null
     };
@@ -291,8 +355,11 @@ function itemDisplayInfo(item) {
         let uniq = UNIQUE_LEGENDARIES[item.rarity][item.slot];
         return { name: uniq.name, emoji: uniq.emoji };
     }
-    let base = ITEM_BASES[item.slot].find(b => b.id === item.base_id);
-    return { name: base ? base.name : item.base_id, emoji: base ? base.emoji : '❓' };
+    let base = ITEM_BASES[item.slot] && ITEM_BASES[item.slot].find(b => b.id === item.base_id);
+    if (!base) return { name: item.base_id, emoji: '❓' };
+    let prefixPool = ITEM_PREFIXES[base.primaryStat];
+    let prefix = prefixPool ? prefixPool[stableItemSeed(item) % prefixPool.length] : null;
+    return { name: prefix ? `${prefix} ${base.name}` : base.name, emoji: base.emoji };
 }
 
 function formatRolledStats(stats) {
@@ -367,7 +434,7 @@ function renderInventory() {
 
     let slotsDiv = document.createElement('div');
     slotsDiv.className = 'modal-section';
-    slotsDiv.innerHTML = '<h4>Kuşanılanlar</h4>';
+    slotsDiv.innerHTML = `<h4>Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">⚡ Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span></h4>`;
     ITEM_SLOTS.forEach(slot => {
         let equipped = currentOwnedItems.find(it => it.equipped_slot === slot);
         let row = document.createElement('div');
@@ -376,7 +443,7 @@ function renderInventory() {
             let rarity = RARITY_DEFS[equipped.rarity];
             let info = itemDisplayInfo(equipped);
             row.innerHTML = `<span class="manual-icon">${info.emoji}</span>
-                <div class="manual-desc" style="color:${rarity.color};"><b>${rarity.mark} ${SLOT_LABELS[slot]}: ${info.name}</b>${formatRolledStats(equipped.rolled_stats)}</div>`;
+                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · ⚡${itemPower(equipped)}</div>`;
         } else {
             row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
         }
@@ -399,12 +466,21 @@ function renderInventory() {
             let info = itemDisplayInfo(item);
             let row = document.createElement('div');
             row.className = 'manual-tile';
+            // Wraps onto its own second row (desc above, buttons below)
+            // instead of overflowing past the modal's edge once an item
+            // picks up its 3rd action button (KUŞAN/ÇIKAR + upgrade +
+            // scrap) - flex's default nowrap let both sides keep their
+            // full natural width and just spill out sideways.
             row.style.justifyContent = 'space-between';
+            row.style.flexWrap = 'wrap';
+            row.style.rowGap = '6px';
 
             let desc = document.createElement('div');
             desc.className = 'manual-desc';
             desc.style.color = rarity.color;
-            desc.innerHTML = `<b>${info.emoji} ${rarity.mark} ${rarity.name} ${info.name}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
+            desc.style.flex = '1 1 180px';
+            desc.style.minWidth = '0';
+            desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
             row.appendChild(desc);
 
             let btnWrap = document.createElement('div');
@@ -452,7 +528,7 @@ function showLootToast(item) {
     let el = document.createElement('div');
     el.className = 'achievement-toast';
     el.style.borderColor = rarity.color;
-    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.name} DÜŞTÜ</b><br>${item.name}`;
+    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.label} DÜŞTÜ</b><br>${item.name}${item.set_key || (RARITY_DEFS[item.rarity] && RARITY_DEFS[item.rarity].isUnique) ? '' : ` · ⚡${itemPower(item)}`}`;
     document.body.appendChild(el);
     setTimeout(() => el.classList.add('visible'), 10);
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
