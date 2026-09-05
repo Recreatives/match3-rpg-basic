@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.93">
+    <link rel="stylesheet" href="style.css?v=0.94">
 </head>
 <body>
     <div id="app">
@@ -197,6 +197,84 @@
                 <div class="tip-box" style="margin-top:5px;">
                     <b>Dinlenme:</b> Her yeni seviyeden önce eksik canının %50'sini geri kazanırsın.
                 </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>🗺️ OYUN MODLARI</h4>
+                <p>Üç farklı şekilde oynayabilirsin, üstteki menüden seçersin:</p>
+                <ul style="font-size:0.85rem;">
+                    <li><b>Solo:</b> Tek başına, sonsuz canavar dalgasına karşı. Her 5. seviyede bir boss çıkar.</li>
+                    <li><b>Co-op:</b> Bir arkadaşınla aynı zindanda, paylaşımlı tahtada omuz omuza savaşırsınız.</li>
+                    <li><b>PvP:</b> Gerçek zamanlı 1v1 düello - tek oyunculu ile aynı kurallar (eşleşme çarpanları, kombolar, sınıf ultimateleri) geçerli, ama rakibin canı sana gizli.</li>
+                </ul>
+                <div class="warning-box">
+                    <b>Co-op'ta dikkat:</b> Her boss öncesi gizli bir oylama açılır. Bazen bu oylama seni arkadaşına karşı küçük bir PvP düellosuna sürükleyebilir - sadık kalmanın da ihanet etmenin de kendine göre bir bedeli/ödülü var. Sürpriz bozulmasın diye detayını burada vermiyoruz, ama karşına çıkınca şaşırma!
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>🎒 EŞYA SİSTEMİ</h4>
+                <ul style="font-size:0.85rem;">
+                    <li>8 kuşam yeri var: Silah, Kalkan, Miğfer, Zırh, Omuzluk, Eldiven, Çizme, Takı. <b>Sadece KUŞANDIĞIN</b> eşyaların statları sayılır - envanterinde durması yetmez.</li>
+                    <li>İsimler rastgele ama anlamlı seçilir: "Kanlı Balta" gibi önek, eşyanın en güçlü olduğu stat'a göre gelir (kan/hasar temalı önekler hasar eşyalarına, şifa temalı önekler can eşyalarına düşer).</li>
+                    <li>Her eşyanın yanında bir <b>⚡ Güç</b> puanı görürsün - eşyaları hızlıca karşılaştırmanı sağlar. Kuşandıklarının toplamı Envanter ekranının üstünde yazar.</li>
+                    <li><b>⬆️ Yükselt:</b> Altın + hammadde karşılığında eşyayı bir üst nadirliğe taşır (statları yeniden belirlenir, daha güçlü olur).</li>
+                    <li><b>♻️ Hurdaya Çevir:</b> İşine yaramayan bir eşyayi hammaddeye çevirir.</li>
+                    <li><b>Set & Efsanevi eşyalar:</b> Sabit isim ve statlara sahip, çok nadir düşerler. Bir setin TÜM parçalarını kuşanınca ekstra bir bonus açılır.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>🌳 KALICI İLERLEME</h4>
+                <p style="font-size:0.85rem;">Bu ikisi tek bir koşuyla sınırlı değil - kazandığın bonus HER koşunda seninle gelir.</p>
+                <ul style="font-size:0.85rem;">
+                    <li><b>Yetenek Ağacı</b> (👤 Profil > Yetenekler): PvP galibiyetleri ve tamamladığın günlük görevler "yetenek puanı" kazandırır. Bu puanlarla küçük ama kalıcı bonuslar (örn. +2 Kılıç) öğrenebilirsin.</li>
+                    <li><b>Prestij</b> (🛒 Dükkan > Prestij sekmesi): 1000 altına ulaşınca açılır. Altının sıfırlanır, karşılığında kalıcı olarak daha fazla altın kazanmaya başlarsın (her prestij seviyesi bu bonusu büyütür). İstersen tekrar tekrar yapabilirsin.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>🎁 GÜNLÜK & ÖZEL ETKİNLİKLER</h4>
+                <ul style="font-size:0.85rem;">
+                    <li><b>Günlük Ödül:</b> Her gün giriş yap, seri arttıkça ödül büyür (7. günden sonra sabitlenir). Bir gün atlarsan seri sıfırlanır.</li>
+                    <li><b>Günlük Görevler:</b> Her gün yenilenen küçük hedefler (bir boss öldür, bir PvP maçı kazan, ultimate kullan) - tamamlayınca altın kazandırır, aynı zamanda yetenek puanı sayılır.</li>
+                    <li><b>Sezonluk Etkinlikler:</b> Zaman zaman sınırlı süreli özel etkinlikler açılır, ekranın üst kısmında sarı bir bantla duyurulur - kaçırmadan katıl!</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>👥 ARKADAŞLAR, LONCA & TAKAS</h4>
+                <ul style="font-size:0.85rem;">
+                    <li><b>Arkadaş Ekle:</b> Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için önce kendi takma adını Lider Tablosu'ndan belirlemen gerekir.</li>
+                    <li><b>Mesajlaşma:</b> Kabul ettiğin arkadaşlarınla sohbet edebilirsin (💬 simgesi).</li>
+                    <li><b>Lonca:</b> Bir lonca kur ya da mevcut birine katıl - aynı anda sadece bir loncada olabilirsin.</li>
+                    <li><b>Takas:</b> Bir arkadaşınla eşya ve/veya altın takas edebilirsin (🔄 simgesi) - o an envanterinde neler olduğunu görüp karşılığında bir şey isteyebilirsin.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>🗡️ PvP DETAYLARI</h4>
+                <ul style="font-size:0.85rem;">
+                    <li><b>⚡ Hızlı Eşleşme:</b> Tek tuşla rastgele bir rakip ara - sıraya girersin, uygun biri bulununca otomatik eşleşirsin.</li>
+                    <li><b>Oda Kodu:</b> Bir arkadaşınla önceden kararlaştırdığınız bir kodu ikiniz de yazarsanız otomatik eşleşirsiniz.</li>
+                    <li><b>Derece (Rating):</b> Her PvP maçı derecenizi değiştirir - kazanınca artar, kaybedince azalır. Değişim miktarı rakibinizin gücüne göre farklılık gösterir (güçlü birini yenmek daha çok puan kazandırır).</li>
+                    <li><b>👁️ İzleyici Modu:</b> Devam eden bir maçı sadece izlemek istersen, oda kodunu yazıp "İzle"ye basman yeterli - oynayamazsın ama canlı takip edebilirsin.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>🏅 UNVANLAR, SIRALAMALAR & BAŞARIMLAR</h4>
+                <ul style="font-size:0.85rem;">
+                    <li><b>Unvanlar:</b> Belirli hedefleri tutturunca (yüksek PvP derecesi, çok altın, lonca lideri olmak, bir arkadaş edinmek...) yeni bir unvan açılır. Beğendiğini kuşanabilirsin - adının yanında herkese görünür.</li>
+                    <li><b>Lider Tablosu:</b> En çok altına sahip 10 oyuncu.</li>
+                    <li><b>PvP Sıralaması:</b> En yüksek PvP derecesine sahip 10 oyuncu.</li>
+                    <li><b>Başarımlar:</b> Zorlu anları başardığında (bir boss öldürmek, %100 canla kazanmak...) kalıcı olarak kaydedilir ve küçük bir stat bonusu verir. Bu bonus sadece <b>o anki koşunda</b> aktiftir - ölünce sıfırlanır, ama bir dahaki koşunda aynı şeyi tekrar başarırsan geri gelir.</li>
+                </ul>
+            </div>
+
+            <div class="modal-section" style="border-bottom:none;">
+                <h4>👤 NEREDE NE VAR?</h4>
+                <p style="font-size:0.85rem;">Üst menüde çok fazla buton birikmesin diye bazı ekranlar <b>"👤 Profil"</b> menüsünün altında toplandı: Lider Tablosu, Arkadaşlar, Lonca, Unvanlar, Yetenekler, Takaslar, Başarımlar ve Loot/Stats oradan açılır.</p>
             </div>
         </div>
     </div>
@@ -619,7 +697,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.93 Inventory grouping, overflow fix, sticky wallet</div>
+        <div class="version">v0.94 Comprehensive help guide</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -693,14 +771,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.93"></script>
-    <script src="economy.js?v=0.93"></script>
-    <script src="items.js?v=0.93"></script>
-    <script src="achievements.js?v=0.93"></script>
-    <script src="game.js?v=0.93"></script>
-    <script src="sharedboard.js?v=0.93"></script>
-    <script src="pvp.js?v=0.93"></script>
-    <script src="coop.js?v=0.93"></script>
+    <script src="sound.js?v=0.94"></script>
+    <script src="economy.js?v=0.94"></script>
+    <script src="items.js?v=0.94"></script>
+    <script src="achievements.js?v=0.94"></script>
+    <script src="game.js?v=0.94"></script>
+    <script src="sharedboard.js?v=0.94"></script>
+    <script src="pvp.js?v=0.94"></script>
+    <script src="coop.js?v=0.94"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.
