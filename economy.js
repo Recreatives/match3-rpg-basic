@@ -57,7 +57,10 @@ async function ensureSession() {
 // already typed (kept in memory only, in pendingAccountPassword, between
 // those two calls).
 //
-// Email delivery has to be a typed 6-digit CODE, not Supabase's default
+// Email delivery has to be a typed numeric CODE (Supabase's default OTP is
+// 6 digits, but this project's instance sends 8 - length isn't something
+// the client should assume, hence the generous maxlength on the code
+// inputs in index.html), not Supabase's default
 // magic link - this requires manually editing email templates in the
 // Supabase Dashboard to include {{ .Token }} (see the project's setup
 // notes for the exact steps): "Confirm signup" for a fresh signUp(),
