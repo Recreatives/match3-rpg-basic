@@ -351,7 +351,13 @@ async function renderFriendsList() {
             chatBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
             chatBtn.innerText = '💬';
             chatBtn.onclick = () => openConversation(row.friend_id, row.display_name);
+            let tradeBtn = document.createElement('button');
+            tradeBtn.className = 'action-btn';
+            tradeBtn.style.cssText = 'width:auto; margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem;';
+            tradeBtn.innerText = '🔄';
+            tradeBtn.onclick = () => openTradeComposer(row.friend_id, row.display_name);
             div.querySelector('.history-stats').appendChild(chatBtn);
+            div.querySelector('.history-stats').appendChild(tradeBtn);
         } else if (row.is_incoming_request) {
             div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats"></span>`;
             let acceptBtn = document.createElement('button');
@@ -884,6 +890,167 @@ async function initEconomy() {
     await fetchDailyLoginStatus();
     await fetchDailyQuestStatus();
     if (typeof fetchAchievements === 'function') await fetchAchievements();
+}
+
+// Item trading (friends only) - see supabase/schema.sql's trade_offers
+// table and create_trade_offer/respond_trade_offer/cancel_trade_offer/
+// get_my_trade_offers/get_friend_items functions. Every mutation goes
+// through one of those (never a raw client insert/update on trade_offers
+// or player_items.player_id) since accepting a trade has to atomically
+// move state between TWO different players' rows - exactly the kind of
+// thing this codebase's RLS can only ever reason about one row at a time.
+let tradeTargetFriendId = null;
+
+function tradeItemLabel(item) {
+    if (!item) return null;
+    let info = itemDisplayInfo(item);
+    let rarity = RARITY_DEFS[item.rarity];
+    return `${info.emoji} ${info.name} <span style="color:${rarity ? rarity.color : '#fff'}">(${rarity ? rarity.label : item.rarity})</span>`;
+}
+
+async function fetchFriendItems(friendId) {
+    const { data, error } = await sb.rpc('get_friend_items', { p_friend_id: friendId });
+    if (error) { console.error('get_friend_items failed:', error.message); return []; }
+    return data;
+}
+
+async function createTradeOffer(toPlayer, offerItemId, requestItemId, offerGold, requestGold) {
+    const { data, error } = await sb.rpc('create_trade_offer', {
+        p_to_player: toPlayer,
+        p_offer_item_id: offerItemId || null,
+        p_request_item_id: requestItemId || null,
+        p_offer_gold: offerGold || 0,
+        p_request_gold: requestGold || 0
+    });
+    if (error) { console.error('create_trade_offer failed:', error.message); return null; }
+    return data;
+}
+
+async function respondTradeOffer(offerId, accept) {
+    const { error } = await sb.rpc('respond_trade_offer', { p_offer_id: offerId, p_accept: accept });
+    if (error) { console.error('respond_trade_offer failed:', error.message); return { ok: false, message: error.message }; }
+    return { ok: true };
+}
+
+async function cancelTradeOffer(offerId) {
+    const { error } = await sb.rpc('cancel_trade_offer', { p_offer_id: offerId });
+    if (error) { console.error('cancel_trade_offer failed:', error.message); return false; }
+    return true;
+}
+
+async function fetchMyTradeOffers() {
+    const { data, error } = await sb.rpc('get_my_trade_offers');
+    if (error) { console.error('get_my_trade_offers failed:', error.message); return []; }
+    return data;
+}
+
+function openTradeComposer(friendId, friendName) {
+    tradeTargetFriendId = friendId;
+    document.getElementById('friends-roster-view').style.display = 'none';
+    document.getElementById('trade-compose-view').style.display = 'block';
+    document.getElementById('trade-compose-name').innerText = friendName;
+    document.getElementById('trade-compose-status').innerText = '';
+    renderTradeComposer();
+}
+
+function closeTradeComposer() {
+    tradeTargetFriendId = null;
+    document.getElementById('trade-compose-view').style.display = 'none';
+    document.getElementById('friends-roster-view').style.display = 'block';
+}
+
+async function renderTradeComposer() {
+    let myItems = currentOwnedItems.filter(i => !i.equipped_slot);
+    let theirItems = await fetchFriendItems(tradeTargetFriendId);
+
+    let myOptions = '<option value="">— eşya yok, sadece altın —</option>' +
+        myItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity})</option>`).join('');
+    let theirOptions = '<option value="">— eşya yok, sadece altın —</option>' +
+        theirItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity})</option>`).join('');
+
+    document.getElementById('trade-my-item-select').innerHTML = myOptions;
+    document.getElementById('trade-their-item-select').innerHTML = theirOptions;
+}
+
+async function submitTradeOffer() {
+    let myItemId = document.getElementById('trade-my-item-select').value || null;
+    let theirItemId = document.getElementById('trade-their-item-select').value || null;
+    let myGold = parseInt(document.getElementById('trade-my-gold-input').value, 10) || 0;
+    let theirGold = parseInt(document.getElementById('trade-their-gold-input').value, 10) || 0;
+    let status = document.getElementById('trade-compose-status');
+
+    if (!myItemId && myGold <= 0) {
+        if (status) status.innerText = 'En az bir eşya ya da altın teklif etmelisin.';
+        return;
+    }
+
+    let offerId = await createTradeOffer(tradeTargetFriendId, myItemId, theirItemId, myGold, theirGold);
+    if (offerId) {
+        if (status) status.innerText = 'Teklif gönderildi!';
+        setTimeout(closeTradeComposer, 1000);
+    } else {
+        if (status) status.innerText = 'Teklif gönderilemedi, tekrar dene.';
+    }
+}
+
+async function renderTradeOffers() {
+    let container = document.getElementById('trade-offers-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let offers = await fetchMyTradeOffers();
+    if (offers.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Bekleyen bir takas teklifin yok.</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    offers.forEach(o => {
+        let offerSide = o.offer_item_id
+            ? tradeItemLabel({ base_id: o.offer_base_id, slot: o.offer_slot, rarity: o.offer_rarity, rolled_stats: o.offer_rolled_stats, set_key: o.offer_set_key })
+            : null;
+        let requestSide = o.request_item_id
+            ? tradeItemLabel({ base_id: o.request_base_id, slot: o.request_slot, rarity: o.request_rarity, rolled_stats: o.request_rolled_stats, set_key: o.request_set_key })
+            : null;
+        let offerText = [offerSide, o.offer_gold > 0 ? `🪙 ${o.offer_gold}` : null].filter(Boolean).join(' + ') || '—';
+        let requestText = [requestSide, o.request_gold > 0 ? `🪙 ${o.request_gold}` : null].filter(Boolean).join(' + ') || '—';
+
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        div.style.cssText = 'flex-direction:column; align-items:flex-start; gap:4px;';
+        div.innerHTML = `
+            <span class="history-name">${o.direction === 'incoming' ? '📥' : '📤'} ${o.counterparty_name}</span>
+            <span style="font-size:0.75rem; color:#bdc3c7;">Verilen: ${offerText} → İstenen: ${requestText}</span>
+        `;
+        let btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex; gap:6px; margin-top:4px;';
+        if (o.direction === 'incoming') {
+            let acceptBtn = document.createElement('button');
+            acceptBtn.className = 'action-btn';
+            acceptBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+            acceptBtn.innerText = '✔ Kabul Et';
+            acceptBtn.onclick = () => respondTradeOffer(o.id, true).then(result => {
+                if (result.ok) { renderTradeOffers(); if (typeof fetchOwnedItems === 'function') fetchOwnedItems(); if (typeof fetchWallet === 'function') fetchWallet(); }
+                else alert('Takas başarısız: ' + result.message);
+            });
+            let declineBtn = document.createElement('button');
+            declineBtn.className = 'action-btn';
+            declineBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem; background:#555;';
+            declineBtn.innerText = 'Reddet';
+            declineBtn.onclick = () => respondTradeOffer(o.id, false).then(() => renderTradeOffers());
+            btnRow.appendChild(acceptBtn);
+            btnRow.appendChild(declineBtn);
+        } else {
+            let cancelBtn = document.createElement('button');
+            cancelBtn.className = 'action-btn';
+            cancelBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem; background:#c0392b;';
+            cancelBtn.innerText = 'İptal Et';
+            cancelBtn.onclick = () => cancelTradeOffer(o.id).then(ok => { if (ok) renderTradeOffers(); });
+            btnRow.appendChild(cancelBtn);
+        }
+        div.appendChild(btnRow);
+        container.appendChild(div);
+    });
 }
 
 initEconomy();

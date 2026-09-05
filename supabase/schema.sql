@@ -1560,3 +1560,247 @@ as $$
 $$;
 
 grant execute on function public.get_friends_list() to authenticated;
+
+-- 24. Item trading (friends only) -------------------------------------------------------
+-- Same "friends only" scoping as direct messages/guilds - trading with
+-- strangers is a classic scam vector (fake/bait-and-switch offers), and
+-- gating on mutual friendship keeps this to people who already chose to
+-- connect. 1-for-1 item trades only, each side optionally sweetening with
+-- gold - no multi-item bundles in this first cut.
+create table if not exists public.trade_offers (
+    id              uuid primary key default gen_random_uuid(),
+    from_player     uuid not null references public.players(id) on delete cascade,
+    to_player       uuid not null references public.players(id) on delete cascade,
+    offer_item_id   uuid references public.player_items(id) on delete cascade,
+    offer_gold      integer not null default 0 check (offer_gold >= 0),
+    request_item_id uuid references public.player_items(id) on delete cascade,
+    request_gold    integer not null default 0 check (request_gold >= 0),
+    status          text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled')),
+    created_at      timestamptz not null default now(),
+    check (offer_item_id is not null or offer_gold > 0),
+    check (from_player != to_player)
+);
+
+alter table public.trade_offers enable row level security;
+
+drop policy if exists "read own trade offers" on public.trade_offers;
+create policy "read own trade offers" on public.trade_offers
+    for select using (auth.uid() = from_player or auth.uid() = to_player);
+
+-- No insert/update policy - create/respond/cancel (all security definer)
+-- are the only writers, since accepting one has to atomically move an item
+-- and/or gold between two DIFFERENT players' rows, something RLS (which
+-- only ever reasons about ONE row's ownership) fundamentally can't express.
+create or replace function public.create_trade_offer(
+    p_to_player      uuid,
+    p_offer_item_id  uuid,
+    p_request_item_id uuid,
+    p_offer_gold     integer default 0,
+    p_request_gold   integer default 0
+)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me       uuid := auth.uid();
+    v_offer_id uuid;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+    if v_me = p_to_player then
+        raise exception 'cannot trade with yourself';
+    end if;
+    if p_offer_item_id is null and coalesce(p_offer_gold, 0) <= 0 then
+        raise exception 'offer must include an item or gold';
+    end if;
+
+    if not exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and ((f.requester_id = v_me and f.addressee_id = p_to_player)
+            or (f.requester_id = p_to_player and f.addressee_id = v_me))
+    ) then
+        raise exception 'not friends';
+    end if;
+
+    if p_offer_item_id is not null and not exists (
+        select 1 from public.player_items where id = p_offer_item_id and player_id = v_me
+    ) then
+        raise exception 'you do not own that item';
+    end if;
+
+    insert into public.trade_offers (from_player, to_player, offer_item_id, offer_gold, request_item_id, request_gold)
+        values (v_me, p_to_player, p_offer_item_id, coalesce(p_offer_gold, 0), p_request_item_id, coalesce(p_request_gold, 0))
+        returning id into v_offer_id;
+
+    return v_offer_id;
+end;
+$$;
+
+grant execute on function public.create_trade_offer(uuid, uuid, uuid, integer, integer) to authenticated;
+
+-- The trickiest part of this whole feature: two concurrent calls on the
+-- SAME offer (a double-click, a retry after a slow response) must never
+-- both execute the swap below. Fixed by claiming the offer FIRST, with a
+-- single atomic `update ... where status = 'pending' returning *` - under
+-- concurrent access, Postgres serializes that update per-row, so only the
+-- very first caller ever sees a returned row; every other caller (racing
+-- or retried) hits `if not found` and stops before touching any item or
+-- gold. Every validation below the claim runs in the SAME transaction the
+-- claim happened in, so if any of them fails, the raised exception rolls
+-- back EVERYTHING - including the claim itself - leaving the offer exactly
+-- back at 'pending' as if this call never happened, safe to retry.
+create or replace function public.respond_trade_offer(p_offer_id uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me    uuid := auth.uid();
+    v_offer public.trade_offers;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if not p_accept then
+        update public.trade_offers set status = 'declined'
+            where id = p_offer_id and to_player = v_me and status = 'pending';
+        return;
+    end if;
+
+    update public.trade_offers
+        set status = 'accepted'
+        where id = p_offer_id and to_player = v_me and status = 'pending'
+        returning * into v_offer;
+
+    if not found then
+        raise exception 'offer not found or already resolved';
+    end if;
+
+    if v_offer.offer_item_id is not null and not exists (
+        select 1 from public.player_items where id = v_offer.offer_item_id and player_id = v_offer.from_player
+    ) then
+        raise exception 'offered item no longer available';
+    end if;
+
+    if v_offer.request_item_id is not null and not exists (
+        select 1 from public.player_items where id = v_offer.request_item_id and player_id = v_me
+    ) then
+        raise exception 'requested item no longer available';
+    end if;
+
+    if v_offer.offer_gold > 0 and not exists (
+        select 1 from public.wallets where player_id = v_offer.from_player and gold >= v_offer.offer_gold
+    ) then
+        raise exception 'offerer no longer has enough gold';
+    end if;
+
+    if v_offer.request_gold > 0 and not exists (
+        select 1 from public.wallets where player_id = v_me and gold >= v_offer.request_gold
+    ) then
+        raise exception 'you do not have enough gold';
+    end if;
+
+    -- equipped_slot is always cleared on transfer - it's meaningless in the
+    -- new owner's build context, and leaving it set would silently give
+    -- them a "pre-equipped" item outside the normal equip flow.
+    if v_offer.offer_item_id is not null then
+        update public.player_items set player_id = v_me, equipped_slot = null where id = v_offer.offer_item_id;
+    end if;
+    if v_offer.request_item_id is not null then
+        update public.player_items set player_id = v_offer.from_player, equipped_slot = null where id = v_offer.request_item_id;
+    end if;
+    if v_offer.offer_gold > 0 then
+        update public.wallets set gold = gold - v_offer.offer_gold, updated_at = now() where player_id = v_offer.from_player;
+        update public.wallets set gold = gold + v_offer.offer_gold, updated_at = now() where player_id = v_me;
+    end if;
+    if v_offer.request_gold > 0 then
+        update public.wallets set gold = gold - v_offer.request_gold, updated_at = now() where player_id = v_me;
+        update public.wallets set gold = gold + v_offer.request_gold, updated_at = now() where player_id = v_offer.from_player;
+    end if;
+end;
+$$;
+
+grant execute on function public.respond_trade_offer(uuid, boolean) to authenticated;
+
+create or replace function public.cancel_trade_offer(p_offer_id uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    update public.trade_offers set status = 'cancelled'
+        where id = p_offer_id and from_player = auth.uid() and status = 'pending';
+$$;
+
+grant execute on function public.cancel_trade_offer(uuid) to authenticated;
+
+-- Denormalizes enough of each item's raw columns (base_id/slot/rarity/
+-- rolled_stats/set_key) for the client to render it with its own existing
+-- item-display logic, itemDisplayInfo() (items.js) - the same "server has
+-- no item-rendering code, client already does" split every other item-
+-- related feature here uses. itemDisplayInfo needs ALL FIVE of these
+-- (it branches on set_key first, then rarity, then does
+-- ITEM_BASES[item.slot].find(...)) - leaving any one of them out isn't a
+-- SQL error, it's a client-side crash the first time a real row comes back
+-- (caught by testing this with synthetic data before the real RPC existed
+-- to test against).
+create or replace function public.get_my_trade_offers()
+returns table(
+    id uuid, direction text, counterparty_name text,
+    offer_item_id uuid, offer_base_id text, offer_slot text, offer_rarity text, offer_rolled_stats jsonb, offer_set_key text,
+    offer_gold integer,
+    request_item_id uuid, request_base_id text, request_slot text, request_rarity text, request_rolled_stats jsonb, request_set_key text,
+    request_gold integer,
+    status text, created_at timestamptz
+)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select
+        t.id,
+        case when t.from_player = auth.uid() then 'outgoing' else 'incoming' end,
+        coalesce(p.display_name, 'İsimsiz Kahraman'),
+        oi.id, oi.base_id, oi.slot, oi.rarity, oi.rolled_stats, oi.set_key,
+        t.offer_gold,
+        ri.id, ri.base_id, ri.slot, ri.rarity, ri.rolled_stats, ri.set_key,
+        t.request_gold,
+        t.status, t.created_at
+    from public.trade_offers t
+    join public.players p on p.id = (case when t.from_player = auth.uid() then t.to_player else t.from_player end)
+    left join public.player_items oi on oi.id = t.offer_item_id
+    left join public.player_items ri on ri.id = t.request_item_id
+    where (t.from_player = auth.uid() or t.to_player = auth.uid())
+      and t.status = 'pending'
+    order by t.created_at desc;
+$$;
+
+grant execute on function public.get_my_trade_offers() to authenticated;
+
+-- "read own items" (player_items' only select policy) blocks a client from
+-- browsing anyone else's inventory, including a friend's - which makes
+-- proposing an item-for-item trade impossible without SOME way to see what
+-- a friend actually has. This opens that up, but ONLY between accepted
+-- friends (re-checked here, not just trusted from the client) - the same
+-- opt-in-mutual-connection gating as chat/guilds/trading itself.
+create or replace function public.get_friend_items(p_friend_id uuid)
+returns table(id uuid, base_id text, slot text, rarity text, rolled_stats jsonb)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select pi.id, pi.base_id, pi.slot, pi.rarity, pi.rolled_stats
+    from public.player_items pi
+    where pi.player_id = p_friend_id
+      and exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and ((f.requester_id = auth.uid() and f.addressee_id = p_friend_id)
+            or (f.requester_id = p_friend_id and f.addressee_id = auth.uid()))
+      );
+$$;
+
+grant execute on function public.get_friend_items(uuid) to authenticated;

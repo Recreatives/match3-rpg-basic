@@ -1466,8 +1466,9 @@ function toggleModal(modalId) {
             if (typeof pvpCancelQuickMatch === 'function') pvpCancelQuickMatch();
             if (typeof pvpStopWatching === 'function') pvpStopWatching();
         }
-        if (modalId === 'friends-modal' && typeof closeConversation === 'function') {
-            closeConversation();
+        if (modalId === 'friends-modal') {
+            if (typeof closeConversation === 'function') closeConversation();
+            if (typeof closeTradeComposer === 'function') closeTradeComposer();
         }
     } else {
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
@@ -1506,6 +1507,9 @@ function toggleModal(modalId) {
         }
         if (modalId === 'titles-modal' && typeof renderTitlesPanel === 'function') {
             renderTitlesPanel();
+        }
+        if (modalId === 'trade-modal' && typeof renderTradeOffers === 'function') {
+            renderTradeOffers();
         }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();
