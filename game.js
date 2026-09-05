@@ -1456,6 +1456,9 @@ function toggleModal(modalId) {
         if (modalId === 'leaderboard-modal' && typeof renderLeaderboard === 'function') {
             renderLeaderboard();
         }
+        if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
+            fetchDailyLoginStatus();
+        }
     }
 }
 

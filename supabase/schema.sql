@@ -579,3 +579,68 @@ alter table public.client_errors enable row level security;
 drop policy if exists "insert error reports" on public.client_errors;
 create policy "insert error reports" on public.client_errors
     for insert with check (true);
+
+-- 13. DAILY LOGIN REWARD -----------------------------------------------------
+-- Read-only from the client's side (claim_daily_reward is the only write
+-- path, same "security-definer RPC, not a raw update" rule as the wallet -
+-- see CLAUDE.md) - streak_count/last_claim_date could otherwise be
+-- rewritten directly to fake an indefinitely long streak.
+create table if not exists public.daily_login (
+    player_id       uuid primary key references public.players(id) on delete cascade,
+    last_claim_date date,
+    streak_count    integer not null default 0,
+    updated_at      timestamptz not null default now()
+);
+
+alter table public.daily_login enable row level security;
+
+drop policy if exists "read own daily login" on public.daily_login;
+create policy "read own daily login" on public.daily_login
+    for select using (auth.uid() = player_id);
+
+-- Streak logic: same calendar day as last claim -> reject (already
+-- claimed); exactly the next day -> streak continues; anything else (first
+-- ever claim, or a gap of 2+ days) -> streak restarts at 1. Reward grows
+-- 10/15/20/25/30/35/40 through day 7 of a streak, then holds at 40 - not
+-- open-ended, so a very long streak isn't worth more than a fresh one once
+-- it's a week old.
+--
+-- Output columns are deliberately NOT named gold/materials/streak_count/
+-- last_claim_date - RETURNS TABLE(...) declares those as OUT parameters in
+-- this function's own scope, which would shadow the wallets/daily_login
+-- columns of the same name and cause exactly the "column reference is
+-- ambiguous" runtime error earn_currency shipped with initially (see that
+-- function's own comment) - avoided here by construction instead of by a
+-- table alias.
+create or replace function public.claim_daily_reward()
+returns table(new_gold integer, new_streak integer, reward_gold integer)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_row public.daily_login;
+    v_today date := current_date;
+    v_streak integer;
+    v_reward integer;
+begin
+    select * into v_row from public.daily_login where player_id = auth.uid();
+
+    if not found then
+        v_streak := 1;
+        insert into public.daily_login (player_id, last_claim_date, streak_count)
+            values (auth.uid(), v_today, v_streak);
+    elsif v_row.last_claim_date = v_today then
+        raise exception 'claim_daily_reward: already claimed today';
+    else
+        v_streak := (case when v_row.last_claim_date = v_today - 1 then v_row.streak_count + 1 else 1 end);
+        update public.daily_login set last_claim_date = v_today, streak_count = v_streak, updated_at = now()
+            where player_id = auth.uid();
+    end if;
+
+    v_reward := 10 + (least(v_streak, 7) - 1) * 5;
+
+    update public.wallets w set gold = w.gold + v_reward, updated_at = now() where w.player_id = auth.uid();
+
+    return query select w.gold, v_streak, v_reward from public.wallets w where w.player_id = auth.uid();
+end;
+$$;

@@ -267,6 +267,77 @@ function setWalletStatus(text) {
     if (el) el.innerText = text;
 }
 
+// --- DAILY LOGIN REWARD ----------------------------------------------------
+// Read-only fetch for "can I claim today" UI state - claim_daily_reward()
+// (supabase/schema.sql) is the only thing that ever actually writes
+// last_claim_date/streak_count, this just informs the button's label before
+// the player clicks it. Comparing against the CLIENT's own local date is an
+// approximation (a player exactly at midnight in a timezone that disagrees
+// with the server's could see a stale "claim" button for a few minutes) -
+// acceptable for a casual reward, and claim_daily_reward() itself is the
+// real source of truth regardless (a stale button just means the RPC call
+// fails with "already claimed today" instead of the button never appearing).
+let currentDailyLogin = null;
+
+async function fetchDailyLoginStatus() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await sb.from('daily_login').select('last_claim_date, streak_count').eq('player_id', user.id).maybeSingle();
+    if (error) { console.error('Daily login fetch failed:', error.message); return null; }
+
+    currentDailyLogin = data; // null if never claimed before - that's a valid "claim available" state
+    if (typeof updateDailyLoginUI === 'function') updateDailyLoginUI();
+    return data;
+}
+
+async function claimDailyReward() {
+    const { data, error } = await sb.rpc('claim_daily_reward');
+    if (error) {
+        console.error('claim_daily_reward failed:', error.message);
+        return { ok: false, alreadyClaimed: error.message.includes('already claimed') };
+    }
+
+    const result = data[0];
+    currentWallet = currentWallet ? { ...currentWallet, gold: result.new_gold } : { gold: result.new_gold, materials: 0 };
+    updateWalletUI();
+    await fetchDailyLoginStatus();
+    return { ok: true, streak: result.new_streak, reward: result.reward_gold };
+}
+
+function dailyLoginCanClaimToday() {
+    if (!currentDailyLogin || !currentDailyLogin.last_claim_date) return true;
+    let todayStr = new Date().toISOString().slice(0, 10);
+    return currentDailyLogin.last_claim_date !== todayStr;
+}
+
+function updateDailyLoginUI() {
+    let canClaim = dailyLoginCanClaimToday();
+    let streak = currentDailyLogin ? currentDailyLogin.streak_count : 0;
+    let streakEl = document.getElementById('daily-login-streak');
+    let btn = document.getElementById('daily-login-claim-btn');
+    let topBarBtn = document.getElementById('daily-login-btn');
+    if (streakEl) streakEl.innerText = `Seri: ${streak} gün`;
+    if (btn) {
+        btn.disabled = !canClaim;
+        btn.innerText = canClaim ? 'Ödülü Al' : 'Bugün zaten aldın, yarın gel!';
+        btn.style.opacity = canClaim ? '1' : '0.6';
+    }
+    // A quiet dot on the top-bar button so a claimable reward is noticeable
+    // without having to open the modal first.
+    if (topBarBtn) topBarBtn.innerHTML = canClaim ? '🎁 Günlük Ödül <span style="color:#e74c3c;">●</span>' : '🎁 Günlük Ödül';
+}
+
+async function handleClaimDailyReward() {
+    let result = await claimDailyReward();
+    let status = document.getElementById('daily-login-status');
+    if (!result.ok) {
+        if (status) status.innerText = result.alreadyClaimed ? 'Bugün zaten aldın, yarın tekrar gel!' : 'Bir hata oldu, tekrar dene.';
+        return;
+    }
+    if (status) status.innerText = `+${result.reward} 🪙 kazandın! (${result.streak}. gün serisi)`;
+}
+
 async function initEconomy() {
     setWalletStatus('Bağlanıyor…');
     const session = await ensureSession();
@@ -282,6 +353,7 @@ async function initEconomy() {
     if (!session) return;
     await fetchWallet();
     await fetchOwnedItems();
+    await fetchDailyLoginStatus();
     if (typeof fetchAchievements === 'function') await fetchAchievements();
 }
 
