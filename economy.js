@@ -253,6 +253,110 @@ async function handleAccountResetPassword() {
     showAccountView('login');
 }
 
+// --- AUTH GATE ------------------------------------------------------------
+// A returning player opening the game on a fresh browser/device used to be
+// silently handed a brand-new, empty anonymous account before ever being
+// asked "do you already have one?" - by the time they noticed (mid-game,
+// digging through Profile > Account), logging in properly meant abandoning
+// whatever they'd already done in that throwaway session. This gate runs
+// once at boot, BEFORE any anonymous session gets created (see game.js's
+// boot()), and only for a genuinely first-ever visit - a browser that
+// already has a session (anonymous or real) skips straight to bootGame()
+// as before, so returning players of either kind are never interrupted.
+//
+// Deliberately a separate, minimal set of views/handlers from the
+// account-modal ones above, even though the underlying account*()/
+// accountConfirmPasswordReset() calls are identical - the two contexts
+// have different "what happens after success" behavior (this one has to
+// dismiss itself and boot the game; the modal one just refreshes its own
+// status view) and different back-navigation targets, so sharing one set
+// of view divs between them would mean threading a "came from the gate"
+// flag through every account-modal handler instead of keeping that
+// concern contained to the handful of small functions below.
+
+function showGateView(view) {
+    ['choice', 'login', 'register', 'verify', 'forgot', 'reset'].forEach(v => {
+        let el = document.getElementById('gate-view-' + v);
+        if (el) el.style.display = (v === view) ? 'block' : 'none';
+    });
+    let msg = document.getElementById('gate-status-msg');
+    if (msg) msg.innerText = '';
+}
+
+function dismissGateAndBoot() {
+    let gate = document.getElementById('auth-gate');
+    if (gate) gate.style.display = 'none';
+    if (typeof bootGame === 'function') bootGame();
+}
+
+async function gateContinueAsGuest() {
+    await ensureSession();
+    dismissGateAndBoot();
+}
+
+async function handleGateLogin() {
+    let email = document.getElementById('gate-login-email').value;
+    let password = document.getElementById('gate-login-password').value;
+    let msg = document.getElementById('gate-status-msg');
+    let result = await accountLogin(email, password);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Email veya şifre hatalı.'; return; }
+    dismissGateAndBoot();
+}
+
+async function handleGateRegister() {
+    let email = document.getElementById('gate-register-email').value;
+    let password = document.getElementById('gate-register-password').value;
+    let msg = document.getElementById('gate-status-msg');
+    // No anonymous session exists yet at the gate, so accountRegisterOrUpgrade
+    // takes its signUp() branch here, not the upgrade one - there's no prior
+    // progress to preserve, so no anonymous account needs to be created at all.
+    let result = await accountRegisterOrUpgrade(email, password);
+    if (!result.ok) {
+        const messages = { invalid: 'Geçerli bir email ve en az 6 karakterli bir şifre gir.', taken: 'Bu email zaten kayıtlı - Giriş Yap\'ı dene.', error: 'Bir şeyler ters gitti, tekrar dene.' };
+        if (msg) msg.innerText = messages[result.reason] || messages.error;
+        return;
+    }
+    pendingAccountEmail = email.trim();
+    pendingAccountPassword = result.isUpgrade ? password : null;
+    pendingAccountIsUpgrade = result.isUpgrade;
+    showGateView('verify');
+}
+
+async function handleGateVerify() {
+    let code = document.getElementById('gate-verify-code').value;
+    let msg = document.getElementById('gate-status-msg');
+    let result = await accountVerifySignupCode(pendingAccountEmail, code, pendingAccountIsUpgrade);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Kod hatalı ya da süresi dolmuş.'; return; }
+
+    if (pendingAccountIsUpgrade && pendingAccountPassword) {
+        let pwResult = await accountFinishUpgradePassword(pendingAccountPassword);
+        pendingAccountPassword = null;
+        if (pwResult !== 'ok') { if (msg) msg.innerText = 'Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.'; return; }
+    }
+    dismissGateAndBoot();
+}
+
+async function handleGateForgotPassword() {
+    let email = document.getElementById('gate-forgot-email').value;
+    let msg = document.getElementById('gate-status-msg');
+    let result = await accountRequestPasswordReset(email);
+    if (result !== 'ok') { if (msg) msg.innerText = 'Kod gönderilemedi, email adresini kontrol et.'; return; }
+    pendingResetEmail = email.trim();
+    showGateView('reset');
+}
+
+async function handleGateResetPassword() {
+    let code = document.getElementById('gate-reset-code').value;
+    let newPassword = document.getElementById('gate-reset-password').value;
+    let msg = document.getElementById('gate-status-msg');
+    let result = await accountConfirmPasswordReset(pendingResetEmail, code, newPassword);
+    const messages = { invalid: 'Şifre en az 6 karakter olmalı.', error: 'Kod hatalı ya da süresi dolmuş.' };
+    if (result !== 'ok') { if (msg) msg.innerText = messages[result] || messages.error; return; }
+    // verifyOtp('recovery') inside accountConfirmPasswordReset already
+    // signs the player in with a real session - nothing left to log into.
+    dismissGateAndBoot();
+}
+
 async function fetchWallet() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -1430,7 +1534,9 @@ async function handlePrestige() {
     }
 }
 
-initEconomy();
-if (typeof renderSeasonalEventBanner === 'function') renderSeasonalEventBanner();
-if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
-if (typeof fetchPrestigeLevel === 'function') fetchPrestigeLevel();
+// Session-dependent bootstrap (initEconomy + these three) used to run
+// unconditionally right here, the moment this script loaded - meaning a
+// brand new browser got a throwaway anonymous account before ever being
+// asked "do you already have one?". Now deferred to bootGame() (game.js),
+// called only once the auth gate resolves (existing session found, guest
+// chosen, or login/registration completes) - see game.js's boot().

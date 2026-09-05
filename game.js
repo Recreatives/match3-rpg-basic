@@ -1777,6 +1777,28 @@ function maybeShowTutorial() {
     if (typeof trackEvent === 'function') trackEvent('tutorial_started', {});
 }
 
-createBoard();
-renderClassButtons();
-maybeShowTutorial();
+// The actual game boot, deferred until the auth gate resolves (see boot()
+// below) - this used to just run unconditionally at script-load time.
+function bootGame() {
+    createBoard();
+    renderClassButtons();
+    maybeShowTutorial();
+    if (typeof initEconomy === 'function') initEconomy();
+    if (typeof renderSeasonalEventBanner === 'function') renderSeasonalEventBanner();
+    if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
+    if (typeof fetchPrestigeLevel === 'function') fetchPrestigeLevel();
+}
+
+// A browser that already has ANY session (anonymous or real) skips the
+// gate and boots straight in, exactly like before this feature existed -
+// only a genuinely first-ever visit (no session at all yet) sees it, so
+// a returning player of either kind is never interrupted. This is also
+// why the gate has to be checked here, before bootGame()/initEconomy()
+// ever runs ensureSession() - once that creates an anonymous session,
+// "no session yet" would never be true again and the gate would never show.
+(async function boot() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) { bootGame(); return; }
+    let gate = document.getElementById('auth-gate');
+    if (gate) gate.style.display = 'flex'; else bootGame();
+})();
