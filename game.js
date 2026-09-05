@@ -1610,6 +1610,13 @@ function toggleStatsTooltipTouch(tooltipId, getEnemyStats) {
 }
 
 function renderHistory() {
+    // Persistent equipment (weapon/shield/.../trinket + set-bonus progress)
+    // shown right on the stats screen, not just buried in the shop modal -
+    // this screen's whole title promises "STATLAR & EŞYALAR" (stats AND
+    // items), so it should actually show the items, not just this run's
+    // temporary reward picks below.
+    if (typeof renderEquippedSlotsInto === 'function') renderEquippedSlotsInto('history-equipped-slots');
+
     const listContainer = document.getElementById('history-list-container');
     const summaryContainer = document.getElementById('total-stats-summary');
 

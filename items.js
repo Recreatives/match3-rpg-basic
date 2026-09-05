@@ -427,14 +427,51 @@ function renderShop() {
 
 // --- INVENTORY UI (equip slots + full item list) --------------------------------
 
-function renderInventory() {
-    let container = document.getElementById('inventory-list');
+// One entry per set that has AT LEAST ONE equipped piece (owning pieces
+// unequipped doesn't count - same rule applyEquippedItemBonuses, items.js,
+// already enforces for the actual bonus). Shared by the equipped-slots
+// section and every individual set-item row, so "how many pieces until the
+// bonus kicks in" is answered in both places instead of a player having to
+// infer it from the set's name alone.
+function getSetProgress(ownedItems) {
+    let progress = {};
+    Object.entries(ITEM_SETS).forEach(([setKey, set]) => {
+        let totalCount = Object.keys(set.pieces).length;
+        let equippedCount = (ownedItems || []).filter(it => it.set_key === setKey && it.equipped_slot).length;
+        if (equippedCount > 0) {
+            progress[setKey] = { equippedCount, totalCount, isActive: equippedCount === totalCount, name: set.name, bonusDesc: set.bonusDesc };
+        }
+    });
+    return progress;
+}
+
+// Renders the 8 equip slots (weapon/shield/.../trinket) into the given
+// container id - shared by the Envanter tab and the Loot/Stats screen, so
+// a player doesn't have to open the shop modal just to see what they
+// currently have on. Returns nothing; safe to call even if the container
+// doesn't exist on the current page (Loot/Stats markup only exists once).
+function renderEquippedSlotsInto(containerId) {
+    let container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = '';
 
-    let slotsDiv = document.createElement('div');
-    slotsDiv.className = 'modal-section';
-    slotsDiv.innerHTML = `<h4>Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">⚡ Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span></h4>`;
+    let setProgress = getSetProgress(currentOwnedItems);
+    let setKeys = Object.keys(setProgress);
+    if (setKeys.length > 0) {
+        let setSummary = document.createElement('div');
+        setSummary.style.cssText = 'font-size:0.8rem; margin-bottom:8px; padding:8px; background:rgba(34,197,94,0.08); border-left:3px solid #22c55e; border-radius:4px;';
+        setSummary.innerHTML = setKeys.map(key => {
+            let p = setProgress[key];
+            let icon = p.isActive ? '✅' : '⏳';
+            return `${icon} <b>${p.name}</b> (${p.equippedCount}/${p.totalCount})${p.isActive ? ` - <span style="color:#22c55e;">aktif: ${p.bonusDesc}</span>` : ` - tümü kuşanılınca: ${p.bonusDesc}`}`;
+        }).join('<br>');
+        container.appendChild(setSummary);
+    }
+
+    let header = document.createElement('h4');
+    header.innerHTML = `Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">⚡ Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span>`;
+    container.appendChild(header);
+
     ITEM_SLOTS.forEach(slot => {
         let equipped = currentOwnedItems.find(it => it.equipped_slot === slot);
         let row = document.createElement('div');
@@ -447,9 +484,20 @@ function renderInventory() {
         } else {
             row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
         }
-        slotsDiv.appendChild(row);
+        container.appendChild(row);
     });
+}
+
+function renderInventory() {
+    let container = document.getElementById('inventory-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    let slotsDiv = document.createElement('div');
+    slotsDiv.className = 'modal-section';
+    slotsDiv.id = 'inventory-equipped-slots';
     container.appendChild(slotsDiv);
+    renderEquippedSlotsInto('inventory-equipped-slots');
 
     let listDiv = document.createElement('div');
     listDiv.className = 'modal-section';
@@ -484,7 +532,18 @@ function renderInventory() {
         // btnWrap below for the same reason.
         desc.style.flex = '1 1 100%';
         desc.style.minWidth = '0';
-        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
+        let setLine = '';
+        if (item.set_key) {
+            let set = ITEM_SETS[item.set_key];
+            let totalCount = Object.keys(set.pieces).length;
+            let equippedCount = currentOwnedItems.filter(it => it.set_key === item.set_key && it.equipped_slot).length;
+            // Tells a player exactly how close they are to the bonus, right
+            // on the item itself - previously this only said the set's NAME,
+            // with no indication of how many pieces it needs or what
+            // equipping them all actually does.
+            setLine = ` · Set: ${set.name} (${equippedCount}/${totalCount}) → ${set.bonusDesc}`;
+        }
+        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}`;
         row.appendChild(desc);
 
         let btnWrap = document.createElement('div');
