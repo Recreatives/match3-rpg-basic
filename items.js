@@ -110,6 +110,17 @@ const RARITY_DEFS = {
     teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
 };
 
+// Display-only mirrors of supabase/schema.sql's item_scrap_values /
+// item_upgrade_costs - the actual amounts are enforced server-side
+// (scrap_item/upgrade_item), these just label the buttons correctly. Keep
+// in sync with that file if the numbers ever change.
+const ITEM_SCRAP_VALUES = { grey: 1, white: 2, blue: 4, yellow: 8, green: 15, orange: 15, red: 15, teal: 15 };
+const ITEM_UPGRADE_COSTS = {
+    grey: { to: 'white', gold: 20, materials: 2 },
+    white: { to: 'blue', gold: 50, materials: 5 },
+    blue: { to: 'yellow', gold: 120, materials: 12 }
+};
+
 // The hand-authored Green (Set) gear - slotted into the full 8-slot system
 // now. Stats are fixed, not rolled - a set needs to mean the same thing
 // every time. Every slot has at least one set piece somewhere below.
@@ -390,12 +401,40 @@ function renderInventory() {
             desc.innerHTML = `<b>${info.emoji} ${rarity.mark} ${rarity.name} ${info.name}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
             row.appendChild(desc);
 
+            let btnWrap = document.createElement('div');
+            btnWrap.style.display = 'flex'; btnWrap.style.gap = '4px'; btnWrap.style.flexShrink = '0'; btnWrap.style.flexWrap = 'wrap';
+
             let btn = document.createElement('button');
             btn.className = 'action-btn';
-            btn.style.width = 'auto'; btn.style.margin = '0'; btn.style.flexShrink = '0';
+            btn.style.width = 'auto'; btn.style.margin = '0';
             if (item.equipped_slot) { btn.innerText = 'ÇIKAR'; btn.onclick = () => unequipItem(item.id); }
             else { btn.innerText = 'KUŞAN'; btn.onclick = () => equipItem(item.id); }
-            row.appendChild(btn);
+            btnWrap.appendChild(btn);
+
+            // Scrap/upgrade only make sense for an item that's just sitting
+            // in the bag - an equipped item stays put until you take it off
+            // (scrap_item/upgrade_item, supabase/schema.sql, enforce this
+            // server-side too, this just avoids offering a button that
+            // would fail).
+            if (!item.equipped_slot) {
+                if (ITEM_UPGRADE_COSTS[item.rarity]) {
+                    let uc = ITEM_UPGRADE_COSTS[item.rarity];
+                    let upBtn = document.createElement('button');
+                    upBtn.className = 'action-btn';
+                    upBtn.style.width = 'auto'; upBtn.style.margin = '0'; upBtn.style.background = '#8e44ad';
+                    upBtn.innerText = `⬆️ ${uc.gold}🪙 ${uc.materials}🪨`;
+                    upBtn.onclick = () => upgradeItem(item.id);
+                    btnWrap.appendChild(upBtn);
+                }
+                let scrapBtn = document.createElement('button');
+                scrapBtn.className = 'action-btn';
+                scrapBtn.style.width = 'auto'; scrapBtn.style.margin = '0'; scrapBtn.style.background = '#7f8c8d';
+                scrapBtn.innerText = `♻️ +${ITEM_SCRAP_VALUES[item.rarity] || 1}🪨`;
+                scrapBtn.title = 'Hurdaya çevir';
+                scrapBtn.onclick = () => scrapItem(item.id);
+                btnWrap.appendChild(scrapBtn);
+            }
+            row.appendChild(btnWrap);
 
             listDiv.appendChild(row);
         });

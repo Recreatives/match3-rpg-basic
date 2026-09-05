@@ -176,6 +176,45 @@ async function unequipItem(itemRowId) {
     return true;
 }
 
+// --- SCRAP & UPGRADE ---------------------------------------------------------
+// Materials had no real source or sink before this - scrapping an unwanted,
+// unequipped item is now the main way to earn them (scrap_item, security
+// definer - see supabase/schema.sql for why this can't just be a client
+// DELETE: there's no DELETE policy on player_items at all).
+async function scrapItem(itemId) {
+    const { data, error } = await sb.rpc('scrap_item', { p_item_id: itemId });
+    if (error) {
+        console.error('scrap_item failed:', error.message);
+        setShopStatus(error.message.includes('unequip it first') ? 'Önce çıkarman lazım.' : 'Hurdaya çevrilemedi.');
+        return false;
+    }
+    currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
+    await fetchWallet();
+    setShopStatus(`🪨 +${data} hammadde kazandın.`);
+    if (typeof renderInventory === 'function') renderInventory();
+    return true;
+}
+
+// Rerolls a procedural item (grey/white/blue only) one rarity tier up -
+// same reasoning as purchase_item for why this rolls server-side
+// (upgrade_item, security definer) rather than the client supplying its own
+// "upgraded" stats.
+async function upgradeItem(itemId) {
+    const { data, error } = await sb.rpc('upgrade_item', { p_item_id: itemId });
+    if (error) {
+        console.error('upgrade_item failed:', error.message);
+        setShopStatus(error.message.includes('insufficient') ? 'Yeterli altın/hammadde yok.' : 'Geliştirilemedi.');
+        return false;
+    }
+    let idx = currentOwnedItems.findIndex(it => it.id === itemId);
+    if (idx !== -1) currentOwnedItems[idx] = data;
+    await fetchWallet();
+    let rarity = typeof RARITY_DEFS !== 'undefined' ? RARITY_DEFS[data.rarity] : null;
+    setShopStatus(rarity ? `${rarity.mark} ${rarity.name} seviyesine yükseltildi!` : 'Yükseltildi!');
+    if (typeof renderInventory === 'function') renderInventory();
+    return true;
+}
+
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.

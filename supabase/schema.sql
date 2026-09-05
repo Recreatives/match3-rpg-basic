@@ -699,3 +699,178 @@ begin
     return query select v_reward, false;
 end;
 $$;
+
+-- 15. CLOSE A GAP FOUND WHILE BUILDING THE NEXT SECTION -----------------------
+-- "update own items" (section 7) only ever checked row OWNERSHIP, never
+-- WHICH COLUMNS changed - it was written for equip/unequip
+-- (economy.js's equipItem/unequipItem, the only client-side .update() call
+-- on this table), but as written a client could just as easily
+-- .update({ rarity: 'teal', rolled_stats: {...anything...} }) on their own
+-- row and rewrite any item into anything, completely bypassing both the
+-- shop and validate_player_item_insert (which - being BEFORE INSERT - never
+-- runs on an UPDATE at all). Found while designing upgrade_item() below,
+-- which legitimately DOES need to change rarity/rolled_stats - it marks
+-- itself trusted via a transaction-local setting so this trigger lets it
+-- through; every other caller (i.e. a direct client update) may only ever
+-- change equipped_slot.
+create or replace function public.validate_player_item_update()
+returns trigger
+language plpgsql
+as $$
+begin
+    if current_setting('app.trusted_item_update', true) = 'true' then
+        return new;
+    end if;
+    if new.base_id <> old.base_id or new.slot <> old.slot or new.rarity <> old.rarity
+        or new.rolled_stats <> old.rolled_stats or coalesce(new.set_key, '') <> coalesce(old.set_key, '') then
+        raise exception 'validate_player_item_update: only equipped_slot may be changed directly';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists validate_player_item_update_trg on public.player_items;
+create trigger validate_player_item_update_trg
+    before update on public.player_items
+    for each row execute function public.validate_player_item_update();
+
+-- 16. ITEM SCRAP & UPGRADE ----------------------------------------------------
+-- `materials` existed since the very first version of this schema but had
+-- no real source or sink beyond the tiny PvP loyalty bonus - scrapping an
+-- unwanted item is now the main way to earn them, upgrading a procedural
+-- item the main way to spend them.
+
+create table if not exists public.item_scrap_values (
+    rarity    text primary key,
+    materials integer not null
+);
+insert into public.item_scrap_values (rarity, materials) values
+    ('grey', 1), ('white', 2), ('blue', 4), ('yellow', 8),
+    ('green', 15), ('orange', 15), ('red', 15), ('teal', 15)
+on conflict (rarity) do update set materials = excluded.materials;
+
+alter table public.item_scrap_values enable row level security;
+drop policy if exists "read item scrap values" on public.item_scrap_values;
+create policy "read item scrap values" on public.item_scrap_values for select using (true);
+
+-- Deletes an owned, unequipped item and grants materials for it. There is
+-- no DELETE policy on player_items at all - only this security-definer
+-- function can remove a row (it runs as the table owner, bypassing RLS,
+-- and enforces ownership itself via the player_id = auth.uid() check below
+-- rather than relying on a policy).
+create or replace function public.scrap_item(p_item_id uuid)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_item public.player_items;
+    v_materials integer;
+begin
+    select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid();
+    if not found then
+        raise exception 'scrap_item: item not found or not yours';
+    end if;
+    if v_item.equipped_slot is not null then
+        raise exception 'scrap_item: unequip it first';
+    end if;
+
+    select materials into v_materials from public.item_scrap_values where rarity = v_item.rarity;
+    v_materials := coalesce(v_materials, 1);
+
+    delete from public.player_items where id = p_item_id and player_id = auth.uid();
+    update public.wallets w set materials = w.materials + v_materials, updated_at = now() where w.player_id = auth.uid();
+
+    return v_materials;
+end;
+$$;
+
+-- Procedural rarities only (grey/white/blue -> next tier up) - yellow is
+-- the ceiling reached this way, never upgraded further; orange/red/teal/
+-- green are fixed-identity and never roll (UNIQUE_LEGENDARIES/ITEM_SETS,
+-- items.js), so "upgrading" one has no meaning. Rerolls the item's stats
+-- fresh at the new tier (same shape as purchase_item's own roll) rather
+-- than scaling the existing numbers - equip status carries over.
+create table if not exists public.item_upgrade_costs (
+    from_rarity   text primary key,
+    to_rarity     text not null,
+    gold_cost     integer not null,
+    material_cost integer not null
+);
+insert into public.item_upgrade_costs (from_rarity, to_rarity, gold_cost, material_cost) values
+    ('grey', 'white', 20, 2),
+    ('white', 'blue', 50, 5),
+    ('blue', 'yellow', 120, 12)
+on conflict (from_rarity) do update set to_rarity = excluded.to_rarity, gold_cost = excluded.gold_cost, material_cost = excluded.material_cost;
+
+alter table public.item_upgrade_costs enable row level security;
+drop policy if exists "read item upgrade costs" on public.item_upgrade_costs;
+create policy "read item upgrade costs" on public.item_upgrade_costs for select using (true);
+
+create or replace function public.upgrade_item(p_item_id uuid)
+returns public.player_items
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_item public.player_items;
+    v_cost public.item_upgrade_costs;
+    v_base_range jsonb := '{"sword":2,"heart":2,"shield":2,"energy":3,"skull_dmg":4,"ult_dmg":5,"lifeSteal":2,"teamHeal":2,"skull_self_dmg":2}'::jsonb;
+    v_affix_count integer;
+    v_stat_mult numeric;
+    v_stats jsonb := '{}'::jsonb;
+    v_primary_stat text;
+    v_pool text[];
+    v_pick text;
+    v_rolled integer;
+    v_i integer;
+    v_row public.player_items;
+begin
+    select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid();
+    if not found then
+        raise exception 'upgrade_item: item not found or not yours';
+    end if;
+
+    select * into v_cost from public.item_upgrade_costs where from_rarity = v_item.rarity;
+    if not found then
+        raise exception 'upgrade_item: % cannot be upgraded', v_item.rarity;
+    end if;
+
+    update public.wallets w set gold = w.gold - v_cost.gold_cost, materials = w.materials - v_cost.material_cost, updated_at = now()
+        where w.player_id = auth.uid() and w.gold >= v_cost.gold_cost and w.materials >= v_cost.material_cost;
+    if not found then
+        raise exception 'upgrade_item: insufficient gold or materials';
+    end if;
+
+    v_affix_count := case v_cost.to_rarity when 'white' then 1 when 'blue' then 2 when 'yellow' then 4 end;
+    v_stat_mult := case v_cost.to_rarity when 'white' then 1.0 when 'blue' then 1.6 when 'yellow' then 2.4 end;
+
+    select primary_stat into v_primary_stat from public.item_bases where slot = v_item.slot and base_id = v_item.base_id;
+    if v_primary_stat is null then
+        raise exception 'upgrade_item: unknown base %/%', v_item.slot, v_item.base_id;
+    end if;
+
+    v_rolled := greatest(1, round((v_base_range->>v_primary_stat)::numeric * v_stat_mult * (0.8 + random() * 0.4)))::integer;
+    v_stats := jsonb_build_object(v_primary_stat, v_rolled);
+
+    select array_agg(s order by random()) into v_pool
+        from unnest(array['sword','heart','shield','energy','skull_dmg','ult_dmg','lifeSteal','teamHeal','skull_self_dmg']) as s
+        where s <> v_primary_stat;
+
+    for v_i in 1..(v_affix_count - 1) loop
+        exit when v_i > array_length(v_pool, 1);
+        v_pick := v_pool[v_i];
+        v_rolled := greatest(1, round((v_base_range->>v_pick)::numeric * v_stat_mult * 0.6 * (0.8 + random() * 0.4)))::integer;
+        if v_pick = 'skull_self_dmg' then v_rolled := -v_rolled; end if;
+        v_stats := v_stats || jsonb_build_object(v_pick, coalesce((v_stats->>v_pick)::integer, 0) + v_rolled);
+    end loop;
+
+    perform set_config('app.trusted_item_update', 'true', true);
+    update public.player_items
+        set rarity = v_cost.to_rarity, rolled_stats = v_stats
+        where id = p_item_id and player_id = auth.uid()
+        returning * into v_row;
+
+    return v_row;
+end;
+$$;
