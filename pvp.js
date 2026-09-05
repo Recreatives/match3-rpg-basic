@@ -679,6 +679,13 @@ function pvpUseUltimate() {
     pvpProcessing = true;
     selectedClass.ultEffect(makePvpCombatContext());
     pvpUltCharge = 0;
+
+    // Hiçliğin Fısıltısı (flagship legendary passive, items.js).
+    if (typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_whisper_of_the_void')) {
+        let heal = Math.floor(PVP_MAX_HP * 0.1);
+        if (heal > 0) pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
+    }
+
     pvpUpdateUI();
     if (typeof playSound === 'function') playSound('ult');
     if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
@@ -808,8 +815,21 @@ function pvpApplyGroupEffect(group, isInitial) {
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);
+        // Dünya Yiyen (flagship legendary passive, items.js) - checks
+        // pvpMyHP (own HP, always known) rather than the opponent's, which
+        // PvP deliberately never reveals as an exact number. The boosted
+        // `amount` below is what actually gets broadcast, so the opponent
+        // correctly takes the increased hit on their own side.
+        if (group.type === 'skull' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_world_eater') && pvpMyHP < PVP_MAX_HP * 0.5) {
+            amount = Math.floor(amount * 1.5);
+        }
         pvpMyTurnStats.damage += amount;
         pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+        // Gecenin Ağıtı (flagship legendary passive, items.js).
+        if (group.type === 'sword' && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_nights_lament')) {
+            let bonusArmor = Math.floor(amount * 0.2);
+            if (bonusArmor > 0) { pvpMyArmor += bonusArmor; pvpMyTurnStats.armor += bonusArmor; }
+        }
         if (group.type === 'skull') {
             let recoil = Math.floor(TILE_STATS.skull_self_dmg * multiplier);
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }

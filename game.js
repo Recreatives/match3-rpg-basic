@@ -1082,6 +1082,16 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
         log(`${user} Saldırı ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+        // Gecenin Ağıtı (flagship legendary passive, items.js) - only the
+        // player can ever own/equip it, so this never fires for an enemy's
+        // own sword match.
+        if (isPlayerTurn && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_nights_lament')) {
+            let bonusArmor = Math.floor(baseVal * 0.2);
+            if (bonusArmor > 0) {
+                playerArmor += bonusArmor;
+                log(`✨ Kan Zırhı: +${bonusArmor} Zırh`, 'log-armor');
+            }
+        }
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('hit');
 
@@ -1113,6 +1123,16 @@ function applyRPGEffects(type, multiplier) {
     } else if (type === 'skull') {
         let dmgToOpponent = Math.floor(stats.skull_dmg * multiplier);
         let recoil = Math.floor(stats.skull_self_dmg * multiplier);
+
+        // Dünya Yiyen (flagship legendary passive, items.js) - checks the
+        // PLAYER's own HP, never the enemy's, deliberately: a passive that
+        // read "enemy HP below 25%" would be impossible to replicate
+        // correctly in PvP, where an opponent's exact HP is intentionally
+        // never revealed (see pvp.js) - own-HP conditions work identically
+        // in every mode since a player always knows their own HP.
+        if (isPlayerTurn && typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_world_eater') && playerHP < maxPlayerHP * 0.5) {
+            dmgToOpponent = Math.floor(dmgToOpponent * 1.5);
+        }
 
         let self = isPlayerTurn ? 'player' : 'enemy';
         inflictDamage(target, dmgToOpponent);
@@ -1441,6 +1461,15 @@ function useUltimate() {
         // 2. Apply Effect
         selectedClass.ultEffect(makeSinglePlayerCombatContext());
         ultCharge = 0;
+
+        // Hiçliğin Fısıltısı (flagship legendary passive, items.js).
+        if (typeof hasEquippedItem === 'function' && hasEquippedItem('uniq_whisper_of_the_void')) {
+            let heal = Math.floor(maxPlayerHP * 0.1);
+            if (heal > 0) {
+                playerHP = Math.min(playerHP + heal, maxPlayerHP);
+                log(`✨ Boşluk Yankısı: +${heal} can`, 'log-heal');
+            }
+        }
 
         // 3. Visuals
         log(`ULTİMATE! ${selectedClass.ultName} kullanıldı!`, "log-hit");

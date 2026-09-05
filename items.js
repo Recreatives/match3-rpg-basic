@@ -165,7 +165,7 @@ const ITEM_SETS = {
 // (not yet enforced anywhere - purely descriptive for now, same as before).
 const UNIQUE_LEGENDARIES = {
     orange: {
-        weapon: { id: 'uniq_nights_lament', name: 'Gecenin Ağıtı', emoji: '⚔️', stats: { sword: 8, lifeSteal: 6 } },
+        weapon: { id: 'uniq_nights_lament', name: 'Gecenin Ağıtı', emoji: '⚔️', stats: { sword: 8, lifeSteal: 6 }, passiveDesc: 'Kan Zırhı: Kılıç eşleşmelerinde verdiğin hasarın %20\'si kadar ekstra Zırh kazanırsın.' },
         shield: { id: 'uniq_shield_of_eternity', name: 'Sonsuzluk Kalkanı', emoji: '🛡️', stats: { shield: 7, heart: 7 } },
         helmet: { id: 'uniq_oracles_crown', name: 'Kahinin Tacı', emoji: '👑', stats: { ult_dmg: 16, energy: 10 } },
         chest: { id: 'uniq_dragonheart_plate', name: 'Ejderha Yürek Zırhı', emoji: '🐉', stats: { shield: 7, heart: 7 } },
@@ -175,7 +175,7 @@ const UNIQUE_LEGENDARIES = {
         trinket: { id: 'uniq_ring_of_ancient_wisdom', name: 'Kadim Bilgelik Halkası', emoji: '💍', stats: { ult_dmg: 16, teamHeal: 6 } }
     },
     red: {
-        weapon: { id: 'uniq_world_eater', name: 'Dünya Yiyen', emoji: '⚔️', stats: { sword: 10, skull_dmg: 18, lifeSteal: 8 } },
+        weapon: { id: 'uniq_world_eater', name: 'Dünya Yiyen', emoji: '⚔️', stats: { sword: 10, skull_dmg: 18, lifeSteal: 8 }, passiveDesc: 'Çaresiz Öfke: Canın %50\'nin altındayken Kafatası hasarın %50 artar.' },
         shield: { id: 'uniq_the_last_wall', name: 'Son Duvar', emoji: '🛡️', stats: { shield: 9, heart: 9, energy: 13 } },
         helmet: { id: 'uniq_starfall_helm', name: 'Yıldız Düşüren Miğfer', emoji: '☄️', stats: { ult_dmg: 20, energy: 13, shield: 9 } },
         chest: { id: 'uniq_titans_hide', name: "Titan'ın Derisi", emoji: '🗿', stats: { shield: 9, heart: 9, sword: 10 } },
@@ -185,7 +185,7 @@ const UNIQUE_LEGENDARIES = {
         trinket: { id: 'uniq_eternity_core', name: 'Sonsuzluk Çekirdeği', emoji: '💠', stats: { ult_dmg: 20, energy: 13, teamHeal: 8 } }
     },
     teal: {
-        weapon: { id: 'uniq_whisper_of_the_void', name: 'Hiçliğin Fısıltısı', emoji: '🌌', stats: { ult_dmg: 18, lifeSteal: 7 } },
+        weapon: { id: 'uniq_whisper_of_the_void', name: 'Hiçliğin Fısıltısı', emoji: '🌌', stats: { ult_dmg: 18, lifeSteal: 7 }, passiveDesc: 'Boşluk Yankısı: Ultimate kullandığında maksimum canının %10\'u kadar iyileşirsin.' },
         shield: { id: 'uniq_shattered_time_aegis', name: 'Kırık Zaman Kalkanı', emoji: '⏱️', stats: { shield: 8, energy: 12 } },
         helmet: { id: 'uniq_astral_sight', name: 'Astral Görüş', emoji: '👁️', stats: { energy: 12, ult_dmg: 18 } },
         chest: { id: 'uniq_shroud_of_shadows', name: 'Gölge Örtüsü', emoji: '🌑', stats: { shield: 8, lifeSteal: 7 } },
@@ -252,6 +252,17 @@ function itemPower(item) {
 
 function totalEquippedPower(ownedItems) {
     return (ownedItems || []).filter(it => it.equipped_slot).reduce((sum, it) => sum + itemPower(it), 0);
+}
+
+// Checks by base_id (stable across every roll of that item, unlike the
+// row's own uuid) whether the CURRENT player has it equipped right now -
+// the one thing every flagship-legendary passive below needs to know
+// before doing anything extra. Deliberately global (not scoped to any one
+// mode's own state) so game.js/coop.js/pvp.js can all call the exact same
+// check and a passive behaves identically no matter which mode it's used
+// in.
+function hasEquippedItem(baseId) {
+    return (typeof currentOwnedItems !== 'undefined' ? currentOwnedItems : []).some(it => it.base_id === baseId && it.equipped_slot);
 }
 
 function rollAffixValue(stat, mult) {
@@ -353,7 +364,7 @@ function itemDisplayInfo(item) {
     let rarity = RARITY_DEFS[item.rarity];
     if (rarity && rarity.isUnique) {
         let uniq = UNIQUE_LEGENDARIES[item.rarity][item.slot];
-        return { name: uniq.name, emoji: uniq.emoji };
+        return { name: uniq.name, emoji: uniq.emoji, passiveDesc: uniq.passiveDesc || null };
     }
     let base = ITEM_BASES[item.slot] && ITEM_BASES[item.slot].find(b => b.id === item.base_id);
     if (!base) return { name: item.base_id, emoji: '❓' };
@@ -479,8 +490,9 @@ function renderEquippedSlotsInto(containerId) {
         if (equipped) {
             let rarity = RARITY_DEFS[equipped.rarity];
             let info = itemDisplayInfo(equipped);
+            let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
             row.innerHTML = `<span class="manual-icon">${info.emoji}</span>
-                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · ⚡${itemPower(equipped)}</div>`;
+                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · ⚡${itemPower(equipped)}${passiveLine}</div>`;
         } else {
             row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
         }
@@ -543,7 +555,8 @@ function renderInventory() {
             // equipping them all actually does.
             setLine = ` · Set: ${set.name} (${equippedCount}/${totalCount}) → ${set.bonusDesc}`;
         }
-        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}`;
+        let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
+        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · ⚡${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
         row.appendChild(desc);
 
         let btnWrap = document.createElement('div');
