@@ -549,7 +549,7 @@ function coopShowRewardPick() {
         let reward = rollOneReward();
         let btn = document.createElement('button');
         btn.className = `reward-btn rarity-${reward.tier}`;
-        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
+        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
             applyReward(reward);
             coopLog(`Güç seçildi: ${reward.name} (${reward.desc}) - sadece bu run için.`);

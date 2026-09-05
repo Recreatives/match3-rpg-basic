@@ -152,67 +152,67 @@ let rewardPicksLeft = 1;
 const CLASSES = {
     WARRIOR: {
         name: "Warrior", emoji: "🛡️",
-        desc: "<b>Tank:</b> Gains +2 Bonus Shield. Ult deals dmg based on your Armor.",
+        desc: "<b>Tank:</b> +2 Bonus Zırh kazanır. Ult, Zırhına göre hasar verir.",
         passive: (stats) => { stats.shield += 2; },
         dodgeChance: 0, incomingDmgMult: 1.0,
         ultName: "SHIELD SLAM",
         ultEffect: (ctx) => {
             let dmg = TILE_STATS.ult_dmg + ctx.getSelfArmor();
             ctx.dealDamageToOpponent(dmg);
-            ctx.log(`ULT: Shield Slam deals ${dmg} damage!`, "log-hit");
+            ctx.log(`ULT: Shield Slam ${dmg} hasar verdi!`, "log-hit");
         }
     },
     BERSERKER: {
         name: "Berserker", emoji: "🪓",
-        desc: "<b>DPS:</b> +5 Sword/ +15 Skull Dmg, but takes <b>35% MORE DAMAGE</b>.",
+        desc: "<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%35 DAHA FAZLA HASAR</b> alır.",
         passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
         dodgeChance: 0, incomingDmgMult: 1.25,
         ultName: "BLOOD LUST",
         ultEffect: (ctx) => {
             ctx.dealDirectDamageToSelf(10);
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg * 2);
-            ctx.log(`ULT: Blood Lust deals double damage!`, "log-crit");
+            ctx.log(`ULT: Blood Lust çift hasar verdi!`, "log-crit");
         }
     },
     ROGUE: {
         name: "Rogue", emoji: "🗡️",
-        desc: "<b>Combo:</b> Gains Energy fast. Ult grants an <b>EXTRA TURN</b>.",
+        desc: "<b>Kombo:</b> Hızlı Enerji kazanır. Ult, <b>EKSTRA TUR</b> verir.",
         passive: (stats) => { stats.energy += 5; },
         dodgeChance: 0.1, incomingDmgMult: 1.0,
         ultName: "ASSASSINATE",
         ultEffect: (ctx) => {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             ctx.grantExtraTurn();
-            ctx.log(`ULT: Assassinate! Extra Turn!`, "log-match");
+            ctx.log(`ULT: Assassinate! Ekstra Tur!`, "log-match");
         }
     },
     ARCHER: {
         name: "Archer", emoji: "🏹",
-        desc: "<b>Piercing:</b> <b>20% Dodge</b>. Ult ignores Armor and deals direct HP damage.",
+        desc: "<b>Delici:</b> <b>%20 Savuşturma</b>. Ult, Zırhı yok sayıp doğrudan can hasarı verir.",
         passive: (stats) => {},
         dodgeChance: 0.2, incomingDmgMult: 1.0,
         ultName: "PIERCING SHOT",
         ultEffect: (ctx) => {
             let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
             ctx.dealDirectDamageToOpponent(pierceDmg);
-            ctx.log(`ULT: Piercing Shot ignored Armor! -${pierceDmg} HP`, "log-crit");
+            ctx.log(`ULT: Piercing Shot zırhı yok saydı! -${pierceDmg} Can`, "log-crit");
         }
     },
     MAGE: {
         name: "Mage", emoji: "🧙",
-        desc: "<b>Scaling:</b> Ult gains <b>+10 Power</b> every use.",
+        desc: "<b>Ölçeklenme:</b> Ult her kullanımda <b>+10 Güç</b> kazanır.",
         passive: (stats) => { stats.energy += 10; stats.sword -= 2; },
         dodgeChance: 0, incomingDmgMult: 1.0,
         ultName: "ARCANE BLAST",
         ultEffect: (ctx) => {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             TILE_STATS.ult_dmg += 10;
-            ctx.log(`ULT: Power increased to ${TILE_STATS.ult_dmg}!`, "log-match");
+            ctx.log(`ULT: Güç ${TILE_STATS.ult_dmg}'e yükseldi!`, "log-match");
         }
     },
     NECROMANCER: {
         name: "Necromancer", emoji: "🧟",
-        desc: "<b>Life Drain:</b> +3% Life Steal, +8 Skull Dmg. Ult deals damage and heals for half of it.",
+        desc: "<b>Can Emme:</b> +%3 Can Çalma, +8 Kafatası Hasarı. Ult hasar verir ve yarısını iyileştirir.",
         passive: (stats) => { stats.lifeSteal += 3; stats.skull_dmg += 8; },
         dodgeChance: 0, incomingDmgMult: 1.0,
         ultName: "SOUL SIPHON",
@@ -221,12 +221,12 @@ const CLASSES = {
             let heal = Math.floor(dmg * 0.5);
             ctx.dealDamageToOpponent(dmg);
             ctx.healSelf(heal);
-            ctx.log(`ULT: Soul Siphon deals ${dmg} and heals ${heal}!`, "log-crit");
+            ctx.log(`ULT: Soul Siphon ${dmg} hasar verdi, ${heal} iyileştirdi!`, "log-crit");
         }
     },
     PALADIN: {
         name: "Paladin", emoji: "⚜️",
-        desc: "<b>Bulwark:</b> +3 Shield, +3 Heal, takes 15% LESS damage. Ult heals big and smites for a bit.",
+        desc: "<b>Kalkan:</b> +3 Zırh, +3 İyileşme, <b>%15 DAHA AZ</b> hasar alır. Ult büyük iyileştirir, biraz hasar verir.",
         passive: (stats) => { stats.shield += 3; stats.heart += 3; },
         dodgeChance: 0, incomingDmgMult: 0.85,
         ultName: "DIVINE JUDGEMENT",
@@ -235,7 +235,7 @@ const CLASSES = {
             let dmg = Math.floor(TILE_STATS.ult_dmg * 0.6);
             ctx.healSelf(heal);
             ctx.dealDamageToOpponent(dmg);
-            ctx.log(`ULT: Divine Judgement heals ${heal} and deals ${dmg}!`, "log-heal");
+            ctx.log(`ULT: Divine Judgement ${heal} iyileştirdi, ${dmg} hasar verdi!`, "log-heal");
         }
     }
 };
@@ -351,7 +351,7 @@ function handleOverlayClick() {
     if (currentState === STATE.START || currentState === STATE.GAMEOVER) {
         if (!selectedClass) {
             renderClassButtons();
-            overlayTitle.innerText = "SELECT YOUR HERO";
+            overlayTitle.innerText = "KAHRAMANINI SEÇ";
             return;
         }
         resetGame();
@@ -376,7 +376,7 @@ function resetGame() {
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
     enemySprite.classList.remove('dying');
-    log("Game Reset.", "log-turn");
+    log("Oyun sıfırlandı.", "log-turn");
 }
 
 function startLevel() {
@@ -398,15 +398,15 @@ function startLevel() {
     enemySprite.classList.remove('enraged');
     enemyArmor = currentMinionType === 'armored' ? Math.round(maxEnemyHP * MINION_ARMORED_PCT) : 0;
 
-    let name = isBoss ? `BOSS Lvl ${level}` : `Minion Lvl ${level}`;
+    let name = isBoss ? `BOSS Sv. ${level}` : `Canavar Sv. ${level}`;
     document.getElementById('enemy-name').innerText = name;
     document.getElementById('enemy-sprite').innerText = MINION_ICON[currentMinionType] || (isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4]);
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
-    if (isBoss) log("WARNING: BOSS BATTLE!", "log-crit");
+    if (isBoss) log("UYARI: BOSS SAVAŞI!", "log-crit");
     else if (MINION_LOG[currentMinionType]) log(MINION_LOG[currentMinionType], "log-enemy");
 
-    turnBanner.innerText = "PLAYER TURN";
+    turnBanner.innerText = "OYUNCU SIRASI";
     turnBanner.className = "turn-indicator turn-player";
     isPlayerTurn = true;
     isProcessing = false;
@@ -415,7 +415,7 @@ function startLevel() {
     createBoard();
     updateUI();
     startPlayerTimer();
-    log(`LEVEL ${level} START`, "log-turn");
+    log(`SEVİYE ${level} BAŞLADI`, "log-turn");
 }
 
 function checkWinCondition() {
@@ -431,7 +431,7 @@ function triggerDeathSequence(who) {
     if (who === 'enemy') {
         enemySprite.classList.remove('enemy-display');
         enemySprite.classList.add('dying');
-        log("ENEMY DEFEATED!", "log-crit");
+        log("DÜŞMAN YENİLDİ!", "log-crit");
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('victory');
         setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
@@ -468,18 +468,18 @@ function winLevel() {
     // NOTE: order matters here - the <=0.01 case must be checked before
     // <=0.10, otherwise it is unreachable (0.01 also satisfies <=0.10).
     let hpPercent = (playerHP / maxPlayerHP);
-    if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MIRACLE! Pick 5 Rewards!", "log-crit"); }
-    else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("DESPERATE WIN! Pick 3 Rewards!", "log-match"); }
-    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("FLAWLESS! Pick 3 Rewards!", "log-hit"); unlockAchievement('flawless_victory'); }
-    else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log("DECENT WIN! Pick 2 Rewards!", "log-match"); }
-    else { rewardPicksLeft = 1; log("Level Complete! Pick 1 Reward.", "log-hit"); }
+    if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MUCİZE! 5 Ödül Seç!", "log-crit"); }
+    else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("ÇARESİZ ZAFER! 3 Ödül Seç!", "log-match"); }
+    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("KUSURSUZ ZAFER! 3 Ödül Seç!", "log-hit"); unlockAchievement('flawless_victory'); }
+    else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log("İYİ ZAFER! 2 Ödül Seç!", "log-match"); }
+    else { rewardPicksLeft = 1; log("Seviye Tamamlandı! 1 Ödül Seç.", "log-hit"); }
 
     if (level % 5 === 0) unlockAchievement('boss_slayer');
 
     // Boss Bonus: an extra pick for clearing a boss level (Lvl 5, 10...)
     if (level % 5 === 0) {
         rewardPicksLeft += 1;
-        log("BOSS BONUS! +1 Reward!", "log-crit");
+        log("BOSS BONUSU! +1 Ödül!", "log-crit");
     }
 
     generateRewards();
@@ -503,15 +503,15 @@ function updateRewardTitle() {
         showBossCheckpoint();
         return;
     }
-    overlayTitle.innerText = `READY FOR LEVEL ${level + 1}?`;
-    overlayBtn.innerText = "START NEXT LEVEL";
+    overlayTitle.innerText = `SEVİYE ${level + 1} İÇİN HAZIR MISIN?`;
+    overlayBtn.innerText = "SONRAKİ SEVİYE";
     overlayBtn.style.display = 'block';
     overlayBtn.onclick = () => {
         let missingHP = maxPlayerHP - playerHP;
         let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
         if (healed > 0) {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
-            log(`Rest before battle: +${healed} HP`, 'log-heal');
+            log(`Savaş öncesi dinlenme: +${healed} Can`, 'log-heal');
         }
         level++;
         startLevel();
@@ -539,7 +539,7 @@ function showBossCheckpoint() {
         let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
         if (healed > 0) {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
-            log(`Rest before battle: +${healed} HP`, 'log-heal');
+            log(`Savaş öncesi dinlenme: +${healed} Can`, 'log-heal');
         }
         level++;
         startLevel();
@@ -561,60 +561,66 @@ function returnToMainMenu() {
     log('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.', 'log-turn');
 }
 
+// Turkish label for each REWARD_POOL tier key - used anywhere a tier is
+// shown to the player (the raw key was leaking into the UI as literal
+// English text, e.g. "(legendary)", in both solo's and co-op's reward-pick
+// buttons).
+const REWARD_TIER_LABELS = { common: 'Sıradan', uncommon: 'Az Bulunur', rare: 'Nadir', epic: 'Epik', legendary: 'Efsanevi' };
+
 // Shared by solo's between-level reward screen (generateRewards, 3 picks at
 // once) and co-op's smaller per-player version (coopShowRewardPick, one at
 // a time) - one pool, one tier-weighting rule, instead of two copies that
 // could quietly drift apart.
 const REWARD_POOL = [
     // === COMMON (40%) - 1 Stat ===
-        { tier: 'common', name: 'Whetstone', desc: 'Sword +1', fn: () => TILE_STATS.sword += 1 },
-        { tier: 'common', name: 'Leather Patch', desc: 'Shield +1', fn: () => TILE_STATS.shield += 1 },
-        { tier: 'common', name: 'Herb Mix', desc: 'Heal +1', fn: () => TILE_STATS.heart += 1 },
-        { tier: 'common', name: 'Meditation', desc: 'Energy +1', fn: () => TILE_STATS.energy += 1 },
-        { tier: 'common', name: 'Bone Shard', desc: 'Skull Dmg +6/ Self Dmg +3', fn: () => { TILE_STATS.skull_dmg += 6; TILE_STATS.skull_self_dmg += 3; } },
-        { tier: 'common', name: 'Minor Charge', desc: 'Ult Dmg +10', fn: () => TILE_STATS.ult_dmg += 10 },
-        { tier: 'common', name: 'Leech Seed', desc: 'Life Steal +1%', fn: () => TILE_STATS.lifeSteal += 1 },
+        { tier: 'common', name: 'Bileği Taşı', desc: 'Kılıç +1', fn: () => TILE_STATS.sword += 1 },
+        { tier: 'common', name: 'Deri Yama', desc: 'Kalkan +1', fn: () => TILE_STATS.shield += 1 },
+        { tier: 'common', name: 'Şifalı Bitki Karışımı', desc: 'İyileşme +1', fn: () => TILE_STATS.heart += 1 },
+        { tier: 'common', name: 'Meditasyon', desc: 'Enerji +1', fn: () => TILE_STATS.energy += 1 },
+        { tier: 'common', name: 'Kemik Parçası', desc: 'Kafatası Hsr +6 / Öz Hsr +3', fn: () => { TILE_STATS.skull_dmg += 6; TILE_STATS.skull_self_dmg += 3; } },
+        { tier: 'common', name: 'Küçük Şarj', desc: 'Ult Hasarı +10', fn: () => TILE_STATS.ult_dmg += 10 },
+        { tier: 'common', name: 'Sülük Tohumu', desc: 'Can Çalma +%1', fn: () => TILE_STATS.lifeSteal += 1 },
 
         // === UNCOMMON (30%) - 1 Stat (Stronger) ===
-        { tier: 'uncommon', name: 'Steel Sword', desc: 'Sword +2', fn: () => TILE_STATS.sword += 2 },
-        { tier: 'uncommon', name: 'Iron Plate', desc: 'Shield +2', fn: () => TILE_STATS.shield += 2 },
-        { tier: 'uncommon', name: 'Potion', desc: 'Heal +2', fn: () => TILE_STATS.heart += 2 },
-        { tier: 'uncommon', name: 'Focus', desc: 'Energy +2', fn: () => TILE_STATS.energy += 2 },
-        { tier: 'uncommon', name: 'Skull Idol', desc: 'Skull +10/ Self Dmg +5', fn: () => { TILE_STATS.skull_dmg += 10; TILE_STATS.skull_self_dmg += 5; } },
-        { tier: 'uncommon', name: 'Mana Crystal', desc: 'Ult Dmg +20', fn: () => TILE_STATS.ult_dmg += 20 },
-        { tier: 'uncommon', name: 'Bat Wing', desc: 'Life Steal +2%', fn: () => TILE_STATS.lifeSteal += 2 },
+        { tier: 'uncommon', name: 'Çelik Kılıç', desc: 'Kılıç +2', fn: () => TILE_STATS.sword += 2 },
+        { tier: 'uncommon', name: 'Demir Levha', desc: 'Kalkan +2', fn: () => TILE_STATS.shield += 2 },
+        { tier: 'uncommon', name: 'İksir', desc: 'İyileşme +2', fn: () => TILE_STATS.heart += 2 },
+        { tier: 'uncommon', name: 'Odaklanma', desc: 'Enerji +2', fn: () => TILE_STATS.energy += 2 },
+        { tier: 'uncommon', name: 'Kafatası Put', desc: 'Kafatası +10 / Öz Hsr +5', fn: () => { TILE_STATS.skull_dmg += 10; TILE_STATS.skull_self_dmg += 5; } },
+        { tier: 'uncommon', name: 'Mana Kristali', desc: 'Ult Hasarı +20', fn: () => TILE_STATS.ult_dmg += 20 },
+        { tier: 'uncommon', name: 'Yarasa Kanadı', desc: 'Can Çalma +%2', fn: () => TILE_STATS.lifeSteal += 2 },
 
         // === RARE (15%) - 1 Stat (Big) ===
-        { tier: 'rare', name: 'Diamond Blade', desc: 'Sword +3', fn: () => TILE_STATS.sword += 3 },
-        { tier: 'rare', name: 'Tower Shield', desc: 'Shield +3', fn: () => TILE_STATS.shield += 3 },
-        { tier: 'rare', name: 'Elixir', desc: 'Heal +3', fn: () => TILE_STATS.heart += 3 },
-        { tier: 'rare', name: 'Deep Focus', desc: 'Energy +3', fn: () => TILE_STATS.energy += 3 },
-        { tier: 'rare', name: 'Cursed Skull', desc: 'Skull +14/ Self Dmg +7', fn: () => { TILE_STATS.skull_dmg += 14; TILE_STATS.skull_self_dmg += 7; } },
-        { tier: 'rare', name: 'Spell Book', desc: 'Ult Dmg +35', fn: () => TILE_STATS.ult_dmg += 35 },
-        { tier: 'rare', name: 'Vampire Tooth', desc: 'Life Steal +3%', fn: () => TILE_STATS.lifeSteal += 3 },
+        { tier: 'rare', name: 'Elmas Bıçak', desc: 'Kılıç +3', fn: () => TILE_STATS.sword += 3 },
+        { tier: 'rare', name: 'Kule Kalkanı', desc: 'Kalkan +3', fn: () => TILE_STATS.shield += 3 },
+        { tier: 'rare', name: 'İksir Özü', desc: 'İyileşme +3', fn: () => TILE_STATS.heart += 3 },
+        { tier: 'rare', name: 'Derin Odaklanma', desc: 'Enerji +3', fn: () => TILE_STATS.energy += 3 },
+        { tier: 'rare', name: 'Lanetli Kafatası', desc: 'Kafatası +14 / Öz Hsr +7', fn: () => { TILE_STATS.skull_dmg += 14; TILE_STATS.skull_self_dmg += 7; } },
+        { tier: 'rare', name: 'Büyü Kitabı', desc: 'Ult Hasarı +35', fn: () => TILE_STATS.ult_dmg += 35 },
+        { tier: 'rare', name: 'Vampir Dişi', desc: 'Can Çalma +%3', fn: () => TILE_STATS.lifeSteal += 3 },
 
         // === EPIC (10%) - 2 Stats (Enriched Pool) ===
-        { tier: 'epic', name: 'Paladin Set', desc: 'Sword +3 & Shield +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; } },
-        { tier: 'epic', name: 'Blood Mage', desc: 'Ult +30 & Steal +3%', fn: () => { TILE_STATS.ult_dmg += 30; TILE_STATS.lifeSteal += 3; } },
-        { tier: 'epic', name: 'Berserker Soul', desc: 'Skull Dmg +20(Self Dmg +10) & Sword +4', fn: () => { TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.sword += 4; } },
-        { tier: 'epic', name: 'Monk Vow', desc: 'Heal +4 & Energy +4', fn: () => { TILE_STATS.heart += 4; TILE_STATS.energy += 4; } },
-        { tier: 'epic', name: 'Stone Skin', desc: 'Shield +4 & HP +30', fn: () => { TILE_STATS.shield += 4; maxPlayerHP += 30; playerHP += 30; } },
-        { tier: 'epic', name: 'Crimson Edge', desc: 'Sword +4 & Steal +3%', fn: () => { TILE_STATS.sword += 4; TILE_STATS.lifeSteal += 3; } },
-        { tier: 'epic', name: 'Storm Caller', desc: 'Energy +4 & Ult +25', fn: () => { TILE_STATS.energy += 4; TILE_STATS.ult_dmg += 25; } },
-        { tier: 'epic', name: 'Iron Heart', desc: 'Shield +4 & Heal +4', fn: () => { TILE_STATS.shield += 4; TILE_STATS.heart += 4; } },
-        { tier: 'epic', name: 'Necromancer', desc: 'Skull Dmg +24 (Self Dmg +12) & Steal +3%', fn: () => { TILE_STATS.skull_dmg += 24; TILE_STATS.skull_self_dmg += 12; TILE_STATS.lifeSteal += 3; } },
-        { tier: 'epic', name: 'Gladiator', desc: 'Sword +4 & Energy +3', fn: () => { TILE_STATS.sword += 4; TILE_STATS.energy += 3; } },
-        { tier: 'epic', name: 'Giant Strength', desc: 'Max HP +40 & Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.sword += 3; } },
+        { tier: 'epic', name: 'Paladin Takımı', desc: 'Kılıç +3 & Kalkan +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; } },
+        { tier: 'epic', name: 'Kan Büyücüsü', desc: 'Ult +30 & Çalma +%3', fn: () => { TILE_STATS.ult_dmg += 30; TILE_STATS.lifeSteal += 3; } },
+        { tier: 'epic', name: 'Berserker Ruhu', desc: 'Kafatası Hsr +20 (Öz Hsr +10) & Kılıç +4', fn: () => { TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.sword += 4; } },
+        { tier: 'epic', name: 'Keşiş Yemini', desc: 'İyileşme +4 & Enerji +4', fn: () => { TILE_STATS.heart += 4; TILE_STATS.energy += 4; } },
+        { tier: 'epic', name: 'Taş Deri', desc: 'Kalkan +4 & Can +30', fn: () => { TILE_STATS.shield += 4; maxPlayerHP += 30; playerHP += 30; } },
+        { tier: 'epic', name: 'Kızıl Kenar', desc: 'Kılıç +4 & Çalma +%3', fn: () => { TILE_STATS.sword += 4; TILE_STATS.lifeSteal += 3; } },
+        { tier: 'epic', name: 'Fırtına Çağırıcı', desc: 'Enerji +4 & Ult +25', fn: () => { TILE_STATS.energy += 4; TILE_STATS.ult_dmg += 25; } },
+        { tier: 'epic', name: 'Demir Yürek', desc: 'Kalkan +4 & İyileşme +4', fn: () => { TILE_STATS.shield += 4; TILE_STATS.heart += 4; } },
+        { tier: 'epic', name: 'Nekromansi', desc: 'Kafatası Hsr +24 (Öz Hsr +12) & Çalma +%3', fn: () => { TILE_STATS.skull_dmg += 24; TILE_STATS.skull_self_dmg += 12; TILE_STATS.lifeSteal += 3; } },
+        { tier: 'epic', name: 'Gladyatör', desc: 'Kılıç +4 & Enerji +3', fn: () => { TILE_STATS.sword += 4; TILE_STATS.energy += 3; } },
+        { tier: 'epic', name: 'Dev Gücü', desc: 'Maks Can +40 & Kılıç +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.sword += 3; } },
 
         // === LEGENDARY (5%) - 3 Stats ===
-        { tier: 'legendary', name: 'God Slayer', desc: 'Sword +5, Ult +40, Energy +3', fn: () => { TILE_STATS.sword += 5; TILE_STATS.ult_dmg += 40; TILE_STATS.energy += 3; } },
-        { tier: 'legendary', name: 'Immortality', desc: 'Shield +5, Heal +5, Max HP +50', fn: () => { TILE_STATS.shield += 5; TILE_STATS.heart += 5; maxPlayerHP+=50; playerHP+=50; } },
-        { tier: 'legendary', name: 'Demon Lord', desc: 'Skull Dmg +30(Self Dmg +15), Steal +5%, Sword +4', fn: () => { TILE_STATS.skull_dmg += 30; TILE_STATS.skull_self_dmg += 15; TILE_STATS.lifeSteal += 5; TILE_STATS.sword += 4; } },
-        { tier: 'legendary', name: 'Archmage', desc: 'Energy +5, Ult +30, Shield +4', fn: () => { TILE_STATS.energy += 5; TILE_STATS.ult_dmg += 30; TILE_STATS.shield += 4; } },
-        { tier: 'legendary', name: 'Trinity', desc: 'Sword +3, Shield +3, Heal +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
-        { tier: 'legendary', name: 'Titan Blood', desc: 'Max HP +40, Heal +4, Sword +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
-        { tier: 'legendary', name: 'Vampire King', desc: 'Life Steal +4%, Skull Dmg +20(Self Dmg +10), Energy +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.energy += 3; } },
-    { tier: 'legendary', name: 'Juggernaut', desc: 'Max HP +60, Shield +4, Sword +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
+        { tier: 'legendary', name: 'Tanrı Katili', desc: 'Kılıç +5, Ult +40, Enerji +3', fn: () => { TILE_STATS.sword += 5; TILE_STATS.ult_dmg += 40; TILE_STATS.energy += 3; } },
+        { tier: 'legendary', name: 'Ölümsüzlük', desc: 'Kalkan +5, İyileşme +5, Maks Can +50', fn: () => { TILE_STATS.shield += 5; TILE_STATS.heart += 5; maxPlayerHP+=50; playerHP+=50; } },
+        { tier: 'legendary', name: 'İblis Lordu', desc: 'Kafatası Hsr +30 (Öz Hsr +15), Çalma +%5, Kılıç +4', fn: () => { TILE_STATS.skull_dmg += 30; TILE_STATS.skull_self_dmg += 15; TILE_STATS.lifeSteal += 5; TILE_STATS.sword += 4; } },
+        { tier: 'legendary', name: 'Baş Büyücü', desc: 'Enerji +5, Ult +30, Kalkan +4', fn: () => { TILE_STATS.energy += 5; TILE_STATS.ult_dmg += 30; TILE_STATS.shield += 4; } },
+        { tier: 'legendary', name: 'Üçleme', desc: 'Kılıç +3, Kalkan +3, İyileşme +3', fn: () => { TILE_STATS.sword += 3; TILE_STATS.shield += 3; TILE_STATS.heart += 3; } },
+        { tier: 'legendary', name: 'Titan Kanı', desc: 'Maks Can +40, İyileşme +4, Kılıç +3', fn: () => { maxPlayerHP += 40; playerHP += 40; TILE_STATS.heart += 4; TILE_STATS.sword += 3; } },
+        { tier: 'legendary', name: 'Vampir Kral', desc: 'Can Çalma +%4, Kafatası Hsr +20 (Öz Hsr +10), Enerji +3', fn: () => { TILE_STATS.lifeSteal += 4; TILE_STATS.skull_dmg += 20; TILE_STATS.skull_self_dmg += 10; TILE_STATS.energy += 3; } },
+    { tier: 'legendary', name: 'Ezici Güç', desc: 'Maks Can +60, Kalkan +4, Kılıç +2', fn: () => { maxPlayerHP += 60; playerHP += 60; TILE_STATS.shield += 4; TILE_STATS.sword += 2; } }
 ];
 
 function rollOneReward() {
@@ -657,10 +663,10 @@ function generateRewards() {
 
         let btn = document.createElement('button');
         btn.className = `reward-btn rarity-${reward.tier}`;
-        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${reward.tier})</span></b><small>${reward.desc}</small>`;
+        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
             applyReward(reward);
-            log(`Picked: ${reward.name}`, "log-heal");
+            log(`Seçildi: ${reward.name}`, "log-heal");
             rewardPicksLeft--;
 
             updateUI();
@@ -680,8 +686,8 @@ function generateRewards() {
 function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     currentState = STATE.GAMEOVER;
-    overlayTitle.innerText = "GAME OVER";
-    overlayBtn.innerText = "TRY AGAIN";
+    overlayTitle.innerText = "OYUN BİTTİ";
+    overlayBtn.innerText = "TEKRAR DENE";
     overlayBtn.style.display = 'block';
     overlayBtn.onclick = handleOverlayClick;
     rewardArea.style.display = 'none';
@@ -986,10 +992,10 @@ function processMatch(group, isInitial) {
 
     // --- VISUALS & LOGS ---
     if (!isInitial && finalMultiplier > 1) { // Only log if it's special
-        let user = isPlayerTurn ? "Player" : "Enemy";
+        let user = isPlayerTurn ? "Oyuncu" : "Düşman";
         let displayMult = Math.round(finalMultiplier * 10) / 10;
 
-        log(`${user}: ${shapeLabel} Match! (x${displayMult})`, "log-match");
+        log(`${user}: ${shapeLabel} Eşleşme! (x${displayMult})`, "log-match");
 
         let centerTile = tiles[group.indices[1]];
         let color = (finalMultiplier >= 3) ? "#f1c40f" : "#e74c3c";
@@ -1026,14 +1032,14 @@ function showFloatingText(text, tileElement, color) {
 function applyRPGEffects(type, multiplier) {
     if (currentState !== STATE.PLAYING) return;
 
-    let user = isPlayerTurn ? "Player" : "Enemy";
+    let user = isPlayerTurn ? "Oyuncu" : "Düşman";
     let target = isPlayerTurn ? 'enemy' : 'player';
     let stats = isPlayerTurn ? TILE_STATS : ENEMY_TILE_STATS;
 
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
-        log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+        log(`${user} Saldırı ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('hit');
 
@@ -1041,14 +1047,14 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.heart * multiplier);
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
-        log(`${user} Heal +${baseVal}`, 'log-heal');
+        log(`${user} İyileşme +${baseVal}`, 'log-heal');
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
 
     } else if (type === 'shield') {
         let baseVal = Math.floor(stats.shield * multiplier);
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
-        log(`${user} Armor +${baseVal}`, 'log-armor');
+        log(`${user} Zırh +${baseVal}`, 'log-armor');
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
 
     } else if (type === 'energy') {
@@ -1059,7 +1065,7 @@ function applyRPGEffects(type, multiplier) {
         } else {
             let absorb = Math.floor(baseVal / 2);
             enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
-            log(`Enemy Absorbs ${absorb}`, "log-enemy");
+            log(`Düşman ${absorb} emdi`, "log-enemy");
         }
 
     } else if (type === 'skull') {
@@ -1069,7 +1075,7 @@ function applyRPGEffects(type, multiplier) {
         let self = isPlayerTurn ? 'player' : 'enemy';
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
-        log(`Skull! Dmg: ${dmgToOpponent} / Self: ${recoil}`, 'log-crit');
+        log(`Kafatası! Hasar: ${dmgToOpponent} / Kendine: ${recoil}`, 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('crit');
     }
@@ -1130,7 +1136,7 @@ function inflictDamage(targetStr, amount) {
         let afterDefense = applyDefensiveTraits(amount);
         if (afterDefense === null) {
             showFloatingText("DODGE!", document.getElementById('player-hp-bar'), "#2ecc71");
-            log("DODGED!", "log-heal");
+            log("SAVUŞTURULDU!", "log-heal");
             if (typeof playSound === 'function') playSound('dodge');
             return;
         }
@@ -1142,7 +1148,7 @@ function inflictDamage(targetStr, amount) {
         let heal = Math.floor(amount * (TILE_STATS.lifeSteal / 100));
         if (heal > 0) {
             playerHP = Math.min(playerHP + heal, maxPlayerHP);
-            log(`Life Steal +${heal}`, 'log-heal');
+            log(`Can Çalma +${heal}`, 'log-heal');
         }
     }
 
@@ -1233,7 +1239,7 @@ function endTurnLogic() {
     }
 
     if (extraTurnTriggered) {
-        log(isPlayerTurn ? ">> EXTRA TURN!" : ">> ENEMY EXTRA TURN!", "log-turn");
+        log(isPlayerTurn ? ">> EKSTRA TUR!" : ">> DÜŞMANIN EKSTRA TURU!", "log-turn");
         extraTurnTriggered = false;
         isProcessing = false;
         updateUI();
@@ -1257,10 +1263,10 @@ function endTurnLogic() {
 
 function updateTurnBanner() {
     if (isPlayerTurn) {
-        turnBanner.innerText = "PLAYER TURN";
+        turnBanner.innerText = "OYUNCU SIRASI";
         turnBanner.className = "turn-indicator turn-player";
     } else {
-        turnBanner.innerText = "ENEMY TURN";
+        turnBanner.innerText = "DÜŞMAN SIRASI";
         turnBanner.className = "turn-indicator turn-enemy";
     }
 }
@@ -1279,7 +1285,7 @@ function enemyPlayTurn() {
         // parent dims every descendant regardless of the child's own
         // opacity). Slowed to 3 distinct beats (settle on t1, slide to t2,
         // hold before the swap actually lands) instead of one quick blur.
-        log(`Enemy is targeting ${t1.innerHTML} ↔ ${t2.innerHTML}...`, "log-enemy");
+        log(`Düşman ${t1.innerHTML} ↔ ${t2.innerHTML} hedefliyor...`, "log-enemy");
         t1.classList.add('ai-target');
         t2.classList.add('ai-target');
         aiCursor.style.display = 'block';
@@ -1296,7 +1302,7 @@ function enemyPlayTurn() {
             attemptSwap(t1, t2);
         }, 1600);
     } else {
-        log("Enemy found no moves. Passing...", "log-enemy");
+        log("Düşman hamle bulamadı. Pas geçiyor...", "log-enemy");
         isPlayerTurn = true;
         updateTurnBanner();
         updateUI();
@@ -1395,7 +1401,7 @@ function useUltimate() {
         ultCharge = 0;
 
         // 3. Visuals
-        log(`ULTIMATE! ${selectedClass.ultName} used!`, "log-hit");
+        log(`ULTİMATE! ${selectedClass.ultName} kullanıldı!`, "log-hit");
         if (typeof playSound === 'function') playSound('ult');
         updateUI(); // Disables button immediately
 
@@ -1490,13 +1496,13 @@ function toggleModal(modalId) {
 // touch, see toggleStatsTooltipTouch) costs nothing - the board's still
 // right there the whole time.
 const STAT_DISPLAY_LABELS = {
-    sword: '⚔️ Sword', heart: '💖 Heal', shield: '🛡️ Shield', energy: '⚡ Ult Şarj',
-    skull_dmg: '💀 Skull Dmg', skull_self_dmg: '☠️ Öz Hasar', ult_dmg: '✨ Ult Gücü',
+    sword: '⚔️ Kılıç', heart: '💖 İyileşme', shield: '🛡️ Kalkan', energy: '⚡ Ult Şarj',
+    skull_dmg: '💀 Kafatası Hsr', skull_self_dmg: '☠️ Öz Hasar', ult_dmg: '✨ Ult Gücü',
     lifeSteal: '🩸 Can Çalma%', teamHeal: '💚 Takım Şifa'
 };
 const ENEMY_STAT_DISPLAY_LABELS = {
-    sword: '⚔️ Sword', shield: '🛡️ Shield', heart: '💖 Heal',
-    energy: '⚡ Enerji', skull_dmg: '💀 Skull', skull_self_dmg: '☠️ Öz Hasar'
+    sword: '⚔️ Kılıç', shield: '🛡️ Kalkan', heart: '💖 İyileşme',
+    energy: '⚡ Enerji', skull_dmg: '💀 Kafatası', skull_self_dmg: '☠️ Öz Hasar'
 };
 
 // `enemyStats` is optional - PvP has no fixed "enemy" stat block (the
@@ -1539,8 +1545,8 @@ function renderHistory() {
     // 1. Render Summary
     summaryContainer.innerHTML = '';
     const statLabels = {
-        sword: 'Sword', shield: 'Shield', heart: 'Heal', energy: 'Energy',
-        skull_dmg: 'Skull', skull_self_dmg: 'Self Dmg', ult_dmg: 'Ult', lifeSteal: 'Steal %', maxHP: 'Max HP'
+        sword: 'Kılıç', shield: 'Kalkan', heart: 'İyileşme', energy: 'Enerji',
+        skull_dmg: 'Kafatası', skull_self_dmg: 'Öz Hasar', ult_dmg: 'Ult', lifeSteal: 'Çalma %', maxHP: 'Maks Can'
     };
 
     let hasStats = false;
@@ -1552,12 +1558,12 @@ function renderHistory() {
             summaryContainer.appendChild(div);
         }
     }
-    if(!hasStats) summaryContainer.innerHTML = '<div style="grid-column: span 2; text-align:center;">No items collected yet.</div>';
+    if(!hasStats) summaryContainer.innerHTML = '<div style="grid-column: span 2; text-align:center;">Henüz eşya toplanmadı.</div>';
 
     // 2. Render List
     listContainer.innerHTML = '';
     if(pickedRewards.length === 0) {
-        listContainer.innerHTML = '<div style="color:#777; text-align:center;">Empty</div>';
+        listContainer.innerHTML = '<div style="color:#777; text-align:center;">Boş</div>';
         return;
     }
 

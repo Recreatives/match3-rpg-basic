@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.73">
+    <link rel="stylesheet" href="style.css?v=0.74">
 </head>
 <body>
     <div id="app">
@@ -48,153 +48,153 @@
             <span class="close-modal" onclick="toggleModal('info-modal')">×</span>
 
             <div class="modal-section">
-                <h2 class="modal-title">📜 BATTLE MANUAL</h2>
-                <p>Welcome to <b>Pixel Dungeon</b>. Your goal is to defeat endless waves of monsters. You lose if your HP reaches 0.</p>
+                <h2 class="modal-title">📜 SAVAŞ KILAVUZU</h2>
+                <p><b>Pixel Dungeon</b>'a hoş geldin. Amacın sonsuz canavar dalgalarını yenmek. Canın 0'a düşerse kaybedersin.</p>
                 <div class="tip-box">
-                    <b>Core Loop:</b> Pick a Class ➡ Fight ➡ Win ➡ Draft Items to upgrade stats ➡ Repeat.
+                    <b>Çekirdek Döngü:</b> Sınıf Seç ➡ Savaş ➡ Kazan ➡ Statlarını yükseltecek eşya seç ➡ Tekrarla.
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🦸 HERO CLASSES</h4>
+                <h4>🦸 KAHRAMAN SINIFLARI</h4>
                 <table class="class-table">
                     <tr>
                         <td class="class-icon">🛡️</td>
-                        <td><b>Warrior (Tank)</b><br>Starts with Bonus Shield. Ult deals dmg based on your Armor.</td>
+                        <td><b>Warrior (Tank)</b><br>Bonus Zırh ile başlar. Ult, Zırhına göre hasar verir.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🪓</td>
-                        <td><b>Berserker (Risk)</b><br>High Dmg, but takes +25% Dmg. Ult hurts self to deal double dmg.</td>
+                        <td><b>Berserker (Risk)</b><br>Yüksek hasar, ama +%25 hasar alır. Ult kendine zarar verip çift hasar verir.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🗡️</td>
-                        <td><b>Rogue (Combo)</b><br>Gains Energy fast. Ult triggers an <b>Instant Extra Turn</b>.</td>
+                        <td><b>Rogue (Kombo)</b><br>Hızlı Enerji kazanır. Ult, <b>Anlık Ekstra Tur</b> tetikler.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🏹</td>
-                        <td><b>Archer (Sniper)</b><br>20% Dodge Chance. Ult <b>Ignores Armor</b> (Direct HP Dmg).</td>
+                        <td><b>Archer (Nişancı)</b><br>%20 Savuşturma Şansı. Ult, <b>Zırhı Yok Sayar</b> (Doğrudan Can Hasarı).</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🧙</td>
-                        <td><b>Mage (Scaler)</b><br>Ult gains <b>+10 Permanent Power</b> every time you cast it.</td>
+                        <td><b>Mage (Ölçekleyici)</b><br>Ult, her kullanımda <b>+10 Kalıcı Güç</b> kazanır.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🧟</td>
-                        <td><b>Necromancer (Life Drain)</b><br>+3% Life Steal, +8 Skull Dmg. Ult deals damage and <b>heals for half of it</b>.</td>
+                        <td><b>Necromancer (Can Emme)</b><br>+%3 Can Çalma, +8 Kafatası Hasarı. Ult hasar verir ve <b>yarısını iyileştirir</b>.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">⚜️</td>
-                        <td><b>Paladin (Bulwark)</b><br>+3 Shield, +3 Heal, takes <b>15% less damage</b>. Ult heals big and smites for a bit.</td>
+                        <td><b>Paladin (Kalkan)</b><br>+3 Zırh, +3 İyileşme, <b>%15 daha az</b> hasar alır. Ult büyük iyileştirir, biraz hasar verir.</td>
                     </tr>
                 </table>
             </div>
 
             <div class="modal-section">
-                <h4>💠 TILE EFFECTS</h4>
+                <h4>💠 TAŞ EFEKTLERİ</h4>
                 <div class="manual-grid">
                     <div class="manual-tile">
                         <div class="manual-icon">⚔️</div>
-                        <div class="manual-desc"><b>SWORD</b><br>Deals physical damage. Blocked by Armor.</div>
+                        <div class="manual-desc"><b>KILIÇ</b><br>Fiziksel hasar verir. Zırh tarafından engellenir.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">🛡️</div>
-                        <div class="manual-desc"><b>SHIELD</b><br>Adds Armor. Armor takes damage before HP.</div>
+                        <div class="manual-desc"><b>KALKAN</b><br>Zırh ekler. Zırh, candan önce hasar alır.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">💖</div>
-                        <div class="manual-desc"><b>HEART</b><br>Heals your HP. Cannot exceed Max HP.</div>
+                        <div class="manual-desc"><b>KALP</b><br>Canını iyileştirir. Maksimum Canı geçemez.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">⚡</div>
-                        <div class="manual-desc"><b>ENERGY</b><br>Charges Ultimate. <br><b style="color:#e74c3c;">(Enemies EAT this to Heal!)</b></div>
+                        <div class="manual-desc"><b>ENERJİ</b><br>Ultimate'i şarj eder. <br><b style="color:#e74c3c;">(Düşmanlar bunu YİYEREK iyileşir!)</b></div>
                     </div>
                 </div>
                 <div class="manual-tile" style="margin-top: 5px; border-color: #e74c3c;">
                     <div class="manual-icon">💀</div>
-                    <div class="manual-desc"><b>SKULL (High Risk)</b><br>Deals massive damage to Enemy, but deals <b>Recoil Damage</b> to you. Be careful when low on HP!</div>
+                    <div class="manual-desc"><b>KAFATASI (Yüksek Risk)</b><br>Düşmana büyük hasar verir, ama sana da <b>Geri Tepme Hasarı</b> verir. Canın azken dikkatli ol!</div>
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>📊 STATS EXPLAINED</h4>
+                <h4>📊 STATLAR AÇIKLAMASI</h4>
                 <div class="stat-explain">
-                    <div><b>⚔️ Sword:</b> Damage per tile.</div>
-                    <div><b>🛡️ Shield:</b> Armor gain per tile.</div>
-                    <div><b>💖 Heart:</b> Healing per tile.</div>
-                    <div><b>⚡ Energy:</b> Ult Charge % per tile.</div>
-                    <div><b>💀 Skull Damage:</b> The Damage you deal to the opponent using skulls</div>
-                    <div><b>☠️ Skull Self Damage:</b> The Damage you deal to yourself using skulls</div>
-                    <div><b>💥 Ult Power:</b> Base damage of Ultimate.</div>
-                    <div><b>🧛 Life Steal:</b> % of Dmg dealt returns as HP.</div>
+                    <div><b>⚔️ Kılıç:</b> Taş başına hasar.</div>
+                    <div><b>🛡️ Kalkan:</b> Taş başına zırh kazancı.</div>
+                    <div><b>💖 Kalp:</b> Taş başına iyileşme.</div>
+                    <div><b>⚡ Enerji:</b> Taş başına Ult Şarj %.</div>
+                    <div><b>💀 Kafatası Hasarı:</b> Kafatasıyla rakibe verdiğin hasar.</div>
+                    <div><b>☠️ Kafatası Öz Hasarı:</b> Kafatasıyla kendine verdiğin hasar.</div>
+                    <div><b>💥 Ult Gücü:</b> Ultimate'in temel hasarı.</div>
+                    <div><b>🧛 Can Çalma:</b> Verilen hasarın % kaçı cana döner.</div>
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🔥 COMBOS & TURNS (CRITICAL!)</h4>
-                <p>Mastering combos is the only way to survive high levels.</p>
+                <h4>🔥 KOMBOLAR & TURLAR (KRİTİK!)</h4>
+                <p>Kombolara hakim olmak, yüksek seviyelerde hayatta kalmanın tek yolu.</p>
                 <table class="stat-table">
                     <tr>
-                        <td>Match 3</td>
-                        <td>1x Effect. Turn passes to Enemy.</td>
+                        <td>3'lü Eşleşme</td>
+                        <td>1x Etki. Tur düşmana geçer.</td>
                     </tr>
                     <tr>
-                        <td>Match 4</td>
-                        <td><b>2x Effect</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                        <td>4'lü Eşleşme</td>
+                        <td><b>2x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>L / T Shape</td>
-                        <td><b>2.5x Effect</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                        <td>L / T Şekli</td>
+                        <td><b>2.5x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>Match 5</td>
-                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%30</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                        <td>5'li Eşleşme</td>
+                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%30</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>Match 6</td>
-                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%60</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                        <td>6'lı Eşleşme</td>
+                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%60</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>Match 7</td>
-                        <td><b>3x Effect</b> + <b style="color:#f1c40f">ULT +%90</b> + <b style="color:#2ecc71">EXTRA TURN</b>.</td>
+                        <td>7'li Eşleşme</td>
+                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%90</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                 </table>
             </div>
 
             <div class="modal-section">
-                <h4>⚡ SPEED BONUS</h4>
-                <p>On your turn, a countdown starts the moment you regain control. The faster you make your swap, the bigger the multiplier on that move's effect (and any chain reaction it causes) - up to <b>x2.0</b>.</p>
+                <h4>⚡ HIZ BONUSU</h4>
+                <p>Sıran geldiği anda bir geri sayım başlar. Hamleni ne kadar hızlı yaparsan, o hamlenin (ve tetiklediği zincirleme etkilerin) çarpanı o kadar büyür - <b>x2.0</b>'a kadar.</p>
                 <div class="tip-box">
-                    <b>No Pressure:</b> Letting the window run out never costs your turn - the bonus just fades back to a neutral x1. Play fast for bigger hits, or take your time. This bonus is yours only; enemies don't get it.
+                    <b>Baskı Yok:</b> Sürenin dolması turunu kaybettirmez - bonus sadece nötr x1'e geri döner. Büyük vuruşlar için hızlı oyna, ya da vaktini al. Bu bonus sadece sana ait; düşmanlar bunu alamaz.
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🧠 ENEMY AI</h4>
+                <h4>🧠 DÜŞMAN YAPAY ZEKASI</h4>
                 <ul>
-                    <li><b>Minions:</b> Make random moves. 30% chance to miss a good move.</li>
-                    <li><b>Bosses (Lvl 5, 10...):</b> Highly intelligent. They prioritize Match-4s and Skulls.</li>
-                    <li><b>Independent Stats:</b> Enemies have their own Sword/Shield/Heal/Energy/Skull stats that scale up with level (and spike further on bosses) - your own loot upgrades only make you stronger, not them.</li>
-                    <li><b>Armor:</b> If an enemy has Armor (Grey bar), you must break it before you can hurt their HP (Red bar).</li>
-                    <li><b>Energy Denial:</b> Enemies CANNOT use Ultimates. If they match ⚡ Energy, they <b>Heal</b> instead. Don't leave Energy for them!</li>
+                    <li><b>Canavarlar:</b> Rastgele hamleler yapar. İyi bir hamleyi kaçırma şansı %30.</li>
+                    <li><b>Boss'lar (Sv. 5, 10...):</b> Oldukça zeki. 4'lü eşleşmeleri ve Kafatasını önceliklendirir.</li>
+                    <li><b>Bağımsız Statlar:</b> Düşmanların kendi Kılıç/Kalkan/İyileşme/Enerji/Kafatası statları var, seviyeyle birlikte ölçeklenir (boss'larda daha da sıçrar) - senin eşya yükseltmelerin sadece seni güçlendirir, onları değil.</li>
+                    <li><b>Zırh:</b> Bir düşmanın Zırhı varsa (Gri bar), canına (Kırmızı bar) zarar vermeden önce onu kırmalısın.</li>
+                    <li><b>Enerji Engeli:</b> Düşmanlar Ultimate KULLANAMAZ. ⚡ Enerji eşleştirirlerse, bunun yerine <b>İyileşir</b>. Onlara Enerji bırakma!</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🎁 REWARDS & LOOT</h4>
-                <p>After winning, you pick items. The quality depends on your performance:</p>
+                <h4>🎁 ÖDÜLLER & EŞYALAR</h4>
+                <p>Kazandıktan sonra eşya seçersin. Kalitesi performansına bağlı:</p>
                 <ul style="font-size: 0.85rem;">
-                    <li><b>Flawless (100% HP):</b> Pick 3 Items (Best for scaling).</li>
-                    <li><b>Decent Win (75%+ HP):</b> Pick 2 Items.</li>
-                    <li><b>Standard Win:</b> Pick 1 Item.</li>
-                    <li><b>Near Death (<10% HP):</b> Pick 3 Items (Comeback mechanic).</li>
-                    <li><b>Last Stand (<1% HP):</b> Pick 5 Items (Comeback mechanic).</li>
-                    <li><b>Boss Kill Bonus:</b> +1 extra Item on top of the above.</li>
+                    <li><b>Kusursuz (%100 Can):</b> 3 Eşya Seç (Ölçeklenme için en iyisi).</li>
+                    <li><b>İyi Zafer (%75+ Can):</b> 2 Eşya Seç.</li>
+                    <li><b>Standart Zafer:</b> 1 Eşya Seç.</li>
+                    <li><b>Ölüme Yakın (<%10 Can):</b> 3 Eşya Seç (Geri dönüş mekaniği).</li>
+                    <li><b>Son Nefes (<%1 Can):</b> 5 Eşya Seç (Geri dönüş mekaniği).</li>
+                    <li><b>Boss Öldürme Bonusu:</b> Yukarıdakine ek +1 Eşya.</li>
                 </ul>
                 <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;">
-                    <b>Rarities:</b> <span style="color:#95a5a6">Common</span>, <span style="color:#2ecc71">Uncommon</span>, <span style="color:#3498db">Rare</span>, <span style="color:#9b59b6">Epic</span>, <span style="color:#e67e22">Legendary</span>.
+                    <b>Nadirlikler:</b> <span style="color:#9d9d9d">● Adi</span>, <span style="color:#e8e8e8">◐ Normal</span>, <span style="color:#3b82f6">◆ Sihirli</span>, <span style="color:#eab308">★ Nadir</span>, <span style="color:#22c55e">⬡ Set</span>, <span style="color:#f97316">✦ Efsanevi</span>, <span style="color:#ef4444">▲ İlksel Efsanevi</span>, <span style="color:#14b8a6">✧ Ethereal</span>.
                 </div>
                 <div class="tip-box" style="margin-top:5px;">
-                    <b>Rest:</b> Before each new level you recover 50% of your missing HP.
+                    <b>Dinlenme:</b> Her yeni seviyeden önce eksik canının %50'sini geri kazanırsın.
                 </div>
             </div>
         </div>
@@ -204,7 +204,7 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('history-modal')">×</span>
             <div class="modal-section">
-                <h2 class="modal-title">📊 STATS & LOOT</h2>
+                <h2 class="modal-title">📊 STATLAR & EŞYALAR</h2>
 
                 <h4>CÜZDAN <span id="wallet-status" style="font-weight:normal; color:#7f8c8d; font-size:0.75rem;"></span></h4>
                 <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr);">
@@ -212,38 +212,14 @@
                     <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials" class="stat-val">–</span></div>
                 </div>
 
-                <h4>YOUR STATS</h4>
-                <div class="stats-bar">
-                    <div class="stat-item" title="Sword Damage"><span>⚔️</span><span id="stat-sword" class="stat-val">6</span></div>
-                    <div class="stat-item" title="Shield Gain"><span>🛡️</span><span id="stat-shield" class="stat-val">5</span></div>
-                    <div class="stat-item" title="Heal Amount"><span>💖</span><span id="stat-heart" class="stat-val">4</span></div>
-                    <div class="stat-item" title="Energy Gain"><span>⚡</span><span id="stat-energy" class="stat-val">12</span></div>
-
-                    <div class="stat-item" title="Skull Damage"><span>💀</span><span id="stat-skull" class="stat-val">25</span></div>
-                    <div class="stat-item" title="Self Damage"><span>☠️</span><span id="stat-self-dmg" class="stat-val">12</span></div>
-                    <div class="stat-item" title="Ultimate Power"><span>💥</span><span id="stat-ult" class="stat-val">35</span></div>
-                    <div class="stat-item" title="Life Steal %"><span>🧛</span><span id="stat-lifesteal" class="stat-val">0%</span></div>
-                    <div class="stat-item" title="Team Heal Power (co-op only)"><span>💚</span><span id="stat-teamheal" class="stat-val">6</span></div>
-                </div>
-
-                <h4 style="color:#c0665f;">ENEMY STATS</h4>
-                <div class="stats-bar enemy-stats-bar">
-                    <div class="stat-item" title="Enemy Sword Damage"><span>⚔️</span><span id="enemy-stat-sword" class="stat-val">4</span></div>
-                    <div class="stat-item" title="Enemy Shield Gain"><span>🛡️</span><span id="enemy-stat-shield" class="stat-val">4</span></div>
-                    <div class="stat-item" title="Enemy Heal Amount"><span>💖</span><span id="enemy-stat-heart" class="stat-val">3</span></div>
-                    <div class="stat-item" title="Enemy Energy Absorb"><span>⚡</span><span id="enemy-stat-energy" class="stat-val">10</span></div>
-
-                    <div class="stat-item" title="Enemy Skull Damage"><span>💀</span><span id="enemy-stat-skull" class="stat-val">15</span></div>
-                    <div class="stat-item" title="Enemy Self Damage"><span>☠️</span><span id="enemy-stat-self-dmg" class="stat-val">8</span></div>
-                </div>
             </div>
             <div class="modal-section">
-                <h4>🎒 LOOT HISTORY</h4>
-                <p>Total stats gained from items this run:</p>
+                <h4>🎒 EŞYA GEÇMİŞİ</h4>
+                <p>Bu run'da eşyalardan kazanılan toplam statlar:</p>
                 <div id="total-stats-summary" class="history-summary">
                     </div>
 
-                <h4>ITEM LOG</h4>
+                <h4>EŞYA KAYDI</h4>
                 <div id="history-list-container" class="history-list">
                     </div>
             </div>
@@ -446,7 +422,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.73 Colorblind rarity marks, PWA installable</div>
+        <div class="version">v0.74 Full Turkish localization pass</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -466,7 +442,7 @@
             <span id="enemy-name">Slime Lvl 1</span>
         </div>
         <div class="turn-status">
-            <div id="turn-banner" class="turn-indicator turn-player">WAITING...</div>
+            <div id="turn-banner" class="turn-indicator turn-player">BEKLENİYOR...</div>
             <div id="speed-bonus" class="speed-bonus">⚡x2.0</div>
             <div class="stats-peek-wrap" onmouseenter="renderStatsTooltip(document.getElementById('stats-tooltip-solo'), ENEMY_TILE_STATS)">
                 <button class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-solo', () => ENEMY_TILE_STATS)">📊</button>
@@ -477,7 +453,7 @@
 
     <div class="hud">
         <div class="stat-box">
-            <div id="player-class-label">YOU</div>
+            <div id="player-class-label">SEN</div>
             <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
             <span id="hp-text" class="hp-text">100/100</span>
@@ -490,7 +466,7 @@
         </div>
 
         <div class="stat-box">
-            <div>ENEMY</div>
+            <div>DÜŞMAN</div>
             <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
             <span id="enemy-hp-text" class="hp-text">50/50</span>
@@ -506,7 +482,7 @@
 
             <div id="reward-area" class="reward-container" style="display:none;"></div>
             <div id="boss-checkpoint" class="reward-container" style="display:none;"></div>
-            <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">START BATTLE</button>
+            <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">SAVAŞA BAŞLA</button>
         </div>
     </div>
 
@@ -516,18 +492,18 @@
         <span class="log-chevron">▼</span>
     </div>
     <div id="log"></div>
-    <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>USE ULTIMATE (Requires 100%)</button>
+    <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>ULTİMATE KULLAN (%100 Gerekli)</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.73"></script>
-    <script src="economy.js?v=0.73"></script>
-    <script src="items.js?v=0.73"></script>
-    <script src="achievements.js?v=0.73"></script>
-    <script src="game.js?v=0.73"></script>
-    <script src="sharedboard.js?v=0.73"></script>
-    <script src="pvp.js?v=0.73"></script>
-    <script src="coop.js?v=0.73"></script>
+    <script src="sound.js?v=0.74"></script>
+    <script src="economy.js?v=0.74"></script>
+    <script src="items.js?v=0.74"></script>
+    <script src="achievements.js?v=0.74"></script>
+    <script src="game.js?v=0.74"></script>
+    <script src="sharedboard.js?v=0.74"></script>
+    <script src="pvp.js?v=0.74"></script>
+    <script src="coop.js?v=0.74"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.
