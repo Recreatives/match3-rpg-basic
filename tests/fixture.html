@@ -407,7 +407,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.72 Sound effects (Web Audio synthesized)</div>
+        <div class="version">v0.73 Colorblind rarity marks, PWA installable</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -489,6 +489,17 @@
     <script src="../sharedboard.js"></script>
     <script src="../pvp.js"></script>
     <script src="../coop.js"></script>
+    <script>
+        // Registration only - sw.js itself is network-first (see its own
+        // header comment for why), so this never risks serving stale code.
+        // Wrapped in a feature check + try/catch since this must never be
+        // the thing that breaks the game on a browser without SW support.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+    </script>
 
 
     <script>

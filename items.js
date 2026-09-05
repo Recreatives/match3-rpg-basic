@@ -93,15 +93,21 @@ const STAT_POOL = ['sword', 'heart', 'shield', 'energy', 'skull_dmg', 'ult_dmg',
 // statMult: how strong each roll is, relative to a White item's baseline.
 // dropWeight: relative chance in the post-battle loot roll (see rollLootDrop).
 // shopAvailable: can this rarity be bought outright, or only ever drop?
+// `mark` is a shape badge shown alongside every rarity's color (shop,
+// inventory, loot toasts) - color alone isn't accessible to colorblind
+// players, and grey/green in particular are a common confusion pair under
+// deuteranopia. Shapes roughly track power level too (a plain dot through
+// to an aggressive triangle), so the badge alone hints at rarity even with
+// color perception removed entirely.
 const RARITY_DEFS = {
-    grey: { key: 'grey', name: 'Grey', label: 'Adi', color: '#9d9d9d', affixCount: 1, statMult: 0.5, costMult: 0.4, dropWeight: 38, shopAvailable: true },
-    white: { key: 'white', name: 'White', label: 'Normal', color: '#e8e8e8', affixCount: 1, statMult: 1.0, costMult: 1, dropWeight: 30, shopAvailable: true },
-    blue: { key: 'blue', name: 'Blue', label: 'Sihirli', color: '#3b82f6', affixCount: 2, statMult: 1.6, costMult: 2.5, dropWeight: 16, shopAvailable: true },
-    yellow: { key: 'yellow', name: 'Yellow', label: 'Nadir', color: '#eab308', affixCount: 4, statMult: 2.4, costMult: 6, dropWeight: 9, shopAvailable: false },
-    green: { key: 'green', name: 'Green', label: 'Set', color: '#22c55e', affixCount: 0, statMult: 1, costMult: 4, dropWeight: 4, shopAvailable: false, isSet: true },
-    orange: { key: 'orange', name: 'Orange', label: 'Efsanevi', color: '#f97316', affixCount: 2, statMult: 3.2, costMult: 0, dropWeight: 2, shopAvailable: false, isUnique: true },
-    red: { key: 'red', name: 'Red', label: 'İlksel Efsanevi', color: '#ef4444', affixCount: 3, statMult: 4.0, costMult: 0, dropWeight: 0.4, shopAvailable: false, isUnique: true },
-    teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
+    grey: { key: 'grey', name: 'Grey', label: 'Adi', color: '#9d9d9d', mark: '●', affixCount: 1, statMult: 0.5, costMult: 0.4, dropWeight: 38, shopAvailable: true },
+    white: { key: 'white', name: 'White', label: 'Normal', color: '#e8e8e8', mark: '◐', affixCount: 1, statMult: 1.0, costMult: 1, dropWeight: 30, shopAvailable: true },
+    blue: { key: 'blue', name: 'Blue', label: 'Sihirli', color: '#3b82f6', mark: '◆', affixCount: 2, statMult: 1.6, costMult: 2.5, dropWeight: 16, shopAvailable: true },
+    yellow: { key: 'yellow', name: 'Yellow', label: 'Nadir', color: '#eab308', mark: '★', affixCount: 4, statMult: 2.4, costMult: 6, dropWeight: 9, shopAvailable: false },
+    green: { key: 'green', name: 'Green', label: 'Set', color: '#22c55e', mark: '⬡', affixCount: 0, statMult: 1, costMult: 4, dropWeight: 4, shopAvailable: false, isSet: true },
+    orange: { key: 'orange', name: 'Orange', label: 'Efsanevi', color: '#f97316', mark: '✦', affixCount: 2, statMult: 3.2, costMult: 0, dropWeight: 2, shopAvailable: false, isUnique: true },
+    red: { key: 'red', name: 'Red', label: 'İlksel Efsanevi', color: '#ef4444', mark: '▲', affixCount: 3, statMult: 4.0, costMult: 0, dropWeight: 0.4, shopAvailable: false, isUnique: true },
+    teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
 };
 
 // The hand-authored Green (Set) gear - slotted into the full 8-slot system
@@ -319,7 +325,7 @@ function renderShop() {
             let desc = document.createElement('div');
             desc.className = 'manual-desc';
             desc.style.color = rarity.color;
-            desc.innerHTML = `<b>${rarity.name}</b> ${rarity.label} - rastgele ${rarity.affixCount} stat`;
+            desc.innerHTML = `<b>${rarity.mark} ${rarity.name}</b> ${rarity.label} - rastgele ${rarity.affixCount} stat`;
             row.appendChild(desc);
 
             let btn = document.createElement('button');
@@ -353,7 +359,7 @@ function renderInventory() {
             let rarity = RARITY_DEFS[equipped.rarity];
             let info = itemDisplayInfo(equipped);
             row.innerHTML = `<span class="manual-icon">${info.emoji}</span>
-                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name}</b>${formatRolledStats(equipped.rolled_stats)}</div>`;
+                <div class="manual-desc" style="color:${rarity.color};"><b>${rarity.mark} ${SLOT_LABELS[slot]}: ${info.name}</b>${formatRolledStats(equipped.rolled_stats)}</div>`;
         } else {
             row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
         }
@@ -381,7 +387,7 @@ function renderInventory() {
             let desc = document.createElement('div');
             desc.className = 'manual-desc';
             desc.style.color = rarity.color;
-            desc.innerHTML = `<b>${info.emoji} ${rarity.name} ${info.name}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
+            desc.innerHTML = `<b>${info.emoji} ${rarity.mark} ${rarity.name} ${info.name}</b>${formatRolledStats(item.rolled_stats)}${item.set_key ? ` · Set: ${ITEM_SETS[item.set_key].name}` : ''}`;
             row.appendChild(desc);
 
             let btn = document.createElement('button');
@@ -401,7 +407,7 @@ function showLootToast(item) {
     let el = document.createElement('div');
     el.className = 'achievement-toast';
     el.style.borderColor = rarity.color;
-    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.name} DÜŞTÜ</b><br>${item.name}`;
+    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.name} DÜŞTÜ</b><br>${item.name}`;
     document.body.appendChild(el);
     setTimeout(() => el.classList.add('visible'), 10);
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
