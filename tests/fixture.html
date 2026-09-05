@@ -289,7 +289,7 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('leaderboard-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🏅 LİDERLİK TABLOSU</h2>
+                <h2 class="modal-title">🏅 ALTIN SIRALAMASI</h2>
                 <p style="font-size:0.8rem; color:#bdc3c7;">En çok altına sahip 10 oyuncu.</p>
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
                     <input id="display-name-input" type="text" placeholder="Takma adın (opsiyonel)" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
@@ -297,6 +297,11 @@
                 </div>
                 <p id="leaderboard-name-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
                 <div id="leaderboard-list"></div>
+            </div>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🗡️ PvP SIRALAMASI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Kazanılan her PvP maçı derece (rating) kazandırır, kaybedilen düşürür.</p>
+                <div id="pvp-leaderboard-list"></div>
             </div>
         </div>
     </div>
@@ -447,7 +452,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.79 Onboarding tutorial</div>
+        <div class="version">v0.80 PvP ranked rating (ELO)</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>

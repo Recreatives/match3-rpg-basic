@@ -1486,6 +1486,7 @@ function toggleModal(modalId) {
         }
         if (modalId === 'leaderboard-modal' && typeof renderLeaderboard === 'function') {
             renderLeaderboard();
+            if (typeof renderPvpLeaderboard === 'function') renderPvpLeaderboard();
         }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();

@@ -400,6 +400,13 @@ function pvpOnOpponentDefeated() {
     if (typeof playSound === 'function') playSound('victory');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'win', betrayal: !!pvpBetrayalMode });
     if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
+    // Ranked rating - same "only the winner calls it" rule as the betrayal
+    // payout below, so the match is never scored twice.
+    if (typeof resolvePvpMatch === 'function' && pvpOpponentId) {
+        resolvePvpMatch(pvpOpponentId).then(result => {
+            if (result) pvpLog(`Derecen: ${result.new_winner_rating} (+${result.rating_delta})`);
+        });
+    }
     // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
     // via pvpUpdateUI() the instant their HP hits 0 (before they send this
     // 'defeated' event), but force it here too in case that status-update
@@ -459,6 +466,12 @@ function pvpOnDefeat() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'loss', betrayal: !!pvpBetrayalMode });
+    // The winner's resolve_pvp_match call needs a moment to land server-side
+    // before this fetch would see the updated row - same timing concern as
+    // the wallet re-fetch in pvpLogBetrayalLossIfNeeded below.
+    if (typeof fetchMyPvpRating === 'function') {
+        setTimeout(() => fetchMyPvpRating().then(r => { if (r) pvpLog(`Derecen: ${r.rating} (${r.wins}G/${r.losses}K)`); }), 1200);
+    }
     pvpLogBetrayalLossIfNeeded();
 }
 

@@ -285,6 +285,55 @@ async function renderLeaderboard() {
     });
 }
 
+// PvP ranked rating (ELO) - see supabase/schema.sql's pvp_ratings table and
+// resolve_pvp_match/get_pvp_leaderboard functions for why this needs its own
+// security-definer read path, same reasoning as get_leaderboard above.
+// Direct select, not the leaderboard RPC - "read own pvp rating" RLS policy
+// already allows a client to read its own row, same as fetchWallet.
+async function fetchMyPvpRating() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await sb.from('pvp_ratings').select('rating, wins, losses').eq('player_id', user.id).maybeSingle();
+    if (error) { console.error('PvP rating fetch failed:', error.message); return null; }
+    return data || { rating: 1000, wins: 0, losses: 0 };
+}
+
+async function fetchPvpLeaderboard(limit) {
+    const { data, error } = await sb.rpc('get_pvp_leaderboard', { limit_count: limit || 10 });
+    if (error) { console.error('PvP leaderboard fetch failed:', error.message); return []; }
+    return data;
+}
+
+// Called only by the WINNING client right after a match ends (pvp.js) - the
+// same "one authoritative caller" rule already used for the betrayal
+// currency steal (pvpResolveBetrayalPayoutIfNeeded). Never called by the
+// loser, so there's no risk of the same match being scored twice.
+async function resolvePvpMatch(loserId) {
+    const { data, error } = await sb.rpc('resolve_pvp_match', { p_loser_id: loserId });
+    if (error) { console.error('resolve_pvp_match failed:', error.message); return null; }
+    return data[0];
+}
+
+async function renderPvpLeaderboard() {
+    let container = document.getElementById('pvp-leaderboard-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let rows = await fetchPvpLeaderboard(10);
+    if (rows.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz derecelendirilmiş bir PvP maçı oynanmadı.</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    rows.forEach((row, i) => {
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `<span class="history-name">#${i + 1} ${row.display_name}</span><span class="history-stats">🎖️ ${row.rating} (${row.wins}G/${row.losses}K)</span>`;
+        container.appendChild(div);
+    });
+}
+
 async function submitDisplayName() {
     let input = document.getElementById('display-name-input');
     if (!input) return;

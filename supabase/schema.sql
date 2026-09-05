@@ -896,3 +896,85 @@ alter table public.analytics_events enable row level security;
 drop policy if exists "insert analytics events" on public.analytics_events;
 create policy "insert analytics events" on public.analytics_events
     for insert with check (true);
+
+-- 18. PvP ranked rating (ELO) ----------------------------------------------------
+-- Every player starts at 1000. Only the WINNING client ever calls
+-- resolve_pvp_match - the same "one authoritative caller" rule
+-- pvpResolveBetrayalPayoutIfNeeded (pvp.js) already relies on for the
+-- betrayal currency steal, so this doesn't introduce a new trust pattern.
+-- A client can SELECT its own row directly (RLS below) but can never write
+-- one - rating/wins/losses only ever change inside this security-definer
+-- function, so a client cannot inflate its own rating or tamper with an
+-- opponent's.
+create table if not exists public.pvp_ratings (
+    player_id  uuid primary key references public.players(id) on delete cascade,
+    rating     integer not null default 1000,
+    wins       integer not null default 0,
+    losses     integer not null default 0,
+    updated_at timestamptz not null default now()
+);
+
+alter table public.pvp_ratings enable row level security;
+
+drop policy if exists "read own pvp rating" on public.pvp_ratings;
+create policy "read own pvp rating" on public.pvp_ratings
+    for select using (auth.uid() = player_id);
+
+-- Standard ELO with K=32, floored at a minimum +1 gain for the winner (and
+-- a matching loss for the loser) so a huge rating gap can never round down
+-- to a 0-point match - every match has to move the needle a little.
+create or replace function public.resolve_pvp_match(p_loser_id uuid)
+returns table(new_winner_rating integer, new_loser_rating integer, rating_delta integer)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_winner_id     uuid := auth.uid();
+    v_winner_rating integer;
+    v_loser_rating  integer;
+    v_expected      numeric;
+    v_delta         integer;
+    k               constant integer := 32;
+begin
+    if v_winner_id is null or p_loser_id is null or v_winner_id = p_loser_id then
+        raise exception 'invalid pvp match participants';
+    end if;
+
+    insert into public.pvp_ratings (player_id) values (v_winner_id)
+        on conflict (player_id) do nothing;
+    insert into public.pvp_ratings (player_id) values (p_loser_id)
+        on conflict (player_id) do nothing;
+
+    select pr.rating into v_winner_rating from public.pvp_ratings pr where pr.player_id = v_winner_id;
+    select pr.rating into v_loser_rating from public.pvp_ratings pr where pr.player_id = p_loser_id;
+
+    v_expected := 1.0 / (1.0 + power(10, (v_loser_rating - v_winner_rating) / 400.0));
+    v_delta := greatest(1, round(k * (1 - v_expected)));
+
+    update public.pvp_ratings pr set rating = pr.rating + v_delta, wins = pr.wins + 1, updated_at = now()
+        where pr.player_id = v_winner_id;
+    update public.pvp_ratings pr set rating = greatest(0, pr.rating - v_delta), losses = pr.losses + 1, updated_at = now()
+        where pr.player_id = p_loser_id;
+
+    return query select (v_winner_rating + v_delta), greatest(0, v_loser_rating - v_delta), v_delta;
+end;
+$$;
+
+grant execute on function public.resolve_pvp_match(uuid) to authenticated;
+
+-- Same "security definer function is the only cross-player read" pattern as
+-- get_leaderboard above - never exposes a player id, just name + record.
+create or replace function public.get_pvp_leaderboard(limit_count integer default 10)
+returns table(display_name text, rating integer, wins integer, losses integer)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select coalesce(p.display_name, 'İsimsiz Kahraman'), r.rating, r.wins, r.losses
+    from public.pvp_ratings r
+    join public.players p on p.id = r.player_id
+    order by r.rating desc
+    limit greatest(1, least(limit_count, 50));
+$$;
+
+grant execute on function public.get_pvp_leaderboard(integer) to authenticated, anon;

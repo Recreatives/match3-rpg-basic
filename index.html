@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.79">
+    <link rel="stylesheet" href="style.css?v=0.80">
 </head>
 <body>
     <div id="app">
@@ -328,7 +328,7 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('leaderboard-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🏅 LİDERLİK TABLOSU</h2>
+                <h2 class="modal-title">🏅 ALTIN SIRALAMASI</h2>
                 <p style="font-size:0.8rem; color:#bdc3c7;">En çok altına sahip 10 oyuncu.</p>
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
                     <input id="display-name-input" type="text" placeholder="Takma adın (opsiyonel)" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
@@ -336,6 +336,11 @@
                 </div>
                 <p id="leaderboard-name-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
                 <div id="leaderboard-list"></div>
+            </div>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🗡️ PvP SIRALAMASI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Kazanılan her PvP maçı derece (rating) kazandırır, kaybedilen düşürür.</p>
+                <div id="pvp-leaderboard-list"></div>
             </div>
         </div>
     </div>
@@ -486,7 +491,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.79 Onboarding tutorial</div>
+        <div class="version">v0.80 PvP ranked rating (ELO)</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -560,14 +565,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.79"></script>
-    <script src="economy.js?v=0.79"></script>
-    <script src="items.js?v=0.79"></script>
-    <script src="achievements.js?v=0.79"></script>
-    <script src="game.js?v=0.79"></script>
-    <script src="sharedboard.js?v=0.79"></script>
-    <script src="pvp.js?v=0.79"></script>
-    <script src="coop.js?v=0.79"></script>
+    <script src="sound.js?v=0.80"></script>
+    <script src="economy.js?v=0.80"></script>
+    <script src="items.js?v=0.80"></script>
+    <script src="achievements.js?v=0.80"></script>
+    <script src="game.js?v=0.80"></script>
+    <script src="sharedboard.js?v=0.80"></script>
+    <script src="pvp.js?v=0.80"></script>
+    <script src="coop.js?v=0.80"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.
