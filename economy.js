@@ -37,22 +37,43 @@ async function ensureSession() {
 // Every session still starts anonymous (ensureSession() above, unchanged) -
 // this layer only decides whether that identity LATER gets a real email and
 // password attached. Supabase's own identity-linking is the mechanism:
-// calling auth.updateUser({email, password}) on an anonymous session turns
-// the SAME auth.uid() into a permanent one in place, so every row already
-// written under that id (wallets, player_items, pvp_ratings...) carries over
+// calling auth.updateUser({email}) on an anonymous session turns the SAME
+// auth.uid() into a permanent one in place, so every row already written
+// under that id (wallets, player_items, pvp_ratings...) carries over
 // untouched - no manual data migration, no "copy everything to a new row"
 // script. A brand-new auth.signUp() would instead mint a DIFFERENT uid and
 // orphan all of that, which is why upgrade and fresh-signup are NOT the same
-// call below.
+// call below (in practice the signUp() branch is a defensive fallback -
+// ensureSession() means every visitor already has an anonymous session
+// before they ever see this UI, so the upgrade branch is the one that
+// actually runs).
+//
+// Per Supabase's own anonymous-linking flow, email and password can NOT be
+// set in the same updateUser() call for an anonymous user - the account's
+// email has to be verified FIRST, and only THEN does Supabase accept a
+// password on it (https://supabase.com/docs/guides/auth/auth-anonymous).
+// So the upgrade path is three steps: updateUser({email}) -> verifyOtp
+// confirms it -> updateUser({password}) sets the password the player
+// already typed (kept in memory only, in pendingAccountPassword, between
+// those two calls).
 //
 // Email delivery has to be a typed 6-digit CODE, not Supabase's default
-// magic link - this requires manually editing two templates in the Supabase
-// Dashboard (Authentication > Email Templates) to include {{ .Token }}:
-// "Confirm signup" (used for both fresh signups AND anonymous upgrades) and
-// "Reset Password". Without that edit the emails still send, but they only
-// contain a link and verifyOtp() below will never see a valid code.
+// magic link - this requires manually editing email templates in the
+// Supabase Dashboard to include {{ .Token }} (see the project's setup
+// notes for the exact steps): "Confirm signup" for a fresh signUp(),
+// "Change Email Address" for the updateUser({email}) upgrade path (a
+// different template - it's an email CHANGE from Supabase's point of view,
+// even though the anonymous user never had an old one), and "Reset
+// Password" for the forgot-password flow. Without that edit the emails
+// still send, but they only contain a link and verifyOtp() below will
+// never see a valid code.
+//
+// This whole path also requires "Allow manual linking" to be turned ON in
+// Supabase Dashboard > Authentication > Sign In / Providers - without it,
+// updateUser({email}) on an anonymous session fails outright.
 
 let pendingAccountEmail = null;
+let pendingAccountPassword = null;
 let pendingAccountIsUpgrade = false;
 let pendingResetEmail = null;
 
@@ -63,8 +84,10 @@ async function accountRegisterOrUpgrade(email, password) {
     const { data: { user } } = await sb.auth.getUser();
     const isUpgrade = !!(user && user.is_anonymous);
 
+    // Upgrade path: email only for now - password follows in
+    // accountFinishUpgradePassword(), after the code is verified.
     const { error } = isUpgrade
-        ? await sb.auth.updateUser({ email, password })
+        ? await sb.auth.updateUser({ email })
         : await sb.auth.signUp({ email, password });
 
     if (error) {
@@ -81,6 +104,15 @@ async function accountVerifySignupCode(email, token, wasUpgrade) {
         type: wasUpgrade ? 'email_change' : 'signup'
     });
     if (error) { console.error('verifyOtp (signup) failed:', error.message); return 'error'; }
+    return 'ok';
+}
+
+// Second half of the upgrade path (see the big comment above) - only
+// called when accountVerifySignupCode() just confirmed an upgrade, never
+// for a fresh signUp() (which already got its password in one call).
+async function accountFinishUpgradePassword(password) {
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) { console.error('Setting password after upgrade failed:', error.message); return 'error'; }
     return 'ok';
 }
 
@@ -156,6 +188,9 @@ async function handleAccountRegister() {
         return;
     }
     pendingAccountEmail = email.trim();
+    // Only needed for the upgrade path's second call (accountFinishUpgradePassword) -
+    // a fresh signUp() already set its password in accountRegisterOrUpgrade above.
+    pendingAccountPassword = result.isUpgrade ? password : null;
     pendingAccountIsUpgrade = result.isUpgrade;
     showAccountView('verify');
 }
@@ -165,6 +200,16 @@ async function handleAccountVerify() {
     let msg = document.getElementById('account-status-msg');
     let result = await accountVerifySignupCode(pendingAccountEmail, code, pendingAccountIsUpgrade);
     if (result !== 'ok') { if (msg) msg.innerText = 'Kod hatalı ya da süresi dolmuş.'; return; }
+
+    if (pendingAccountIsUpgrade && pendingAccountPassword) {
+        let pwResult = await accountFinishUpgradePassword(pendingAccountPassword);
+        pendingAccountPassword = null;
+        if (pwResult !== 'ok') {
+            if (msg) msg.innerText = 'Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.';
+            renderAccountStatus();
+            return;
+        }
+    }
     if (msg) msg.innerText = 'Hesap doğrulandı!';
     renderAccountStatus();
 }
