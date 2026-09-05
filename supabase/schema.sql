@@ -272,3 +272,275 @@ drop trigger if exists coop_sessions_touch_updated_at on public.coop_sessions;
 create trigger coop_sessions_touch_updated_at
     before update on public.coop_sessions
     for each row execute procedure public.touch_updated_at();
+
+-- 11. SERVER-SIDE ECONOMY GUARDS -------------------------------------------------
+-- Until now, every currency/item change was a plain client-side
+-- `.update()`/`.insert()` call (economy.js) - the "update own wallet"/
+-- "insert own items" policies only ever checked WHOSE row it was, never
+-- whether the new value made sense. A player's own browser console could
+-- set their own gold to any non-negative number, or insert a "teal"
+-- (Ethereal) item with hand-picked stats, and RLS would happily allow it -
+-- it's their own row. This section closes both gaps: gold/materials can now
+-- only change through earn_currency() (bounded, security definer) or the
+-- existing resolve_betrayal()/purchase_item() paths, and every item insert
+-- - however it gets there - is checked against reference data mirroring
+-- items.js's own catalog before it's allowed to land.
+
+-- Direct client writes to gold/materials are retired - every legitimate
+-- path (kill rewards, betrayal payouts, shop purchases) now goes through a
+-- security-definer function instead.
+drop policy if exists "update own wallet" on public.wallets;
+
+-- Bounded gold/materials grant for anything that ISN'T a purchase or a
+-- betrayal payout (those keep their own dedicated functions below/above) -
+-- kill rewards (game.js/coop.js) and small flat bonuses (pvp.js's
+-- loyal_survivor reward). The ceilings are deliberately well above any
+-- reward this version of the game can produce (goldRewardForKill tops out
+-- far below 500 even at very high levels) - raise them if the reward
+-- formulas ever scale past that, but a client can never hand itself more
+-- than these hard limits in one call regardless of what it claims earned it.
+create or replace function public.earn_currency(p_gold integer default 0, p_materials integer default 0)
+returns table(gold integer, materials integer)
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if p_gold < 0 or p_gold > 500 then
+        raise exception 'earn_currency: gold amount out of bounds';
+    end if;
+    if p_materials < 0 or p_materials > 50 then
+        raise exception 'earn_currency: materials amount out of bounds';
+    end if;
+
+    update public.wallets
+        set gold = gold + p_gold, materials = materials + p_materials, updated_at = now()
+        where player_id = auth.uid();
+
+    return query select w.gold, w.materials from public.wallets w where w.player_id = auth.uid();
+end;
+$$;
+
+-- Reference data for the item-insert guard below - NOT a reimplementation
+-- of items.js's random generation (that stays entirely client-side, for
+-- responsiveness and to avoid a second source of truth for the roll
+-- algorithm itself). This only describes the SHAPE a legitimate row is
+-- allowed to have: which base_id belongs to which slot, and a generous
+-- per-stat ceiling per rarity a real roll could never exceed. A client
+-- bypassing items.js and inserting fabricated stats gets bounded to "at
+-- best as good as a lucky legitimate roll," not "anything they type."
+create table if not exists public.item_bases (
+    slot         text not null,
+    base_id      text not null,
+    primary_stat text not null,
+    primary key (slot, base_id)
+);
+insert into public.item_bases (slot, base_id, primary_stat) values
+    ('weapon','blade','sword'), ('weapon','axe','skull_dmg'), ('weapon','scepter','ult_dmg'),
+    ('weapon','dagger','lifeSteal'), ('weapon','bow','energy'), ('weapon','spear','skull_dmg'), ('weapon','mace','sword'),
+    ('shield','kite_shield','shield'), ('shield','tower_shield','shield'), ('shield','buckler','shield'), ('shield','dragon_shield','heart'),
+    ('helmet','helm','shield'), ('helmet','hood','energy'), ('helmet','crown','ult_dmg'), ('helmet','skull_mask','skull_dmg'),
+    ('chest','breastplate','shield'), ('chest','robe','heart'), ('chest','leather_vest','sword'), ('chest','scale_armor','heart'),
+    ('shoulder','pauldron','shield'), ('shoulder','spiked_pauldron','skull_dmg'), ('shoulder','winged_pauldron','energy'),
+    ('gloves','gauntlets','sword'), ('gloves','assassin_gloves','lifeSteal'), ('gloves','healing_gloves','heart'),
+    ('boots','leather_boots','energy'), ('boots','wind_boots','sword'), ('boots','earth_boots','shield'),
+    ('trinket','amulet','energy'), ('trinket','ring','lifeSteal'), ('trinket','charm','teamHeal'), ('trinket','necklace','ult_dmg')
+on conflict (slot, base_id) do update set primary_stat = excluded.primary_stat;
+
+-- Procedural rarities (grey/white/blue/yellow) - affix count + per-stat
+-- ceiling, derived from items.js's RARITY_DEFS.statMult and rollAffixValue's
+-- baseRange at the top of their random range (mult * 1.2), rounded up with
+-- headroom.
+create table if not exists public.item_rarity_bounds (
+    rarity          text primary key,
+    max_affix_count integer not null,
+    max_stat_value  integer not null
+);
+insert into public.item_rarity_bounds (rarity, max_affix_count, max_stat_value) values
+    ('grey', 1, 5), ('white', 1, 8), ('blue', 2, 15), ('yellow', 4, 25)
+on conflict (rarity) do update set max_affix_count = excluded.max_affix_count, max_stat_value = excluded.max_stat_value;
+
+-- Fixed-identity items (orange/red/teal uniques + green set pieces) - exact
+-- rolled_stats allowlist, copied verbatim from items.js's UNIQUE_LEGENDARIES
+-- and ITEM_SETS. These never roll, so an exact match is the correct check
+-- (not a bound).
+create table if not exists public.item_fixed_defs (
+    rarity       text not null,
+    base_id      text not null,
+    rolled_stats jsonb not null,
+    primary key (rarity, base_id)
+);
+insert into public.item_fixed_defs (rarity, base_id, rolled_stats) values
+    ('green', 'bloodied_gauntlet', '{"sword":3}'),
+    ('green', 'crimson_pauldron', '{"skull_dmg":8}'),
+    ('green', 'iron_greaves', '{"shield":3}'),
+    ('green', 'oak_shield_charm', '{"heart":2}'),
+    ('green', 'swift_boots', '{"energy":3}'),
+    ('green', 'shadow_cloak', '{"energy":3}'),
+    ('green', 'venom_vial', '{"skull_self_dmg":-3}'),
+    ('green', 'frozen_crown', '{"shield":3}'),
+    ('green', 'glacier_ward', '{"heart":3}'),
+    ('orange', 'uniq_nights_lament', '{"sword":8,"lifeSteal":6}'),
+    ('orange', 'uniq_shield_of_eternity', '{"shield":7,"heart":7}'),
+    ('orange', 'uniq_oracles_crown', '{"ult_dmg":16,"energy":10}'),
+    ('orange', 'uniq_dragonheart_plate', '{"shield":7,"heart":7}'),
+    ('orange', 'uniq_storm_eagle_pauldrons', '{"energy":10,"sword":8}'),
+    ('orange', 'uniq_butchers_claws', '{"skull_dmg":14,"lifeSteal":6}'),
+    ('orange', 'uniq_windwalkers', '{"energy":10,"sword":8}'),
+    ('orange', 'uniq_ring_of_ancient_wisdom', '{"ult_dmg":16,"teamHeal":6}'),
+    ('red', 'uniq_world_eater', '{"sword":10,"skull_dmg":18,"lifeSteal":8}'),
+    ('red', 'uniq_the_last_wall', '{"shield":9,"heart":9,"energy":13}'),
+    ('red', 'uniq_starfall_helm', '{"ult_dmg":20,"energy":13,"shield":9}'),
+    ('red', 'uniq_titans_hide', '{"shield":9,"heart":9,"sword":10}'),
+    ('red', 'uniq_doomwings', '{"energy":13,"skull_dmg":18,"sword":10}'),
+    ('red', 'uniq_the_throatreaver', '{"skull_dmg":18,"lifeSteal":8,"sword":10}'),
+    ('red', 'uniq_timestep_striders', '{"energy":13,"sword":10,"ult_dmg":20}'),
+    ('red', 'uniq_eternity_core', '{"ult_dmg":20,"energy":13,"teamHeal":8}'),
+    ('teal', 'uniq_whisper_of_the_void', '{"ult_dmg":18,"lifeSteal":7}'),
+    ('teal', 'uniq_shattered_time_aegis', '{"shield":8,"energy":12}'),
+    ('teal', 'uniq_astral_sight', '{"energy":12,"ult_dmg":18}'),
+    ('teal', 'uniq_shroud_of_shadows', '{"shield":8,"lifeSteal":7}'),
+    ('teal', 'uniq_cosmic_wings', '{"energy":12,"skull_dmg":16}'),
+    ('teal', 'uniq_soul_rending_claws', '{"skull_dmg":16,"lifeSteal":7}'),
+    ('teal', 'uniq_voidstep', '{"energy":12,"sword":9}'),
+    ('teal', 'uniq_eye_of_infinity', '{"ult_dmg":18,"teamHeal":7}')
+on conflict (rarity, base_id) do update set rolled_stats = excluded.rolled_stats;
+
+create or replace function public.validate_player_item_insert()
+returns trigger
+language plpgsql
+as $$
+declare
+    v_bounds record;
+    v_fixed record;
+    v_base record;
+    v_stat_count integer;
+    v_stat_val numeric;
+begin
+    if new.rarity in ('orange', 'red', 'teal', 'green') then
+        select * into v_fixed from public.item_fixed_defs
+            where rarity = new.rarity and base_id = new.base_id;
+        if not found then
+            raise exception 'validate_player_item_insert: unknown fixed item %/%', new.rarity, new.base_id;
+        end if;
+        if new.rolled_stats <> v_fixed.rolled_stats then
+            raise exception 'validate_player_item_insert: rolled_stats mismatch for %/%', new.rarity, new.base_id;
+        end if;
+    else
+        select * into v_bounds from public.item_rarity_bounds where rarity = new.rarity;
+        if not found then
+            raise exception 'validate_player_item_insert: unknown rarity %', new.rarity;
+        end if;
+        select * into v_base from public.item_bases where slot = new.slot and base_id = new.base_id;
+        if not found then
+            raise exception 'validate_player_item_insert: unknown base %/%', new.slot, new.base_id;
+        end if;
+
+        select count(*) into v_stat_count from jsonb_object_keys(new.rolled_stats);
+        if v_stat_count = 0 or v_stat_count > v_bounds.max_affix_count then
+            raise exception 'validate_player_item_insert: % stats exceeds bound for rarity %', v_stat_count, new.rarity;
+        end if;
+
+        for v_stat_val in select abs((value)::numeric) from jsonb_each_text(new.rolled_stats) loop
+            if v_stat_val > v_bounds.max_stat_value then
+                raise exception 'validate_player_item_insert: stat value % exceeds bound for rarity %', v_stat_val, new.rarity;
+            end if;
+        end loop;
+    end if;
+
+    return new;
+end;
+$$;
+
+drop trigger if exists validate_player_item_insert_trg on public.player_items;
+create trigger validate_player_item_insert_trg
+    before insert on public.player_items
+    for each row execute function public.validate_player_item_insert();
+
+-- Server-side purchase: was a client-side generateItem() + two separate
+-- calls (adjustWallet then insert) - a client could always just skip the
+-- deduction and insert the item directly, since "insert own items" only
+-- ever checked identity. This does both atomically, and rolls the item
+-- itself (grey/white/blue only - the only shop-purchasable rarities,
+-- items.js RARITY_DEFS.shopAvailable) so the client never gets a chance to
+-- supply its own stats for a purchase.
+create or replace function public.purchase_item(p_slot text, p_rarity text)
+returns public.player_items
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_cost integer;
+    v_affix_count integer;
+    v_stat_mult numeric;
+    v_base record;
+    v_stats jsonb := '{}'::jsonb;
+    v_row public.player_items;
+    v_pool text[];
+    v_pick text;
+    v_base_range jsonb := '{"sword":2,"heart":2,"shield":2,"energy":3,"skull_dmg":4,"ult_dmg":5,"lifeSteal":2,"teamHeal":2,"skull_self_dmg":2}'::jsonb;
+    v_i integer;
+    v_rolled integer;
+begin
+    if p_rarity not in ('grey', 'white', 'blue') then
+        raise exception 'purchase_item: rarity % is not shop-purchasable', p_rarity;
+    end if;
+
+    v_cost := round(20 * (case p_rarity when 'grey' then 0.4 when 'white' then 1 when 'blue' then 2.5 end));
+    v_affix_count := case p_rarity when 'grey' then 1 when 'white' then 1 when 'blue' then 2 end;
+    v_stat_mult := case p_rarity when 'grey' then 0.5 when 'white' then 1.0 when 'blue' then 1.6 end;
+
+    update public.wallets set gold = gold - v_cost, updated_at = now()
+        where player_id = auth.uid() and gold >= v_cost;
+    if not found then
+        raise exception 'purchase_item: insufficient gold';
+    end if;
+
+    select * into v_base from public.item_bases where slot = p_slot order by random() limit 1;
+    if not found then
+        raise exception 'purchase_item: unknown slot %', p_slot;
+    end if;
+
+    v_rolled := greatest(1, round((v_base_range->>v_base.primary_stat)::numeric * v_stat_mult * (0.8 + random() * 0.4)))::integer;
+    v_stats := jsonb_build_object(v_base.primary_stat, v_rolled);
+
+    select array_agg(s order by random()) into v_pool
+        from unnest(array['sword','heart','shield','energy','skull_dmg','ult_dmg','lifeSteal','teamHeal','skull_self_dmg']) as s
+        where s <> v_base.primary_stat;
+
+    for v_i in 1..(v_affix_count - 1) loop
+        exit when v_i > array_length(v_pool, 1);
+        v_pick := v_pool[v_i];
+        v_rolled := greatest(1, round((v_base_range->>v_pick)::numeric * v_stat_mult * 0.6 * (0.8 + random() * 0.4)))::integer;
+        if v_pick = 'skull_self_dmg' then v_rolled := -v_rolled; end if;
+        v_stats := v_stats || jsonb_build_object(v_pick, coalesce((v_stats->>v_pick)::integer, 0) + v_rolled);
+    end loop;
+
+    insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, set_key)
+        values (auth.uid(), v_base.base_id, p_slot, p_rarity, v_stats, null)
+        returning * into v_row;
+    return v_row;
+end;
+$$;
+
+-- 12. CLIENT ERROR REPORTS --------------------------------------------------
+-- Write-only from the client's side (see index.html's logClientError,
+-- registered before any other script loads so it also catches load-time
+-- errors) - there is deliberately no SELECT policy, so the anon/authenticated
+-- roles can insert a report but never read one back, including their own.
+-- Reading these is a dashboard/service-role-only activity (Supabase Studio's
+-- Table Editor, or a service-role query) - there is no in-app UI for it.
+create table if not exists public.client_errors (
+    id         uuid primary key default gen_random_uuid(),
+    player_id  uuid references public.players(id) on delete set null,
+    message    text not null,
+    stack      text,
+    url        text,
+    user_agent text,
+    created_at timestamptz not null default now()
+);
+
+alter table public.client_errors enable row level security;
+
+drop policy if exists "insert error reports" on public.client_errors;
+create policy "insert error reports" on public.client_errors
+    for insert with check (true);

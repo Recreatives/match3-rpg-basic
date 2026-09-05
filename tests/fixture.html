@@ -1,43 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Dungeon (MUB) - Match-3 & Be Free</title>
-    <script>
-        // As early as possible - before any other script, so a load-time
-        // error in economy.js/items.js/etc. itself still gets caught, not
-        // just runtime errors during play. Queues reports until economy.js's
-        // `sb` client exists (initEconomy() flushes the queue once it does -
-        // see economy.js) since this script runs before that file loads.
-        // Errors only ever get INSERTed, never read back by the client - see
-        // supabase/schema.sql's client_errors table, which has no SELECT
-        // policy at all (dashboard/service-role access only).
-        window.__pendingClientErrors = [];
-        function logClientError(message, stack) {
-            var entry = {
-                message: String(message || '').slice(0, 2000),
-                stack: stack ? String(stack).slice(0, 4000) : null,
-                url: location.href,
-                user_agent: navigator.userAgent
-            };
-            if (typeof sb !== 'undefined' && sb.from) {
-                sb.from('client_errors').insert(entry).then(function () {}, function () {});
-            } else {
-                window.__pendingClientErrors.push(entry);
-            }
-        }
-        window.addEventListener('error', function (e) {
-            logClientError(e.message, e.error && e.error.stack);
-        });
-        window.addEventListener('unhandledrejection', function (e) {
-            var reason = e.reason;
-            logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
-        });
-    </script>
-    <link rel="stylesheet" href="style.css?v=0.60">
-</head>
+<!doctype html>
+<html>
+<head><meta charset="UTF-8"><title>Test Fixture</title></head>
 <body>
+
     <div id="app">
     <div id="info-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
@@ -492,13 +457,28 @@
     <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>USE ULTIMATE (Requires 100%)</button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js?v=0.60"></script>
-    <script src="items.js?v=0.60"></script>
-    <script src="achievements.js?v=0.60"></script>
-    <script src="game.js?v=0.60"></script>
-    <script src="sharedboard.js?v=0.60"></script>
-    <script src="pvp.js?v=0.60"></script>
-    <script src="coop.js?v=0.60"></script>
+    <script src="supabase-stub.js"></script>
+    <script src="../economy.js"></script>
+    <script src="../items.js"></script>
+    <script src="../achievements.js"></script>
+    <script src="../game.js"></script>
+    <script src="../sharedboard.js"></script>
+    <script src="../pvp.js"></script>
+    <script src="../coop.js"></script>
+
+    <script>
+        // Test-only bridge: top-level `const`/`let` in a classic script
+        // (unlike `var` or function declarations) never become properties
+        // of `window`, so the parent test runner - reaching in via
+        // frame.contentWindow - can't see them even though this fixture's
+        // own inline scripts could reference them by bare name. Re-export
+        // exactly what tests/index.html needs; nothing here touches the
+        // actual game source.
+        window.ITEM_SLOTS = ITEM_SLOTS;
+        window.ITEM_BASES = ITEM_BASES;
+        window.ITEM_SETS = ITEM_SETS;
+        window.UNIQUE_LEGENDARIES = UNIQUE_LEGENDARIES;
+        window.tileTypes = tileTypes;
+    </script>
 </body>
 </html>

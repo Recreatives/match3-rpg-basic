@@ -1,0 +1,201 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pixel Dungeon - Test Suite</title>
+<style>
+  body { font-family: monospace; background: #10161d; color: #e7ecf1; padding: 20px; }
+  .pass { color: #22c55e; }
+  .fail { color: #ef4444; font-weight: bold; }
+  #summary { font-size: 1.2rem; margin-bottom: 16px; }
+  iframe { display: none; }
+</style>
+</head>
+<body>
+<h1>Pixel Dungeon - Automated Test Suite</h1>
+<div id="summary">Running...</div>
+<div id="results"></div>
+<iframe id="game-frame" src="fixture.html"></iframe>
+<script>
+// Plain-assertion harness, zero dependencies - see CLAUDE.md's Testing
+// section for why this runs in a real browser (against the actual game
+// scripts, via fixture.html) instead of Node: the source files are
+// global-scope browser scripts with no module boundary, and this way tests
+// exercise the exact same code the game ships, not a reimplementation of it.
+var results = [];
+function assert(name, cond, detail) {
+    results.push({ name: name, pass: !!cond, detail: detail || '' });
+}
+function assertEqual(name, actual, expected) {
+    var pass = JSON.stringify(actual) === JSON.stringify(expected);
+    assert(name, pass, pass ? '' : ('expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual)));
+}
+
+document.getElementById('game-frame').onload = function () {
+    var win = document.getElementById('game-frame').contentWindow;
+    try {
+        runTests(win);
+    } catch (e) {
+        assert('test harness crashed', false, e.message + '\n' + e.stack);
+    }
+    render();
+};
+
+function runTests(win) {
+    // --- Match detection -----------------------------------------------
+    (function () {
+        var width = 8;
+        var pattern = ['sword', 'heart', 'shield', 'energy', 'skull_dmg']; // no filler run ever reaches length 3
+        var tiles = [];
+        for (var i = 0; i < 64; i++) tiles.push({ dataset: { type: pattern[i % pattern.length] } });
+        // Overwrite indices 10,11,12 (a horizontal run within one row) with a clean 3-in-a-row
+        tiles[10].dataset.type = 'sword';
+        tiles[11].dataset.type = 'sword';
+        tiles[12].dataset.type = 'sword';
+        var groups = win.findMatchGroups(tiles, width);
+        var found = groups.find(function (g) { return g.type === 'sword' && g.indices.length === 3 &&
+            [10, 11, 12].every(function (idx) { return g.indices.indexOf(idx) !== -1; }); });
+        assert('findMatchGroups detects a horizontal 3-match', !!found, JSON.stringify(groups));
+    })();
+
+    // --- Match shape multiplier scaling ----------------------------------
+    (function () {
+        var m3 = win.getMatchShapeInfo(3, false);
+        var m4 = win.getMatchShapeInfo(4, false);
+        var m5 = win.getMatchShapeInfo(5, false);
+        assert('3-match: 1x, no extra turn', m3.multiplier === 1 && !m3.extraTurn, JSON.stringify(m3));
+        assert('4-match: 2x + extra turn', m4.multiplier === 2 && m4.extraTurn, JSON.stringify(m4));
+        assert('5-match: 3x + extra turn + ult bonus', m5.multiplier === 3 && m5.extraTurn && m5.ultBonus > 0, JSON.stringify(m5));
+    })();
+
+    // --- Board reshuffle always leaves a valid move (regression: the
+    //     original version required "no existing match AND a valid move",
+    //     which failed ~30% of the time at a 50-attempt cap) -------------
+    (function () {
+        var width = 8;
+        var tileTypes = win.tileTypes;
+        var allPass = true;
+        for (var trial = 0; trial < 100; trial++) {
+            var tiles = [];
+            for (var i = 0; i < 64; i++) tiles.push({ dataset: {}, innerHTML: '' });
+            win.reshuffleBoard(tiles, width, tileTypes);
+            if (!win.boardHasValidMove(tiles, width)) { allPass = false; break; }
+        }
+        assert('reshuffleBoard always produces a valid move (100 trials)', allPass);
+    })();
+
+    // --- Health tier bucketing (5-tier injury status) --------------------
+    (function () {
+        assertEqual('sbHealthTier(100) -> SAĞLAM', win.sbHealthTier(100).text, 'SAĞLAM');
+        assertEqual('sbHealthTier(75) -> HAFİF YARALI (boundary)', win.sbHealthTier(75).text, 'HAFİF YARALI');
+        assertEqual('sbHealthTier(76) -> SAĞLAM (just above boundary)', win.sbHealthTier(76).text, 'SAĞLAM');
+        assertEqual('sbHealthTier(40) -> YARALI (boundary)', win.sbHealthTier(40).text, 'YARALI');
+        assertEqual('sbHealthTier(15) -> AĞIR YARALI (boundary)', win.sbHealthTier(15).text, 'AĞIR YARALI');
+        assertEqual('sbHealthTier(0) -> BAYILDI', win.sbHealthTier(0).text, 'BAYILDI');
+    })();
+
+    // --- Gold-per-kill formula --------------------------------------------
+    (function () {
+        assertEqual('goldRewardForKill(1, false)', win.goldRewardForKill(1, false), 10);
+        assertEqual('goldRewardForKill(5, true)', win.goldRewardForKill(5, true), 40);
+        assert('boss always pays more than a minion at the same level',
+            win.goldRewardForKill(10, true) > win.goldRewardForKill(10, false));
+    })();
+
+    // --- Item catalog integrity (promoted from a one-off manual browser
+    //     check into a permanent regression test) -------------------------
+    (function () {
+        var allIds = [];
+        win.ITEM_SLOTS.forEach(function (slot) { win.ITEM_BASES[slot].forEach(function (b) { allIds.push(b.id); }); });
+        Object.values(win.ITEM_SETS).forEach(function (set) { Object.keys(set.pieces).forEach(function (id) { allIds.push(id); }); });
+        Object.values(win.UNIQUE_LEGENDARIES).forEach(function (bySlot) { Object.values(bySlot).forEach(function (u) { allIds.push(u.id); }); });
+
+        var idCounts = {};
+        allIds.forEach(function (id) { idCounts[id] = (idCounts[id] || 0) + 1; });
+        var collisions = Object.keys(idCounts).filter(function (id) { return idCounts[id] > 1; });
+        assert('no base_id collisions across the item catalog (' + allIds.length + ' ids)', collisions.length === 0, JSON.stringify(collisions));
+
+        var everySlotHasBases = win.ITEM_SLOTS.every(function (slot) { return win.ITEM_BASES[slot] && win.ITEM_BASES[slot].length > 0; });
+        assert('every item slot has at least one procedural base', everySlotHasBases);
+    })();
+
+    // --- Procedural item rolls stay within the same bounds the server-side
+    //     insert trigger enforces (supabase/schema.sql's item_rarity_bounds)
+    //     - if these ever drift apart, legitimate drops start getting
+    //     silently rejected in production. -------------------------------
+    (function () {
+        var bounds = {
+            grey: { maxAffix: 1, maxStat: 5 },
+            white: { maxAffix: 1, maxStat: 8 },
+            blue: { maxAffix: 2, maxStat: 15 },
+            yellow: { maxAffix: 4, maxStat: 25 }
+        };
+        var allWithinBounds = true;
+        var failDetail = '';
+        Object.keys(bounds).forEach(function (rarityKey) {
+            for (var trial = 0; trial < 40 && allWithinBounds; trial++) {
+                win.ITEM_SLOTS.forEach(function (slot) {
+                    var item = win.generateItem(slot, rarityKey);
+                    var keys = Object.keys(item.rolled_stats);
+                    if (keys.length > bounds[rarityKey].maxAffix) {
+                        allWithinBounds = false;
+                        failDetail = rarityKey + '/' + slot + ': ' + keys.length + ' stats (max ' + bounds[rarityKey].maxAffix + ')';
+                    }
+                    keys.forEach(function (k) {
+                        if (Math.abs(item.rolled_stats[k]) > bounds[rarityKey].maxStat) {
+                            allWithinBounds = false;
+                            failDetail = rarityKey + '/' + slot + '/' + k + ': ' + item.rolled_stats[k] + ' (max ' + bounds[rarityKey].maxStat + ')';
+                        }
+                    });
+                });
+            }
+        });
+        assert('procedural item rolls (grey/white/blue/yellow, 40 trials/slot) stay within schema.sql\'s server-side bounds', allWithinBounds, failDetail);
+    })();
+
+    // --- Unique legendaries / set pieces produce their exact fixed stats -
+    (function () {
+        var ok = true;
+        ['orange', 'red', 'teal'].forEach(function (rarityKey) {
+            win.ITEM_SLOTS.forEach(function (slot) {
+                var expected = win.UNIQUE_LEGENDARIES[rarityKey][slot];
+                var item = win.generateItem(slot, rarityKey);
+                if (item.base_id !== expected.id || JSON.stringify(item.rolled_stats) !== JSON.stringify(expected.stats)) ok = false;
+            });
+        });
+        assert('every orange/red/teal unique generates its exact fixed identity', ok);
+    })();
+
+    // --- Set completion bonus only applies when every piece is equipped --
+    (function () {
+        var stats = { sword: 0, heart: 0, shield: 0, energy: 0, skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, teamHeal: 0 };
+        var onePiece = [Object.assign(win.generateItem('gloves', 'green', { setKey: 'berserker_fury', pieceId: 'bloodied_gauntlet' }), { equipped_slot: 'gloves' })];
+        win.applyEquippedItemBonuses(stats, onePiece);
+        assert('set bonus does NOT apply with only 1 of 2 pieces equipped', stats.ult_dmg === 0, JSON.stringify(stats));
+
+        var stats2 = { sword: 0, heart: 0, shield: 0, energy: 0, skull_dmg: 0, skull_self_dmg: 0, ult_dmg: 0, lifeSteal: 0, teamHeal: 0 };
+        var bothPieces = [
+            Object.assign(win.generateItem('gloves', 'green', { setKey: 'berserker_fury', pieceId: 'bloodied_gauntlet' }), { equipped_slot: 'gloves' }),
+            Object.assign(win.generateItem('shoulder', 'green', { setKey: 'berserker_fury', pieceId: 'crimson_pauldron' }), { equipped_slot: 'shoulder' })
+        ];
+        win.applyEquippedItemBonuses(stats2, bothPieces);
+        assert('set bonus DOES apply with both pieces equipped', stats2.ult_dmg === 10, JSON.stringify(stats2));
+    })();
+}
+
+function render() {
+    var passCount = results.filter(function (r) { return r.pass; }).length;
+    var allPass = passCount === results.length;
+    document.getElementById('summary').innerHTML =
+        '<span class="' + (allPass ? 'pass' : 'fail') + '">' + passCount + '/' + results.length + ' passed</span>';
+    document.getElementById('results').innerHTML = results.map(function (r) {
+        return '<div class="' + (r.pass ? 'pass' : 'fail') + '">' + (r.pass ? '✓' : '✗') + ' ' + r.name +
+            (r.detail ? '<br><small>' + r.detail + '</small>' : '') + '</div>';
+    }).join('');
+    // Exposed for CI (Playwright reads this to decide pass/fail)
+    window.__TEST_RESULTS__ = results;
+    window.__TEST_PASS__ = allPass;
+}
+</script>
+</body>
+</html>

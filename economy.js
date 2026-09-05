@@ -55,33 +55,26 @@ async function fetchWallet() {
     return data;
 }
 
-// Not wired to any UI yet (no shop, no confirmed earning/spending rules) -
-// this is here so the shop and reward systems have a single, already-tested
-// place to change a player's balance from, instead of each feature writing
-// its own Supabase call later.
+// Grants gold/materials - only ever positive amounts now (kill rewards,
+// PvP's small loyal_survivor bonus). Purchases and betrayal payouts have
+// their own dedicated functions below/in schema.sql. This used to be a
+// plain `.update()` the client fully controlled (any player could set their
+// own gold to anything non-negative via devtools, since RLS only checked
+// row ownership, not the value); it's now the earn_currency() security
+// definer RPC (supabase/schema.sql), which enforces a hard ceiling per call
+// server-side regardless of what the client claims it earned.
 async function adjustWallet(goldDelta, materialsDelta) {
-    if (!currentWallet) await fetchWallet();
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return null;
-
-    const newGold = Math.max(0, (currentWallet?.gold || 0) + goldDelta);
-    const newMaterials = Math.max(0, (currentWallet?.materials || 0) + materialsDelta);
-
-    const { data, error } = await sb
-        .from('wallets')
-        .update({ gold: newGold, materials: newMaterials })
-        .eq('player_id', user.id)
-        .select('gold, materials')
-        .single();
-
+    const { data, error } = await sb.rpc('earn_currency', {
+        p_gold: goldDelta || 0, p_materials: materialsDelta || 0
+    });
     if (error) {
-        console.error('Wallet update failed:', error.message);
+        console.error('earn_currency failed:', error.message);
         return null;
     }
 
-    currentWallet = data;
+    currentWallet = data[0];
     updateWalletUI();
-    return data;
+    return currentWallet;
 }
 
 // Betrayal PvP currency steal (see supabase/schema.sql's resolve_betrayal).
@@ -119,38 +112,30 @@ async function fetchOwnedItems() {
 // items.js) - yellow/green/orange/red/teal only ever come from
 // awardLootDrop. Rolls a brand new instance on every purchase, same item
 // bought twice will NOT be identical.
+//
+// This used to be three separate client-driven steps (roll the item, deduct
+// gold, insert the row) - nothing actually forced them to happen together,
+// so a client could just insert the item directly and skip the deduction
+// entirely (RLS only checked "is this my row," never "did they pay").
+// purchase_item() (supabase/schema.sql) now does the cost lookup, gold
+// deduction and item roll atomically server-side - the client only ever
+// gets back the finished row or an error, never a chance to supply its own
+// stats or skip payment.
 async function purchaseItem(slot, rarityKey) {
     let rarity = RARITY_DEFS[rarityKey];
     if (!rarity || !rarity.shopAvailable) return false;
-    let item = generateItem(slot, rarityKey);
-    if (!currentWallet) await fetchWallet();
-    if ((currentWallet?.gold || 0) < item.cost) {
-        setShopStatus('Yeterli altının yok.');
-        return false;
-    }
 
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return false;
-
-    let updatedWallet = await adjustWallet(-item.cost, 0);
-    if (!updatedWallet) { setShopStatus('Satın alma başarısız oldu.'); return false; }
-
-    const { data, error } = await sb.from('player_items').insert({
-        player_id: user.id, base_id: item.base_id, slot: item.slot,
-        rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key
-    }).select().single();
-
+    const { data, error } = await sb.rpc('purchase_item', { p_slot: slot, p_rarity: rarityKey });
     if (error) {
-        console.error('Item purchase insert failed:', error.message);
-        // Wallet was already charged - refund locally so the player isn't
-        // left worse off by a failed insert.
-        await adjustWallet(item.cost, 0);
-        setShopStatus('Satın alma başarısız oldu, ücret iade edildi.');
+        console.error('purchase_item failed:', error.message);
+        setShopStatus(error.message.includes('insufficient gold') ? 'Yeterli altının yok.' : 'Satın alma başarısız oldu.');
         return false;
     }
 
     currentOwnedItems.push(data);
-    setShopStatus(`${item.emoji} ${item.name} satın alındı!`);
+    await fetchWallet();
+    let info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(data) : { name: data.base_id, emoji: '' };
+    setShopStatus(`${info.emoji} ${info.name} satın alındı!`);
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
     return true;
@@ -285,6 +270,15 @@ function setWalletStatus(text) {
 async function initEconomy() {
     setWalletStatus('Bağlanıyor…');
     const session = await ensureSession();
+    // Flush whatever logClientError (index.html) queued before `sb` existed -
+    // that queue is the only reason any error from before this point isn't
+    // already lost. Runs regardless of whether the session succeeded, since
+    // a failed session is itself exactly the kind of thing worth reporting.
+    if (window.__pendingClientErrors && window.__pendingClientErrors.length) {
+        const pending = window.__pendingClientErrors;
+        window.__pendingClientErrors = [];
+        pending.forEach(entry => sb.from('client_errors').insert(entry).then(() => {}, () => {}));
+    }
     if (!session) return;
     await fetchWallet();
     await fetchOwnedItems();

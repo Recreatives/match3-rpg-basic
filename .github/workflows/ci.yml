@@ -1,0 +1,77 @@
+name: CI
+
+# Runs the in-browser test suite (tests/index.html - see CLAUDE.md's Testing
+# section for why it's a browser harness and not a Node test runner) on every
+# push and PR, headlessly via Playwright. On a push to main specifically,
+# once tests pass, also triggers a GitHub Pages rebuild - the same
+# `pages/builds` API call this project has been triggering by hand after
+# every merge (deployment stays "whatever branch Pages is currently
+# configured to serve from," set via the repo's Pages settings or
+# `gh api .../pages -X PUT` - this workflow does not change that, it only
+# automates the "rebuild now" step that already exists).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright (Chromium only)
+        run: npx --yes playwright@1 install --with-deps chromium
+
+      - name: Serve the site
+        run: |
+          python3 -m http.server 8080 &
+          sleep 2
+
+      - name: Run tests/index.html headlessly
+        run: |
+          cat > run-tests.mjs <<'EOF'
+          import { chromium } from 'playwright';
+
+          const browser = await chromium.launch();
+          const page = await browser.newPage();
+          page.on('console', msg => console.log('[browser]', msg.text()));
+          page.on('pageerror', err => console.error('[browser error]', err.message));
+
+          await page.goto('http://localhost:8080/tests/index.html');
+          await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, { timeout: 20000 });
+
+          const results = await page.evaluate(() => window.__TEST_RESULTS__);
+          const pass = await page.evaluate(() => window.__TEST_PASS__);
+
+          for (const r of results) {
+            console.log(`${r.pass ? '✓' : '✗'} ${r.name}${r.detail ? ' - ' + r.detail : ''}`);
+          }
+          console.log(`\n${results.filter(r => r.pass).length}/${results.length} passed`);
+
+          await browser.close();
+          if (!pass) {
+            console.error('\nTEST SUITE FAILED');
+            process.exit(1);
+          }
+          EOF
+          node run-tests.mjs
+
+  trigger-pages-rebuild:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+    steps:
+      - name: Trigger a GitHub Pages rebuild
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages/builds"
