@@ -85,8 +85,27 @@ const SOUNDS = {
     gold: () => playSequence([{ freq: 987, duration: 0.06 }, { freq: 1318, duration: 0.1 }])
 };
 
+// Short vibration patterns (ms) for the moments worth actually feeling on a
+// touch device, not every single sound - a hit/crit/victory/defeat lands
+// differently than a quiet click or a match blip. Silently does nothing on
+// desktop or any browser without the Vibration API; tied to the same mute
+// toggle as sound (SOUNDS above) rather than a separate setting, since
+// "make this quiet" and "stop buzzing my phone" are the same request from
+// a player's point of view.
+const HAPTICS = {
+    hit: 15,
+    crit: [20, 30, 40],
+    dodge: 10,
+    victory: [30, 40, 60],
+    defeat: [60, 40, 60],
+    gold: 12
+};
+
 function playSound(name) {
     if (SOUNDS[name]) SOUNDS[name]();
+    if (!soundMuted && HAPTICS[name] && navigator.vibrate) {
+        try { navigator.vibrate(HAPTICS[name]); } catch (e) { /* never worth breaking gameplay over */ }
+    }
 }
 
 updateSoundMuteUI(); // reflect the stored preference on the button as soon as it exists
