@@ -346,6 +346,19 @@ insert into public.item_bases (slot, base_id, primary_stat) values
     ('trinket','amulet','energy'), ('trinket','ring','lifeSteal'), ('trinket','charm','teamHeal'), ('trinket','necklace','ult_dmg')
 on conflict (slot, base_id) do update set primary_stat = excluded.primary_stat;
 
+-- RLS here isn't about confidentiality (this table mirrors items.js's own
+-- ITEM_BASES, already shipped in plaintext to every client) - it's that
+-- Supabase grants anon/authenticated broad CRUD on public tables by default
+-- and relies on RLS as the actual backstop. Without it, a client could
+-- UPDATE/INSERT/DELETE rows here directly and rewrite the very allowlist
+-- validate_player_item_insert checks against, defeating the whole point of
+-- that trigger. Read is open to everyone (nothing secret); write has no
+-- policy at all, which - once RLS is on - means no policy an anon/
+-- authenticated role could ever need denies it implicitly.
+alter table public.item_bases enable row level security;
+drop policy if exists "read item bases" on public.item_bases;
+create policy "read item bases" on public.item_bases for select using (true);
+
 -- Procedural rarities (grey/white/blue/yellow) - affix count + per-stat
 -- ceiling, derived from items.js's RARITY_DEFS.statMult and rollAffixValue's
 -- baseRange at the top of their random range (mult * 1.2), rounded up with
@@ -358,6 +371,13 @@ create table if not exists public.item_rarity_bounds (
 insert into public.item_rarity_bounds (rarity, max_affix_count, max_stat_value) values
     ('grey', 1, 5), ('white', 1, 8), ('blue', 2, 15), ('yellow', 4, 25)
 on conflict (rarity) do update set max_affix_count = excluded.max_affix_count, max_stat_value = excluded.max_stat_value;
+
+-- Same reasoning as item_bases above: without this, a client could widen
+-- its own max_stat_value/max_affix_count row and then roll an item that
+-- passes the (now-tampered) bound check.
+alter table public.item_rarity_bounds enable row level security;
+drop policy if exists "read item rarity bounds" on public.item_rarity_bounds;
+create policy "read item rarity bounds" on public.item_rarity_bounds for select using (true);
 
 -- Fixed-identity items (orange/red/teal uniques + green set pieces) - exact
 -- rolled_stats allowlist, copied verbatim from items.js's UNIQUE_LEGENDARIES
@@ -404,6 +424,14 @@ insert into public.item_fixed_defs (rarity, base_id, rolled_stats) values
     ('teal', 'uniq_voidstep', '{"energy":12,"sword":9}'),
     ('teal', 'uniq_eye_of_infinity', '{"ult_dmg":18,"teamHeal":7}')
 on conflict (rarity, base_id) do update set rolled_stats = excluded.rolled_stats;
+
+-- Same reasoning again: this is the exact-match allowlist for
+-- orange/red/teal/green items - if a client could write to it, they could
+-- insert their own row here first and then have any stats they want
+-- rubber-stamped as "correct" for that rarity/base_id.
+alter table public.item_fixed_defs enable row level security;
+drop policy if exists "read item fixed defs" on public.item_fixed_defs;
+create policy "read item fixed defs" on public.item_fixed_defs for select using (true);
 
 create or replace function public.validate_player_item_insert()
 returns trigger
