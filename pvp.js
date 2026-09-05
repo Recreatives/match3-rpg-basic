@@ -398,6 +398,7 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
     // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
     // via pvpUpdateUI() the instant their HP hits 0 (before they send this
     // 'defeated' event), but force it here too in case that status-update
@@ -547,6 +548,7 @@ function pvpUseUltimate() {
     pvpUltCharge = 0;
     pvpUpdateUI();
     if (typeof playSound === 'function') playSound('ult');
+    if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
 
     if (pvpMyHP <= 0) {
         pvpMatchOver = true;

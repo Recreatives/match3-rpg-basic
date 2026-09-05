@@ -454,6 +454,7 @@ function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
     if (typeof adjustWallet === 'function') {
@@ -1403,6 +1404,7 @@ function useUltimate() {
         // 3. Visuals
         log(`ULTİMATE! ${selectedClass.ultName} kullanıldı!`, "log-hit");
         if (typeof playSound === 'function') playSound('ult');
+        if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
         updateUI(); // Disables button immediately
 
         // 4. Check Win Condition
@@ -1478,6 +1480,7 @@ function toggleModal(modalId) {
         }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();
+            if (typeof fetchDailyQuestStatus === 'function') fetchDailyQuestStatus();
         }
     }
 }

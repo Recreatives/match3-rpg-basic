@@ -328,6 +328,81 @@ function updateDailyLoginUI() {
     if (topBarBtn) topBarBtn.innerHTML = canClaim ? '🎁 Günlük Ödül <span style="color:#e74c3c;">●</span>' : '🎁 Günlük Ödül';
 }
 
+// --- DAILY QUESTS ------------------------------------------------------------
+// Three fixed quests (same for everyone, no rotation), each a single
+// real-gameplay-event claim rather than a tracked counter - see
+// supabase/schema.sql's claim_daily_quest for why. Trigger call sites live
+// in game.js (boss kill, useUltimate), pvp.js (match win, pvpUseUltimate)
+// and coop.js (boss kill, coopUseUltimate) - all three modes share the same
+// three quest keys, so winning any of them (or using any class's ult in any
+// mode) can complete a quest.
+const DAILY_QUEST_DEFS = {
+    kill_boss: { label: 'Bir boss öldür', emoji: '👹' },
+    win_pvp: { label: 'Bir PvP maçı kazan', emoji: '🗡️' },
+    use_ultimate: { label: 'Bir Ultimate kullan', emoji: '✨' }
+};
+let currentDailyQuests = {}; // { quest_key: true } for ones already claimed today
+
+async function fetchDailyQuestStatus() {
+    // Render the static quest list immediately from whatever
+    // currentDailyQuests already holds (empty on first call, meaning "all
+    // pending") - the list showing up right away, correct or not yet
+    // confirmed, beats staying blank while the network round trip is in
+    // flight or if it fails outright.
+    if (typeof updateDailyQuestUI === 'function') updateDailyQuestUI();
+
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    let todayStr = new Date().toISOString().slice(0, 10);
+
+    const { data, error } = await sb.from('daily_quests').select('quest_key').eq('player_id', user.id).eq('quest_date', todayStr);
+    if (error) { console.error('Daily quest fetch failed:', error.message); return; }
+
+    currentDailyQuests = {};
+    (data || []).forEach(row => { currentDailyQuests[row.quest_key] = true; });
+    if (typeof updateDailyQuestUI === 'function') updateDailyQuestUI();
+}
+
+// Called from the actual gameplay moment (boss kill / PvP win / ult use) in
+// all three modes - silent and best-effort. A player who already claimed
+// today just sees nothing happen, which is correct; the local
+// currentDailyQuests check skips the round trip entirely once claimed this
+// session, same as economy.js's other "don't bother the network for
+// something we already know" checks.
+async function claimDailyQuest(questKey) {
+    if (currentDailyQuests[questKey]) return;
+    const { data, error } = await sb.rpc('claim_daily_quest', { p_quest_key: questKey });
+    if (error) { console.error('claim_daily_quest failed:', error.message); return; }
+
+    const result = data[0];
+    currentDailyQuests[questKey] = true;
+    if (typeof updateDailyQuestUI === 'function') updateDailyQuestUI();
+
+    if (!result.already_claimed) {
+        await fetchWallet();
+        let def = DAILY_QUEST_DEFS[questKey];
+        let el = document.createElement('div');
+        el.className = 'achievement-toast';
+        el.innerHTML = `<b>${def.emoji} GÖREV TAMAMLANDI</b><br>${def.label} (+${result.quest_gold} 🪙)`;
+        document.body.appendChild(el);
+        setTimeout(() => el.classList.add('visible'), 10);
+        setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
+    }
+}
+
+function updateDailyQuestUI() {
+    let container = document.getElementById('daily-quest-list');
+    if (!container) return;
+    container.innerHTML = Object.keys(DAILY_QUEST_DEFS).map(key => {
+        let def = DAILY_QUEST_DEFS[key];
+        let done = !!currentDailyQuests[key];
+        return `<div class="manual-tile" style="opacity:${done ? '0.6' : '1'};">
+            <span class="manual-icon">${done ? '✅' : def.emoji}</span>
+            <div class="manual-desc"><b>${def.label}</b>${done ? 'Tamamlandı (+15 🪙)' : 'Beklemede'}</div>
+        </div>`;
+    }).join('');
+}
+
 async function handleClaimDailyReward() {
     let result = await claimDailyReward();
     let status = document.getElementById('daily-login-status');
@@ -354,6 +429,7 @@ async function initEconomy() {
     await fetchWallet();
     await fetchOwnedItems();
     await fetchDailyLoginStatus();
+    await fetchDailyQuestStatus();
     if (typeof fetchAchievements === 'function') await fetchAchievements();
 }
 

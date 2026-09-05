@@ -517,6 +517,7 @@ function coopOnEnemyDefeated(payload) {
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
+    if (payload.isBoss && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
     // Fires identically on BOTH clients (host calls this directly, the
     // guest via the 'enemy-defeated' broadcast) - each player rolls their
     // OWN drop against their OWN wallet/inventory, not a shared roll. Same
@@ -966,6 +967,7 @@ function coopUseUltimate() {
     coopUltCharge = 0;
     coopUpdateUI();
     if (typeof playSound === 'function') playSound('ult');
+    if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
 
     setTimeout(() => {
         coopProcessing = false;

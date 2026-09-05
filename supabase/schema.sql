@@ -644,3 +644,58 @@ begin
     return query select w.gold, v_streak, v_reward from public.wallets w where w.player_id = auth.uid();
 end;
 $$;
+
+-- 14. DAILY QUESTS -----------------------------------------------------------
+-- Three fixed daily quests (same for everyone, no rotation) - each is a
+-- single-trigger "I just did the thing" claim rather than a cumulative
+-- counter (e.g. "3 boss kills"), which would need real server-tracked game
+-- state to validate honestly. A client can only ever claim a quest once per
+-- calendar day regardless of how many times it calls this - the actual
+-- trigger points (game.js/coop.js's boss-kill, pvp.js's match win, all
+-- three modes' useUltimate) are each a real, already-happening event, not
+-- something free to spam for reward.
+create table if not exists public.daily_quests (
+    player_id  uuid not null references public.players(id) on delete cascade,
+    quest_date date not null,
+    quest_key  text not null check (quest_key in ('kill_boss', 'win_pvp', 'use_ultimate')),
+    claimed_at timestamptz not null default now(),
+    primary key (player_id, quest_date, quest_key)
+);
+
+alter table public.daily_quests enable row level security;
+
+drop policy if exists "read own daily quests" on public.daily_quests;
+create policy "read own daily quests" on public.daily_quests
+    for select using (auth.uid() = player_id);
+
+-- Output column deliberately not named gold/reward_gold in a way that could
+-- collide with a table column or another local var - see earn_currency's
+-- own comment for why this matters (a real bug there, not a hypothetical).
+create or replace function public.claim_daily_quest(p_quest_key text)
+returns table(quest_gold integer, already_claimed boolean)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_reward integer;
+    v_today date := current_date;
+begin
+    if p_quest_key not in ('kill_boss', 'win_pvp', 'use_ultimate') then
+        raise exception 'claim_daily_quest: unknown quest %', p_quest_key;
+    end if;
+
+    insert into public.daily_quests (player_id, quest_date, quest_key)
+        values (auth.uid(), v_today, p_quest_key)
+        on conflict (player_id, quest_date, quest_key) do nothing;
+
+    if not found then
+        return query select 0, true;
+        return;
+    end if;
+
+    v_reward := 15;
+    update public.wallets w set gold = w.gold + v_reward, updated_at = now() where w.player_id = auth.uid();
+
+    return query select v_reward, false;
+end;
+$$;
