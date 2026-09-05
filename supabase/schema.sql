@@ -312,9 +312,16 @@ begin
         raise exception 'earn_currency: materials amount out of bounds';
     end if;
 
-    update public.wallets
-        set gold = gold + p_gold, materials = materials + p_materials, updated_at = now()
-        where player_id = auth.uid();
+    -- `w` alias is load-bearing, not stylistic: this function's own
+    -- `returns table(gold integer, materials integer)` declares OUT
+    -- parameters named gold/materials, which shadow the bare column names
+    -- inside this function's body - an unqualified `gold + p_gold` here
+    -- fails at call time with "column reference is ambiguous" (a real bug
+    -- caught only by actually running this against Postgres, not by static
+    -- syntax checking - see the commit that added this fix).
+    update public.wallets w
+        set gold = w.gold + p_gold, materials = w.materials + p_materials, updated_at = now()
+        where w.player_id = auth.uid();
 
     return query select w.gold, w.materials from public.wallets w where w.player_id = auth.uid();
 end;
