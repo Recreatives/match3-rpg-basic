@@ -1625,5 +1625,59 @@ function toggleLog() {
     document.getElementById('log-toggle').classList.toggle('open');
 }
 
+const TUTORIAL_SEEN_KEY = 'pd_tutorial_seen_v1';
+const TUTORIAL_TOTAL_STEPS = 5;
+let tutorialStep = 1;
+
+function showTutorialStep(n) {
+    document.querySelectorAll('.tutorial-step').forEach(el => {
+        el.style.display = (parseInt(el.dataset.step, 10) === n) ? 'block' : 'none';
+    });
+    document.getElementById('tutorial-progress').innerText = `${n} / ${TUTORIAL_TOTAL_STEPS}`;
+    document.getElementById('tutorial-back-btn').style.visibility = (n === 1) ? 'hidden' : 'visible';
+    document.getElementById('tutorial-next-btn').innerText = (n === TUTORIAL_TOTAL_STEPS) ? 'Başlayalım! ✔' : 'İleri ▶';
+}
+
+function tutorialNext() {
+    if (tutorialStep >= TUTORIAL_TOTAL_STEPS) {
+        closeTutorial(true);
+        return;
+    }
+    tutorialStep++;
+    showTutorialStep(tutorialStep);
+}
+
+function tutorialBack() {
+    if (tutorialStep <= 1) return;
+    tutorialStep--;
+    showTutorialStep(tutorialStep);
+}
+
+function tutorialSkip() {
+    closeTutorial(false);
+}
+
+function closeTutorial(completed) {
+    document.getElementById('tutorial-modal').style.display = 'none';
+    localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
+    if (typeof trackEvent === 'function') trackEvent('tutorial_closed', { completed });
+}
+
+function replayTutorial() {
+    toggleModal('info-modal');
+    tutorialStep = 1;
+    showTutorialStep(1);
+    document.getElementById('tutorial-modal').style.display = 'flex';
+}
+
+function maybeShowTutorial() {
+    if (localStorage.getItem(TUTORIAL_SEEN_KEY) === 'true') return;
+    tutorialStep = 1;
+    showTutorialStep(1);
+    document.getElementById('tutorial-modal').style.display = 'flex';
+    if (typeof trackEvent === 'function') trackEvent('tutorial_started', {});
+}
+
 createBoard();
 renderClassButtons();
+maybeShowTutorial();

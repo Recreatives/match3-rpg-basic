@@ -14,6 +14,7 @@
                 <div class="tip-box">
                     <b>Çekirdek Döngü:</b> Sınıf Seç ➡ Savaş ➡ Kazan ➡ Statlarını yükseltecek eşya seç ➡ Tekrarla.
                 </div>
+                <button class="action-btn" style="margin-top:8px;" onclick="replayTutorial()">🔰 Hızlı Başlangıç Turunu Tekrar Göster</button>
             </div>
 
             <div class="modal-section">
@@ -157,6 +158,65 @@
                 <div class="tip-box" style="margin-top:5px;">
                     <b>Dinlenme:</b> Her yeni seviyeden önce eksik canının %50'sini geri kazanırsın.
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tutorial-modal" class="modal-overlay" style="z-index:250;">
+        <div class="modal-content" style="max-width: 420px;">
+            <span class="close-modal" onclick="tutorialSkip()">×</span>
+
+            <div class="tutorial-step" data-step="1">
+                <h2 class="modal-title">👋 Pixel Dungeon'a Hoş Geldin</h2>
+                <p>Bu, taşları eşleştirerek savaştığın bir zindan macerası. Amacın sonsuz canavar dalgalarını yenmek - canın 0'a düşerse macera biter.</p>
+                <div class="tip-box">5 adımlık kısa bir tur ile başlayalım. İstersen ✕'e basıp atlayabilir, sonradan Yardım menüsünden tekrar açabilirsin.</div>
+            </div>
+
+            <div class="tutorial-step" data-step="2" style="display:none;">
+                <h2 class="modal-title">💠 Taşları Eşleştir</h2>
+                <div class="manual-grid">
+                    <div class="manual-tile">
+                        <div class="manual-icon">⚔️</div>
+                        <div class="manual-desc"><b>KILIÇ</b><br>Düşmana hasar verir.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">🛡️</div>
+                        <div class="manual-desc"><b>KALKAN</b><br>Sana Zırh ekler.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">💖</div>
+                        <div class="manual-desc"><b>KALP</b><br>Canını iyileştirir.</div>
+                    </div>
+                    <div class="manual-tile">
+                        <div class="manual-icon">⚡</div>
+                        <div class="manual-desc"><b>ENERJİ</b><br>Ultimate'i şarj eder.</div>
+                    </div>
+                </div>
+                <div class="tip-box">3 veya daha fazla aynı taşı yan yana getirerek eşleştir - ne kadar çok taş, o kadar güçlü etki!</div>
+            </div>
+
+            <div class="tutorial-step" data-step="3" style="display:none;">
+                <h2 class="modal-title">🦸 Bir Sınıf Seç</h2>
+                <p>Her sınıfın kendine has bir oynanışı var: Warrior tank gibi dayanır, Rogue ekstra tur kazanır, Mage ultimate'iyle güçlenir ve daha fazlası.</p>
+                <div class="tip-box">Hangisini seçtiğin önemli değil - istediğin an yeni bir koşu (run) başlatıp farklı bir sınıf deneyebilirsin.</div>
+            </div>
+
+            <div class="tutorial-step" data-step="4" style="display:none;">
+                <h2 class="modal-title">🌀 Enerji ve Ultimate</h2>
+                <p>Üstteki <b>ULT</b> barı Enerji taşlarıyla dolar. %100'e ulaşınca Ultimate'i kullanabilirsin - her sınıfın ultimate'i farklı bir avantaj sağlar.</p>
+                <div class="tip-box">Dikkat: Düşmanlar da Enerji taşı yiyerek iyileşebilir!</div>
+            </div>
+
+            <div class="tutorial-step" data-step="5" style="display:none;">
+                <h2 class="modal-title">🎁 Ödüller ve İlerleme</h2>
+                <p>Üstteki menüden <b>Günlük Ödül</b>, <b>Dükkan</b>, <b>Başarımlar</b> ve <b>Lider Tablosu</b>'na zindan dışındayken göz atabilirsin. Kazandığın altın ve eşyalar hesabına kalıcı olarak işlenir.</p>
+                <div class="tip-box">Hazırsan bir sınıf seçip maceraya başlayalım!</div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 15px;">
+                <button class="action-btn" id="tutorial-back-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialBack()">◀ Geri</button>
+                <span id="tutorial-progress" style="color:#bdc3c7; font-size:0.85rem;">1 / 5</span>
+                <button class="action-btn" id="tutorial-next-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialNext()">İleri ▶</button>
             </div>
         </div>
     </div>
@@ -387,7 +447,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.78 Analytics/telemetri</div>
+        <div class="version">v0.79 Onboarding tutorial</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
