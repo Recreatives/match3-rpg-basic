@@ -398,6 +398,7 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'win', betrayal: !!pvpBetrayalMode });
     if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
     // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
     // via pvpUpdateUI() the instant their HP hits 0 (before they send this
@@ -457,6 +458,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 function pvpOnDefeat() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
+    if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'loss', betrayal: !!pvpBetrayalMode });
     pvpLogBetrayalLossIfNeeded();
 }
 

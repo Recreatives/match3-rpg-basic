@@ -874,3 +874,25 @@ begin
     return v_row;
 end;
 $$;
+
+-- 17. ANALYTICS EVENTS ---------------------------------------------------------
+-- Write-only from the client (trackEvent, economy.js) - same shape as
+-- client_errors: no SELECT policy at all, so this is a dashboard/service-
+-- role-only read (Supabase Studio's Table Editor or a service-role query),
+-- never something the game itself displays. Exists so future roadmap
+-- decisions (which class/mode gets played, where a run tends to end, which
+-- items get bought) can be based on what players actually do instead of a
+-- guess - see the roadmap's own Faz 5 "Analytics/telemetri" item.
+create table if not exists public.analytics_events (
+    id         uuid primary key default gen_random_uuid(),
+    player_id  uuid references public.players(id) on delete set null,
+    event_name text not null,
+    event_data jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+);
+
+alter table public.analytics_events enable row level security;
+
+drop policy if exists "insert analytics events" on public.analytics_events;
+create policy "insert analytics events" on public.analytics_events
+    for insert with check (true);

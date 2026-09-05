@@ -134,6 +134,7 @@ async function purchaseItem(slot, rarityKey) {
 
     currentOwnedItems.push(data);
     await fetchWallet();
+    if (typeof trackEvent === 'function') trackEvent('item_purchased', { slot, rarity: rarityKey });
     let info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(data) : { name: data.base_id, emoji: '' };
     setShopStatus(`${info.emoji} ${info.name} satın alındı!`);
     if (typeof renderShop === 'function') renderShop();
@@ -304,6 +305,27 @@ function updateWalletUI() {
 function setWalletStatus(text) {
     let el = document.getElementById('wallet-status');
     if (el) el.innerText = text;
+}
+
+// --- ANALYTICS ---------------------------------------------------------------
+// Write-only, best-effort - never awaited by a caller and never allowed to
+// throw into gameplay code (see the try/catch below). Exists purely so
+// future roadmap decisions (which class/mode gets played, where a run
+// tends to end, which items get bought) can be based on real player
+// behavior - see supabase/schema.sql's analytics_events, which has no
+// SELECT policy at all (dashboard/service-role read only, same as
+// client_errors).
+function trackEvent(eventName, eventData) {
+    if (typeof sb === 'undefined') return;
+    try {
+        sb.auth.getUser().then(({ data }) => {
+            sb.from('analytics_events').insert({
+                player_id: data && data.user ? data.user.id : null,
+                event_name: eventName,
+                event_data: eventData || {}
+            }).then(() => {}, () => {});
+        }, () => {});
+    } catch (e) { /* telemetry is never worth breaking gameplay over */ }
 }
 
 // --- DAILY LOGIN REWARD ----------------------------------------------------

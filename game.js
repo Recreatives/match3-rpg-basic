@@ -301,6 +301,7 @@ function renderClassButtons() {
         btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${c.desc}</small>`;
         btn.onclick = () => {
             selectedClass = c;
+            if (typeof trackEvent === 'function') trackEvent('class_selected', { class: key });
             // getElementById, not querySelector('.stat-box div:first-child') -
             // pvp-modal/coop-modal have their own .stat-box elements earlier in
             // the DOM than the solo HUD, so the class selector was silently
@@ -342,7 +343,10 @@ function renderModeButtons() {
         const btn = document.createElement('button');
         btn.className = 'reward-btn rarity-rare';
         btn.innerHTML = `<b>${m.emoji} ${m.label}</b><small>${m.desc}</small>`;
-        btn.onclick = m.action;
+        btn.onclick = () => {
+            if (typeof trackEvent === 'function') trackEvent('mode_selected', { mode: m.label.toLowerCase(), class: selectedClass ? selectedClass.name : null });
+            m.action();
+        };
         container.appendChild(btn);
     });
 }
@@ -535,6 +539,7 @@ function showBossCheckpoint() {
     continueBtn.className = 'reward-btn rarity-rare';
     continueBtn.innerHTML = `<b>⚔️ Zindana Devam Et</b><small>Bir sonraki seviyeye geç.</small>`;
     continueBtn.onclick = () => {
+        if (typeof trackEvent === 'function') trackEvent('boss_checkpoint_choice', { choice: 'continue', level });
         container.style.display = 'none';
         let missingHP = maxPlayerHP - playerHP;
         let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
@@ -550,7 +555,10 @@ function showBossCheckpoint() {
     let returnBtn = document.createElement('button');
     returnBtn.className = 'reward-btn rarity-epic';
     returnBtn.innerHTML = `<b>🏠 Ana Menüye Dön</b><small>Zindandan çık - altının ve eşyaların dükkanda seni bekliyor.</small>`;
-    returnBtn.onclick = returnToMainMenu;
+    returnBtn.onclick = () => {
+        if (typeof trackEvent === 'function') trackEvent('boss_checkpoint_choice', { choice: 'menu', level });
+        returnToMainMenu();
+    };
     container.appendChild(returnBtn);
 }
 
@@ -686,6 +694,7 @@ function generateRewards() {
 
 function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
+    if (typeof trackEvent === 'function') trackEvent('solo_run_ended', { level, class: selectedClass ? selectedClass.name : null });
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = "OYUN BİTTİ";
     overlayBtn.innerText = "TEKRAR DENE";
