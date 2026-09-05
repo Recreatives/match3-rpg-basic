@@ -433,9 +433,11 @@ function triggerDeathSequence(who) {
         enemySprite.classList.add('dying');
         log("ENEMY DEFEATED!", "log-crit");
         gridDisplay.classList.add('shake');
+        if (typeof playSound === 'function') playSound('victory');
         setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
     } else {
         gridDisplay.classList.add('shake');
+        if (typeof playSound === 'function') playSound('defeat');
         setTimeout(() => { gridDisplay.classList.remove('shake'); gameOver(); }, 1500);
     }
 }
@@ -455,7 +457,11 @@ function winLevel() {
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
     if (typeof adjustWallet === 'function') {
-        adjustWallet(goldReward, 0).then(result => { if (result) log(`+${goldReward} 🪙 kazandın!`, 'log-hit'); });
+        adjustWallet(goldReward, 0).then(result => {
+            if (!result) return;
+            log(`+${goldReward} 🪙 kazandın!`, 'log-hit');
+            if (typeof playSound === 'function') playSound('gold');
+        });
     }
 
     // Calculate Reward Picks
@@ -976,6 +982,8 @@ function processMatch(group, isInitial) {
     // trigger) are further scaled by how fast the swap was made.
     let finalMultiplier = isPlayerTurn ? multiplier * currentMoveTimeMultiplier : multiplier;
 
+    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+
     // --- VISUALS & LOGS ---
     if (!isInitial && finalMultiplier > 1) { // Only log if it's special
         let user = isPlayerTurn ? "Player" : "Enemy";
@@ -1027,18 +1035,21 @@ function applyRPGEffects(type, multiplier) {
         inflictDamage(target, baseVal);
         log(`${user} Atk ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        if (typeof playSound === 'function') playSound('hit');
 
     } else if (type === 'heart') {
         let baseVal = Math.floor(stats.heart * multiplier);
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
         log(`${user} Heal +${baseVal}`, 'log-heal');
+        if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
 
     } else if (type === 'shield') {
         let baseVal = Math.floor(stats.shield * multiplier);
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
         log(`${user} Armor +${baseVal}`, 'log-armor');
+        if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
 
     } else if (type === 'energy') {
         let baseVal = Math.floor(stats.energy * multiplier);
@@ -1060,6 +1071,7 @@ function applyRPGEffects(type, multiplier) {
         inflictDamage(self, recoil);
         log(`Skull! Dmg: ${dmgToOpponent} / Self: ${recoil}`, 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        if (typeof playSound === 'function') playSound('crit');
     }
 
     if (isPlayerTurn) checkBossEnrage();
@@ -1119,6 +1131,7 @@ function inflictDamage(targetStr, amount) {
         if (afterDefense === null) {
             showFloatingText("DODGE!", document.getElementById('player-hp-bar'), "#2ecc71");
             log("DODGED!", "log-heal");
+            if (typeof playSound === 'function') playSound('dodge');
             return;
         }
         amount = afterDefense;
@@ -1383,6 +1396,7 @@ function useUltimate() {
 
         // 3. Visuals
         log(`ULTIMATE! ${selectedClass.ultName} used!`, "log-hit");
+        if (typeof playSound === 'function') playSound('ult');
         updateUI(); // Disables button immediately
 
         // 4. Check Win Condition

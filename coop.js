@@ -513,6 +513,7 @@ function coopApplySessionResume(state) {
 
 function coopOnEnemyDefeated(payload) {
     coopLog(payload.isBoss ? `Boss (Lvl ${payload.level}) yenildi!` : `Minion (Lvl ${payload.level}) yenildi!`);
+    if (typeof playSound === 'function') playSound('victory');
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
@@ -921,6 +922,7 @@ function coopApplyTurnSet(role) {
 
 function coopOnPartyWiped() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
+    if (typeof playSound === 'function') playSound('defeat');
     coopMatchOver = true;
     coopStopThinkingAnimation();
     coopSetStatus(`İKİNİZ DE DÜŞTÜNÜZ - Lvl ${coopLevel}'de YENİLGİ`);
@@ -963,6 +965,7 @@ function coopUseUltimate() {
     selectedClass.ultEffect(makeCoopCombatContext());
     coopUltCharge = 0;
     coopUpdateUI();
+    if (typeof playSound === 'function') playSound('ult');
 
     setTimeout(() => {
         coopProcessing = false;
@@ -1047,6 +1050,7 @@ function coopApplyGroupEffect(group, isInitial) {
     // (game.js's processMatch) - ultBonus stays a flat add, not scaled by it.
     let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
     let multiplier = shapeMultiplier * coopMoveTimeMultiplier;
+    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
         if (!isInitial) coopTiles[i].classList.add('matched');

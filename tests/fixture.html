@@ -232,6 +232,19 @@
         </div>
     </div>
 
+    <div id="daily-login-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 380px; text-align:center;">
+            <span class="close-modal" onclick="toggleModal('daily-login-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🎁 GÜNLÜK ÖDÜL</h2>
+                <p id="daily-login-streak" style="font-size:0.9rem; color:#bdc3c7;">Seri: 0 gün</p>
+                <p style="font-size:0.8rem; color:#7f8c8d;">Her gün giriş yap, ödülün 7. güne kadar büyüsün (sonra sabit kalır).</p>
+                <button id="daily-login-claim-btn" class="overlay-btn" style="width:100%; margin-top:10px;" onclick="handleClaimDailyReward()">Ödülü Al</button>
+                <p id="daily-login-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px; min-height:1.2em;"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="leaderboard-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('leaderboard-modal')">×</span>
@@ -394,8 +407,10 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.70 2 new classes, solo minion variety, boss enrage phase</div>
+        <div class="version">v0.72 Sound effects (Web Audio synthesized)</div>
         <div>
+            <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
+            <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
@@ -466,6 +481,7 @@
     </div>
 
     <script src="supabase-stub.js"></script>
+    <script src="../sound.js"></script>
     <script src="../economy.js"></script>
     <script src="../items.js"></script>
     <script src="../achievements.js"></script>
@@ -476,13 +492,6 @@
 
 
     <script>
-        // Test-only bridge: top-level `const`/`let` in a classic script
-        // (unlike `var` or function declarations) never become properties
-        // of `window`, so the parent test runner - reaching in via
-        // frame.contentWindow - can't see them even though this fixture's
-        // own inline scripts could reference them by bare name. Re-export
-        // exactly what tests/index.html needs; nothing here touches the
-        // actual game source.
         window.ITEM_SLOTS = ITEM_SLOTS;
         window.ITEM_BASES = ITEM_BASES;
         window.ITEM_SETS = ITEM_SETS;

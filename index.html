@@ -35,7 +35,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.71">
+    <link rel="stylesheet" href="style.css?v=0.72">
 </head>
 <body>
     <div id="app">
@@ -442,8 +442,9 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.71 Daily login rewards</div>
+        <div class="version">v0.72 Sound effects (Web Audio synthesized)</div>
         <div>
+            <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
@@ -515,12 +516,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="economy.js?v=0.71"></script>
-    <script src="items.js?v=0.71"></script>
-    <script src="achievements.js?v=0.71"></script>
-    <script src="game.js?v=0.71"></script>
-    <script src="sharedboard.js?v=0.71"></script>
-    <script src="pvp.js?v=0.71"></script>
-    <script src="coop.js?v=0.71"></script>
+    <script src="sound.js?v=0.72"></script>
+    <script src="economy.js?v=0.72"></script>
+    <script src="items.js?v=0.72"></script>
+    <script src="achievements.js?v=0.72"></script>
+    <script src="game.js?v=0.72"></script>
+    <script src="sharedboard.js?v=0.72"></script>
+    <script src="pvp.js?v=0.72"></script>
+    <script src="coop.js?v=0.72"></script>
 </body>
 </html>

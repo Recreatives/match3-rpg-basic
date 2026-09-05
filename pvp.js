@@ -397,6 +397,7 @@ function pvpOnOpponentDefeated() {
     pvpStopThinkingAnimation();
     pvpSetStatus('KAZANDIN!');
     pvpLog('Rakip yenildi - kazandın!');
+    if (typeof playSound === 'function') playSound('victory');
     // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
     // via pvpUpdateUI() the instant their HP hits 0 (before they send this
     // 'defeated' event), but force it here too in case that status-update
@@ -454,6 +455,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 // "lifetime" split).
 function pvpOnDefeat() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
+    if (typeof playSound === 'function') playSound('defeat');
     pvpLogBetrayalLossIfNeeded();
 }
 
@@ -544,6 +546,7 @@ function pvpUseUltimate() {
     selectedClass.ultEffect(makePvpCombatContext());
     pvpUltCharge = 0;
     pvpUpdateUI();
+    if (typeof playSound === 'function') playSound('ult');
 
     if (pvpMyHP <= 0) {
         pvpMatchOver = true;
@@ -651,6 +654,7 @@ function pvpApplyGroupEffect(group, isInitial) {
     // stays a flat add, not scaled by it (matching game.js's processMatch).
     let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
     let multiplier = shapeMultiplier * pvpMoveTimeMultiplier;
+    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
         if (!isInitial) pvpTiles[i].classList.add('matched');
