@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=0.83">
+    <link rel="stylesheet" href="style.css?v=0.84">
 </head>
 <body>
     <div id="app">
@@ -361,6 +361,17 @@
         </div>
     </div>
 
+    <div id="guild-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('guild-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">🛡️ LONCA</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Bir lonca kur ya da mevcut birine katıl. Aynı anda sadece bir loncada olabilirsin.</p>
+                <div id="guild-panel"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="achievements-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
@@ -520,12 +531,13 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.83 PvP spectator mode</div>
+        <div class="version">v0.84 Guilds</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
             <button class="loot-btn" onclick="toggleModal('friends-modal')">👥 Arkadaşlar</button>
+            <button class="loot-btn" onclick="toggleModal('guild-modal')">🛡️ Lonca</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>
@@ -595,14 +607,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=0.83"></script>
-    <script src="economy.js?v=0.83"></script>
-    <script src="items.js?v=0.83"></script>
-    <script src="achievements.js?v=0.83"></script>
-    <script src="game.js?v=0.83"></script>
-    <script src="sharedboard.js?v=0.83"></script>
-    <script src="pvp.js?v=0.83"></script>
-    <script src="coop.js?v=0.83"></script>
+    <script src="sound.js?v=0.84"></script>
+    <script src="economy.js?v=0.84"></script>
+    <script src="items.js?v=0.84"></script>
+    <script src="achievements.js?v=0.84"></script>
+    <script src="game.js?v=0.84"></script>
+    <script src="sharedboard.js?v=0.84"></script>
+    <script src="pvp.js?v=0.84"></script>
+    <script src="coop.js?v=0.84"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

@@ -1498,6 +1498,9 @@ function toggleModal(modalId) {
         if (modalId === 'friends-modal' && typeof renderFriendsList === 'function') {
             renderFriendsList();
         }
+        if (modalId === 'guild-modal' && typeof renderGuildPanel === 'function') {
+            renderGuildPanel();
+        }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();
             if (typeof fetchDailyQuestStatus === 'function') fetchDailyQuestStatus();

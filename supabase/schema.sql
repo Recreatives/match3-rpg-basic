@@ -1183,3 +1183,179 @@ as $$
 $$;
 
 grant execute on function public.get_friends_list() to authenticated;
+
+-- 21. Guilds -------------------------------------------------------------------------
+-- One guild per player at most (guild_members.player_id is its own primary
+-- key, not part of a composite one) - simpler than supporting multiple
+-- memberships, and matches how this feature is actually pitched to players
+-- (join a team, not several).
+create table if not exists public.guilds (
+    id         uuid primary key default gen_random_uuid(),
+    name       text not null unique,
+    owner_id   uuid not null references public.players(id) on delete cascade,
+    created_at timestamptz not null default now()
+);
+
+alter table public.guilds enable row level security;
+
+-- Guild names/rosters are meant to be browsable (so a player can find one to
+-- join), unlike everything else in this file - open read, no auth.uid()
+-- check at all.
+drop policy if exists "read all guilds" on public.guilds;
+create policy "read all guilds" on public.guilds
+    for select using (true);
+
+create table if not exists public.guild_members (
+    player_id uuid primary key references public.players(id) on delete cascade,
+    guild_id  uuid not null references public.guilds(id) on delete cascade,
+    role      text not null default 'member' check (role in ('owner', 'member')),
+    joined_at timestamptz not null default now()
+);
+
+alter table public.guild_members enable row level security;
+
+-- A client can read its own membership row, or any row belonging to the
+-- SAME guild it's in (self-referencing subquery) - so a member can see
+-- their teammates, but not every other guild's roster.
+drop policy if exists "read own guild roster" on public.guild_members;
+create policy "read own guild roster" on public.guild_members
+    for select using (
+        player_id = auth.uid()
+        or guild_id in (select gm.guild_id from public.guild_members gm where gm.player_id = auth.uid())
+    );
+
+create or replace function public.create_guild(p_name text)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me       uuid := auth.uid();
+    v_guild_id uuid;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if exists (select 1 from public.guild_members where player_id = v_me) then
+        raise exception 'already in a guild';
+    end if;
+
+    insert into public.guilds (name, owner_id) values (trim(p_name), v_me)
+        returning id into v_guild_id;
+
+    insert into public.guild_members (player_id, guild_id, role) values (v_me, v_guild_id, 'owner');
+
+    return v_guild_id;
+end;
+$$;
+
+grant execute on function public.create_guild(text) to authenticated;
+
+create or replace function public.join_guild(p_guild_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if exists (select 1 from public.guild_members where player_id = v_me) then
+        raise exception 'already in a guild';
+    end if;
+
+    if not exists (select 1 from public.guilds where id = p_guild_id) then
+        raise exception 'guild not found';
+    end if;
+
+    insert into public.guild_members (player_id, guild_id, role) values (v_me, p_guild_id, 'member');
+end;
+$$;
+
+grant execute on function public.join_guild(uuid) to authenticated;
+
+-- If the owner leaves and teammates remain, ownership passes to whoever
+-- joined earliest (simple, deterministic succession) - if no teammates
+-- remain, the guild itself is deleted (its membership row is already gone
+-- by this point, so there'd be nothing left in it anyway).
+create or replace function public.leave_guild()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me          uuid := auth.uid();
+    v_guild_id    uuid;
+    v_was_owner   boolean;
+    v_next_owner  uuid;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    select guild_id, (role = 'owner') into v_guild_id, v_was_owner
+        from public.guild_members where player_id = v_me;
+
+    if v_guild_id is null then
+        return;
+    end if;
+
+    delete from public.guild_members where player_id = v_me;
+
+    if v_was_owner then
+        select gm.player_id into v_next_owner from public.guild_members gm
+            where gm.guild_id = v_guild_id order by gm.joined_at asc limit 1;
+
+        if v_next_owner is null then
+            delete from public.guilds where id = v_guild_id;
+        else
+            update public.guild_members set role = 'owner' where player_id = v_next_owner;
+            update public.guilds set owner_id = v_next_owner where id = v_guild_id;
+        end if;
+    end if;
+end;
+$$;
+
+grant execute on function public.leave_guild() to authenticated;
+
+-- players.display_name can't be joined directly against guild_members from
+-- the client (RLS only allows reading your OWN player row), same reasoning
+-- as get_friends_list above.
+-- guild_name repeats on every row (denormalized) rather than needing a
+-- second round trip - cheap for a roster that's realistically a handful of
+-- rows, and keeps the client to one call for the whole guild panel.
+create or replace function public.get_my_guild_roster()
+returns table(player_id uuid, display_name text, role text, joined_at timestamptz, guild_name text)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select gm.player_id, coalesce(p.display_name, 'İsimsiz Kahraman'), gm.role, gm.joined_at, g.name
+    from public.guild_members gm
+    join public.players p on p.id = gm.player_id
+    join public.guilds g on g.id = gm.guild_id
+    where gm.guild_id = (select guild_id from public.guild_members where player_id = auth.uid())
+    order by gm.role asc, gm.joined_at asc;
+$$;
+
+grant execute on function public.get_my_guild_roster() to authenticated;
+
+create or replace function public.get_guild_list(limit_count integer default 20)
+returns table(guild_id uuid, name text, member_count bigint)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select g.id, g.name, count(gm.player_id)
+    from public.guilds g
+    left join public.guild_members gm on gm.guild_id = g.id
+    group by g.id, g.name
+    order by count(gm.player_id) desc, g.name asc
+    limit greatest(1, least(limit_count, 50));
+$$;
+
+grant execute on function public.get_guild_list(integer) to authenticated, anon;

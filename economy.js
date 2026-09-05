@@ -376,6 +376,116 @@ async function submitFriendRequest() {
     if (result === 'sent') { input.value = ''; renderFriendsList(); }
 }
 
+// Guilds - see supabase/schema.sql's guilds/guild_members tables and
+// create_guild/join_guild/leave_guild/get_my_guild_roster/get_guild_list
+// functions. A player can only ever join/create through those, never a raw
+// insert - guild_members has no client insert policy at all.
+async function createGuild(name) {
+    const trimmed = (name || '').trim().slice(0, 30);
+    if (!trimmed) return 'empty';
+    const { error } = await sb.rpc('create_guild', { p_name: trimmed });
+    if (error) {
+        console.error('create_guild failed:', error.message);
+        if (error.code === '23505') return 'name_taken';
+        if (error.message.includes('already in a guild')) return 'already_in_guild';
+        return 'error';
+    }
+    return 'ok';
+}
+
+async function joinGuild(guildId) {
+    const { error } = await sb.rpc('join_guild', { p_guild_id: guildId });
+    if (error) { console.error('join_guild failed:', error.message); return false; }
+    return true;
+}
+
+async function leaveGuild() {
+    const { error } = await sb.rpc('leave_guild');
+    if (error) { console.error('leave_guild failed:', error.message); return false; }
+    return true;
+}
+
+async function fetchMyGuildRoster() {
+    const { data, error } = await sb.rpc('get_my_guild_roster');
+    if (error) { console.error('get_my_guild_roster failed:', error.message); return []; }
+    return data;
+}
+
+async function fetchGuildList() {
+    const { data, error } = await sb.rpc('get_guild_list', { limit_count: 20 });
+    if (error) { console.error('get_guild_list failed:', error.message); return []; }
+    return data;
+}
+
+async function renderGuildPanel() {
+    let container = document.getElementById('guild-panel');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let roster = await fetchMyGuildRoster();
+    if (roster.length > 0) {
+        let rows = roster.map(r =>
+            `<div class="history-item"><span class="history-name">${r.role === 'owner' ? '👑 ' : ''}${r.display_name}</span></div>`
+        ).join('');
+        container.innerHTML = `
+            <h4 style="margin:0 0 4px;">${roster[0].guild_name}</h4>
+            <p style="font-size:0.8rem; color:#bdc3c7;">${roster.length} üye</p>
+            ${rows}
+            <button class="action-btn" style="width:100%; margin-top:10px; background:#c0392b;" onclick="handleLeaveGuild()">Loncadan Ayrıl</button>
+        `;
+        return;
+    }
+
+    let guilds = await fetchGuildList();
+    container.innerHTML = `
+        <div style="display:flex; gap:6px; margin-bottom:10px;">
+            <input id="guild-name-input" type="text" placeholder="Yeni lonca adı" maxlength="30" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+            <button class="action-btn" style="width:auto; margin:0;" onclick="handleCreateGuild()">Kur</button>
+        </div>
+        <p id="guild-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
+        <p style="font-size:0.8rem; color:#bdc3c7; margin-top:10px;">— veya mevcut bir loncaya katıl —</p>
+        <div id="guild-browse-list"></div>
+    `;
+    let browseList = document.getElementById('guild-browse-list');
+    if (guilds.length === 0) {
+        browseList.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz hiç lonca kurulmamış.</p>';
+    } else {
+        guilds.forEach(g => {
+            let div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerHTML = `<span class="history-name">${g.name}</span><span class="history-stats"></span>`;
+            let joinBtn = document.createElement('button');
+            joinBtn.className = 'action-btn';
+            joinBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
+            joinBtn.innerText = `Katıl (${g.member_count})`;
+            joinBtn.onclick = () => joinGuild(g.guild_id).then(ok => { if (ok) renderGuildPanel(); });
+            div.querySelector('.history-stats').appendChild(joinBtn);
+            browseList.appendChild(div);
+        });
+    }
+}
+
+async function handleCreateGuild() {
+    let input = document.getElementById('guild-name-input');
+    if (!input) return;
+    let status = document.getElementById('guild-status');
+    let result = await createGuild(input.value);
+    const messages = {
+        ok: 'Lonca kuruldu!',
+        name_taken: 'Bu isim zaten alınmış.',
+        already_in_guild: 'Zaten bir loncadasın.',
+        empty: 'Önce bir isim yaz.',
+        error: 'Bir hata oldu, tekrar dene.'
+    };
+    if (status) status.innerText = messages[result] || messages.error;
+    if (result === 'ok') renderGuildPanel();
+}
+
+async function handleLeaveGuild() {
+    let ok = await leaveGuild();
+    if (ok) renderGuildPanel();
+}
+
 async function fetchMyPvpRating() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
