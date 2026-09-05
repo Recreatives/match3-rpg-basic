@@ -1069,3 +1069,117 @@ as $$
 $$;
 
 grant execute on function public.leave_pvp_queue() to authenticated;
+
+-- 20. Friends list ------------------------------------------------------------------
+-- Friend requests are looked up by display_name, so it has to actually be
+-- unique from here on - it wasn't before (nothing needed it to be). Multiple
+-- NULLs are still allowed (players who never set one), only non-null values
+-- collide. If this fails, it means two existing players already share a
+-- name - whoever set theirs more recently will need to change it (leaderboard
+-- modal, "Kaydet") before this can be re-run.
+alter table public.players add constraint players_display_name_unique unique (display_name);
+
+-- A client can only ever SELECT its own player row ("read own player row"),
+-- so resolving a target's id from a typed display name - and letting a
+-- client act on ANOTHER player's incoming request - both have to go through
+-- a trusted function, same reasoning as get_leaderboard/resolve_pvp_match.
+create table if not exists public.friendships (
+    requester_id uuid not null references public.players(id) on delete cascade,
+    addressee_id uuid not null references public.players(id) on delete cascade,
+    status       text not null default 'pending' check (status in ('pending', 'accepted')),
+    created_at   timestamptz not null default now(),
+    primary key (requester_id, addressee_id),
+    check (requester_id != addressee_id)
+);
+
+alter table public.friendships enable row level security;
+
+drop policy if exists "read own friendships" on public.friendships;
+create policy "read own friendships" on public.friendships
+    for select using (auth.uid() = requester_id or auth.uid() = addressee_id);
+
+create or replace function public.send_friend_request(p_display_name text)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me     uuid := auth.uid();
+    v_target uuid;
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    select id into v_target from public.players
+        where display_name = trim(p_display_name) and id != v_me;
+
+    if v_target is null then
+        return 'not_found';
+    end if;
+
+    if exists (
+        select 1 from public.friendships f
+        where (f.requester_id = v_me and f.addressee_id = v_target)
+           or (f.requester_id = v_target and f.addressee_id = v_me)
+    ) then
+        return 'already_exists';
+    end if;
+
+    insert into public.friendships (requester_id, addressee_id, status)
+        values (v_me, v_target, 'pending');
+
+    return 'sent';
+end;
+$$;
+
+grant execute on function public.send_friend_request(text) to authenticated;
+
+create or replace function public.respond_friend_request(p_requester_id uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+
+    if p_accept then
+        update public.friendships set status = 'accepted'
+            where requester_id = p_requester_id and addressee_id = v_me and status = 'pending';
+    else
+        delete from public.friendships
+            where requester_id = p_requester_id and addressee_id = v_me and status = 'pending';
+    end if;
+end;
+$$;
+
+grant execute on function public.respond_friend_request(uuid, boolean) to authenticated;
+
+-- Projects the OTHER party's display name for each of my friendships
+-- (direction-agnostic - I may be either requester or addressee), plus
+-- whether a pending row is an incoming request (someone else waiting on ME)
+-- so the client can tell "waiting for them to accept" apart from "they're
+-- waiting on me to respond".
+create or replace function public.get_friends_list()
+returns table(friend_id uuid, display_name text, status text, is_incoming_request boolean)
+language sql
+security definer set search_path = public
+stable
+as $$
+    select
+        case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end,
+        coalesce(p.display_name, 'İsimsiz Kahraman'),
+        f.status,
+        (f.status = 'pending' and f.addressee_id = auth.uid())
+    from public.friendships f
+    join public.players p
+        on p.id = case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    where f.requester_id = auth.uid() or f.addressee_id = auth.uid()
+    order by f.status desc, 2 asc;
+$$;
+
+grant execute on function public.get_friends_list() to authenticated;

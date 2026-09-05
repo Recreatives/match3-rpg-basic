@@ -1494,6 +1494,9 @@ function toggleModal(modalId) {
             renderLeaderboard();
             if (typeof renderPvpLeaderboard === 'function') renderPvpLeaderboard();
         }
+        if (modalId === 'friends-modal' && typeof renderFriendsList === 'function') {
+            renderFriendsList();
+        }
         if (modalId === 'daily-login-modal' && typeof fetchDailyLoginStatus === 'function') {
             fetchDailyLoginStatus();
             if (typeof fetchDailyQuestStatus === 'function') fetchDailyQuestStatus();

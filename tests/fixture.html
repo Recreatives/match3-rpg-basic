@@ -306,6 +306,22 @@
         </div>
     </div>
 
+    <div id="friends-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal" onclick="toggleModal('friends-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">👥 ARKADAŞLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için Lider Tablosu'ndan önce kendi takma adını belirlemelisin.</p>
+                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <input id="friend-request-input" type="text" placeholder="Arkadaşının takma adı" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button class="action-btn" style="width:auto; margin:0;" onclick="submitFriendRequest()">Ekle</button>
+                </div>
+                <p id="friends-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
+                <div id="friends-list"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="achievements-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
@@ -455,11 +471,12 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v0.81 PvP quick match</div>
+        <div class="version">v0.82 Friends list</div>
         <div>
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
             <button class="loot-btn" onclick="toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
+            <button class="loot-btn" onclick="toggleModal('friends-modal')">👥 Arkadaşlar</button>
             <button class="loot-btn" onclick="toggleModal('achievements-modal')">🏆 Başarımlar</button>
             <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op Test</button>

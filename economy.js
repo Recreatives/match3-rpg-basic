@@ -253,16 +253,23 @@ async function fetchLeaderboard(limit) {
 
 // players.display_name is nullable and defaults to null (shown as
 // "İsimsiz Kahraman" on the leaderboard) - RLS's existing "update own player
-// row" policy already covers this, no new policy or RPC needed.
+// row" policy already covers this, no new policy or RPC needed. Now unique
+// (schema.sql, added alongside the friends list - a friend request looks
+// someone up BY this name, so two players can no longer share one) - a
+// duplicate attempt comes back as Postgres error code 23505, surfaced here
+// as 'taken' instead of the generic 'error' so the UI can say why it failed.
 async function setDisplayName(name) {
     const trimmed = (name || '').trim().slice(0, 24);
-    if (!trimmed) return false;
+    if (!trimmed) return 'empty';
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) return false;
+    if (!user) return 'error';
 
     const { error } = await sb.from('players').update({ display_name: trimmed }).eq('id', user.id);
-    if (error) { console.error('Display name update failed:', error.message); return false; }
-    return true;
+    if (error) {
+        console.error('Display name update failed:', error.message);
+        return error.code === '23505' ? 'taken' : 'error';
+    }
+    return 'ok';
 }
 
 async function renderLeaderboard() {
@@ -290,6 +297,85 @@ async function renderLeaderboard() {
 // security-definer read path, same reasoning as get_leaderboard above.
 // Direct select, not the leaderboard RPC - "read own pvp rating" RLS policy
 // already allows a client to read its own row, same as fetchWallet.
+// Friends list - see supabase/schema.sql's friendships table and
+// send_friend_request/respond_friend_request/get_friends_list functions.
+// A client can only ever SELECT its own player row, so resolving a typed
+// display name into a target player id has to happen inside the trusted
+// function, not here.
+async function sendFriendRequest(displayName) {
+    const trimmed = (displayName || '').trim();
+    if (!trimmed) return 'empty';
+    const { data, error } = await sb.rpc('send_friend_request', { p_display_name: trimmed });
+    if (error) { console.error('send_friend_request failed:', error.message); return 'error'; }
+    return data;
+}
+
+async function respondFriendRequest(requesterId, accept) {
+    const { error } = await sb.rpc('respond_friend_request', { p_requester_id: requesterId, p_accept: accept });
+    if (error) { console.error('respond_friend_request failed:', error.message); return false; }
+    return true;
+}
+
+async function fetchFriendsList() {
+    const { data, error } = await sb.rpc('get_friends_list');
+    if (error) { console.error('get_friends_list failed:', error.message); return []; }
+    return data;
+}
+
+async function renderFriendsList() {
+    let container = document.getElementById('friends-list');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+
+    let rows = await fetchFriendsList();
+    if (rows.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz arkadaşın yok. Yukarıdan bir takma ad yazıp istek gönder.</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    rows.forEach(row => {
+        let div = document.createElement('div');
+        div.className = 'history-item';
+        if (row.status === 'accepted') {
+            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats">✅ Arkadaş</span>`;
+        } else if (row.is_incoming_request) {
+            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats"></span>`;
+            let acceptBtn = document.createElement('button');
+            acceptBtn.className = 'action-btn';
+            acceptBtn.style.cssText = 'width:auto; margin:0 0 0 6px; padding:4px 10px; font-size:0.75rem;';
+            acceptBtn.innerText = '✔ Kabul Et';
+            acceptBtn.onclick = () => respondFriendRequest(row.friend_id, true).then(ok => { if (ok) renderFriendsList(); });
+            let declineBtn = document.createElement('button');
+            declineBtn.className = 'action-btn';
+            declineBtn.style.cssText = 'width:auto; margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem; background:#555;';
+            declineBtn.innerText = '✕';
+            declineBtn.onclick = () => respondFriendRequest(row.friend_id, false).then(ok => { if (ok) renderFriendsList(); });
+            div.querySelector('.history-stats').appendChild(acceptBtn);
+            div.querySelector('.history-stats').appendChild(declineBtn);
+        } else {
+            div.innerHTML = `<span class="history-name">${row.display_name}</span><span class="history-stats" style="color:#7f8c8d;">İstek gönderildi…</span>`;
+        }
+        container.appendChild(div);
+    });
+}
+
+async function submitFriendRequest() {
+    let input = document.getElementById('friend-request-input');
+    if (!input) return;
+    let status = document.getElementById('friends-status');
+    let result = await sendFriendRequest(input.value);
+    const messages = {
+        sent: 'İstek gönderildi!',
+        already_exists: 'Zaten arkadaşsınız ya da istek beklemede.',
+        not_found: 'Bu takma adla bir oyuncu bulunamadı.',
+        empty: 'Önce bir takma ad yaz.',
+        error: 'Bir hata oldu, tekrar dene.'
+    };
+    if (status) status.innerText = messages[result] || messages.error;
+    if (result === 'sent') { input.value = ''; renderFriendsList(); }
+}
+
 async function fetchMyPvpRating() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -337,10 +423,11 @@ async function renderPvpLeaderboard() {
 async function submitDisplayName() {
     let input = document.getElementById('display-name-input');
     if (!input) return;
-    let ok = await setDisplayName(input.value);
+    let result = await setDisplayName(input.value);
     let status = document.getElementById('leaderboard-name-status');
-    if (status) status.innerText = ok ? 'Kaydedildi!' : 'Kaydedilemedi.';
-    if (ok) renderLeaderboard();
+    const messages = { ok: 'Kaydedildi!', taken: 'Bu isim zaten alınmış, başka bir isim dene.', empty: 'Önce bir isim yaz.', error: 'Kaydedilemedi.' };
+    if (status) status.innerText = messages[result] || messages.error;
+    if (result === 'ok') renderLeaderboard();
 }
 
 function updateWalletUI() {
