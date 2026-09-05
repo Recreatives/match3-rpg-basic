@@ -2056,10 +2056,12 @@ grant execute on function public.delete_own_account() to authenticated;
 -- fixed blocklist with l33t-speak or spacing tricks - but it catches the obvious,
 -- unmodified cases for free, at the one layer that actually enforces anything: RLS's
 -- "update own player row" / create_guild only ever check OWNERSHIP, never CONTENT, so
--- without this a player could set literally any string. economy.js checks the same short
--- list client-side too, purely so a caught player gets an instant message instead of a
--- round-trip - the authority is always this trigger, exactly like
--- validate_player_item_insert above is for item rolls.
+-- without this a player could set literally any string. This trigger is the sole
+-- authority (no client-side mirror of the list, unlike e.g. item rarity bounds) - a
+-- rejected name surfaces as a normal Postgres error, mapped to a friendly message in
+-- economy.js's setDisplayName()/createGuild() exactly like the existing "name taken"
+-- (23505) case already is, so it costs one extra round-trip rather than two lists to
+-- keep in sync.
 create or replace function public.contains_banned_word(p_text text)
 returns boolean
 language sql
