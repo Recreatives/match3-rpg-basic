@@ -184,7 +184,7 @@ const CLASSES = {
         ultEffect: (ctx) => {
             let dmg = TILE_STATS.ult_dmg + ctx.getSelfArmor();
             ctx.dealDamageToOpponent(dmg);
-            ctx.log(`ULT: Shield Slam ${dmg} hasar verdi!`, "log-hit");
+            ctx.log(tf('ULT: Shield Slam {dmg} hasar verdi!', { dmg }), "log-hit");
         }
     },
     BERSERKER: {
@@ -196,7 +196,7 @@ const CLASSES = {
         ultEffect: (ctx) => {
             ctx.dealDirectDamageToSelf(10);
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg * 2);
-            ctx.log(`ULT: Blood Lust çift hasar verdi!`, "log-crit");
+            ctx.log(t('ULT: Blood Lust çift hasar verdi!'), "log-crit");
         }
     },
     ROGUE: {
@@ -208,7 +208,7 @@ const CLASSES = {
         ultEffect: (ctx) => {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             ctx.grantExtraTurn();
-            ctx.log(`ULT: Assassinate! Ekstra Tur!`, "log-match");
+            ctx.log(t('ULT: Assassinate! Ekstra Tur!'), "log-match");
         }
     },
     ARCHER: {
@@ -220,7 +220,7 @@ const CLASSES = {
         ultEffect: (ctx) => {
             let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
             ctx.dealDirectDamageToOpponent(pierceDmg);
-            ctx.log(`ULT: Piercing Shot zırhı yok saydı! -${pierceDmg} Can`, "log-crit");
+            ctx.log(tf('ULT: Piercing Shot zırhı yok saydı! -{pierceDmg} Can', { pierceDmg }), "log-crit");
         }
     },
     MAGE: {
@@ -232,7 +232,7 @@ const CLASSES = {
         ultEffect: (ctx) => {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             TILE_STATS.ult_dmg += 10;
-            ctx.log(`ULT: Güç ${TILE_STATS.ult_dmg}'e yükseldi!`, "log-match");
+            ctx.log(tf("ULT: Güç {val}'e yükseldi!", { val: TILE_STATS.ult_dmg }), "log-match");
         }
     },
     NECROMANCER: {
@@ -246,7 +246,7 @@ const CLASSES = {
             let heal = Math.floor(dmg * 0.5);
             ctx.dealDamageToOpponent(dmg);
             ctx.healSelf(heal);
-            ctx.log(`ULT: Soul Siphon ${dmg} hasar verdi, ${heal} iyileştirdi!`, "log-crit");
+            ctx.log(tf('ULT: Soul Siphon {dmg} hasar verdi, {heal} iyileştirdi!', { dmg, heal }), "log-crit");
         }
     },
     PALADIN: {
@@ -260,7 +260,7 @@ const CLASSES = {
             let dmg = Math.floor(TILE_STATS.ult_dmg * 0.6);
             ctx.healSelf(heal);
             ctx.dealDamageToOpponent(dmg);
-            ctx.log(`ULT: Divine Judgement ${heal} iyileştirdi, ${dmg} hasar verdi!`, "log-heal");
+            ctx.log(tf('ULT: Divine Judgement {heal} iyileştirdi, {dmg} hasar verdi!', { heal, dmg }), "log-heal");
         }
     }
 };
@@ -330,7 +330,7 @@ function renderClassButtons() {
         const c = CLASSES[key];
         const btn = document.createElement('button');
         btn.className = 'reward-btn rarity-rare';
-        btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${c.desc}</small>`;
+        btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${t(c.desc)}</small>`;
         btn.onclick = () => {
             selectedClass = c;
             if (typeof trackEvent === 'function') trackEvent('class_selected', { class: key });
@@ -364,7 +364,7 @@ function renderModeButtons() {
     const container = document.getElementById('mode-selection');
     container.innerHTML = '';
     container.style.display = 'flex';
-    overlayTitle.innerText = 'NASIL OYNAMAK İSTİYORSUN?';
+    overlayTitle.innerText = t('NASIL OYNAMAK İSTİYORSUN?');
 
     const modes = [
         { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); } },
@@ -374,7 +374,7 @@ function renderModeButtons() {
     modes.forEach(m => {
         const btn = document.createElement('button');
         btn.className = 'reward-btn rarity-rare';
-        btn.innerHTML = `<b>${m.emoji} ${m.label}</b><small>${m.desc}</small>`;
+        btn.innerHTML = `<b>${m.emoji} ${t(m.label)}</b><small>${t(m.desc)}</small>`;
         btn.onclick = () => {
             if (typeof trackEvent === 'function') trackEvent('mode_selected', { mode: m.label.toLowerCase(), class: selectedClass ? selectedClass.name : null });
             m.action();
@@ -387,7 +387,7 @@ function handleOverlayClick() {
     if (currentState === STATE.START || currentState === STATE.GAMEOVER) {
         if (!selectedClass) {
             renderClassButtons();
-            overlayTitle.innerText = "KAHRAMANINI SEÇ";
+            overlayTitle.innerText = t("KAHRAMANINI SEÇ");
             return;
         }
         resetGame();
@@ -412,7 +412,7 @@ function resetGame() {
     extraTurnTriggered = false;
     gridDisplay.classList.remove('shake');
     enemySprite.classList.remove('dying');
-    log("Oyun sıfırlandı.", "log-turn");
+    log(t("Oyun sıfırlandı."), "log-turn");
 }
 
 function startLevel() {
@@ -434,15 +434,15 @@ function startLevel() {
     enemySprite.classList.remove('enraged');
     enemyArmor = currentMinionType === 'armored' ? Math.round(maxEnemyHP * MINION_ARMORED_PCT) : 0;
 
-    let name = isBoss ? `BOSS Sv. ${level}` : `Canavar Sv. ${level}`;
+    let name = isBoss ? tf('BOSS Sv. {level}', { level }) : tf('Canavar Sv. {level}', { level });
     document.getElementById('enemy-name').innerText = name;
     document.getElementById('enemy-sprite').innerText = MINION_ICON[currentMinionType] || (isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4]);
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
-    if (isBoss) log("UYARI: BOSS SAVAŞI!", "log-crit");
-    else if (MINION_LOG[currentMinionType]) log(MINION_LOG[currentMinionType], "log-enemy");
+    if (isBoss) log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
+    else if (MINION_LOG[currentMinionType]) log(t(MINION_LOG[currentMinionType]), "log-enemy");
 
-    turnBanner.innerText = "OYUNCU SIRASI";
+    turnBanner.innerText = t("OYUNCU SIRASI");
     turnBanner.className = "turn-indicator turn-player";
     isPlayerTurn = true;
     isProcessing = false;
@@ -451,7 +451,7 @@ function startLevel() {
     createBoard();
     updateUI();
     startPlayerTimer();
-    log(`SEVİYE ${level} BAŞLADI`, "log-turn");
+    log(tf('SEVİYE {level} BAŞLADI', { level }), "log-turn");
 }
 
 function checkWinCondition() {
@@ -467,7 +467,7 @@ function triggerDeathSequence(who) {
     if (who === 'enemy') {
         enemySprite.classList.remove('enemy-display');
         enemySprite.classList.add('dying');
-        log("DÜŞMAN YENİLDİ!", "log-crit");
+        log(t("DÜŞMAN YENİLDİ!"), "log-crit");
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('victory');
         setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
@@ -503,7 +503,7 @@ function winLevel() {
     if (typeof adjustWallet === 'function') {
         adjustWallet(goldReward, 0).then(result => {
             if (!result) return;
-            log(`+${goldReward} 🪙 kazandın!`, 'log-hit');
+            log(tf('+{goldReward} 🪙 kazandın!', { goldReward }), 'log-hit');
             if (typeof playSound === 'function') playSound('gold');
         });
     }
@@ -512,18 +512,18 @@ function winLevel() {
     // NOTE: order matters here - the <=0.01 case must be checked before
     // <=0.10, otherwise it is unreachable (0.01 also satisfies <=0.10).
     let hpPercent = (playerHP / maxPlayerHP);
-    if (hpPercent <= 0.01) { rewardPicksLeft = 5; log("MUCİZE! 5 Ödül Seç!", "log-crit"); }
-    else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log("ÇARESİZ ZAFER! 3 Ödül Seç!", "log-match"); }
-    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log("KUSURSUZ ZAFER! 3 Ödül Seç!", "log-hit"); unlockAchievement('flawless_victory'); }
-    else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log("İYİ ZAFER! 2 Ödül Seç!", "log-match"); }
-    else { rewardPicksLeft = 1; log("Seviye Tamamlandı! 1 Ödül Seç.", "log-hit"); }
+    if (hpPercent <= 0.01) { rewardPicksLeft = 5; log(t("MUCİZE! 5 Ödül Seç!"), "log-crit"); }
+    else if (hpPercent <= 0.10) { rewardPicksLeft = 3; log(t("ÇARESİZ ZAFER! 3 Ödül Seç!"), "log-match"); }
+    else if (hpPercent >= 1.0) { rewardPicksLeft = 3; log(t("KUSURSUZ ZAFER! 3 Ödül Seç!"), "log-hit"); unlockAchievement('flawless_victory'); }
+    else if (hpPercent >= 0.75) { rewardPicksLeft = 2; log(t("İYİ ZAFER! 2 Ödül Seç!"), "log-match"); }
+    else { rewardPicksLeft = 1; log(t("Seviye Tamamlandı! 1 Ödül Seç."), "log-hit"); }
 
     if (level % 5 === 0) unlockAchievement('boss_slayer');
 
     // Boss Bonus: an extra pick for clearing a boss level (Lvl 5, 10...)
     if (level % 5 === 0) {
         rewardPicksLeft += 1;
-        log("BOSS BONUSU! +1 Ödül!", "log-crit");
+        log(t("BOSS BONUSU! +1 Ödül!"), "log-crit");
     }
 
     generateRewards();
@@ -535,7 +535,7 @@ function winLevel() {
 
 function updateRewardTitle() {
     if (rewardPicksLeft > 0) {
-        overlayTitle.innerText = `VICTORY! PICK ${rewardPicksLeft}`;
+        overlayTitle.innerText = tf('VICTORY! PICK {n}', { n: rewardPicksLeft });
         return;
     }
     rewardArea.style.display = 'none';
@@ -547,15 +547,15 @@ function updateRewardTitle() {
         showBossCheckpoint();
         return;
     }
-    overlayTitle.innerText = `SEVİYE ${level + 1} İÇİN HAZIR MISIN?`;
-    overlayBtn.innerText = "SONRAKİ SEVİYE";
+    overlayTitle.innerText = tf('SEVİYE {n} İÇİN HAZIR MISIN?', { n: level + 1 });
+    overlayBtn.innerText = t("SONRAKİ SEVİYE");
     overlayBtn.style.display = 'block';
     overlayBtn.onclick = () => {
         let missingHP = maxPlayerHP - playerHP;
         let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
         if (healed > 0) {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
-            log(`Savaş öncesi dinlenme: +${healed} Can`, 'log-heal');
+            log(tf('Savaş öncesi dinlenme: +{healed} Can', { healed }), 'log-heal');
         }
         level++;
         startLevel();
@@ -571,12 +571,12 @@ function showBossCheckpoint() {
     let container = document.getElementById('boss-checkpoint');
     container.innerHTML = '';
     container.style.display = 'flex';
-    overlayTitle.innerText = 'BOSS DÜŞTÜ! NE YAPMAK İSTERSİN?';
+    overlayTitle.innerText = t('BOSS DÜŞTÜ! NE YAPMAK İSTERSİN?');
     overlayBtn.style.display = 'none';
 
     let continueBtn = document.createElement('button');
     continueBtn.className = 'reward-btn rarity-rare';
-    continueBtn.innerHTML = `<b>⚔️ Zindana Devam Et</b><small>Bir sonraki seviyeye geç.</small>`;
+    continueBtn.innerHTML = `<b>⚔️ ${t('Zindana Devam Et')}</b><small>${t('Bir sonraki seviyeye geç.')}</small>`;
     continueBtn.onclick = () => {
         if (typeof trackEvent === 'function') trackEvent('boss_checkpoint_choice', { choice: 'continue', level });
         container.style.display = 'none';
@@ -584,7 +584,7 @@ function showBossCheckpoint() {
         let healed = Math.ceil(missingHP * LEVEL_CLEAR_HEAL_PERCENT);
         if (healed > 0) {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
-            log(`Savaş öncesi dinlenme: +${healed} Can`, 'log-heal');
+            log(tf('Savaş öncesi dinlenme: +{healed} Can', { healed }), 'log-heal');
         }
         level++;
         startLevel();
@@ -593,7 +593,7 @@ function showBossCheckpoint() {
 
     let returnBtn = document.createElement('button');
     returnBtn.className = 'reward-btn rarity-epic';
-    returnBtn.innerHTML = `<b>🏠 Ana Menüye Dön</b><small>Zindandan çık - altının ve eşyaların dükkanda seni bekliyor.</small>`;
+    returnBtn.innerHTML = `<b>🏠 ${t('Ana Menüye Dön')}</b><small>${t('Zindandan çık - altının ve eşyaların dükkanda seni bekliyor.')}</small>`;
     returnBtn.onclick = () => {
         if (typeof trackEvent === 'function') trackEvent('boss_checkpoint_choice', { choice: 'menu', level });
         returnToMainMenu();
@@ -606,7 +606,7 @@ function returnToMainMenu() {
     currentState = STATE.START;
     overlay.classList.add('visible');
     renderModeButtons(); // selectedClass is already set - straight to Solo/Co-op/PvP
-    log('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.', 'log-turn');
+    log(t('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.'), 'log-turn');
 }
 
 // Turkish label for each REWARD_POOL tier key - used anywhere a tier is
@@ -711,10 +711,10 @@ function generateRewards() {
 
         let btn = document.createElement('button');
         btn.className = `reward-btn rarity-${reward.tier}`;
-        btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
+        btn.innerHTML = `<b>${t(reward.name)} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${t(REWARD_TIER_LABELS[reward.tier])})</span></b><small>${t(reward.desc)}</small>`;
         btn.onclick = () => {
             applyReward(reward);
-            log(`Seçildi: ${reward.name}`, "log-heal");
+            log(tf('Seçildi: {name}', { name: t(reward.name) }), "log-heal");
             rewardPicksLeft--;
 
             updateUI();
@@ -735,8 +735,8 @@ function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof trackEvent === 'function') trackEvent('solo_run_ended', { level, class: selectedClass ? selectedClass.name : null });
     currentState = STATE.GAMEOVER;
-    overlayTitle.innerText = "OYUN BİTTİ";
-    overlayBtn.innerText = "TEKRAR DENE";
+    overlayTitle.innerText = t("OYUN BİTTİ");
+    overlayBtn.innerText = t("TEKRAR DENE");
     overlayBtn.style.display = 'block';
     overlayBtn.onclick = handleOverlayClick;
     rewardArea.style.display = 'none';
@@ -1044,7 +1044,7 @@ function processMatch(group, isInitial) {
         let user = isPlayerTurn ? "Oyuncu" : "Düşman";
         let displayMult = Math.round(finalMultiplier * 10) / 10;
 
-        log(`${user}: ${shapeLabel} Eşleşme! (x${displayMult})`, "log-match");
+        log(tf('{user}: {shapeLabel} Eşleşme! (x{displayMult})', { user: t(user), shapeLabel, displayMult }), "log-match");
 
         let centerTile = tiles[group.indices[1]];
         let color = (finalMultiplier >= 3) ? "#f1c40f" : "#e74c3c";
@@ -1093,7 +1093,7 @@ function applyRPGEffects(type, multiplier) {
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
-        log(`${user} Saldırı ${baseVal}`, isPlayerTurn ? 'log-hit' : 'log-enemy');
+        log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('hit');
@@ -1102,7 +1102,7 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.heart * multiplier);
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
-        log(`${user} İyileşme +${baseVal}`, 'log-heal');
+        log(tf('{user} İyileşme +{val}', { user: t(user), val: baseVal }), 'log-heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
 
@@ -1110,7 +1110,7 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.shield * multiplier);
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
-        log(`${user} Zırh +${baseVal}`, 'log-armor');
+        log(tf('{user} Zırh +{val}', { user: t(user), val: baseVal }), 'log-armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
 
@@ -1118,12 +1118,12 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.energy * multiplier);
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
-            log(`Ult +${baseVal}%`, 'log-hit');
+            log(tf('Ult +{val}%', { val: baseVal }), 'log-hit');
             if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: baseVal });
         } else {
             let absorb = Math.floor(baseVal / 2);
             enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
-            log(`Düşman ${absorb} emdi`, "log-enemy");
+            log(tf('Düşman {val} emdi', { val: absorb }), "log-enemy");
         }
 
     } else if (type === 'skull') {
@@ -1144,7 +1144,7 @@ function applyRPGEffects(type, multiplier) {
         let self = isPlayerTurn ? 'player' : 'enemy';
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
-        log(`Kafatası! Hasar: ${dmgToOpponent} / Kendine: ${recoil}`, 'log-crit');
+        log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('crit');
     }
@@ -1160,7 +1160,7 @@ function drainPlayerUltIfNeeded() {
     if (currentMinionType !== 'drain') return;
     let before = ultCharge;
     ultCharge = Math.max(0, ultCharge - MINION_DRAIN_AMOUNT);
-    if (ultCharge < before) log(`Enerjini emdi: ult -%${before - ultCharge}`, 'log-enemy');
+    if (ultCharge < before) log(tf('Enerjini emdi: ult -%{val}', { val: before - ultCharge }), 'log-enemy');
 }
 
 // Boss phase mechanic: every boss (level % 5 === 0) permanently hits harder
@@ -1180,7 +1180,7 @@ function checkBossEnrage() {
         ENEMY_TILE_STATS.sword = Math.round(ENEMY_TILE_STATS.sword * BOSS_ENRAGE_STAT_MULT);
         ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
         enemySprite.classList.add('enraged');
-        log('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!', 'log-crit');
+        log(t('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!'), 'log-crit');
     }
 }
 
@@ -1205,7 +1205,7 @@ function inflictDamage(targetStr, amount) {
         let afterDefense = applyDefensiveTraits(amount);
         if (afterDefense === null) {
             showFloatingText("DODGE!", document.getElementById('player-hp-bar'), "#2ecc71");
-            log("SAVUŞTURULDU!", "log-heal");
+            log(t("SAVUŞTURULDU!"), "log-heal");
             if (typeof playSound === 'function') playSound('dodge');
             return;
         }
@@ -1217,7 +1217,7 @@ function inflictDamage(targetStr, amount) {
         let heal = Math.floor(amount * (TILE_STATS.lifeSteal / 100));
         if (heal > 0) {
             playerHP = Math.min(playerHP + heal, maxPlayerHP);
-            log(`Can Çalma +${heal}`, 'log-heal');
+            log(tf('Can Çalma +{val}', { val: heal }), 'log-heal');
         }
     }
 
@@ -1287,7 +1287,7 @@ function fillBoard(isInitial) {
     let chainReaction = checkForMatches(isInitial);
     if (!chainReaction && !boardHasValidMove(tiles, width)) {
         reshuffleBoard(tiles, width, tileTypes);
-        log("Hiç hamle kalmamıştı, tahta karıştırıldı!", "log-turn");
+        log(t("Hiç hamle kalmamıştı, tahta karıştırıldı!"), "log-turn");
         chainReaction = checkForMatches(isInitial); // resolve any matches the reshuffle happened to land
     }
     if (!chainReaction && !isInitial) endTurnLogic();
@@ -1332,10 +1332,10 @@ function endTurnLogic() {
 
 function updateTurnBanner() {
     if (isPlayerTurn) {
-        turnBanner.innerText = "OYUNCU SIRASI";
+        turnBanner.innerText = t("OYUNCU SIRASI");
         turnBanner.className = "turn-indicator turn-player";
     } else {
-        turnBanner.innerText = "DÜŞMAN SIRASI";
+        turnBanner.innerText = t("DÜŞMAN SIRASI");
         turnBanner.className = "turn-indicator turn-enemy";
     }
 }
@@ -1354,7 +1354,7 @@ function enemyPlayTurn() {
         // parent dims every descendant regardless of the child's own
         // opacity). Slowed to 3 distinct beats (settle on t1, slide to t2,
         // hold before the swap actually lands) instead of one quick blur.
-        log(`Düşman ${t1.innerHTML} ↔ ${t2.innerHTML} hedefliyor...`, "log-enemy");
+        log(tf('Düşman {a} ↔ {b} hedefliyor...', { a: t1.innerHTML, b: t2.innerHTML }), "log-enemy");
         t1.classList.add('ai-target');
         t2.classList.add('ai-target');
         aiCursor.style.display = 'block';
@@ -1371,7 +1371,7 @@ function enemyPlayTurn() {
             attemptSwap(t1, t2);
         }, 1600);
     } else {
-        log("Düşman hamle bulamadı. Pas geçiyor...", "log-enemy");
+        log(t("Düşman hamle bulamadı. Pas geçiyor..."), "log-enemy");
         isPlayerTurn = true;
         updateTurnBanner();
         updateUI();
@@ -1473,7 +1473,7 @@ function useUltimate() {
         if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
         // 3. Visuals
-        log(`ULTİMATE! ${selectedClass.ultName} kullanıldı!`, "log-hit");
+        log(tf('ULTİMATE! {name} kullanıldı!', { name: selectedClass.ultName }), "log-hit");
         if (typeof playSound === 'function') playSound('ult');
         if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
         updateUI(); // Disables button immediately
@@ -1540,7 +1540,7 @@ function toggleModal(modalId) {
         // "Ana Menüye Dön" there sets currentState back to STATE.START,
         // which is what actually unblocks this.
         if (modalId === 'shop-modal' && (currentState === STATE.PLAYING || currentState === STATE.REWARD)) {
-            log('Dükkana sadece zindan dışındayken girebilirsin.', 'log-turn');
+            log(t('Dükkana sadece zindan dışındayken girebilirsin.'), 'log-turn');
             return;
         }
         m.style.display = 'flex';
@@ -1734,7 +1734,7 @@ function showTutorialStep(n) {
     });
     document.getElementById('tutorial-progress').innerText = `${n} / ${TUTORIAL_TOTAL_STEPS}`;
     document.getElementById('tutorial-back-btn').style.visibility = (n === 1) ? 'hidden' : 'visible';
-    document.getElementById('tutorial-next-btn').innerText = (n === TUTORIAL_TOTAL_STEPS) ? 'Başlayalım! ✔' : 'İleri ▶';
+    document.getElementById('tutorial-next-btn').innerText = (n === TUTORIAL_TOTAL_STEPS) ? t('Başlayalım! ✔') : t('İleri ▶');
 }
 
 function tutorialNext() {
