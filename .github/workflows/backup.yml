@@ -10,8 +10,13 @@ name: Weekly Database Backup
 # Actions in THIS repo), neither of which should ever appear in this file
 # or anywhere in chat/code - only entered directly into GitHub's own secret
 # fields:
-#   SUPABASE_DB_URL    the Direct Connection URI from Supabase Dashboard >
-#                      Connect > Connection String, password filled in
+#   SUPABASE_DB_URL    the Session Pooler URI from Supabase Dashboard >
+#                      Connect > Connection String, password filled in -
+#                      NOT Direct Connection: Supabase's direct-connection
+#                      hostname is IPv6-only, and GitHub-hosted runners have
+#                      no IPv6 route, so that one fails with "Network is
+#                      unreachable" here even though it works fine from a
+#                      home/office network that does have IPv6
 #   BACKUP_REPO_TOKEN  a GitHub Personal Access Token (fine-grained,
 #                      scoped to just match3-rpg-basic-backups, Contents:
 #                      Read and write) so this workflow can push there
@@ -35,7 +40,12 @@ jobs:
       - name: Dump the database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: pg_dump "$SUPABASE_DB_URL" -f backup.sql
+        # Full path, not bare `pg_dump` - the runner image already has an
+        # older client on PATH (whatever /usr/bin/pg_dump's
+        # update-alternatives link points to), and installing 17 alongside
+        # it doesn't repoint that link. Calling the versioned binary
+        # directly sidesteps that instead of fighting update-alternatives.
+        run: /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" -f backup.sql
 
       - name: Push the dump to the private backup repo
         env:
