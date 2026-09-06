@@ -1308,7 +1308,7 @@ function endTurnLogic() {
     }
 
     if (extraTurnTriggered) {
-        log(isPlayerTurn ? ">> EKSTRA TUR!" : ">> DÜŞMANIN EKSTRA TURU!", "log-turn");
+        log(isPlayerTurn ? t(">> EKSTRA TUR!") : t(">> DÜŞMANIN EKSTRA TURU!"), "log-turn");
         extraTurnTriggered = false;
         isProcessing = false;
         updateUI();
@@ -1615,12 +1615,12 @@ const ENEMY_STAT_DISPLAY_LABELS = {
 function renderStatsTooltip(container, enemyStats) {
     if (!container) return;
     let ownRows = Object.keys(STAT_DISPLAY_LABELS)
-        .map(key => `<div>${STAT_DISPLAY_LABELS[key]}: <b>${TILE_STATS[key]}</b></div>`).join('');
-    let html = `<div class="stats-tooltip-col"><h5>SEN</h5>${ownRows}</div>`;
+        .map(key => `<div>${t(STAT_DISPLAY_LABELS[key])}: <b>${TILE_STATS[key]}</b></div>`).join('');
+    let html = `<div class="stats-tooltip-col"><h5>${t('SEN')}</h5>${ownRows}</div>`;
     if (enemyStats) {
         let enemyRows = Object.keys(ENEMY_STAT_DISPLAY_LABELS)
-            .map(key => `<div>${ENEMY_STAT_DISPLAY_LABELS[key]}: <b>${enemyStats[key]}</b></div>`).join('');
-        html += `<div class="stats-tooltip-col enemy"><h5>DÜŞMAN</h5>${enemyRows}</div>`;
+            .map(key => `<div>${t(ENEMY_STAT_DISPLAY_LABELS[key])}: <b>${enemyStats[key]}</b></div>`).join('');
+        html += `<div class="stats-tooltip-col enemy"><h5>${t('DÜŞMAN')}</h5>${enemyRows}</div>`;
     }
     container.innerHTML = html;
 }
@@ -1656,8 +1656,8 @@ function renderHistory() {
     // 1. Render Summary
     summaryContainer.innerHTML = '';
     const statLabels = {
-        sword: 'Kılıç', shield: 'Kalkan', heart: 'İyileşme', energy: 'Enerji',
-        skull_dmg: 'Kafatası', skull_self_dmg: 'Öz Hasar', ult_dmg: 'Ult', lifeSteal: 'Çalma %', maxHP: 'Maks Can'
+        sword: t('Kılıç'), shield: t('Kalkan'), heart: t('İyileşme'), energy: t('Enerji'),
+        skull_dmg: t('Kafatası'), skull_self_dmg: t('Öz Hasar'), ult_dmg: 'Ult', lifeSteal: t('Çalma %'), maxHP: t('Maks Can')
     };
 
     let hasStats = false;
@@ -1669,12 +1669,12 @@ function renderHistory() {
             summaryContainer.appendChild(div);
         }
     }
-    if(!hasStats) summaryContainer.innerHTML = '<div style="grid-column: span 2; text-align:center;">Henüz eşya toplanmadı.</div>';
+    if(!hasStats) summaryContainer.innerHTML = `<div style="grid-column: span 2; text-align:center;">${t('Henüz eşya toplanmadı.')}</div>`;
 
     // 2. Render List
     listContainer.innerHTML = '';
     if(pickedRewards.length === 0) {
-        listContainer.innerHTML = '<div style="color:#777; text-align:center;">Boş</div>';
+        listContainer.innerHTML = `<div style="color:#777; text-align:center;">${t('Boş')}</div>`;
         return;
     }
 

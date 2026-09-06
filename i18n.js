@@ -61,6 +61,14 @@ function applyStaticTranslations() {
         if (el.dataset.i18nPlaceholderTr === undefined) el.dataset.i18nPlaceholderTr = el.getAttribute('placeholder') || '';
         el.setAttribute('placeholder', (currentLang === 'en') ? el.getAttribute('data-i18n-placeholder-en') : el.dataset.i18nPlaceholderTr);
     });
+    // Same idea as data-i18n-en, but for a `title` tooltip attribute rather
+    // than innerHTML - needed for elements (like the wallet stat-item divs)
+    // whose innerHTML holds a DYNAMIC child (a live gold/materials count)
+    // that a full innerHTML swap would destroy.
+    document.querySelectorAll('[data-i18n-title-en]').forEach(el => {
+        if (el.dataset.i18nTitleTr === undefined) el.dataset.i18nTitleTr = el.getAttribute('title') || '';
+        el.setAttribute('title', (currentLang === 'en') ? el.getAttribute('data-i18n-title-en') : el.dataset.i18nTitleTr);
+    });
     document.documentElement.lang = currentLang;
 }
 
@@ -84,6 +92,8 @@ function refreshDynamicTranslations() {
     if (typeof renderTalentsPanel === 'function' && document.getElementById('talents-modal') && document.getElementById('talents-modal').style.display === 'flex') renderTalentsPanel();
     if (typeof renderTradeOffers === 'function' && document.getElementById('trade-modal') && document.getElementById('trade-modal').style.display === 'flex') renderTradeOffers();
     if (typeof renderHistory === 'function' && document.getElementById('history-modal') && document.getElementById('history-modal').style.display === 'flex') renderHistory();
+    if (typeof pvpUpdateUI === 'function' && document.getElementById('pvp-modal') && document.getElementById('pvp-modal').style.display === 'flex') pvpUpdateUI();
+    if (typeof coopUpdateUI === 'function' && document.getElementById('coop-modal') && document.getElementById('coop-modal').style.display === 'flex') coopUpdateUI();
 }
 
 function updateLanguageToggleUI() {
