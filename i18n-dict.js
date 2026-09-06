@@ -317,4 +317,27 @@ const EN_DICT = {
     'Prestij yapılamadı - yeterli altının olmayabilir.': "Couldn't prestige - you may not have enough gold.",
     '— eşya yok, sadece altın —': '— no item, gold only —',
     'Verilen: {offer} → İstenen: {request}': 'Giving: {offer} → Requesting: {request}',
+
+    // === sharedboard.js (sbHealthTier) + related display sites ===
+    'BAYILDI': 'DOWN',
+    'AĞIR YARALI': 'CRITICALLY HURT',
+    'YARALI': 'HURT',
+    'HAFİF YARALI': 'LIGHTLY HURT',
+    'SAĞLAM': 'HEALTHY',
+    'BAYILDI - KURTAR!': 'DOWN - REVIVE!',
+    'OYUNCU {n}': 'PLAYER {n}',
+
+    // === achievements.js ===
+    'BAŞARIM YENİDEN AKTİF': 'ACHIEVEMENT REACTIVATED',
+    'BAŞARIM AÇILDI': 'ACHIEVEMENT UNLOCKED',
+    'AKTİF': 'ACTIVE',
+    'pasif - tekrar kazan': 'inactive - earn it again',
+    'Boss Avcısı': 'Boss Hunter', 'Solo modda bir boss yendin.': 'Defeated a boss in Solo mode.', '+2 Kılıç': '+2 Sword',
+    'Kusursuz Zafer': 'Flawless Victory', 'Solo modda %100 canla bir zafer kazandın.': 'Won a Solo battle at 100% HP.', '+5 Kalkan': '+5 Shield',
+    'İlk Bıçak': 'First Blade', 'İlk kez yoldaşına ihanet ettin.': 'Betrayed your companion for the first time.', '+5 Kafatası Hasarı': '+5 Skull Damage',
+    'Sadakatin Bedeli': 'Price of Loyalty', 'İhanete uğradın ama düelloyu yine de kazandın.': 'You were betrayed but won the duel anyway.', '+3 Kalp': '+3 Heart',
+    'Lanetli Zafer': 'Cursed Victory', 'Kibir Laneti’ni taşıyıp düelloyu yine de kazandın.': 'Carried the Curse of Pride and won the duel anyway.', '+8 Ult Gücü': '+8 Ult Power',
+    'Karşılıklı Yıkım': 'Mutual Destruction', 'Karşılıklı ihanet düellosunu kazandın.': 'Won a mutual-betrayal duel.', '+%3 Can Çalma': '+3% Lifesteal',
+    'Ayağa Kalkan': 'The Reviver', 'Co-op’ta bayılıp takım arkadaşınca ayağa kaldırıldın.': 'Went down in Co-op and were revived by your teammate.', '+3 Takım İyileştirme': '+3 Team Heal',
+    'Zindan Ekibi': 'Dungeon Crew', 'Co-op’ta bir boss’u sadık kalarak birlikte yendiniz.': 'Defeated a boss together in Co-op by staying loyal.', '+3 Enerji': '+3 Energy',
 };

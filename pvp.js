@@ -272,9 +272,9 @@ function pvpRenderSpectateStatus() {
     container.innerHTML = ids.map((id, i) => {
         let tier = pvpSpectateStatus[id];
         return `<div class="stat-box" style="width:100%; margin-bottom:10px;">
-            <div>OYUNCU ${i + 1}</div>
+            <div>${tf('OYUNCU {n}', { n: i + 1 })}</div>
             <div class="bar-container"><div class="bar" style="background-color:${tier.color}; width:${tier.barPct}%;"></div></div>
-            <span class="hp-text">${tier.text}</span>
+            <span class="hp-text">${t(tier.text)}</span>
         </div>`;
     }).join('');
 }
@@ -942,7 +942,7 @@ function pvpApplyOpponentStatus(tier) {
     let oppBar = document.getElementById('pvp-opp-status-bar');
     let oppText = document.getElementById('pvp-opp-status-text');
     if (oppBar) { oppBar.style.width = tier.barPct + '%'; oppBar.style.backgroundColor = tier.color; }
-    if (oppText) oppText.innerText = tier.text;
+    if (oppText) oppText.innerText = t(tier.text);
 }
 
 function pvpUpdateUI() {

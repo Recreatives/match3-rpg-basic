@@ -96,7 +96,7 @@ function applyActiveAchievementBonuses(stats, activeIds) {
 function showAchievementToast(def, isReactivation) {
     let el = document.createElement('div');
     el.className = 'achievement-toast';
-    el.innerHTML = `<b>${def.emoji} ${isReactivation ? 'BAŞARIM YENİDEN AKTİF' : 'BAŞARIM AÇILDI'}</b><br>${def.name} (${def.bonusDesc})`;
+    el.innerHTML = `<b>${def.emoji} ${isReactivation ? t('BAŞARIM YENİDEN AKTİF') : t('BAŞARIM AÇILDI')}</b><br>${t(def.name)} (${t(def.bonusDesc)})`;
     document.body.appendChild(el);
     setTimeout(() => el.classList.add('visible'), 10);
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
@@ -114,10 +114,10 @@ function renderAchievements() {
         row.className = 'manual-tile';
         row.style.opacity = lifetime ? '1' : '0.4';
         let statusTag = !lifetime ? '' : (active
-            ? ` <span style="color:#2ecc71;">● AKTİF</span>`
-            : ` <span style="color:#e74c3c;">○ pasif - tekrar kazan</span>`);
+            ? ` <span style="color:#2ecc71;">● ${t('AKTİF')}</span>`
+            : ` <span style="color:#e74c3c;">○ ${t('pasif - tekrar kazan')}</span>`);
         row.innerHTML = `<span class="manual-icon">${lifetime ? def.emoji : '🔒'}</span>
-            <div class="manual-desc"><b>${def.name}</b>${statusTag}<br>${def.desc}<br><span style="color:#f1c40f;">${def.bonusDesc}</span></div>`;
+            <div class="manual-desc"><b>${t(def.name)}</b>${statusTag}<br>${t(def.desc)}<br><span style="color:#f1c40f;">${t(def.bonusDesc)}</span></div>`;
         container.appendChild(row);
     });
 }

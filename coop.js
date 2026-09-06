@@ -1231,7 +1231,7 @@ function coopUpdateUI() {
     let allyText = document.getElementById('coop-ally-hp-text');
     let allyTier = sbHealthTier(coopAllyDown ? 0 : Math.max(0, (coopAllyHP / COOP_MAX_HP) * 100));
     if (allyBar) { allyBar.style.width = allyTier.barPct + '%'; allyBar.style.backgroundColor = allyTier.color; }
-    if (allyText) allyText.innerText = coopAllyDown ? 'BAYILDI - KURTAR!' : allyTier.text;
+    if (allyText) allyText.innerText = coopAllyDown ? t('BAYILDI - KURTAR!') : t(allyTier.text);
 
     let enemyPct = coopEnemyMaxHP > 0 ? Math.max(0, (coopEnemyHP / coopEnemyMaxHP) * 100) : 0;
     let enemyBar = document.getElementById('coop-boss-hp-bar');
