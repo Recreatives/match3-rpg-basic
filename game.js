@@ -1800,5 +1800,10 @@ function bootGame() {
     const { data: { session } } = await sb.auth.getSession();
     if (session) { bootGame(); return; }
     let gate = document.getElementById('auth-gate');
-    if (gate) gate.style.display = 'flex'; else bootGame();
+    if (gate) {
+        gate.style.display = 'flex';
+        if (typeof renderGateCaptcha === 'function') renderGateCaptcha();
+    } else {
+        bootGame();
+    }
 })();

@@ -20,11 +20,16 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let currentWallet = null; // { gold, materials } once loaded
 let currentOwnedItems = []; // array of item ids, see items.js for what they mean
 
-async function ensureSession() {
+// `captchaToken` is only ever provided by the gate's guest button
+// (gateContinueAsGuest, the sole place this actually calls
+// signInAnonymously in practice - by the time bootGame()'s own
+// ensureSession() call runs, the gate has already resolved one way or
+// another, so a session already exists and this returns early above).
+async function ensureSession(captchaToken) {
     const { data: { session } } = await sb.auth.getSession();
     if (session) return session;
 
-    const { data, error } = await sb.auth.signInAnonymously();
+    const { data, error } = await sb.auth.signInAnonymously({ options: { captchaToken } });
     if (error) {
         console.error('Anonymous sign-in failed:', error.message);
         setWalletStatus('Bağlantı hatası');
@@ -80,7 +85,12 @@ let pendingAccountPassword = null;
 let pendingAccountIsUpgrade = false;
 let pendingResetEmail = null;
 
-async function accountRegisterOrUpgrade(email, password) {
+// `captchaToken` is only meaningful on the signUp() branch - Supabase's
+// documented captcha support covers signUp/signInWithPassword/
+// resetPasswordForEmail, not updateUser(), and the upgrade branch below
+// already required passing through signInAnonymously's own captcha check
+// (gateContinueAsGuest) to get an anonymous session in the first place.
+async function accountRegisterOrUpgrade(email, password, captchaToken) {
     email = (email || '').trim();
     if (!email || !password || password.length < 6) return { ok: false, reason: 'invalid' };
 
@@ -91,7 +101,7 @@ async function accountRegisterOrUpgrade(email, password) {
     // accountFinishUpgradePassword(), after the code is verified.
     const { error } = isUpgrade
         ? await sb.auth.updateUser({ email })
-        : await sb.auth.signUp({ email, password });
+        : await sb.auth.signUp({ email, password, options: { captchaToken } });
 
     if (error) {
         console.error('Account register/upgrade failed:', error.message);
@@ -119,8 +129,8 @@ async function accountFinishUpgradePassword(password) {
     return 'ok';
 }
 
-async function accountLogin(email, password) {
-    const { error } = await sb.auth.signInWithPassword({ email: (email || '').trim(), password });
+async function accountLogin(email, password, captchaToken) {
+    const { error } = await sb.auth.signInWithPassword({ email: (email || '').trim(), password, options: { captchaToken } });
     if (error) { console.error('Login failed:', error.message); return 'error'; }
     return 'ok';
 }
@@ -147,8 +157,8 @@ async function deleteOwnAccount() {
     return 'ok';
 }
 
-async function accountRequestPasswordReset(email) {
-    const { error } = await sb.auth.resetPasswordForEmail((email || '').trim());
+async function accountRequestPasswordReset(email, captchaToken) {
+    const { error } = await sb.auth.resetPasswordForEmail((email || '').trim(), { captchaToken });
     if (error) { console.error('resetPasswordForEmail failed:', error.message); return 'error'; }
     return 'ok';
 }
@@ -299,6 +309,52 @@ async function handleAccountResetPassword() {
 // flag through every account-modal handler instead of keeping that
 // concern contained to the handful of small functions below.
 
+// Cloudflare Turnstile ("Managed" mode - invisible for most visitors,
+// challenges only suspicious traffic) protects the gate's three
+// session-creating actions (guest/register/forgot-password all mint a new
+// Supabase auth event; login doesn't create anything new but shares the
+// same widget for simplicity). Explicit render (index.html loads api.js
+// with ?render=explicit) because the widget's container lives inside
+// #auth-gate, which starts out display:none - rendered here, the moment
+// boot() actually shows the gate, not any earlier.
+let gateCaptchaToken = null;
+let gateCaptchaWidgetId = null;
+
+// index.html loads Turnstile's script with async/defer, so it's a real
+// race whether `turnstile` is already defined the instant the gate first
+// shows (game.js's boot() runs as soon as getSession() resolves, which is
+// often faster than a script tag on a slow connection). A few retries
+// covers that without holding up the gate itself - it's still shown and
+// usable immediately either way, just without a token until this resolves.
+function renderGateCaptcha(attemptsLeft) {
+    if (attemptsLeft === undefined) attemptsLeft = 10;
+    if (typeof turnstile === 'undefined') {
+        // Genuinely blocked/offline (ad-blocker, no network) rather than
+        // just slow to arrive - degrade to "no token" permanently rather
+        // than soft-locking the gate. Supabase's own server-side captcha
+        // check (once enabled in the Dashboard) is the real enforcement;
+        // a missing token there just fails that one request with a normal,
+        // retryable error, same as any other failed sign-in/sign-up.
+        if (attemptsLeft <= 0) return;
+        setTimeout(() => renderGateCaptcha(attemptsLeft - 1), 200);
+        return;
+    }
+    gateCaptchaWidgetId = turnstile.render('#gate-turnstile', {
+        sitekey: '0x4AAAAAAEprMTaCsFnqMQ65',
+        callback: (token) => { gateCaptchaToken = token; },
+        'expired-callback': () => { gateCaptchaToken = null; },
+        'error-callback': () => { gateCaptchaToken = null; }
+    });
+}
+
+// Turnstile tokens are single-use - call after every attempt (success or
+// failure) so a retry gets a fresh one instead of silently reusing a
+// spent/expired token.
+function resetGateCaptcha() {
+    gateCaptchaToken = null;
+    if (typeof turnstile !== 'undefined' && gateCaptchaWidgetId !== null) turnstile.reset(gateCaptchaWidgetId);
+}
+
 function showGateView(view) {
     ['choice', 'login', 'register', 'verify', 'forgot', 'reset'].forEach(v => {
         let el = document.getElementById('gate-view-' + v);
@@ -315,7 +371,8 @@ function dismissGateAndBoot() {
 }
 
 async function gateContinueAsGuest() {
-    await ensureSession();
+    await ensureSession(gateCaptchaToken);
+    resetGateCaptcha();
     dismissGateAndBoot();
 }
 
@@ -323,7 +380,8 @@ async function handleGateLogin() {
     let email = document.getElementById('gate-login-email').value;
     let password = document.getElementById('gate-login-password').value;
     let msg = document.getElementById('gate-status-msg');
-    let result = await accountLogin(email, password);
+    let result = await accountLogin(email, password, gateCaptchaToken);
+    resetGateCaptcha();
     if (result !== 'ok') { if (msg) msg.innerText = 'Email veya şifre hatalı.'; return; }
     dismissGateAndBoot();
 }
@@ -335,7 +393,8 @@ async function handleGateRegister() {
     // No anonymous session exists yet at the gate, so accountRegisterOrUpgrade
     // takes its signUp() branch here, not the upgrade one - there's no prior
     // progress to preserve, so no anonymous account needs to be created at all.
-    let result = await accountRegisterOrUpgrade(email, password);
+    let result = await accountRegisterOrUpgrade(email, password, gateCaptchaToken);
+    resetGateCaptcha();
     if (!result.ok) {
         const messages = { invalid: 'Geçerli bir email ve en az 6 karakterli bir şifre gir.', taken: 'Bu email zaten kayıtlı - Giriş Yap\'ı dene.', error: 'Bir şeyler ters gitti, tekrar dene.' };
         if (msg) msg.innerText = messages[result.reason] || messages.error;
@@ -364,7 +423,8 @@ async function handleGateVerify() {
 async function handleGateForgotPassword() {
     let email = document.getElementById('gate-forgot-email').value;
     let msg = document.getElementById('gate-status-msg');
-    let result = await accountRequestPasswordReset(email);
+    let result = await accountRequestPasswordReset(email, gateCaptchaToken);
+    resetGateCaptcha();
     if (result !== 'ok') { if (msg) msg.innerText = 'Kod gönderilemedi, email adresini kontrol et.'; return; }
     pendingResetEmail = email.trim();
     showGateView('reset');
