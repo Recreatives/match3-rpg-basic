@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=1.05">
+    <link rel="stylesheet" href="style.css?v=1.06">
     <!-- Cloudflare Turnstile - explicit render mode (explicit.js), not the
          default auto-scanning api.js: the gate's widget container starts
          out inside a display:none element (#auth-gate, until boot() shows
@@ -61,7 +61,11 @@
                 <button class="action-btn" onclick="showGateView('login')">Giriş Yap</button>
                 <button class="action-btn" onclick="showGateView('register')" style="background:#34495e; color:#fff;">Hesap Oluştur</button>
                 <button class="loot-btn" style="width:100%;" onclick="gateContinueAsGuest()">Misafir Olarak Devam Et</button>
-                <p style="text-align:center; margin-top:10px;"><a href="#" onclick="toggleModal('privacy-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">🔒 Gizlilik Politikası</a></p>
+                <p style="text-align:center; margin-top:10px;">
+                    <a href="#" onclick="toggleModal('privacy-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">🔒 Gizlilik Politikası</a>
+                    <span style="color:#7f8c8d; font-size:0.75rem;"> · </span>
+                    <a href="#" onclick="toggleModal('terms-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">📜 Kullanım Şartları</a>
+                </p>
             </div>
 
             <div id="gate-view-login" style="display:none;">
@@ -434,6 +438,7 @@
                     <button class="action-btn" id="account-switch-btn" onclick="showAccountView('login')" style="background:#34495e; color:#fff;">Farklı Hesapla Giriş Yap</button>
                     <button class="action-btn" id="account-logout-btn" onclick="handleAccountLogout()" style="background:#7f2020; color:#fff; display:none;">Çıkış Yap</button>
                     <button class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('privacy-modal')">🔒 Gizlilik Politikası</button>
+                    <button class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('terms-modal')">📜 Kullanım Şartları</button>
                     <button class="action-btn" onclick="handleDeleteAccount()" style="background:#7f2020; color:#fff; margin-top:4px;">🗑️ Hesabımı Kalıcı Olarak Sil</button>
                 </div>
 
@@ -498,7 +503,37 @@
                 <p style="font-size:0.85rem;">👤 Profil → 🔑 Hesap ekranındaki <b>"Hesabımı Kalıcı Olarak Sil"</b> butonuyla hesabını ve tüm ilerlemeni (altın, eşyalar, arkadaşlar, mesajlar, PvP geçmişi) kalıcı ve geri dönüşsüz şekilde silebilirsin. Misafir (email eklenmemiş) hesaplar için de aynı buton geçerlidir.</p>
 
                 <h4>Sorular</h4>
-                <p style="font-size:0.85rem;">Bu proje açık kaynaklı bir hobi projesidir - sorularını GitHub deposu üzerinden iletebilirsin.</p>
+                <p style="font-size:0.85rem;">Bu proje açık kaynaklı bir hobi projesidir. Bir hata bulduysan, bir önerin varsa ya da bir sorun yaşadıysan <a href="https://github.com/Recreatives/match3-rpg-basic/issues/new?template=oyuncu-geri-bildirimi.yml" target="_blank" rel="noopener" style="color:var(--accent);">buradan bildirebilirsin</a>.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="terms-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal" onclick="toggleModal('terms-modal')">×</span>
+            <div class="modal-section" style="border-bottom:none;">
+                <h2 class="modal-title">📜 KULLANIM ŞARTLARI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;">Bu oyunu oynayarak aşağıdaki şartları kabul etmiş olursun. Bu, küçük bir hobi projesi için yazılmış basit bir metindir - amaç seni korkutmak değil, herkes için adil bir zemin oluşturmak.</p>
+
+                <h4>Hesabın senin sorumluluğun</h4>
+                <p style="font-size:0.85rem;">Şifreni kimseyle paylaşma. Hesabından yapılan işlemlerden sen sorumlusun.</p>
+
+                <h4>Kabul edilemez davranışlar</h4>
+                <ul style="font-size:0.85rem;">
+                    <li>Diğer oyunculara taciz, zorbalık ya da uygunsuz içerik göndermek.</li>
+                    <li>Hile, bug istismarı veya oyunun ekonomisini bozmaya yönelik kötüye kullanım.</li>
+                    <li>Uygunsuz takma ad / lonca ismi kullanmak.</li>
+                </ul>
+                <p style="font-size:0.85rem;">Bunları fark edersek, önceden haber vermeden hesabını askıya alabilir ya da kalıcı olarak silebiliriz. 🚩 Şikayet Et butonuyla bunları bize bildirebilirsin.</p>
+
+                <h4>Sanal eşyalar gerçek para değildir</h4>
+                <p style="font-size:0.85rem;">Altın, eşyalar, PvP derecesi gibi oyun içi her şeyin gerçek dünyada parasal bir değeri yoktur, gerçek parayla satılamaz/devredilemez ve gerekirse (bir hata, kötüye kullanım ya da dengeleme nedeniyle) tarafımızca sıfırlanabilir veya değiştirilebilir.</p>
+
+                <h4>Hizmet garantisi yok</h4>
+                <p style="font-size:0.85rem;">Bu bir hobi projesi - sürekli çalışacağının, hatasız olacağının ya da süresiz devam edeceğinin garantisini veremeyiz. Elimizden geldiğince düzenli yedek alıyoruz (bkz. Gizlilik Politikası) ama veri kaybı riskini tamamen ortadan kaldıramayız. Proje istediğimiz zaman durdurulabilir veya kapatılabilir - böyle bir durumda burada duyururuz.</p>
+
+                <h4>Değişiklikler</h4>
+                <p style="font-size:0.85rem;">Bu şartlar zaman zaman güncellenebilir. Önemli değişiklikleri oyun içinde duyururuz.</p>
             </div>
         </div>
     </div>
@@ -865,7 +900,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v1.05 Drop test/prototype labeling from PvP and Co-op</div>
+        <div class="version">v1.06 Add Terms of Service and player-feedback link</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -939,14 +974,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="sound.js?v=1.05"></script>
-    <script src="economy.js?v=1.05"></script>
-    <script src="items.js?v=1.05"></script>
-    <script src="achievements.js?v=1.05"></script>
-    <script src="game.js?v=1.05"></script>
-    <script src="sharedboard.js?v=1.05"></script>
-    <script src="pvp.js?v=1.05"></script>
-    <script src="coop.js?v=1.05"></script>
+    <script src="sound.js?v=1.06"></script>
+    <script src="economy.js?v=1.06"></script>
+    <script src="items.js?v=1.06"></script>
+    <script src="achievements.js?v=1.06"></script>
+    <script src="game.js?v=1.06"></script>
+    <script src="sharedboard.js?v=1.06"></script>
+    <script src="pvp.js?v=1.06"></script>
+    <script src="coop.js?v=1.06"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

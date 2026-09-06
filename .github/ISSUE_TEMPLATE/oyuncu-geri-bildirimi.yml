@@ -1,0 +1,41 @@
+name: 🎮 Oyuncu Geri Bildirimi
+description: Bir hata bildir, öneri paylaş ya da bir şey sor.
+title: "[Geri Bildirim] "
+labels: ["player-feedback"]
+body:
+  - type: dropdown
+    id: tur
+    attributes:
+      label: Bu ne tür bir geri bildirim?
+      options:
+        - Hata / Bug
+        - Öneri / İstek
+        - Şikayet (bir oyuncuyla ilgili değil, oyunla ilgili)
+        - Diğer
+    validations:
+      required: true
+
+  - type: textarea
+    id: aciklama
+    attributes:
+      label: Ne oldu?
+      description: Mümkün olduğunca detaylı anlat - ne yapmaya çalışıyordun, ne bekliyordun, ne oldu?
+      placeholder: "Örn: PvP'de ultimate kullandığımda oyun donuyor..."
+    validations:
+      required: true
+
+  - type: input
+    id: oyun-modu
+    attributes:
+      label: Hangi modda oldu? (varsa)
+      placeholder: "Solo / Co-op / PvP"
+    validations:
+      required: false
+
+  - type: input
+    id: takma-ad
+    attributes:
+      label: Oyun içi takma adın (varsa)
+      description: Hesabınla ilgili bir sorunsa, seni bulmamıza yardımcı olur.
+    validations:
+      required: false
