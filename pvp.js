@@ -147,7 +147,7 @@ function pvpStartThinkingAnimation() {
     clearInterval(pvpThinkingInterval);
     pvpThinkingInterval = setInterval(() => {
         dots = (dots + 1) % 4;
-        pvpSetStatus('Rakip oynuyor' + '.'.repeat(dots));
+        pvpSetStatus(t('Rakip oynuyor') + '.'.repeat(dots));
     }, 400);
 }
 
@@ -159,15 +159,15 @@ function pvpStopThinkingAnimation() {
 // --- ROOM JOINING -----------------------------------------------------------
 
 async function pvpJoinRoom() {
-    if (!selectedClass) { pvpSetStatus('Önce ana menüden bir sınıf seç.'); return; }
+    if (!selectedClass) { pvpSetStatus(t('Önce ana menüden bir sınıf seç.')); return; }
     let input = document.getElementById('pvp-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
-    if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
+    if (!code) { pvpSetStatus(t('Önce bir oda kodu yaz.')); return; }
 
     pvpBetrayalMode = null;
     pvpForcedFirstMoverId = null;
     await pvpConnectChannel(code);
-    pvpSetStatus(`Oda "${pvpRoomCode}" - rakip bekleniyor…`);
+    pvpSetStatus(tf('Oda "{code}" - rakip bekleniyor…', { code: pvpRoomCode }));
 }
 
 // --- QUICK MATCH (matchmaking queue) -----------------------------------------
@@ -179,19 +179,19 @@ async function pvpJoinRoom() {
 let pvpMatchmakingPoll = null;
 
 async function pvpStartQuickMatch() {
-    if (!selectedClass) { pvpSetStatus('Önce ana menüden bir sınıf seç.'); return; }
+    if (!selectedClass) { pvpSetStatus(t('Önce ana menüden bir sınıf seç.')); return; }
     if (pvpMatchmakingPoll) return;
 
     document.getElementById('pvp-quickmatch-btn').disabled = true;
     document.getElementById('pvp-cancel-quickmatch-btn').style.display = 'block';
-    pvpSetStatus('Rakip aranıyor…');
+    pvpSetStatus(t('Rakip aranıyor…'));
 
     const poll = async () => {
         const { data, error } = await sb.rpc('find_pvp_match');
         if (error) {
             console.error('find_pvp_match failed:', error.message);
             pvpCancelQuickMatch();
-            pvpSetStatus('Eşleştirme başarısız oldu, tekrar dene.');
+            pvpSetStatus(t('Eşleştirme başarısız oldu, tekrar dene.'));
             return;
         }
         if (data) {
@@ -202,7 +202,7 @@ async function pvpStartQuickMatch() {
             pvpBetrayalMode = null;
             pvpForcedFirstMoverId = null;
             await pvpConnectChannel(data);
-            pvpSetStatus(`Eşleşme bulundu! Oda "${pvpRoomCode}" - rakip bekleniyor…`);
+            pvpSetStatus(tf('Eşleşme bulundu! Oda "{code}" - rakip bekleniyor…', { code: pvpRoomCode }));
         }
     };
 
@@ -242,7 +242,7 @@ let pvpSpectateStatus = {};
 async function pvpWatchRoom() {
     let input = document.getElementById('pvp-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
-    if (!code) { pvpSetStatus('Önce bir oda kodu yaz.'); return; }
+    if (!code) { pvpSetStatus(t('Önce bir oda kodu yaz.')); return; }
 
     if (pvpSpectateChannel) await pvpSpectateChannel.unsubscribe();
     pvpSpectateStatus = {};
@@ -266,7 +266,7 @@ function pvpRenderSpectateStatus() {
     if (!container) return;
     let ids = Object.keys(pvpSpectateStatus);
     if (ids.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">Maç bekleniyor…</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">' + t('Maç bekleniyor…') + '</p>';
         return;
     }
     container.innerHTML = ids.map((id, i) => {
@@ -296,7 +296,7 @@ async function pvpJoinBetrayalRoom(code, opts) {
     pvpBetrayalMode = { isBetrayer: !!opts.isBetrayer, isMutual: !!opts.isMutual };
     pvpForcedFirstMoverId = opts.firstMoverId || null;
     await pvpConnectChannel(code);
-    pvpSetStatus(pvpBetrayalMode.isMutual ? 'İhanet düellosu hazırlanıyor…' : (pvpBetrayalMode.isBetrayer ? 'İlk vuruş senin - düello hazırlanıyor…' : 'İhanete uğradın - düello hazırlanıyor…'));
+    pvpSetStatus(pvpBetrayalMode.isMutual ? t('İhanet düellosu hazırlanıyor…') : (pvpBetrayalMode.isBetrayer ? t('İlk vuruş senin - düello hazırlanıyor…') : t('İhanete uğradın - düello hazırlanıyor…')));
 }
 
 // Rejoining a different room code in the same tab without reloading the
@@ -326,7 +326,7 @@ function pvpResetSessionState() {
 
 async function pvpConnectChannel(code) {
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) { pvpSetStatus('Giriş yapılamadı, sayfayı yenile.'); return; }
+    if (!user) { pvpSetStatus(t('Giriş yapılamadı, sayfayı yenile.')); return; }
     pvpMyId = user.id;
     pvpRoomCode = code;
     pvpResetSessionState();
@@ -411,10 +411,10 @@ function pvpStartMatch() {
         pvpResolveMatches(true);
     }
     pvpUpdateUI();
-    pvpLog(pvpBetrayalMode ? '⚔️ İhanet düellosu başladı.' : '🟢 Rakip bağlı - eşleşme başladı.');
+    pvpLog(pvpBetrayalMode ? t('⚔️ İhanet düellosu başladı.') : t('🟢 Rakip bağlı - eşleşme başladı.'));
     if (pvpMyTurn) {
         pvpStopThinkingAnimation();
-        pvpSetStatus('Senin sıran!');
+        pvpSetStatus(t('Senin sıran!'));
         pvpBeginMyTurn(); // counts as my turn 1 - Kibir Laneti only bites from turn 2
     } else pvpStartThinkingAnimation();
 }
@@ -434,7 +434,7 @@ function pvpBeginMyTurn() {
     let pct = PVP_CURSE_PERCENTS[Math.min(pvpCurseTurnCount - 2, PVP_CURSE_PERCENTS.length - 1)];
     let dmg = Math.max(1, Math.round(PVP_MAX_HP * pct / 100));
     pvpMyHP -= dmg; // ignores armor - Kibir Laneti punishes arrogance directly
-    pvpLog(`Kibir Laneti: kendine %${pct} (${dmg}) hasar verdin.`);
+    pvpLog(tf('Kibir Laneti: kendine %{pct} ({dmg}) hasar verdin.', { pct, dmg }));
     showFloatingText(`-${dmg}`, document.getElementById('pvp-my-hp-bar'), '#9b59b6');
     pvpUpdateUI();
 
@@ -442,8 +442,8 @@ function pvpBeginMyTurn() {
         pvpMatchOver = true;
         pvpStopThinkingAnimation();
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
-        pvpSetStatus('KAYBETTİN');
-        pvpLog('Kibir Laneti seni yendi.');
+        pvpSetStatus(t('KAYBETTİN'));
+        pvpLog(t('Kibir Laneti seni yendi.'));
         pvpOnDefeat();
         pvpUpdateUI();
     }
@@ -458,7 +458,7 @@ function pvpApplyIncomingDamage(amount, direct) {
     let afterDefense = applyDefensiveTraits(amount);
     if (afterDefense === null) {
         showFloatingText("DODGE!", document.getElementById('pvp-my-hp-bar'), "#2ecc71");
-        pvpLog('Rakibin saldırısını savuşturdun!');
+        pvpLog(t('Rakibin saldırısını savuşturdun!'));
         return;
     }
     amount = afterDefense;
@@ -481,8 +481,8 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpMatchOver = true;
         pvpStopThinkingAnimation();
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
-        pvpSetStatus('KAYBETTİN');
-        pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi ve seni yendi.`);
+        pvpSetStatus(t('KAYBETTİN'));
+        pvpLog(tf('Rakip bu turda toplam {dmg} hasar verdi ve seni yendi.', { dmg: pvpIncomingStats.damage }));
         pvpOnDefeat();
     }
 }
@@ -500,12 +500,12 @@ function pvpReceiveAttack(payload) {
 function pvpReceiveTurnEnd() {
     if (pvpMatchOver) return;
     pvpStopThinkingAnimation();
-    if (pvpIncomingStats.damage > 0) pvpLog(`Rakip bu turda toplam ${pvpIncomingStats.damage} hasar verdi.`);
-    else pvpLog('Rakip bu tur hasar vermedi.');
+    if (pvpIncomingStats.damage > 0) pvpLog(tf('Rakip bu turda toplam {dmg} hasar verdi.', { dmg: pvpIncomingStats.damage }));
+    else pvpLog(t('Rakip bu tur hasar vermedi.'));
     pvpIncomingStats = { damage: 0 };
 
     pvpMyTurn = true;
-    pvpSetStatus('Senin sıran!');
+    pvpSetStatus(t('Senin sıran!'));
     pvpUpdateUI();
     pvpBeginMyTurn();
 }
@@ -514,8 +514,8 @@ function pvpOnOpponentDefeated() {
     if (pvpMatchOver) return;
     pvpMatchOver = true;
     pvpStopThinkingAnimation();
-    pvpSetStatus('KAZANDIN!');
-    pvpLog('Rakip yenildi - kazandın!');
+    pvpSetStatus(t('KAZANDIN!'));
+    pvpLog(t('Rakip yenildi - kazandın!'));
     if (typeof playSound === 'function') playSound('victory');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'win', betrayal: !!pvpBetrayalMode });
     if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
@@ -523,7 +523,7 @@ function pvpOnOpponentDefeated() {
     // payout below, so the match is never scored twice.
     if (typeof resolvePvpMatch === 'function' && pvpOpponentId) {
         resolvePvpMatch(pvpOpponentId).then(result => {
-            if (result) pvpLog(`Derecen: ${result.new_winner_rating} (+${result.rating_delta})`);
+            if (result) pvpLog(tf('Derecen: {rating} (+{delta})', { rating: result.new_winner_rating, delta: result.rating_delta }));
         });
     }
     // Belt-and-braces: the opponent's own client already broadcasts BAYILDI
@@ -567,13 +567,13 @@ function pvpResolveBetrayalPayoutIfNeeded() {
         // duel: steal currency from the loser.
         let pct = pvpBetrayalLossPercent();
         return resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(ok => {
-            pvpLog(ok ? `Rakibinden %${Math.round(pct * 100)} çaldın.` : 'Ödül aktarımı başarısız oldu.');
+            pvpLog(ok ? tf('Rakibinden %{pct} çaldın.', { pct: Math.round(pct * 100) }) : t('Ödül aktarımı başarısız oldu.'));
         });
     } else {
         // The loyal player winning against a betrayer - deliberately tiny,
         // no steal from the betrayer's wallet (see the design doc: this
         // reward is intentionally small so loyalty isn't a free win).
-        return adjustWallet(10, 5).then(result => { if (result) pvpLog('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.'); });
+        return adjustWallet(10, 5).then(result => { if (result) pvpLog(t('Sadakatinin küçük bir ödülü: +10 altın, +5 hammadde.')); });
     }
 }
 
@@ -589,7 +589,7 @@ function pvpOnDefeat() {
     // before this fetch would see the updated row - same timing concern as
     // the wallet re-fetch in pvpLogBetrayalLossIfNeeded below.
     if (typeof fetchMyPvpRating === 'function') {
-        setTimeout(() => fetchMyPvpRating().then(r => { if (r) pvpLog(`Derecen: ${r.rating} (${r.wins}G/${r.losses}K)`); }), 1200);
+        setTimeout(() => fetchMyPvpRating().then(r => { if (r) pvpLog(tf('Derecen: {rating} ({wins}G/{losses}K)', { rating: r.rating, wins: r.wins, losses: r.losses })); }), 1200);
     }
     pvpLogBetrayalLossIfNeeded();
 }
@@ -598,9 +598,9 @@ function pvpLogBetrayalLossIfNeeded() {
     if (!pvpBetrayalMode) return;
     if (pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer) {
         let pct = pvpBetrayalLossPercent();
-        pvpLog(`Cüzdanının %${Math.round(pct * 100)}'i rakibine geçti.`);
+        pvpLog(tf("Cüzdanının %{pct}'i rakibine geçti.", { pct: Math.round(pct * 100) }));
     } else {
-        pvpLog('İhanetin sana kazandırmadı ama cüzdanın güvende.');
+        pvpLog(t('İhanetin sana kazandırmadı ama cüzdanın güvende.'));
     }
     // Give the WINNER's resolve_betrayal RPC a moment to actually land server-
     // side before we fetch our own wallet for the summary screen - I have no
@@ -616,26 +616,26 @@ function pvpLogBetrayalLossIfNeeded() {
 async function pvpShowBetrayalSummary(iWon) {
     if (!pvpBetrayalMode) return;
 
-    let title = pvpBetrayalMode.isMutual ? '💀 KARŞILIKLI İHANET'
-        : (pvpBetrayalMode.isBetrayer ? '🗡️ İHANET ETTİN' : '🩹 İHANETE UĞRADIN');
+    let title = pvpBetrayalMode.isMutual ? t('💀 KARŞILIKLI İHANET')
+        : (pvpBetrayalMode.isBetrayer ? t('🗡️ İHANET ETTİN') : t('🩹 İHANETE UĞRADIN'));
 
     let detail;
     if (iWon) {
         detail = (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer)
-            ? `Rakibinin cüzdanının %${Math.round(pvpBetrayalLossPercent() * 100)}'ini çaldın.`
-            : 'Sadakatinin küçük bir ödülünü aldın (+10 altın, +5 hammadde) - rakibinin cüzdanına dokunmadın.';
+            ? tf("Rakibinin cüzdanının %{pct}'ini çaldın.", { pct: Math.round(pvpBetrayalLossPercent() * 100) })
+            : t('Sadakatinin küçük bir ödülünü aldın (+10 altın, +5 hammadde) - rakibinin cüzdanına dokunmadın.');
     } else {
         detail = (pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer)
-            ? `Cüzdanının %${Math.round(pvpBetrayalLossPercent() * 100)}'i rakibine geçti.`
-            : 'İhanetin sana kazandırmadı ama cüzdanın güvende kaldı.';
+            ? tf("Cüzdanının %{pct}'i rakibine geçti.", { pct: Math.round(pvpBetrayalLossPercent() * 100) })
+            : t('İhanetin sana kazandırmadı ama cüzdanın güvende kaldı.');
     }
 
     await fetchWallet();
-    let walletLine = currentWallet ? `Güncel cüzdanın: 🪙 ${currentWallet.gold}  🪨 ${currentWallet.materials}` : '';
+    let walletLine = currentWallet ? tf('Güncel cüzdanın: 🪙 {gold}  🪨 {materials}', { gold: currentWallet.gold, materials: currentWallet.materials }) : '';
 
     document.getElementById('betrayal-summary-title').innerText = title;
     let outcomeEl = document.getElementById('betrayal-summary-outcome');
-    outcomeEl.innerText = iWon ? 'KAZANDIN' : 'KAYBETTİN';
+    outcomeEl.innerText = iWon ? t('KAZANDIN') : t('KAYBETTİN');
     outcomeEl.style.color = iWon ? '#2ecc71' : '#e74c3c';
     document.getElementById('betrayal-summary-detail').innerText = detail;
     document.getElementById('betrayal-summary-wallet').innerText = walletLine;
@@ -696,7 +696,7 @@ function pvpUseUltimate() {
     if (pvpMyHP <= 0) {
         pvpMatchOver = true;
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
-        pvpSetStatus('KAYBETTİN');
+        pvpSetStatus(t('KAYBETTİN'));
         pvpOnDefeat();
         pvpUpdateUI();
         return;
@@ -708,7 +708,7 @@ function pvpUseUltimate() {
         pvpProcessing = false;
         if (pvpExtraTurnTriggered) {
             pvpExtraTurnTriggered = false;
-            pvpLog('>> Ekstra tur!');
+            pvpLog(t('>> Ekstra tur!'));
         } else {
             pvpMyTurn = false;
             pvpStartThinkingAnimation();
@@ -868,21 +868,21 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpMatchOver = true;
         pvpStopThinkingAnimation();
         pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
-        pvpSetStatus('KAYBETTİN');
+        pvpSetStatus(t('KAYBETTİN'));
         pvpLogTurnSummary();
-        pvpLog('Kendi hasarınla yenildin.');
+        pvpLog(t('Kendi hasarınla yenildin.'));
         pvpOnDefeat();
     }
 }
 
 function pvpLogTurnSummary() {
     let parts = [];
-    if (pvpMyTurnStats.damage > 0) parts.push(`${pvpMyTurnStats.damage} hasar verdin`);
-    if (pvpMyTurnStats.heal > 0) parts.push(`${pvpMyTurnStats.heal} can iyileştin`);
-    if (pvpMyTurnStats.armor > 0) parts.push(`${pvpMyTurnStats.armor} zırh kazandın`);
-    if (pvpMyTurnStats.ultGain > 0) parts.push(`ult +%${pvpMyTurnStats.ultGain}`);
-    if (pvpMyTurnStats.selfDamage > 0) parts.push(`kendine ${pvpMyTurnStats.selfDamage} hasar verdin`);
-    pvpLog(parts.length > 0 ? `Hamlen: ${parts.join(', ')}.` : 'Hamlen bir etki yaratmadı.');
+    if (pvpMyTurnStats.damage > 0) parts.push(tf('{val} hasar verdin', { val: pvpMyTurnStats.damage }));
+    if (pvpMyTurnStats.heal > 0) parts.push(tf('{val} can iyileştin', { val: pvpMyTurnStats.heal }));
+    if (pvpMyTurnStats.armor > 0) parts.push(tf('{val} zırh kazandın', { val: pvpMyTurnStats.armor }));
+    if (pvpMyTurnStats.ultGain > 0) parts.push(tf('ult +%{val}', { val: pvpMyTurnStats.ultGain }));
+    if (pvpMyTurnStats.selfDamage > 0) parts.push(tf('kendine {val} hasar verdin', { val: pvpMyTurnStats.selfDamage }));
+    pvpLog(parts.length > 0 ? tf('Hamlen: {parts}.', { parts: parts.join(', ') }) : t('Hamlen bir etki yaratmadı.'));
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 }
 
@@ -910,7 +910,7 @@ function pvpDropAndRefill(isInitial) {
     if (!chained && !pvpMatchOver && !boardHasValidMove(pvpTiles, PVP_WIDTH)) {
         reshuffleBoard(pvpTiles, PVP_WIDTH, tileTypes);
         sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the reshuffled board too
-        pvpLog('Hiç hamle kalmamıştı, tahta karıştırıldı!');
+        pvpLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
         chained = pvpResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
     }
     if (chained || isInitial || pvpMatchOver) return;
@@ -922,7 +922,7 @@ function pvpDropAndRefill(isInitial) {
         // A 4+/cross match grants another turn immediately, same as
         // single-player - stay pvpMyTurn=true, no turn-end broadcast.
         pvpExtraTurnTriggered = false;
-        pvpLog('>> Ekstra tur!');
+        pvpLog(t('>> Ekstra tur!'));
         pvpUpdateUI();
         pvpStartSpeedTimer(); // fresh speed-bonus window for the extra turn
     } else {
@@ -976,7 +976,7 @@ function pvpUpdateUI() {
     let ultBtn = document.getElementById('pvp-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = pvpUltCharge < 100 || !pvpMyTurn || pvpMatchOver || pvpProcessing || !selectedClass;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(pvpUltCharge)}%)` : 'ULT (sınıf seçilmedi)';
+        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(pvpUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
     }
 
     let grid = document.getElementById('pvp-grid');
