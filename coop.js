@@ -179,7 +179,7 @@ function coopStartThinkingAnimation() {
     clearInterval(coopThinkingInterval);
     coopThinkingInterval = setInterval(() => {
         dots = (dots + 1) % 4;
-        coopSetStatus('Takım arkadaşın oynuyor' + '.'.repeat(dots));
+        coopSetStatus(t('Takım arkadaşın oynuyor') + '.'.repeat(dots));
     }, 400);
 }
 
@@ -235,13 +235,13 @@ function coopResetSessionState() {
 // --- ROOM JOINING ------------------------------------------------------------
 
 async function coopJoinRoom() {
-    if (!selectedClass) { coopSetStatus('Önce ana menüden bir sınıf seç.'); return; }
+    if (!selectedClass) { coopSetStatus(t('Önce ana menüden bir sınıf seç.')); return; }
     let input = document.getElementById('coop-room-input');
     let code = input ? input.value.trim().toUpperCase() : '';
-    if (!code) { coopSetStatus('Önce bir oda kodu yaz.'); return; }
+    if (!code) { coopSetStatus(t('Önce bir oda kodu yaz.')); return; }
 
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) { coopSetStatus('Giriş yapılamadı, sayfayı yenile.'); return; }
+    if (!user) { coopSetStatus(t('Giriş yapılamadı, sayfayı yenile.')); return; }
     coopMyId = user.id;
     coopRoomCode = code;
     coopResetSessionState();
@@ -276,7 +276,7 @@ async function coopJoinRoom() {
     coopChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
             await coopChannel.track({ joined_at: Date.now() });
-            coopSetStatus(`Oda "${coopRoomCode}" - takım arkadaşı bekleniyor…`);
+            coopSetStatus(tf('Oda "{code}" - takım arkadaşı bekleniyor…', { code: coopRoomCode }));
         }
     });
 }
@@ -312,7 +312,7 @@ async function coopCheckPresence() {
             coopOnLevelStart(payload);
         }
     } else {
-        coopSetStatus('Takım arkadaşın bulundu, savaş hazırlanıyor…');
+        coopSetStatus(t('Takım arkadaşın bulundu, savaş hazırlanıyor…'));
     }
 }
 
@@ -363,7 +363,7 @@ function coopBeginRun() {
 
     document.getElementById('coop-setup').style.display = 'none';
     document.getElementById('coop-battle').style.display = 'block';
-    coopLog('🐉 Takım tamamlandı - zindan yürüyüşü başladı.');
+    coopLog(t('🐉 Takım tamamlandı - zindan yürüyüşü başladı.'));
 }
 
 // Reused between EVERY level after the first: the "rest before battle" heal
@@ -376,7 +376,7 @@ function coopApplyLevelClearHeal() {
     if (wasDown) { coopMyHP = 0; coopMyDown = false; }
     if (healed > 0) {
         coopMyHP = Math.min(coopMyHP + healed, COOP_MAX_HP);
-        coopLog(wasDown ? `Ayağa kalktın: +${healed} HP` : `Dinlenme: +${healed} HP`);
+        coopLog(wasDown ? tf('Ayağa kalktın: +{val} HP', { val: healed }) : tf('Dinlenme: +{val} HP', { val: healed }));
     }
     coopSyncSelfState();
 }
@@ -408,8 +408,8 @@ function coopOnLevelStart(payload) {
         coopResolveMatches(true);
     }
     coopUpdateUI();
-    coopLog(payload.isBoss ? `⚠️ BOSS - Lvl ${payload.level} başlıyor!` : `Lvl ${payload.level} başlıyor. ${COOP_MINION_LOG[coopMinionType]}`);
-    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); coopStartSpeedTimer(); }
+    coopLog(payload.isBoss ? tf('⚠️ BOSS - Lvl {level} başlıyor!', { level: payload.level }) : tf('Lvl {level} başlıyor. {minion}', { level: payload.level, minion: t(COOP_MINION_LOG[coopMinionType]) }));
+    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus(t('Senin sıran!')); coopStartSpeedTimer(); }
     else coopStartThinkingAnimation();
     coopSaveSessionSnapshot();
 }
@@ -490,7 +490,7 @@ function coopApplySessionResume(state) {
 
     document.getElementById('coop-setup').style.display = 'none';
     document.getElementById('coop-battle').style.display = 'block';
-    coopLog('🔄 Kaldığınız yerden devam ediyorsunuz!');
+    coopLog(t('🔄 Kaldığınız yerden devam ediyorsunuz!'));
 
     // Board state isn't persisted (see file header) - a resumed session
     // just gets a fresh board, authored by the host same as any other level.
@@ -505,14 +505,14 @@ function coopApplySessionResume(state) {
     // uses whenever turn continuity doesn't matter enough to track.
     coopMyTurn = coopIsHost;
     coopUpdateUI();
-    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); coopStartSpeedTimer(); }
+    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus(t('Senin sıran!')); coopStartSpeedTimer(); }
     else coopStartThinkingAnimation();
 
     coopSaveSessionSnapshot();
 }
 
 function coopOnEnemyDefeated(payload) {
-    coopLog(payload.isBoss ? `Boss (Lvl ${payload.level}) yenildi!` : `Minion (Lvl ${payload.level}) yenildi!`);
+    coopLog(payload.isBoss ? tf('Boss (Lvl {level}) yenildi!', { level: payload.level }) : tf('Minion (Lvl {level}) yenildi!', { level: payload.level }));
     if (typeof playSound === 'function') playSound('victory');
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
@@ -526,7 +526,7 @@ function coopOnEnemyDefeated(payload) {
     if (typeof awardLootDrop === 'function') awardLootDrop();
     if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
         let goldReward = goldRewardForKill(payload.level, payload.isBoss);
-        adjustWallet(goldReward, 0).then(result => { if (result) coopLog(`+${goldReward} 🪙 kazandın!`); });
+        adjustWallet(goldReward, 0).then(result => { if (result) coopLog(tf('+{val} 🪙 kazandın!', { val: goldReward })); });
     }
     // Same for the between-level power pick (solo's REWARD_POOL, game.js) -
     // purely local, no networking needed: each player picks their own boost
@@ -553,7 +553,7 @@ function coopShowRewardPick() {
         btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
             applyReward(reward);
-            coopLog(`Güç seçildi: ${reward.name} (${reward.desc}) - sadece bu run için.`);
+            coopLog(tf('Güç seçildi: {name} ({desc}) - sadece bu run için.', { name: t(reward.name), desc: t(reward.desc) }));
             modal.style.display = 'none';
         };
         container.appendChild(btn);
@@ -571,7 +571,7 @@ function coopSyncSelfState() {
     if (coopMyHP <= 0 && !coopMyDown) {
         coopMyHP = 0;
         coopMyDown = true;
-        coopLog('Bayıldın! Takım arkadaşın seni ayağa kaldırana kadar bekle.');
+        coopLog(t('Bayıldın! Takım arkadaşın seni ayağa kaldırana kadar bekle.'));
     }
     coopChannel.send({ type: 'broadcast', event: 'hp-sync', payload: { role: coopRole, hp: coopMyHP, armor: coopMyArmor, down: coopMyDown } });
     coopUpdateUI();
@@ -586,13 +586,13 @@ function coopSyncSelfState() {
 function coopApplyIncomingDamage(amount, drainUlt) {
     if (drainUlt) {
         coopUltCharge = Math.max(0, coopUltCharge - drainUlt);
-        coopLog(`Enerjini emdi: ult -%${drainUlt}`);
+        coopLog(tf('Enerjini emdi: ult -%{val}', { val: drainUlt }));
     }
 
     let afterDefense = applyDefensiveTraits(amount);
     if (afterDefense === null) {
         showFloatingText("DODGE!", document.getElementById('coop-my-hp-bar'), "#2ecc71");
-        coopLog('Saldırıyı savuşturdun!');
+        coopLog(t('Saldırıyı savuşturdun!'));
         coopUpdateUI();
         return;
     }
@@ -602,14 +602,14 @@ function coopApplyIncomingDamage(amount, drainUlt) {
     else { coopMyHP -= (amount - coopMyArmor); coopMyArmor = 0; }
 
     showFloatingText(`-${amount}`, document.getElementById('coop-my-hp-bar'), '#e74c3c');
-    coopLog(`Düşman sana ${amount} hasar verdi.`);
+    coopLog(tf('Düşman sana {val} hasar verdi.', { val: amount }));
     coopSyncSelfState();
 }
 
 function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
     if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0, payload.drainUlt || 0);
-    else coopLog(`Düşman takım arkadaşına ${payload.amount} hasar verdi.`);
+    else coopLog(tf('Düşman takım arkadaşına {val} hasar verdi.', { val: payload.amount }));
 }
 
 function coopOnAllyHpSync(payload) {
@@ -708,12 +708,12 @@ function coopOpenVote(kind, context) {
     coopVotes = {};
 
     let copy = COOP_VOTE_COPY[kind];
-    document.getElementById('hidden-vote-title').innerText = copy.title;
-    document.getElementById('hidden-vote-desc').innerText = copy.desc;
+    document.getElementById('hidden-vote-title').innerText = t(copy.title);
+    document.getElementById('hidden-vote-desc').innerText = t(copy.desc);
     let btnA = document.getElementById('hidden-vote-btn-a');
     let btnB = document.getElementById('hidden-vote-btn-b');
-    btnA.innerText = copy.labelA; btnA.dataset.choice = copy.choiceA; btnA.style.background = copy.colorA; btnA.style.color = '';
-    btnB.innerText = copy.labelB; btnB.dataset.choice = copy.choiceB; btnB.style.background = copy.colorB; btnB.style.color = '#fff';
+    btnA.innerText = t(copy.labelA); btnA.dataset.choice = copy.choiceA; btnA.style.background = copy.colorA; btnA.style.color = '';
+    btnB.innerText = t(copy.labelB); btnB.dataset.choice = copy.choiceB; btnB.style.background = copy.colorB; btnB.style.color = '#fff';
     [btnA, btnB].forEach(b => b.disabled = false);
     document.getElementById('hidden-vote-status').innerText = '';
 
@@ -721,8 +721,8 @@ function coopOpenVote(kind, context) {
     document.getElementById('hidden-vote-modal').style.display = 'flex';
 
     coopLog(kind === 'betrayal'
-        ? `⚠️ Lvl ${context.level} BOSS öncesi gizli oy zamanı!`
-        : `🏁 Lvl ${context.level} boss'u yenildi - devam/çık oyu zamanı!`);
+        ? tf('⚠️ Lvl {level} BOSS öncesi gizli oy zamanı!', { level: context.level })
+        : tf("🏁 Lvl {level} boss'u yenildi - devam/çık oyu zamanı!", { level: context.level }));
 }
 
 function coopSubmitVote(choice) {
@@ -733,7 +733,7 @@ function coopSubmitVote(choice) {
     if (!coopVoteOpen || coopVoteChoice) return;
     coopVoteChoice = choice;
     coopVotes[coopRole] = choice;
-    document.getElementById('hidden-vote-status').innerText = 'Cevabın gönderildi. Takım arkadaşın bekleniyor…';
+    document.getElementById('hidden-vote-status').innerText = t('Cevabın gönderildi. Takım arkadaşın bekleniyor…');
     document.querySelectorAll('#hidden-vote-modal button').forEach(b => b.disabled = true);
     coopChannel.send({ type: 'broadcast', event: 'vote-choice', payload: { role: coopRole, choice } });
     coopMaybeResolveVotes();
@@ -775,14 +775,14 @@ function coopApplyExitVoteResult(result) {
 
     if (bothLeave) {
         coopMatchOver = true;
-        coopLog(`🏁 İkiniz de zindandan çıkmayı seçtiniz. Lvl ${level}'e kadar temiz bir koşu!`);
-        coopSetStatus(`ZİNDANDAN ÇIKTINIZ - Lvl ${level}`);
+        coopLog(tf("🏁 İkiniz de zindandan çıkmayı seçtiniz. Lvl {level}'e kadar temiz bir koşu!", { level }));
+        coopSetStatus(tf('ZİNDANDAN ÇIKTINIZ - Lvl {level}', { level }));
         coopMarkSessionFinished();
         return;
     }
 
     let bothContinue = (result.hostChoice === 'continue' && result.guestChoice === 'continue');
-    coopLog(bothContinue ? '🏁 İkiniz de devam kararı verdiniz!' : '🏁 Biri çıkmak istedi, diğeri devam - şimdilik birlikte bir tur daha gidiyorsunuz.');
+    coopLog(bothContinue ? t('🏁 İkiniz de devam kararı verdiniz!') : t('🏁 Biri çıkmak istedi, diğeri devam - şimdilik birlikte bir tur daha gidiyorsunuz.'));
 
     document.getElementById('coop-battle').style.display = 'block';
     if (coopIsHost) {
@@ -797,7 +797,7 @@ function coopApplyBetrayalResult(result) {
     let bothLoyal = (result.hostChoice === 'loyal' && result.guestChoice === 'loyal');
     if (bothLoyal) {
         document.getElementById('coop-battle').style.display = 'block';
-        coopLog('İkiniz de sadık kaldınız - boss karşınızda!');
+        coopLog(t('İkiniz de sadık kaldınız - boss karşınızda!'));
         if (coopIsHost) {
             let payload = coopBuildLevelPayload(level, continuingRole);
             coopChannel.send({ type: 'broadcast', event: 'level-start', payload });
@@ -811,9 +811,9 @@ function coopApplyBetrayalResult(result) {
     let iAmBetrayer = (betrayerRole === coopRole);
     if (iAmBetrayer || isMutual) unlockAchievement('first_betrayal');
 
-    coopLog(isMutual ? '💀 İKİNİZ DE İHANET ETTİNİZ! 1v1 düellosu başlıyor…'
-        : (iAmBetrayer ? '🗡️ İHANET ETTİN! İlk vuruş senin, ama Kibir Laneti seni bekliyor.'
-        : '🗡️ TAKIM ARKADAŞIN İHANET ETTİ! 1v1 düellosuna sürükleniyorsun…'));
+    coopLog(isMutual ? t('💀 İKİNİZ DE İHANET ETTİNİZ! 1v1 düellosu başlıyor…')
+        : (iAmBetrayer ? t('🗡️ İHANET ETTİN! İlk vuruş senin, ama Kibir Laneti seni bekliyor.')
+        : t('🗡️ TAKIM ARKADAŞIN İHANET ETTİ! 1v1 düellosuna sürükleniyorsun…')));
 
     // Each client derives host/guest uids from its OWN coopIsHost/coopMyId/
     // coopAllyId, so this comes out identical on both machines without any
@@ -885,11 +885,11 @@ function coopReviveRole(role) {
     let reviveHP = Math.round(COOP_MAX_HP * COOP_REVIVE_PCT);
     if (role === coopRole) {
         coopMyHP = reviveHP; coopMyArmor = 0; coopMyDown = false;
-        coopLog('Takım arkadaşın seni ayağa kaldırdı!');
+        coopLog(t('Takım arkadaşın seni ayağa kaldırdı!'));
         unlockAchievement('down_and_up');
     } else {
         coopAllyHP = reviveHP; coopAllyArmor = 0; coopAllyDown = false;
-        coopLog('Takım arkadaşını ayağa kaldırdın!');
+        coopLog(t('Takım arkadaşını ayağa kaldırdın!'));
     }
     coopChannel.send({ type: 'broadcast', event: 'revive', payload: { role } });
     coopUpdateUI();
@@ -899,12 +899,12 @@ function coopOnRevive(payload) {
     let reviveHP = Math.round(COOP_MAX_HP * COOP_REVIVE_PCT);
     if (payload.role === coopRole) {
         coopMyHP = reviveHP; coopMyArmor = 0; coopMyDown = false;
-        coopLog('Takım arkadaşın seni ayağa kaldırdı!');
+        coopLog(t('Takım arkadaşın seni ayağa kaldırdı!'));
         coopChannel.send({ type: 'broadcast', event: 'hp-sync', payload: { role: coopRole, hp: coopMyHP, armor: coopMyArmor, down: false } });
         unlockAchievement('down_and_up');
     } else {
         coopAllyHP = reviveHP; coopAllyArmor = 0; coopAllyDown = false;
-        coopLog('Takım arkadaşını ayağa kaldırdın!');
+        coopLog(t('Takım arkadaşını ayağa kaldırdın!'));
     }
     coopUpdateUI();
 }
@@ -916,7 +916,7 @@ function coopOnTurnSet(payload) {
 
 function coopApplyTurnSet(role) {
     coopMyTurn = (role === coopRole);
-    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus('Senin sıran!'); coopStartSpeedTimer(); }
+    if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus(t('Senin sıran!')); coopStartSpeedTimer(); }
     else coopStartThinkingAnimation();
     coopUpdateUI();
 }
@@ -926,8 +926,8 @@ function coopOnPartyWiped() {
     if (typeof playSound === 'function') playSound('defeat');
     coopMatchOver = true;
     coopStopThinkingAnimation();
-    coopSetStatus(`İKİNİZ DE DÜŞTÜNÜZ - Lvl ${coopLevel}'de YENİLGİ`);
-    coopLog('İkiniz de aynı anda düştünüz. Zindan yürüyüşü bitti.');
+    coopSetStatus(tf("İKİNİZ DE DÜŞTÜNÜZ - Lvl {level}'de YENİLGİ", { level: coopLevel }));
+    coopLog(t('İkiniz de aynı anda düştünüz. Zindan yürüyüşü bitti.'));
     coopUpdateUI();
     coopMarkSessionFinished();
 }
@@ -1129,7 +1129,7 @@ function coopApplyGroupEffect(group, isInitial) {
         let allyRole = coopRole === 'host' ? 'guest' : 'host';
         coopChannel.send({ type: 'broadcast', event: 'ally-heal', payload: { targetRole: allyRole, amount: heal } });
         coopMyTurnStats.teamHeal += heal;
-        coopLog(`Takım arkadaşını ${heal} can iyileştirdin.`);
+        coopLog(tf('Takım arkadaşını {val} can iyileştirdin.', { val: heal }));
     }
 
     coopUpdateUI();
@@ -1138,19 +1138,19 @@ function coopApplyGroupEffect(group, isInitial) {
 function coopOnAllyHeal(payload) {
     if (payload.targetRole !== coopRole) return; // only the target applies this
     coopMyHP = Math.min(coopMyHP + payload.amount, COOP_MAX_HP);
-    coopLog(`Takım arkadaşın seni ${payload.amount} can iyileştirdi!`);
+    coopLog(tf('Takım arkadaşın seni {val} can iyileştirdi!', { val: payload.amount }));
     coopSyncSelfState();
 }
 
 function coopLogTurnSummary() {
     let parts = [];
-    if (coopMyTurnStats.damage > 0) parts.push(`düşmana ${coopMyTurnStats.damage} hasar verdin`);
-    if (coopMyTurnStats.heal > 0) parts.push(`${coopMyTurnStats.heal} can iyileştin`);
-    if (coopMyTurnStats.armor > 0) parts.push(`${coopMyTurnStats.armor} zırh kazandın`);
-    if (coopMyTurnStats.ultGain > 0) parts.push(`ult +%${coopMyTurnStats.ultGain}`);
-    if (coopMyTurnStats.selfDamage > 0) parts.push(`kendine ${coopMyTurnStats.selfDamage} hasar verdin`);
-    if (coopMyTurnStats.teamHeal > 0) parts.push(`takım arkadaşını ${coopMyTurnStats.teamHeal} can iyileştirdin`);
-    coopLog(parts.length > 0 ? `Hamlen: ${parts.join(', ')}.` : 'Hamlen bir etki yaratmadı.');
+    if (coopMyTurnStats.damage > 0) parts.push(tf('düşmana {val} hasar verdin', { val: coopMyTurnStats.damage }));
+    if (coopMyTurnStats.heal > 0) parts.push(tf('{val} can iyileştin', { val: coopMyTurnStats.heal }));
+    if (coopMyTurnStats.armor > 0) parts.push(tf('{val} zırh kazandın', { val: coopMyTurnStats.armor }));
+    if (coopMyTurnStats.ultGain > 0) parts.push(tf('ult +%{val}', { val: coopMyTurnStats.ultGain }));
+    if (coopMyTurnStats.selfDamage > 0) parts.push(tf('kendine {val} hasar verdin', { val: coopMyTurnStats.selfDamage }));
+    if (coopMyTurnStats.teamHeal > 0) parts.push(tf('takım arkadaşını {val} can iyileştirdin', { val: coopMyTurnStats.teamHeal }));
+    coopLog(parts.length > 0 ? tf('Hamlen: {parts}.', { parts: parts.join(', ') }) : t('Hamlen bir etki yaratmadı.'));
     coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
 }
 
@@ -1178,7 +1178,7 @@ function coopDropAndRefill(isInitial) {
     if (!chained && !coopMatchOver && !boardHasValidMove(coopTiles, COOP_WIDTH)) {
         reshuffleBoard(coopTiles, COOP_WIDTH, COOP_TILE_TYPES);
         sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the reshuffled board too
-        coopLog('Hiç hamle kalmamıştı, tahta karıştırıldı!');
+        coopLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
         chained = coopResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
     }
     if (chained || isInitial || coopMatchOver) return;
@@ -1197,7 +1197,7 @@ function coopEndOwnTurn() {
 
     if (coopExtraTurnTriggered) {
         coopExtraTurnTriggered = false;
-        coopLog('>> Ekstra tur!');
+        coopLog(t('>> Ekstra tur!'));
         coopUpdateUI();
         coopStartSpeedTimer(); // fresh speed-bonus window for the extra turn
         return;
@@ -1252,7 +1252,7 @@ function coopUpdateUI() {
     let ultBtn = document.getElementById('coop-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = coopUltCharge < 100 || !coopMyTurn || coopMatchOver || coopProcessing || !selectedClass || coopMyDown;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(coopUltCharge)}%)` : 'ULT (sınıf seçilmedi)';
+        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(coopUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
     }
 
     let grid = document.getElementById('coop-grid');
