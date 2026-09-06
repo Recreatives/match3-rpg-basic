@@ -772,8 +772,14 @@ async function renderFriendsList() {
             tradeBtn.style.cssText = 'width:auto; margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem;';
             tradeBtn.innerText = '🔄';
             tradeBtn.onclick = () => openTradeComposer(row.friend_id, row.display_name);
+            let reportBtn = document.createElement('button');
+            reportBtn.className = 'action-btn';
+            reportBtn.style.cssText = 'width:auto; margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem; background:#7f2020; color:#fff;';
+            reportBtn.innerText = '🚩';
+            reportBtn.onclick = () => openReportModal(row.friend_id, row.display_name, 'arkadaş');
             div.querySelector('.history-stats').appendChild(chatBtn);
             div.querySelector('.history-stats').appendChild(tradeBtn);
+            div.querySelector('.history-stats').appendChild(reportBtn);
         } else if (row.is_incoming_request) {
             div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats"></span>`;
             let acceptBtn = document.createElement('button');
@@ -853,6 +859,43 @@ async function fetchGuildList() {
     return data;
 }
 
+// Reporting - see supabase/schema.sql's reports table and report_player()
+// function. Write-only from here on purpose (same as client_errors) - no
+// in-app admin view yet, reports are reviewed straight from the Supabase
+// dashboard until this project has an actual moderation workflow worth
+// building.
+let reportTargetId = null;
+let reportContext = null;
+
+function openReportModal(targetId, targetName, context) {
+    reportTargetId = targetId;
+    reportContext = context || null;
+    let label = document.getElementById('report-target-label');
+    if (label) label.innerText = `${targetName} kullanıcısını şikayet ediyorsun.`;
+    let status = document.getElementById('report-status');
+    if (status) status.innerText = '';
+    let detail = document.getElementById('report-detail-input');
+    if (detail) detail.value = '';
+    toggleModal('report-modal');
+}
+
+async function reportPlayer(targetId, reason, context) {
+    const { error } = await sb.rpc('report_player', { p_target_id: targetId, p_reason: reason, p_context: context || null });
+    if (error) { console.error('report_player failed:', error.message); return 'error'; }
+    return 'ok';
+}
+
+async function submitReport() {
+    if (!reportTargetId) return;
+    let category = document.getElementById('report-reason-select').value;
+    let detail = document.getElementById('report-detail-input').value.trim();
+    let reason = detail ? `${category}: ${detail}` : category;
+    let status = document.getElementById('report-status');
+    let result = await reportPlayer(reportTargetId, reason, reportContext);
+    if (status) status.innerText = result === 'ok' ? 'Şikayetin alındı, teşekkürler.' : 'Bir hata oldu, tekrar dene.';
+    if (result === 'ok') setTimeout(() => toggleModal('report-modal'), 1200);
+}
+
 async function renderGuildPanel() {
     let container = document.getElementById('guild-panel');
     if (!container) return;
@@ -860,15 +903,28 @@ async function renderGuildPanel() {
 
     let roster = await fetchMyGuildRoster();
     if (roster.length > 0) {
-        let rows = roster.map(r =>
-            `<div class="history-item"><span class="history-name">${r.role === 'owner' ? '👑 ' : ''}${r.display_name}</span></div>`
-        ).join('');
+        const { data: { user } } = await sb.auth.getUser();
         container.innerHTML = `
             <h4 style="margin:0 0 4px;">${roster[0].guild_name}</h4>
             <p style="font-size:0.8rem; color:#bdc3c7;">${roster.length} üye</p>
-            ${rows}
+            <div id="guild-roster-rows"></div>
             <button class="action-btn" style="width:100%; margin-top:10px; background:#c0392b;" onclick="handleLeaveGuild()">Loncadan Ayrıl</button>
         `;
+        let rowsContainer = document.getElementById('guild-roster-rows');
+        roster.forEach(r => {
+            let div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerHTML = `<span class="history-name">${r.role === 'owner' ? '👑 ' : ''}${r.display_name}</span><span class="history-stats"></span>`;
+            if (user && r.player_id !== user.id) {
+                let reportBtn = document.createElement('button');
+                reportBtn.className = 'action-btn';
+                reportBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem; background:#7f2020; color:#fff;';
+                reportBtn.innerText = '🚩';
+                reportBtn.onclick = () => openReportModal(r.player_id, r.display_name, 'lonca');
+                div.querySelector('.history-stats').appendChild(reportBtn);
+            }
+            rowsContainer.appendChild(div);
+        });
         return;
     }
 

@@ -2109,3 +2109,51 @@ drop trigger if exists guilds_validate_name on public.guilds;
 create trigger guilds_validate_name
     before insert or update of name on public.guilds
     for each row execute procedure public.validate_guild_name();
+
+-- 30. Report a player (basic moderation) -------------------------------------------------
+-- Deliberately write-only from the client's side, same as client_errors above - no SELECT
+-- policy at all, so reports are only ever readable from the Supabase dashboard (Table
+-- Editor, which runs as service role and bypasses RLS) until this project has an actual
+-- admin surface worth building. That's enough for a first cut: the point right now is
+-- giving a harassed player somewhere to go beyond "just remove the friend" (see the
+-- direct_messages comment above for why DMs are friends-only in the first place), not
+-- building a full moderation queue/workflow.
+create table if not exists public.reports (
+    id          uuid primary key default gen_random_uuid(),
+    reporter_id uuid not null references public.players(id) on delete cascade,
+    reported_id uuid not null references public.players(id) on delete cascade,
+    reason      text not null check (char_length(reason) between 1 and 500),
+    context     text, -- where the 🚩 button was clicked: 'arkadaş' / 'lonca' / 'mesaj'
+    created_at  timestamptz not null default now()
+);
+
+alter table public.reports enable row level security;
+-- No policies at all is intentional here (unlike every table above, which at least has a
+-- "read own row" policy) - a report shouldn't be readable by the reporter OR the reported
+-- player through the client, only ever through report_player() below (which only ever
+-- INSERTs, security definer, never returns rows) or the dashboard.
+
+create or replace function public.report_player(p_target_id uuid, p_reason text, p_context text default null)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+begin
+    if v_me is null then
+        raise exception 'not authenticated';
+    end if;
+    if v_me = p_target_id then
+        raise exception 'cannot report yourself';
+    end if;
+    if p_reason is null or char_length(trim(p_reason)) = 0 then
+        raise exception 'reason required';
+    end if;
+
+    insert into public.reports (reporter_id, reported_id, reason, context)
+    values (v_me, p_target_id, trim(p_reason), p_context);
+end;
+$$;
+
+grant execute on function public.report_player(uuid, text, text) to authenticated;
