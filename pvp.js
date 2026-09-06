@@ -4,7 +4,8 @@
 // before the betrayal vote, Kibir Laneti, and currency stakes got layered on
 // top (see the "İhanet Protokolü" design doc). Those are all here now, gated
 // behind pvpBetrayalMode (see "BETRAYAL MODE" below) - manually joining a
-// room via "PvP Test" leaves that null and behaves exactly as before. It has
+// room via the normal PvP screen leaves that null and behaves exactly as
+// before. It has
 // its own state and its own board, entirely separate from game.js's single-
 // player globals (isPlayerTurn, currentState, etc.) - the two modes never
 // touch the same variables, so nothing here can destabilize single-player.
@@ -108,8 +109,8 @@ function pvpStopSpeedTimer() {
 
 // --- BETRAYAL MODE ------------------------------------------------------------
 // Set only when coop.js routes a betrayal-vote outcome into a PvP duel
-// (pvpJoinBetrayalRoom) - null for every ordinary "PvP Test" match, which
-// keeps all of this completely inert for manual testing.
+// (pvpJoinBetrayalRoom) - null for every ordinary PvP match, which keeps
+// all of this completely inert for manual testing.
 //   isBetrayer: am I the one who chose ihanet (only meaningful when !isMutual)
 //   isMutual:   both players chose ihanet - fair fight, no curse, higher stakes
 let pvpBetrayalMode = null;
@@ -534,7 +535,7 @@ function pvpOnOpponentDefeated() {
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
     // Betrayal duels already have their own currency-stakes reward (steal %
     // or the small loyal-survivor bonus) - loot drops are only for a
-    // straightforward "PvP Test" win, to keep that reward model unmuddied.
+    // straightforward ordinary PvP win, to keep that reward model unmuddied.
     else if (typeof awardLootDrop === 'function') awardLootDrop();
 }
 
