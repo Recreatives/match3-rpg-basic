@@ -1117,6 +1117,11 @@ function coopApplyGroupEffect(group, isInitial) {
     // teammate's or the enemy's - so this one context serves every branch.
     let passiveCtx = (typeof triggerPassiveHook === 'function') ? makeCoopCombatContext() : null;
 
+    if (selectedClass && typeof cgGetStage === 'function') {
+        let stage = cgGetStage('coop-my-sprite');
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+    }
+
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;
         let amount = Math.floor(base * multiplier);

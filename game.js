@@ -1119,6 +1119,14 @@ function applyRPGEffects(type, multiplier) {
     // gated on isPlayerTurn - an enemy's own match never checks them.
     let passiveCtx = (isPlayerTurn && typeof triggerPassiveHook === 'function') ? makeSinglePlayerCombatContext() : null;
 
+    // The class-specific "I just did something" motion (graphics.js) plays
+    // on every one of the PLAYER's own matches, any tile type - a monster
+    // has no class, so the enemy's own turn never triggers this.
+    if (isPlayerTurn && selectedClass && typeof cgGetStage === 'function') {
+        let stage = cgGetStage('player-sprite');
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+    }
+
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);

@@ -519,6 +519,11 @@ function pvpReceiveAttack(payload) {
         if (stage) stage.playUlt(pvpOpponentClassName || 'warrior');
     } else {
         pvpPlayHit('me', payload.type || 'sword');
+        // The opponent's own class motion, played on THEIR portrait (as I see
+        // it) - the only signal I get of their own matches at all is this
+        // attack broadcast, so this is the one place it can fire.
+        let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
+        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName);
     }
     pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
@@ -855,6 +860,11 @@ function pvpApplyGroupEffect(group, isInitial) {
     // never reveals an opponent's exact HP, so no passive is allowed to
     // condition on it - meaning one context safely covers every branch.
     let passiveCtx = (typeof triggerPassiveHook === 'function') ? makePvpCombatContext() : null;
+
+    if (selectedClass && typeof cgGetStage === 'function') {
+        let stage = cgGetStage('pvp-my-sprite');
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+    }
 
     if (group.type === 'sword' || group.type === 'skull') {
         let base = group.type === 'sword' ? TILE_STATS.sword : TILE_STATS.skull_dmg;

@@ -16,22 +16,49 @@
 // Character/monster art credit: Batareya (FreePixel.art). Effect art credit:
 // Kenney (kenney.nl). See assets/CREDITS.md.
 
+// Each file is a 4-frame horizontal idle-animation strip (cropped from the
+// artist's 8-direction spritesheet's front-facing row - see
+// scratchpad-era CREDITS.md notes) rather than one static frame, so the
+// portrait actually breathes/bobs instead of standing frozen.
 const CHARACTER_SPRITES = {
-    warrior: 'assets/characters/warrior.png',
-    berserker: 'assets/characters/berserker.png',
-    rogue: 'assets/characters/rogue.png',
-    archer: 'assets/characters/archer.png',
-    mage: 'assets/characters/mage.png',
-    necromancer: 'assets/characters/necromancer.png',
-    paladin: 'assets/characters/paladin.png',
+    warrior: 'assets/characters/warrior_idle.png',
+    berserker: 'assets/characters/berserker_idle.png',
+    rogue: 'assets/characters/rogue_idle.png',
+    archer: 'assets/characters/archer_idle.png',
+    mage: 'assets/characters/mage_idle.png',
+    necromancer: 'assets/characters/necromancer_idle.png',
+    paladin: 'assets/characters/paladin_idle.png',
 };
 
 const MONSTER_SPRITES = {
-    normal: 'assets/characters/monster_normal.png',
-    armored: 'assets/characters/monster_armored.png',
-    swift: 'assets/characters/monster_swift.png',
-    drain: 'assets/characters/monster_drain.png',
-    boss: 'assets/characters/monster_boss.png',
+    normal: 'assets/characters/monster_normal_idle.png',
+    armored: 'assets/characters/monster_armored_idle.png',
+    swift: 'assets/characters/monster_swift_idle.png',
+    drain: 'assets/characters/monster_drain_idle.png',
+    boss: 'assets/characters/monster_boss_idle.png',
+};
+
+// Every idle strip is 4 equal frames side by side.
+const IDLE_FRAME_COUNT = 4;
+
+// No attack spritesheet exists in the free art this project uses (see
+// assets/CREDITS.md) - the character/monster packs only ship idle/walk/run.
+// Rather than leave every class's "hit" looking identical, each class gets a
+// hand-authored procedural motion (position/rotation/scale offsets from the
+// portrait's resting pose, as a function of t in [0,1]) played on top of the
+// idle animation whenever THAT class's own tile match lands. Chosen to echo
+// each class's own combat identity: Warrior bashes forward, Berserker throws
+// two wild hits, Rogue darts in low and fast, Archer draws back then
+// releases, Mage rises and pulses, Necromancer dips down to channel, Paladin
+// winds up and slams down.
+const CLASS_MOTIONS = {
+    warrior: t => ({ dx: Math.sin(t * Math.PI) * 12, dy: 0, rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.1 }),
+    berserker: t => ({ dx: Math.sin(t * Math.PI * 2) * 10, dy: 0, rot: Math.sin(t * Math.PI * 2) * 0.08, scale: 1 }),
+    rogue: t => ({ dx: Math.sin(t * Math.PI) * 16, dy: -Math.sin(t * Math.PI) * 7, rot: -Math.sin(t * Math.PI) * 0.2, scale: 1 - Math.sin(t * Math.PI) * 0.08 }),
+    archer: t => ({ dx: t < 0.35 ? -7 * (t / 0.35) : 11 * Math.sin(((t - 0.35) / 0.65) * Math.PI), dy: 0, rot: 0, scale: 1 }),
+    mage: t => ({ dx: 0, dy: -Math.sin(t * Math.PI) * 9, rot: Math.sin(t * Math.PI * 2) * 0.06, scale: 1 + Math.sin(t * Math.PI) * 0.06 }),
+    necromancer: t => ({ dx: 0, dy: Math.sin(t * Math.PI) * 7, rot: 0, scale: 1 - Math.sin(t * Math.PI) * 0.07 }),
+    paladin: t => ({ dx: 0, dy: t < 0.45 ? -9 * (t / 0.45) : 13 * ((t - 0.45) / 0.55), rot: 0, scale: t > 0.45 ? 1 + ((t - 0.45) / 0.55) * 0.12 : 1 }),
 };
 
 // Kenney's particle pack ships neutral grayscale/white masks meant to be
@@ -107,13 +134,23 @@ class CombatStage {
         });
         this.app = app;
 
-        this.portraitSprite = new PIXI.Sprite();
+        // An AnimatedSprite (not a plain Sprite) so setPortrait can hand it a
+        // 4-frame idle strip and have it actually play - see IDLE_FRAME_COUNT.
+        // autoUpdate:false + the manual app.ticker.add below, rather than
+        // AnimatedSprite's own default behavior of self-subscribing to
+        // PIXI.Ticker.shared - each Application here owns its OWN ticker
+        // (confirmed distinct from Ticker.shared), and Ticker.shared is never
+        // separately driven anywhere in this file, so a sprite left on
+        // autoUpdate's default silently never advances past frame 0.
+        this.portraitSprite = new PIXI.AnimatedSprite([PIXI.Texture.EMPTY]);
+        this.portraitSprite.autoUpdate = false;
         this.portraitSprite.anchor.set(0.5, 1);
         this.portraitSprite.x = app.screen.width / 2;
         this.portraitSprite.y = app.screen.height;
         this.portraitSprite.scale.set(1);
-        this.portraitSprite.texture.source && (this.portraitSprite.texture.source.scaleMode = 'nearest');
+        this.portraitBaseScale = 1;
         app.stage.addChild(this.portraitSprite);
+        app.ticker.add(() => this.portraitSprite.update(app.ticker));
 
         this.effectLayer = new PIXI.Container();
         app.stage.addChild(this.effectLayer);
@@ -122,17 +159,29 @@ class CombatStage {
 
     // Swaps which character/monster art this stage shows. Safe to call before
     // init finishes (awaits internally) or repeatedly (e.g. a fresh monster
-    // every level) - always resets any hit-shake left over from the last one.
+    // every level) - always resets any hit-shake/motion left over from the
+    // last one. `url` points at a 4-frame idle strip (see IDLE_FRAME_COUNT);
+    // slicing it into per-frame textures happens here rather than once at
+    // load time since the same cached strip texture is reused across every
+    // stage showing that character (solo + PvP + co-op can all show a Mage).
     async setPortrait(url) {
         await this.ready;
-        const texture = await cgLoadTexture(url);
-        texture.source.scaleMode = 'nearest';
-        this.portraitSprite.texture = texture;
+        const strip = await cgLoadTexture(url);
+        strip.source.scaleMode = 'nearest';
+        const frameW = strip.width / IDLE_FRAME_COUNT;
+        const frames = [];
+        for (let i = 0; i < IDLE_FRAME_COUNT; i++) {
+            frames.push(new PIXI.Texture({ source: strip.source, frame: new PIXI.Rectangle(i * frameW, 0, frameW, strip.height) }));
+        }
+        this.portraitSprite.textures = frames;
+        this.portraitSprite.animationSpeed = 0.06; // slow, calm bob - not a run cycle
+        this.portraitSprite.play();
         // Fit within the canvas height while preserving aspect ratio - source
         // art varies a few px in width/height per character (see assets/CREDITS.md).
         const maxH = this.app.screen.height * 0.95;
         const maxW = this.app.screen.width * 0.9;
-        const scale = Math.min(maxH / texture.height, maxW / texture.width, 4);
+        const scale = Math.min(maxH / strip.height, maxW / frameW, 4);
+        this.portraitBaseScale = scale;
         this.portraitSprite.scale.set(scale);
         this.portraitSprite.x = this.app.screen.width / 2;
         this.portraitSprite.y = this.app.screen.height;
@@ -161,6 +210,33 @@ class CombatStage {
         this._flash(this.portraitSprite, 220);
         const effects = ULT_EFFECT_SPRITES[classKey] || [HIT_EFFECT_SPRITES.energy];
         this._burst(effects, 1.9, 650);
+    }
+
+    // Played on the ATTACKER's own portrait (as opposed to playHit, which
+    // plays on whoever's getting hit) whenever that class's own tile match
+    // lands - see CLASS_MOTIONS' header comment for why this is procedural
+    // rather than a real attack spritesheet. Silently does nothing for an
+    // unrecognized/missing key (a monster has no class) rather than
+    // guessing at a fallback motion that wouldn't mean anything for it.
+    async playClassMotion(classKey) {
+        await this.ready;
+        const fn = CLASS_MOTIONS[classKey];
+        if (!fn) return;
+        const baseX = this.app.screen.width / 2;
+        const baseY = this.app.screen.height;
+        const baseScale = this.portraitBaseScale;
+        this._tween(420, t => {
+            const m = fn(t);
+            this.portraitSprite.x = baseX + m.dx;
+            this.portraitSprite.y = baseY + m.dy;
+            this.portraitSprite.rotation = m.rot;
+            this.portraitSprite.scale.set(baseScale * m.scale);
+        }, () => {
+            this.portraitSprite.x = baseX;
+            this.portraitSprite.y = baseY;
+            this.portraitSprite.rotation = 0;
+            this.portraitSprite.scale.set(baseScale);
+        });
     }
 
     // `effects` is a list of {sprite, tint} - see HIT_EFFECT_SPRITES/
