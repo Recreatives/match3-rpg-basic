@@ -86,6 +86,7 @@ let coopChannel = null;
 let coopRoomCode = null;
 let coopMyId = null;
 let coopAllyId = null;
+let coopAllyClassName = null; // lowercase class key read off their presence payload - see coopCheckPresence
 let coopIsHost = false;
 let coopRole = null; // 'host' | 'guest'
 let coopTiles = [];
@@ -275,7 +276,10 @@ async function coopJoinRoom() {
 
     coopChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-            await coopChannel.track({ joined_at: Date.now() });
+            // className rides along on presence the same way pvp.js's does -
+            // coopCheckPresence reads it straight off the same state it
+            // already uses to find the ally, no separate handshake needed.
+            await coopChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
             coopSetStatus(tf('Oda "{code}" - takım arkadaşı bekleniyor…', { code: coopRoomCode }));
         }
     });
@@ -291,6 +295,13 @@ async function coopCheckPresence() {
     entries.sort((a, b) => a.joinedAt - b.joinedAt);
     let ally = entries.find(e => e.key !== coopMyId);
     coopAllyId = ally ? ally.key : null;
+
+    if (typeof cgGetStage === 'function' && typeof CHARACTER_SPRITES !== 'undefined' && ally) {
+        coopAllyClassName = state[ally.key][0].className;
+        let url = coopAllyClassName && CHARACTER_SPRITES[coopAllyClassName];
+        let stage = cgGetStage('coop-ally-sprite');
+        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+    }
 
     coopStarted = true;
     coopIsHost = entries[0].key === coopMyId;
@@ -396,6 +407,11 @@ function coopOnLevelStart(payload) {
     coopProcessing = false;
     coopMyTurn = (payload.continuingRole === coopRole);
 
+    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
+        let stage = cgGetStage('coop-enemy-sprite');
+        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
+    }
+
     // One shared board per level (see sharedboard.js) - the host is always
     // the one-time authority for a fresh level's board (randomizes +
     // resolves any initial matches + broadcasts the result), regardless of
@@ -474,6 +490,10 @@ function coopApplySessionResume(state) {
     coopLevel = state.level;
     coopIsBossLevel = state.isBossLevel;
     coopMinionType = state.minionType;
+    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
+        let stage = cgGetStage('coop-enemy-sprite');
+        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
+    }
     coopEnemyHP = state.enemyHP;
     coopEnemyMaxHP = state.enemyMaxHP;
     coopEnemyArmor = state.enemyArmor;
@@ -968,6 +988,10 @@ function coopUseUltimate() {
     if (coopMatchOver || coopProcessing || !coopMyTurn || coopUltCharge < 100 || !selectedClass) return;
 
     coopProcessing = true;
+    if (typeof cgGetStage === 'function') {
+        let stage = cgGetStage('coop-my-sprite');
+        if (stage) stage.playUlt(selectedClass.name.toLowerCase());
+    }
     let ultCtx = makeCoopCombatContext();
     selectedClass.ultEffect(ultCtx);
     coopUltCharge = 0;
@@ -1041,6 +1065,16 @@ function coopAttemptSwap(tile1, tile2) {
     }
 }
 
+// Mirrors game.js's soloPlayHit for co-op's three-canvas layout. 'ally'
+// is used by coopOnAllyHeal below, not by coopApplyGroupEffect - a teamheal
+// match only ever benefits the ally once THEIR client applies the broadcast.
+function coopPlayHit(side, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
+    let stage = cgGetStage(id);
+    if (stage) stage.playHit(tileType);
+}
+
 function coopResolveMatches(isInitial) {
     let groups = findMatchGroups(coopTiles, COOP_WIDTH);
     if (groups.length === 0) {
@@ -1096,29 +1130,34 @@ function coopApplyGroupEffect(group, isInitial) {
                 recoil = payload.recoil;
             }
             coopApplyDamageToEnemy(amount);
+            coopPlayHit('enemy', 'skull');
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
             coopMyTurnStats.selfDamage += recoil;
             coopSyncSelfState();
         } else {
             coopApplyDamageToEnemy(amount);
+            coopPlayHit('enemy', 'sword');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
         let heal = Math.floor(TILE_STATS.heart * multiplier);
         coopMyHP = Math.min(coopMyHP + heal, COOP_MAX_HP);
         coopMyTurnStats.heal += heal;
+        coopPlayHit('me', 'heart');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
         coopSyncSelfState();
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         coopMyArmor += gain;
         coopMyTurnStats.armor += gain;
+        coopPlayHit('me', 'shield');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
         coopSyncSelfState();
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         coopUltCharge = Math.min(coopUltCharge + gain, 100);
         coopMyTurnStats.ultGain += gain;
+        coopPlayHit('me', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     } else if (group.type === 'teamheal') {
         // Heals the ALLY, not me - only ever appears on a co-op board
@@ -1138,6 +1177,7 @@ function coopApplyGroupEffect(group, isInitial) {
 function coopOnAllyHeal(payload) {
     if (payload.targetRole !== coopRole) return; // only the target applies this
     coopMyHP = Math.min(coopMyHP + payload.amount, COOP_MAX_HP);
+    coopPlayHit('me', 'heart'); // this is MY OWN client - I'm the one being healed here
     coopLog(tf('Takım arkadaşın seni {val} can iyileştirdi!', { val: payload.amount }));
     coopSyncSelfState();
 }

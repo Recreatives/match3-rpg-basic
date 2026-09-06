@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=1.08">
+    <link rel="stylesheet" href="style.css?v=1.09">
     <!-- Cloudflare Turnstile - explicit render mode (explicit.js), not the
          default auto-scanning api.js: the gate's widget container starts
          out inside a display:none element (#auth-gate, until boot() shows
@@ -341,9 +341,14 @@
                 </ul>
             </div>
 
-            <div class="modal-section" style="border-bottom:none;">
+            <div class="modal-section">
                 <h4 data-i18n-en="👤 WHERE'S WHAT?">👤 NEREDE NE VAR?</h4>
                 <p style="font-size:0.85rem;" data-i18n-en="So the top menu doesn't get cluttered with buttons, some screens were moved under the <b>&quot;👤 Profile&quot;</b> menu: Leaderboard, Friends, Guild, Titles, Talents, Trades, Achievements, and Loot/Stats all open from there.">Üst menüde çok fazla buton birikmesin diye bazı ekranlar <b>"👤 Profil"</b> menüsünün altında toplandı: Lider Tablosu, Arkadaşlar, Lonca, Unvanlar, Yetenekler, Takaslar, Başarımlar ve Loot/Stats oradan açılır.</p>
+            </div>
+
+            <div class="modal-section" style="border-bottom:none;">
+                <h4 data-i18n-en="🙏 CREDITS">🙏 EMEĞİ GEÇENLER</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="This is a solo hobby project, and the art isn't our own work either - thanks to the fellow solo/indie creators who made it free to use. Character &amp; monster art by Batareya (FreePixel.art). Combat effect art by Kenney (kenney.nl).">Bu da bizim gibi bir solo hobi projesi, görseller de bize ait değil - bunları ücretsiz kullanılabilir yapan diğer solo/indie geliştiricilere teşekkürler. Karakter & canavar görselleri Batareya'ya (FreePixel.art) ait. Savaş efektleri Kenney'e (kenney.nl) ait.</p>
             </div>
         </div>
     </div>
@@ -537,6 +542,9 @@
 
                 <h4 data-i18n-en="Changes">Değişiklikler</h4>
                 <p style="font-size:0.85rem;" data-i18n-en="These terms may be updated from time to time. We'll announce significant changes in-game.">Bu şartlar zaman zaman güncellenebilir. Önemli değişiklikleri oyun içinde duyururuz.</p>
+
+                <h4 data-i18n-en="Credits">Emeği Geçenler</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="This is a solo hobby project, and the character/monster art and combat effects are not our own work either - we're grateful to the fellow solo/indie creators who made them free to use: character and monster art by Batareya (FreePixel.art), combat effect art by Kenney (kenney.nl). Thank you for supporting other small developers.">Bu da bizim gibi bir solo hobi projesi, karakter/canavar görselleri ve savaş efektleri de bize ait değil - bunları ücretsiz kullanılabilir yapan diğer solo/indie geliştiricilere minnettarız: karakter ve canavar görselleri Batareya'ya (FreePixel.art), savaş efektleri Kenney'e (kenney.nl) ait. Diğer küçük geliştiricileri desteklediğiniz için teşekkürler.</p>
             </div>
         </div>
     </div>
@@ -785,11 +793,13 @@
                 <div id="pvp-battle" style="display:none;">
                     <p id="pvp-connection-badge" style="text-align:center; font-size:0.75rem; color:#2ecc71; margin:0 0 6px;" data-i18n-en="🟢 Opponent connected">🟢 Rakip bağlı</p>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <canvas class="combat-portrait" id="pvp-my-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="YOU">SEN</div>
                         <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="pvp-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
+                        <canvas class="combat-portrait" id="pvp-opp-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="OPPONENT">RAKİP</div>
                         <div class="bar-container"><div id="pvp-opp-status-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
                         <span id="pvp-opp-status-text" class="hp-text">AYAKTA</span>
@@ -832,16 +842,19 @@
                 <div id="coop-battle" style="display:none;">
                     <p id="coop-level-label" style="text-align:center; font-size:0.85rem; color:#bdc3c7; margin:0 0 6px;">Lvl 1</p>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <canvas class="combat-portrait" id="coop-enemy-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="ENEMY">DÜŞMAN</div>
                         <div class="bar-container"><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
                         <span id="coop-boss-hp-text" class="hp-text">0/0</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <canvas class="combat-portrait" id="coop-my-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="YOU">SEN</div>
                         <div class="bar-container"><div id="coop-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="coop-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
+                        <canvas class="combat-portrait" id="coop-ally-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="TEAMMATE">TAKIM ARKADAŞI</div>
                         <div class="bar-container"><div id="coop-ally-hp-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
                         <span id="coop-ally-hp-text" class="hp-text">AYAKTA</span>
@@ -903,7 +916,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v1.08 Add Turkish/English in-game language toggle</div>
+        <div class="version">v1.09 Add 2D character/monster art and combat hit/ultimate effects</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button data-i18n-en="🎁 Daily Reward" class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -920,7 +933,6 @@
 
     <div class="battle-header">
         <div class="enemy-info">
-            <span class="enemy-display" id="enemy-sprite">👾</span>
             <span id="enemy-name">Slime Lvl 1</span>
         </div>
         <div class="turn-status">
@@ -935,6 +947,7 @@
 
     <div class="hud">
         <div class="stat-box">
+            <canvas class="combat-portrait" id="player-sprite" width="56" height="70"></canvas>
             <div id="player-class-label">SEN</div>
             <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
@@ -948,6 +961,7 @@
         </div>
 
         <div class="stat-box">
+            <canvas class="enemy-display combat-portrait" id="enemy-sprite" width="56" height="70"></canvas>
             <div data-i18n-en="ENEMY">DÜŞMAN</div>
             <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
@@ -978,16 +992,18 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="i18n.js?v=1.08"></script>
-    <script src="i18n-dict.js?v=1.08"></script>
-    <script src="sound.js?v=1.08"></script>
-    <script src="economy.js?v=1.08"></script>
-    <script src="items.js?v=1.08"></script>
-    <script src="achievements.js?v=1.08"></script>
-    <script src="game.js?v=1.08"></script>
-    <script src="sharedboard.js?v=1.08"></script>
-    <script src="pvp.js?v=1.08"></script>
-    <script src="coop.js?v=1.08"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
+    <script src="graphics.js?v=1.09"></script>
+    <script src="i18n.js?v=1.09"></script>
+    <script src="i18n-dict.js?v=1.09"></script>
+    <script src="sound.js?v=1.09"></script>
+    <script src="economy.js?v=1.09"></script>
+    <script src="items.js?v=1.09"></script>
+    <script src="achievements.js?v=1.09"></script>
+    <script src="game.js?v=1.09"></script>
+    <script src="sharedboard.js?v=1.09"></script>
+    <script src="pvp.js?v=1.09"></script>
+    <script src="coop.js?v=1.09"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

@@ -83,7 +83,6 @@ let ENEMY_TILE_STATS = { sword: 4, heart: 3, shield: 4, energy: 10, skull_dmg: 1
 const MINION_TYPES = ['normal', 'armored', 'swift', 'drain'];
 const MINION_ARMORED_PCT = 0.3; // starting armor as a fraction of the level's max HP
 const MINION_DRAIN_AMOUNT = 15; // flat ult-charge % stolen per drain hit
-const MINION_ICON = { normal: null, armored: '🛡️', swift: '⚡', drain: '🌀', boss: '👹' };
 const MINION_LOG = {
     normal: '', boss: '',
     armored: '🛡️ Zırhlı düşman - önce zırhını kırman gerekiyor.',
@@ -342,6 +341,7 @@ function renderClassButtons() {
             const playerBox = document.getElementById('player-class-label');
             playerBox.style.color = 'var(--accent)';
             playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
+            setMyPortraitEverywhere(c.name.toLowerCase());
             // Picking a class is also PvP/co-op's own "start of run" moment
             // (they never call resetGame() - that's solo's own start path),
             // so this needs the exact same clean-slate rebuild.
@@ -436,7 +436,10 @@ function startLevel() {
 
     let name = isBoss ? tf('BOSS Sv. {level}', { level }) : tf('Canavar Sv. {level}', { level });
     document.getElementById('enemy-name').innerText = name;
-    document.getElementById('enemy-sprite').innerText = MINION_ICON[currentMinionType] || (isBoss ? '👹' : ['👾','👺','👻','🤖'][level % 4]);
+    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
+        let stage = cgGetStage('enemy-sprite');
+        if (stage) stage.setPortrait(MONSTER_SPRITES[currentMinionType] || MONSTER_SPRITES.normal);
+    }
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
     if (isBoss) log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
@@ -1078,11 +1081,37 @@ function showFloatingText(text, tileElement, color) {
     setTimeout(() => pop.remove(), 1500);
 }
 
+// `selectedClass` is a single global shared across solo/PvP/co-op (see
+// CLAUDE.md-adjacent comments elsewhere - there's exactly one "current class"
+// no matter which mode ends up being played), so picking a class updates
+// every mode's own "my portrait" canvas at once rather than each mode having
+// to remember to sync it when its own battle starts.
+function setMyPortraitEverywhere(classKey) {
+    if (typeof cgGetStage !== 'function' || typeof CHARACTER_SPRITES === 'undefined') return;
+    let url = CHARACTER_SPRITES[classKey];
+    if (!url) return;
+    ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
+        let stage = cgGetStage(id);
+        if (stage) stage.setPortrait(url);
+    });
+}
+
+// Small visual feedback layer (graphics.js) on top of the actual combat math
+// above - `actor` is whoever the tile match belongs to (isPlayerTurn ? 'player'
+// : 'enemy'), which is the right target for shield/heart/energy (buffs the
+// actor) as well as the right target for skull's own recoil half.
+function soloPlayHit(sideStr, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
+    if (stage) stage.playHit(tileType);
+}
+
 function applyRPGEffects(type, multiplier) {
     if (currentState !== STATE.PLAYING) return;
 
     let user = isPlayerTurn ? "Oyuncu" : "Düşman";
     let target = isPlayerTurn ? 'enemy' : 'player';
+    let actor = isPlayerTurn ? 'player' : 'enemy';
     let stats = isPlayerTurn ? TILE_STATS : ENEMY_TILE_STATS;
 
     // Legendary item passives (items.js UNIQUE_PASSIVES) only ever belong
@@ -1093,6 +1122,7 @@ function applyRPGEffects(type, multiplier) {
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
+        soloPlayHit(target, 'sword');
         log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
@@ -1102,6 +1132,7 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.heart * multiplier);
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
+        soloPlayHit(actor, 'heart');
         log(tf('{user} İyileşme +{val}', { user: t(user), val: baseVal }), 'log-heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
@@ -1110,12 +1141,14 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.shield * multiplier);
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
+        soloPlayHit(actor, 'shield');
         log(tf('{user} Zırh +{val}', { user: t(user), val: baseVal }), 'log-armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
 
     } else if (type === 'energy') {
         let baseVal = Math.floor(stats.energy * multiplier);
+        soloPlayHit(actor, 'energy');
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
             log(tf('Ult +{val}%', { val: baseVal }), 'log-hit');
@@ -1144,6 +1177,7 @@ function applyRPGEffects(type, multiplier) {
         let self = isPlayerTurn ? 'player' : 'enemy';
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
+        soloPlayHit(target, 'skull');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('crit');
@@ -1473,6 +1507,10 @@ function useUltimate() {
         if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
         // 3. Visuals
+        if (typeof cgGetStage === 'function') {
+            let stage = cgGetStage('player-sprite');
+            if (stage) stage.playUlt(selectedClass.name.toLowerCase());
+        }
         log(tf('ULTİMATE! {name} kullanıldı!', { name: selectedClass.ultName }), "log-hit");
         if (typeof playSound === 'function') playSound('ult');
         if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');

@@ -450,10 +450,21 @@ body {
     100% { transform: translateY(-60px) scale(1); opacity: 0; }
 }
 
-/* Monster Display - now a compact inline icon in .battle-header rather than
-   its own big centered block, to save the vertical space it used to take. */
+/* Character/monster portrait canvas (graphics.js draws into it via PixiJS) -
+   sits at the top of a .stat-box, above its class/HP label. image-rendering
+   keeps the pixel art crisp when the canvas's CSS size differs from its
+   backing resolution (see CombatStage's resolution handling in graphics.js). */
+.combat-portrait {
+    display: block;
+    margin: 0 auto 4px;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+}
+/* Monster Display - the enemy portrait keeps the same float/enraged animation
+   the old emoji-based version had (see game.js's use of enemySprite.classList) -
+   these apply to the canvas element's box exactly the same way they did to a
+   <span>, no JS changes needed for the animation side of the migration. */
 .enemy-display {
-    font-size: 1.8rem; line-height: 1;
     animation: float 3s ease-in-out infinite;
     transition: transform 0.2s, filter 0.2s;
 }

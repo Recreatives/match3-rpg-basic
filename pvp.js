@@ -47,6 +47,7 @@ let pvpChannel = null;
 let pvpRoomCode = null;
 let pvpMyId = null;
 let pvpOpponentId = null;
+let pvpOpponentClassName = null; // lowercase class key read off their presence payload - see pvpCheckPresence
 let pvpTiles = [];
 let pvpStarted = false;
 let pvpMyTurn = false;
@@ -350,7 +351,12 @@ async function pvpConnectChannel(code) {
     await new Promise(resolve => {
         pvpChannel.subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
-                await pvpChannel.track({ joined_at: Date.now() });
+                // className rides along on presence (not a dedicated broadcast) -
+                // it's exactly the kind of small, persistent-for-the-session fact
+                // presence already exists for, and it means pvpCheckPresence can
+                // read the opponent's class off the same state it already uses to
+                // find them, rather than adding a second handshake.
+                await pvpChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
                 resolve();
             }
         });
@@ -367,6 +373,16 @@ function pvpCheckPresence() {
     entries.sort((a, b) => a.joinedAt - b.joinedAt);
     let opponent = entries.find(e => e.key !== pvpMyId);
     pvpOpponentId = opponent ? opponent.key : null;
+
+    if (typeof cgGetStage === 'function' && typeof CHARACTER_SPRITES !== 'undefined' && opponent) {
+        pvpOpponentClassName = state[opponent.key][0].className;
+        let url = pvpOpponentClassName && CHARACTER_SPRITES[pvpOpponentClassName];
+        let stage = cgGetStage('pvp-opp-sprite');
+        // Falls back to a random class portrait if the opponent's client is
+        // an older cached build that never tracked className - still shows
+        // SOMETHING rather than an empty canvas for that mismatch window.
+        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+    }
 
     pvpStarted = true;
     pvpMyTurn = pvpForcedFirstMoverId ? (pvpForcedFirstMoverId === pvpMyId) : (entries[0].key === pvpMyId);
@@ -487,8 +503,23 @@ function pvpApplyIncomingDamage(amount, direct) {
     }
 }
 
+// Mirrors game.js's soloPlayHit for the two-canvas PvP layout - 'me' is
+// always pvp-my-sprite, 'opp' is always pvp-opp-sprite, regardless of who
+// actually dealt the hit (each client only ever renders its own two slots).
+function pvpPlayHit(side, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
+    if (stage) stage.playHit(tileType);
+}
+
 function pvpReceiveAttack(payload) {
     if (pvpMatchOver) return;
+    if (payload.type === 'ult') {
+        let stage = typeof cgGetStage === 'function' ? cgGetStage('pvp-my-sprite') : null;
+        if (stage) stage.playUlt(pvpOpponentClassName || 'warrior');
+    } else {
+        pvpPlayHit('me', payload.type || 'sword');
+    }
     pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
     // be granted on taking damage, which meant a turn that only matched
@@ -683,6 +714,10 @@ function pvpUseUltimate() {
     if (pvpMatchOver || pvpProcessing || !pvpMyTurn || pvpUltCharge < 100 || !selectedClass) return;
 
     pvpProcessing = true;
+    if (typeof cgGetStage === 'function') {
+        let stage = cgGetStage('pvp-my-sprite');
+        if (stage) stage.playUlt(selectedClass.name.toLowerCase());
+    }
     let ultCtx = makePvpCombatContext();
     selectedClass.ultEffect(ultCtx);
     pvpUltCharge = 0;
@@ -838,27 +873,32 @@ function pvpApplyGroupEffect(group, isInitial) {
             }
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpPlayHit('opp', 'skull');
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
         } else {
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpPlayHit('opp', 'sword');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
         let heal = Math.floor(TILE_STATS.heart * multiplier);
         pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
         pvpMyTurnStats.heal += heal;
+        pvpPlayHit('me', 'heart');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
         pvpMyTurnStats.armor += gain;
+        pvpPlayHit('me', 'shield');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         pvpUltCharge = Math.min(pvpUltCharge + gain, 100);
         pvpMyTurnStats.ultGain += gain;
+        pvpPlayHit('me', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     }
 
