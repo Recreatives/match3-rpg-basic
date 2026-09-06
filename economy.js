@@ -32,7 +32,7 @@ async function ensureSession(captchaToken) {
     const { data, error } = await sb.auth.signInAnonymously({ options: { captchaToken } });
     if (error) {
         console.error('Anonymous sign-in failed:', error.message);
-        setWalletStatus('Bağlantı hatası');
+        setWalletStatus(t('Bağlantı hatası'));
         return null;
     }
     return data.session;
@@ -191,12 +191,12 @@ async function renderAccountStatus() {
     if (!detail) return;
 
     if (user && !user.is_anonymous) {
-        detail.innerText = `Giriş yapılan email: ${user.email}`;
+        detail.innerText = tf('Giriş yapılan email: {email}', { email: user.email });
         if (upgradeBtn) upgradeBtn.style.display = 'none';
         if (switchBtn) switchBtn.style.display = 'block';
         if (logoutBtn) logoutBtn.style.display = 'block';
     } else {
-        detail.innerText = 'Şu an misafir olarak oynuyorsun. İlerlemeni (altın, eşyalar, PvP derecen) kaybetmemek için bir hesap oluştur.';
+        detail.innerText = t('Şu an misafir olarak oynuyorsun. İlerlemeni (altın, eşyalar, PvP derecen) kaybetmemek için bir hesap oluştur.');
         if (upgradeBtn) upgradeBtn.style.display = 'block';
         if (switchBtn) switchBtn.style.display = 'block';
         if (logoutBtn) logoutBtn.style.display = 'none';
@@ -211,7 +211,7 @@ async function handleAccountRegister() {
     let result = await accountRegisterOrUpgrade(email, password);
     if (!result.ok) {
         const messages = { invalid: 'Geçerli bir email ve en az 6 karakterli bir şifre gir.', taken: 'Bu email zaten kayıtlı - Giriş Yap\'ı dene.', error: 'Bir şeyler ters gitti, tekrar dene.' };
-        if (msg) msg.innerText = messages[result.reason] || messages.error;
+        if (msg) msg.innerText = t(messages[result.reason] || messages.error);
         return;
     }
     pendingAccountEmail = email.trim();
@@ -226,18 +226,18 @@ async function handleAccountVerify() {
     let code = document.getElementById('account-verify-code').value;
     let msg = document.getElementById('account-status-msg');
     let result = await accountVerifySignupCode(pendingAccountEmail, code, pendingAccountIsUpgrade);
-    if (result !== 'ok') { if (msg) msg.innerText = 'Kod hatalı ya da süresi dolmuş.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Kod hatalı ya da süresi dolmuş.'); return; }
 
     if (pendingAccountIsUpgrade && pendingAccountPassword) {
         let pwResult = await accountFinishUpgradePassword(pendingAccountPassword);
         pendingAccountPassword = null;
         if (pwResult !== 'ok') {
-            if (msg) msg.innerText = 'Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.';
+            if (msg) msg.innerText = t('Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.');
             renderAccountStatus();
             return;
         }
     }
-    if (msg) msg.innerText = 'Hesap doğrulandı!';
+    if (msg) msg.innerText = t('Hesap doğrulandı!');
     renderAccountStatus();
 }
 
@@ -246,7 +246,7 @@ async function handleAccountLogin() {
     let password = document.getElementById('account-login-password').value;
     let msg = document.getElementById('account-status-msg');
     let result = await accountLogin(email, password);
-    if (result !== 'ok') { if (msg) msg.innerText = 'Email veya şifre hatalı.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Email veya şifre hatalı.'); return; }
     renderAccountStatus();
     if (typeof fetchWallet === 'function') fetchWallet();
 }
@@ -258,7 +258,7 @@ async function handleAccountLogout() {
 }
 
 async function handleDeleteAccount() {
-    if (!confirm('Hesabını KALICI olarak silmek üzeresin. Altının, eşyaların, arkadaşların, PvP derecen - hepsi geri dönüşsüz şekilde silinecek. Emin misin?')) return;
+    if (!confirm(t('Hesabını KALICI olarak silmek üzeresin. Altının, eşyaların, arkadaşların, PvP derecen - hepsi geri dönüşsüz şekilde silinecek. Emin misin?'))) return;
     let msg = document.getElementById('account-status-msg');
     let result = await deleteOwnAccount();
     if (result !== 'ok') { if (msg) msg.innerText = 'Hesap silinemedi, tekrar dene.'; return; }
@@ -272,7 +272,7 @@ async function handleAccountForgotPassword() {
     let email = document.getElementById('account-forgot-email').value;
     let msg = document.getElementById('account-status-msg');
     let result = await accountRequestPasswordReset(email);
-    if (result !== 'ok') { if (msg) msg.innerText = 'Kod gönderilemedi, email adresini kontrol et.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Kod gönderilemedi, email adresini kontrol et.'); return; }
     pendingResetEmail = email.trim();
     showAccountView('reset');
 }
@@ -283,8 +283,8 @@ async function handleAccountResetPassword() {
     let msg = document.getElementById('account-status-msg');
     let result = await accountConfirmPasswordReset(pendingResetEmail, code, newPassword);
     const messages = { invalid: 'Şifre en az 6 karakter olmalı.', error: 'Kod hatalı ya da süresi dolmuş.' };
-    if (result !== 'ok') { if (msg) msg.innerText = messages[result] || messages.error; return; }
-    if (msg) msg.innerText = 'Şifren değişti, giriş yapabilirsin.';
+    if (result !== 'ok') { if (msg) msg.innerText = t(messages[result] || messages.error); return; }
+    if (msg) msg.innerText = t('Şifren değişti, giriş yapabilirsin.');
     showAccountView('login');
 }
 
@@ -382,7 +382,7 @@ async function handleGateLogin() {
     let msg = document.getElementById('gate-status-msg');
     let result = await accountLogin(email, password, gateCaptchaToken);
     resetGateCaptcha();
-    if (result !== 'ok') { if (msg) msg.innerText = 'Email veya şifre hatalı.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Email veya şifre hatalı.'); return; }
     dismissGateAndBoot();
 }
 
@@ -397,7 +397,7 @@ async function handleGateRegister() {
     resetGateCaptcha();
     if (!result.ok) {
         const messages = { invalid: 'Geçerli bir email ve en az 6 karakterli bir şifre gir.', taken: 'Bu email zaten kayıtlı - Giriş Yap\'ı dene.', error: 'Bir şeyler ters gitti, tekrar dene.' };
-        if (msg) msg.innerText = messages[result.reason] || messages.error;
+        if (msg) msg.innerText = t(messages[result.reason] || messages.error);
         return;
     }
     pendingAccountEmail = email.trim();
@@ -410,12 +410,12 @@ async function handleGateVerify() {
     let code = document.getElementById('gate-verify-code').value;
     let msg = document.getElementById('gate-status-msg');
     let result = await accountVerifySignupCode(pendingAccountEmail, code, pendingAccountIsUpgrade);
-    if (result !== 'ok') { if (msg) msg.innerText = 'Kod hatalı ya da süresi dolmuş.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Kod hatalı ya da süresi dolmuş.'); return; }
 
     if (pendingAccountIsUpgrade && pendingAccountPassword) {
         let pwResult = await accountFinishUpgradePassword(pendingAccountPassword);
         pendingAccountPassword = null;
-        if (pwResult !== 'ok') { if (msg) msg.innerText = 'Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.'; return; }
+        if (pwResult !== 'ok') { if (msg) msg.innerText = t('Email doğrulandı ama şifre kaydedilemedi - Giriş Yap ekranından "Şifremi Unuttum" ile bir şifre belirleyebilirsin.'); return; }
     }
     dismissGateAndBoot();
 }
@@ -425,7 +425,7 @@ async function handleGateForgotPassword() {
     let msg = document.getElementById('gate-status-msg');
     let result = await accountRequestPasswordReset(email, gateCaptchaToken);
     resetGateCaptcha();
-    if (result !== 'ok') { if (msg) msg.innerText = 'Kod gönderilemedi, email adresini kontrol et.'; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t('Kod gönderilemedi, email adresini kontrol et.'); return; }
     pendingResetEmail = email.trim();
     showGateView('reset');
 }
@@ -436,7 +436,7 @@ async function handleGateResetPassword() {
     let msg = document.getElementById('gate-status-msg');
     let result = await accountConfirmPasswordReset(pendingResetEmail, code, newPassword);
     const messages = { invalid: 'Şifre en az 6 karakter olmalı.', error: 'Kod hatalı ya da süresi dolmuş.' };
-    if (result !== 'ok') { if (msg) msg.innerText = messages[result] || messages.error; return; }
+    if (result !== 'ok') { if (msg) msg.innerText = t(messages[result] || messages.error); return; }
     // verifyOtp('recovery') inside accountConfirmPasswordReset already
     // signs the player in with a real session - nothing left to log into.
     dismissGateAndBoot();
@@ -454,7 +454,7 @@ async function fetchWallet() {
 
     if (error) {
         console.error('Wallet fetch failed:', error.message);
-        setWalletStatus('Yüklenemedi');
+        setWalletStatus(t('Yüklenemedi'));
         return null;
     }
 
@@ -537,7 +537,7 @@ async function purchaseItem(slot, rarityKey) {
     const { data, error } = await sb.rpc('purchase_item', { p_slot: slot, p_rarity: rarityKey });
     if (error) {
         console.error('purchase_item failed:', error.message);
-        setShopStatus(error.message.includes('insufficient gold') ? 'Yeterli altının yok.' : 'Satın alma başarısız oldu.');
+        setShopStatus(error.message.includes('insufficient gold') ? t('Yeterli altının yok.') : t('Satın alma başarısız oldu.'));
         return false;
     }
 
@@ -550,7 +550,7 @@ async function purchaseItem(slot, rarityKey) {
     // but repeating it right in the status line means a player scrolled
     // deep into a long list doesn't have to look up to confirm it landed.
     let remainingGold = currentWallet ? currentWallet.gold : '?';
-    setShopStatus(`${info.emoji} ${info.name} satın alındı! Kalan: ${remainingGold} 🪙`);
+    setShopStatus(tf('{emoji} {name} satın alındı! Kalan: {gold} 🪙', { emoji: info.emoji, name: info.name, gold: remainingGold }));
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
     return true;
@@ -600,12 +600,12 @@ async function scrapItem(itemId) {
     const { data, error } = await sb.rpc('scrap_item', { p_item_id: itemId });
     if (error) {
         console.error('scrap_item failed:', error.message);
-        setShopStatus(error.message.includes('unequip it first') ? 'Önce çıkarman lazım.' : 'Hurdaya çevrilemedi.');
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Hurdaya çevrilemedi.'));
         return false;
     }
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
     await fetchWallet();
-    setShopStatus(`🪨 +${data} hammadde kazandın.`);
+    setShopStatus(tf('🪨 +{val} hammadde kazandın.', { val: data }));
     if (typeof renderInventory === 'function') renderInventory();
     return true;
 }
@@ -618,14 +618,14 @@ async function upgradeItem(itemId) {
     const { data, error } = await sb.rpc('upgrade_item', { p_item_id: itemId });
     if (error) {
         console.error('upgrade_item failed:', error.message);
-        setShopStatus(error.message.includes('insufficient') ? 'Yeterli altın/hammadde yok.' : 'Geliştirilemedi.');
+        setShopStatus(error.message.includes('insufficient') ? t('Yeterli altın/hammadde yok.') : t('Geliştirilemedi.'));
         return false;
     }
     let idx = currentOwnedItems.findIndex(it => it.id === itemId);
     if (idx !== -1) currentOwnedItems[idx] = data;
     await fetchWallet();
     let rarity = typeof RARITY_DEFS !== 'undefined' ? RARITY_DEFS[data.rarity] : null;
-    setShopStatus(rarity ? `${rarity.mark} ${rarity.name} seviyesine yükseltildi!` : 'Yükseltildi!');
+    setShopStatus(rarity ? tf('{mark} {name} seviyesine yükseltildi!', { mark: rarity.mark, name: t(rarity.name) }) : t('Yükseltildi!'));
     if (typeof renderInventory === 'function') renderInventory();
     return true;
 }
@@ -698,11 +698,11 @@ function titleBadge(equippedTitle) {
 async function renderLeaderboard() {
     let container = document.getElementById('leaderboard-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let rows = await fetchLeaderboard(10);
     if (rows.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz kimse altın kazanmadı.</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Henüz kimse altın kazanmadı.') + '</p>';
         return;
     }
 
@@ -748,11 +748,11 @@ async function fetchFriendsList() {
 async function renderFriendsList() {
     let container = document.getElementById('friends-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let rows = await fetchFriendsList();
     if (rows.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz arkadaşın yok. Yukarıdan bir takma ad yazıp istek gönder.</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Henüz arkadaşın yok. Yukarıdan bir takma ad yazıp istek gönder.') + '</p>';
         return;
     }
 
@@ -795,7 +795,7 @@ async function renderFriendsList() {
             div.querySelector('.history-stats').appendChild(acceptBtn);
             div.querySelector('.history-stats').appendChild(declineBtn);
         } else {
-            div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats" style="color:#7f8c8d;">İstek gönderildi…</span>`;
+            div.innerHTML = `<span class="history-name">${row.display_name}${titleBadge(row.equipped_title)}</span><span class="history-stats" style="color:#7f8c8d;">${t('İstek gönderildi…')}</span>`;
         }
         container.appendChild(div);
     });
@@ -807,13 +807,13 @@ async function submitFriendRequest() {
     let status = document.getElementById('friends-status');
     let result = await sendFriendRequest(input.value);
     const messages = {
-        sent: 'İstek gönderildi!',
-        already_exists: 'Zaten arkadaşsınız ya da istek beklemede.',
-        not_found: 'Bu takma adla bir oyuncu bulunamadı.',
-        empty: 'Önce bir takma ad yaz.',
+        sent: t('İstek gönderildi!'),
+        already_exists: t('Zaten arkadaşsınız ya da istek beklemede.'),
+        not_found: t('Bu takma adla bir oyuncu bulunamadı.'),
+        empty: t('Önce bir takma ad yaz.'),
         error: 'Bir hata oldu, tekrar dene.'
     };
-    if (status) status.innerText = messages[result] || messages.error;
+    if (status) status.innerText = t(messages[result] || messages.error);
     if (result === 'sent') { input.value = ''; renderFriendsList(); }
 }
 
@@ -871,7 +871,7 @@ function openReportModal(targetId, targetName, context) {
     reportTargetId = targetId;
     reportContext = context || null;
     let label = document.getElementById('report-target-label');
-    if (label) label.innerText = `${targetName} kullanıcısını şikayet ediyorsun.`;
+    if (label) label.innerText = tf('{name} kullanıcısını şikayet ediyorsun.', { name: targetName });
     let status = document.getElementById('report-status');
     if (status) status.innerText = '';
     let detail = document.getElementById('report-detail-input');
@@ -892,23 +892,23 @@ async function submitReport() {
     let reason = detail ? `${category}: ${detail}` : category;
     let status = document.getElementById('report-status');
     let result = await reportPlayer(reportTargetId, reason, reportContext);
-    if (status) status.innerText = result === 'ok' ? 'Şikayetin alındı, teşekkürler.' : 'Bir hata oldu, tekrar dene.';
+    if (status) status.innerText = result === 'ok' ? t('Şikayetin alındı, teşekkürler.') : t('Bir hata oldu, tekrar dene.');
     if (result === 'ok') setTimeout(() => toggleModal('report-modal'), 1200);
 }
 
 async function renderGuildPanel() {
     let container = document.getElementById('guild-panel');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let roster = await fetchMyGuildRoster();
     if (roster.length > 0) {
         const { data: { user } } = await sb.auth.getUser();
         container.innerHTML = `
             <h4 style="margin:0 0 4px;">${roster[0].guild_name}</h4>
-            <p style="font-size:0.8rem; color:#bdc3c7;">${roster.length} üye</p>
+            <p style="font-size:0.8rem; color:#bdc3c7;">${tf('{n} üye', { n: roster.length })}</p>
             <div id="guild-roster-rows"></div>
-            <button class="action-btn" style="width:100%; margin-top:10px; background:#c0392b;" onclick="handleLeaveGuild()">Loncadan Ayrıl</button>
+            <button class="action-btn" style="width:100%; margin-top:10px; background:#c0392b;" onclick="handleLeaveGuild()">${t('Loncadan Ayrıl')}</button>
         `;
         let rowsContainer = document.getElementById('guild-roster-rows');
         roster.forEach(r => {
@@ -931,16 +931,16 @@ async function renderGuildPanel() {
     let guilds = await fetchGuildList();
     container.innerHTML = `
         <div style="display:flex; gap:6px; margin-bottom:10px;">
-            <input id="guild-name-input" type="text" placeholder="Yeni lonca adı" maxlength="30" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-            <button class="action-btn" style="width:auto; margin:0;" onclick="handleCreateGuild()">Kur</button>
+            <input id="guild-name-input" type="text" placeholder="${t('Yeni lonca adı')}" maxlength="30" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+            <button class="action-btn" style="width:auto; margin:0;" onclick="handleCreateGuild()">${t('Kur')}</button>
         </div>
         <p id="guild-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
-        <p style="font-size:0.8rem; color:#bdc3c7; margin-top:10px;">— veya mevcut bir loncaya katıl —</p>
+        <p style="font-size:0.8rem; color:#bdc3c7; margin-top:10px;">${t('— veya mevcut bir loncaya katıl —')}</p>
         <div id="guild-browse-list"></div>
     `;
     let browseList = document.getElementById('guild-browse-list');
     if (guilds.length === 0) {
-        browseList.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz hiç lonca kurulmamış.</p>';
+        browseList.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Henüz hiç lonca kurulmamış.') + '</p>';
     } else {
         guilds.forEach(g => {
             let div = document.createElement('div');
@@ -949,7 +949,7 @@ async function renderGuildPanel() {
             let joinBtn = document.createElement('button');
             joinBtn.className = 'action-btn';
             joinBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
-            joinBtn.innerText = `Katıl (${g.member_count})`;
+            joinBtn.innerText = tf('Katıl ({n})', { n: g.member_count });
             joinBtn.onclick = () => joinGuild(g.guild_id).then(ok => { if (ok) renderGuildPanel(); });
             div.querySelector('.history-stats').appendChild(joinBtn);
             browseList.appendChild(div);
@@ -964,13 +964,13 @@ async function handleCreateGuild() {
     let result = await createGuild(input.value);
     const messages = {
         ok: 'Lonca kuruldu!',
-        name_taken: 'Bu isim zaten alınmış.',
-        already_in_guild: 'Zaten bir loncadasın.',
-        empty: 'Önce bir isim yaz.',
-        inappropriate: 'Bu isim kullanılamaz, başka bir isim dene.',
+        name_taken: t('Bu isim zaten alınmış.'),
+        already_in_guild: t('Zaten bir loncadasın.'),
+        empty: t('Önce bir isim yaz.'),
+        inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'),
         error: 'Bir hata oldu, tekrar dene.'
     };
-    if (status) status.innerText = messages[result] || messages.error;
+    if (status) status.innerText = t(messages[result] || messages.error);
     if (result === 'ok') renderGuildPanel();
 }
 
@@ -1031,7 +1031,7 @@ async function renderConversation() {
 
     let messages = await fetchConversation(dmActiveFriendId);
     if (messages.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">Henüz mesaj yok - ilk mesajı sen gönder.</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem; text-align:center;">' + t('Henüz mesaj yok - ilk mesajı sen gönder.') + '</p>';
         return;
     }
 
@@ -1076,22 +1076,22 @@ async function setEquippedTitle(title) {
 async function renderTitlesPanel() {
     let container = document.getElementById('titles-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let titles = await fetchAvailableTitles();
     if (titles.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Unvanlar yüklenemedi.</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Unvanlar yüklenemedi.') + '</p>';
         return;
     }
 
     container.innerHTML = '';
     let noneDiv = document.createElement('div');
     noneDiv.className = 'history-item';
-    noneDiv.innerHTML = `<span class="history-name">Yok (unvansız)</span><span class="history-stats"></span>`;
+    noneDiv.innerHTML = `<span class="history-name">${t('Yok (unvansız)')}</span><span class="history-stats"></span>`;
     let noneBtn = document.createElement('button');
     noneBtn.className = 'action-btn';
     noneBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
-    noneBtn.innerText = 'Kaldır';
+    noneBtn.innerText = t('Kaldır');
     noneBtn.onclick = () => setEquippedTitle(null).then(ok => { if (ok) renderTitlesPanel(); });
     noneDiv.querySelector('.history-stats').appendChild(noneBtn);
     container.appendChild(noneDiv);
@@ -1104,7 +1104,7 @@ async function renderTitlesPanel() {
             let equipBtn = document.createElement('button');
             equipBtn.className = 'action-btn';
             equipBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
-            equipBtn.innerText = 'Kuşan';
+            equipBtn.innerText = t('Kuşan');
             equipBtn.onclick = () => setEquippedTitle(t.title).then(ok => { if (ok) renderTitlesPanel(); });
             div.querySelector('.history-stats').replaceWith(equipBtn);
         }
@@ -1139,11 +1139,11 @@ async function resolvePvpMatch(loserId) {
 async function renderPvpLeaderboard() {
     let container = document.getElementById('pvp-leaderboard-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let rows = await fetchPvpLeaderboard(10);
     if (rows.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz derecelendirilmiş bir PvP maçı oynanmadı.</p>';
+        container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Henüz derecelendirilmiş bir PvP maçı oynanmadı.') + '</p>';
         return;
     }
 
@@ -1161,8 +1161,8 @@ async function submitDisplayName() {
     if (!input) return;
     let result = await setDisplayName(input.value);
     let status = document.getElementById('leaderboard-name-status');
-    const messages = { ok: 'Kaydedildi!', taken: 'Bu isim zaten alınmış, başka bir isim dene.', empty: 'Önce bir isim yaz.', inappropriate: 'Bu isim kullanılamaz, başka bir isim dene.', error: 'Kaydedilemedi.' };
-    if (status) status.innerText = messages[result] || messages.error;
+    const messages = { ok: t('Kaydedildi!'), taken: t('Bu isim zaten alınmış, başka bir isim dene.'), empty: t('Önce bir isim yaz.'), inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'), error: t('Kaydedilemedi.') };
+    if (status) status.innerText = t(messages[result] || messages.error);
     if (result === 'ok') renderLeaderboard();
 }
 
@@ -1250,15 +1250,15 @@ function updateDailyLoginUI() {
     let streakEl = document.getElementById('daily-login-streak');
     let btn = document.getElementById('daily-login-claim-btn');
     let topBarBtn = document.getElementById('daily-login-btn');
-    if (streakEl) streakEl.innerText = `Seri: ${streak} gün`;
+    if (streakEl) streakEl.innerText = tf('Seri: {n} gün', { n: streak });
     if (btn) {
         btn.disabled = !canClaim;
-        btn.innerText = canClaim ? 'Ödülü Al' : 'Bugün zaten aldın, yarın gel!';
+        btn.innerText = canClaim ? t('Ödülü Al') : t('Bugün zaten aldın, yarın gel!');
         btn.style.opacity = canClaim ? '1' : '0.6';
     }
     // A quiet dot on the top-bar button so a claimable reward is noticeable
     // without having to open the modal first.
-    if (topBarBtn) topBarBtn.innerHTML = canClaim ? '🎁 Günlük Ödül <span style="color:#e74c3c;">●</span>' : '🎁 Günlük Ödül';
+    if (topBarBtn) topBarBtn.innerHTML = canClaim ? t('🎁 Günlük Ödül') + ' <span style="color:#e74c3c;">●</span>' : t('🎁 Günlük Ödül');
 }
 
 // --- DAILY QUESTS ------------------------------------------------------------
@@ -1316,7 +1316,7 @@ async function claimDailyQuest(questKey) {
         let def = DAILY_QUEST_DEFS[questKey];
         let el = document.createElement('div');
         el.className = 'achievement-toast';
-        el.innerHTML = `<b>${def.emoji} GÖREV TAMAMLANDI</b><br>${def.label} (+${result.quest_gold} 🪙)`;
+        el.innerHTML = tf('<b>{emoji} {title}</b><br>{label} (+{gold} 🪙)', { emoji: def.emoji, title: t('GÖREV TAMAMLANDI'), label: t(def.label), gold: result.quest_gold });
         document.body.appendChild(el);
         setTimeout(() => el.classList.add('visible'), 10);
         setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
@@ -1331,7 +1331,7 @@ function updateDailyQuestUI() {
         let done = !!currentDailyQuests[key];
         return `<div class="manual-tile" style="opacity:${done ? '0.6' : '1'};">
             <span class="manual-icon">${done ? '✅' : def.emoji}</span>
-            <div class="manual-desc"><b>${def.label}</b>${done ? 'Tamamlandı (+15 🪙)' : 'Beklemede'}</div>
+            <div class="manual-desc"><b>${t(def.label)}</b>${done ? t('Tamamlandı (+15 🪙)') : t('Beklemede')}</div>
         </div>`;
     }).join('');
 }
@@ -1340,14 +1340,14 @@ async function handleClaimDailyReward() {
     let result = await claimDailyReward();
     let status = document.getElementById('daily-login-status');
     if (!result.ok) {
-        if (status) status.innerText = result.alreadyClaimed ? 'Bugün zaten aldın, yarın tekrar gel!' : 'Bir hata oldu, tekrar dene.';
+        if (status) status.innerText = result.alreadyClaimed ? t('Bugün zaten aldın, yarın tekrar gel!') : t('Bir hata oldu, tekrar dene.');
         return;
     }
-    if (status) status.innerText = `+${result.reward} 🪙 kazandın! (${result.streak}. gün serisi)`;
+    if (status) status.innerText = tf('+{gold} 🪙 kazandın! ({streak}. gün serisi)', { gold: result.reward, streak: result.streak });
 }
 
 async function initEconomy() {
-    setWalletStatus('Bağlanıyor…');
+    setWalletStatus(t('Bağlanıyor…'));
     const session = await ensureSession();
     // Flush whatever logClientError (index.html) queued before `sb` existed -
     // that queue is the only reason any error from before this point isn't
@@ -1437,9 +1437,9 @@ async function renderTradeComposer() {
     let myItems = currentOwnedItems.filter(i => !i.equipped_slot);
     let theirItems = await fetchFriendItems(tradeTargetFriendId);
 
-    let myOptions = '<option value="">— eşya yok, sadece altın —</option>' +
+    let myOptions = '<option value="">' + t('— eşya yok, sadece altın —') + '</option>' +
         myItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity}) 💎${itemPower(i)}</option>`).join('');
-    let theirOptions = '<option value="">— eşya yok, sadece altın —</option>' +
+    let theirOptions = '<option value="">' + t('— eşya yok, sadece altın —') + '</option>' +
         theirItems.map(i => `<option value="${i.id}">${itemDisplayInfo(i).emoji} ${itemDisplayInfo(i).name} (${RARITY_DEFS[i.rarity] ? RARITY_DEFS[i.rarity].label : i.rarity}) 💎${itemPower(i)}</option>`).join('');
 
     document.getElementById('trade-my-item-select').innerHTML = myOptions;
@@ -1454,23 +1454,23 @@ async function submitTradeOffer() {
     let status = document.getElementById('trade-compose-status');
 
     if (!myItemId && myGold <= 0) {
-        if (status) status.innerText = 'En az bir eşya ya da altın teklif etmelisin.';
+        if (status) status.innerText = t('En az bir eşya ya da altın teklif etmelisin.');
         return;
     }
 
     let offerId = await createTradeOffer(tradeTargetFriendId, myItemId, theirItemId, myGold, theirGold);
     if (offerId) {
-        if (status) status.innerText = 'Teklif gönderildi!';
+        if (status) status.innerText = t('Teklif gönderildi!');
         setTimeout(closeTradeComposer, 1000);
     } else {
-        if (status) status.innerText = 'Teklif gönderilemedi, tekrar dene.';
+        if (status) status.innerText = t('Teklif gönderilemedi, tekrar dene.');
     }
 }
 
 async function renderTradeOffers() {
     let container = document.getElementById('trade-offers-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let offers = await fetchMyTradeOffers();
     if (offers.length === 0) {
@@ -1494,7 +1494,7 @@ async function renderTradeOffers() {
         div.style.cssText = 'flex-direction:column; align-items:flex-start; gap:4px;';
         div.innerHTML = `
             <span class="history-name">${o.direction === 'incoming' ? '📥' : '📤'} ${o.counterparty_name}</span>
-            <span style="font-size:0.75rem; color:#bdc3c7;">Verilen: ${offerText} → İstenen: ${requestText}</span>
+            <span style="font-size:0.75rem; color:#bdc3c7;">${tf('Verilen: {offer} → İstenen: {request}', { offer: offerText, request: requestText })}</span>
         `;
         let btnRow = document.createElement('div');
         btnRow.style.cssText = 'display:flex; gap:6px; margin-top:4px;';
@@ -1505,7 +1505,7 @@ async function renderTradeOffers() {
             acceptBtn.innerText = '✔ Kabul Et';
             acceptBtn.onclick = () => respondTradeOffer(o.id, true).then(result => {
                 if (result.ok) { renderTradeOffers(); if (typeof fetchOwnedItems === 'function') fetchOwnedItems(); if (typeof fetchWallet === 'function') fetchWallet(); }
-                else alert('Takas başarısız: ' + result.message);
+                else alert(t('Takas başarısız: ') + result.message);
             });
             let declineBtn = document.createElement('button');
             declineBtn.className = 'action-btn';
@@ -1518,7 +1518,7 @@ async function renderTradeOffers() {
             let cancelBtn = document.createElement('button');
             cancelBtn.className = 'action-btn';
             cancelBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem; background:#c0392b;';
-            cancelBtn.innerText = 'İptal Et';
+            cancelBtn.innerText = t('İptal Et');
             cancelBtn.onclick = () => cancelTradeOffer(o.id).then(ok => { if (ok) renderTradeOffers(); });
             btnRow.appendChild(cancelBtn);
         }
@@ -1556,11 +1556,11 @@ async function renderSeasonalEventBanner() {
     let ev = events[0];
     container.style.display = 'flex';
     if (ev.already_claimed) {
-        container.innerHTML = `<span>🎉 ${ev.name} - katıldın!</span>`;
+        container.innerHTML = tf('<span>🎉 {name} - katıldın!</span>', { name: ev.name });
     } else {
         container.innerHTML = `
             <span>🎉 ${ev.name}: ${ev.description}</span>
-            <button class="action-btn" style="width:auto; margin:0; padding:4px 10px; font-size:0.75rem;" onclick="handleClaimSeasonalEvent('${ev.event_key}')">Katıl</button>
+            <button class="action-btn" style="width:auto; margin:0; padding:4px 10px; font-size:0.75rem;" onclick="handleClaimSeasonalEvent('${ev.event_key}')">${t('Katıl')}</button>
         `;
     }
 }
@@ -1569,7 +1569,7 @@ async function handleClaimSeasonalEvent(eventKey) {
     let gold = await claimSeasonalEvent(eventKey);
     if (gold !== null) {
         if (typeof fetchWallet === 'function') await fetchWallet();
-        if (typeof log === 'function') log(`Etkinliğe katıldın! +${gold} altın kazandın.`, 'log-turn');
+        if (typeof log === 'function') log(tf('Etkinliğe katıldın! +{gold} altın kazandın.', { gold }), 'log-turn');
     }
     renderSeasonalEventBanner();
 }
@@ -1598,16 +1598,16 @@ async function learnTalent(talentId) {
 async function renderTalentsPanel() {
     let container = document.getElementById('talents-list');
     if (!container) return;
-    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yükleniyor…</p>';
+    container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yükleniyor…') + '</p>';
 
     let status = await fetchTalentStatus();
-    if (!status) { container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">Yüklenemedi.</p>'; return; }
+    if (!status) { container.innerHTML = '<p style="color:#7f8c8d; font-size:0.8rem;">' + t('Yüklenemedi.') + '</p>'; return; }
 
     let available = status.earned_points - status.spent_points;
     container.innerHTML = '';
     let header = document.createElement('p');
     header.style.cssText = 'font-size:0.85rem; color:#f1c40f; margin-bottom:8px;';
-    header.innerText = `Kullanılabilir Puan: ${available} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)`;
+    header.innerText = tf('Kullanılabilir Puan: {n} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)', { n: available });
     container.appendChild(header);
 
     Object.entries(TALENT_CATALOG).forEach(([id, def]) => {
@@ -1619,7 +1619,7 @@ async function renderTalentsPanel() {
             let learnBtn = document.createElement('button');
             learnBtn.className = 'action-btn';
             learnBtn.style.cssText = 'width:auto; margin:0; padding:4px 10px; font-size:0.75rem;';
-            learnBtn.innerText = 'Öğren (1 puan)';
+            learnBtn.innerText = t('Öğren (1 puan)');
             learnBtn.onclick = () => learnTalent(id).then(ok => { if (ok) renderTalentsPanel(); });
             div.querySelector('.history-stats').replaceWith(learnBtn);
         }
@@ -1661,21 +1661,21 @@ async function renderPrestigePanel() {
     let canPrestige = gold >= PRESTIGE_GOLD_THRESHOLD;
 
     container.innerHTML = `
-        <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;">Prestij Seviyesi: <b style="color:#f1c40f;">${currentPrestigeLevel}</b> (+%${bonusPct} kalıcı altın kazanımı)</p>
-        <p style="font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;">${PRESTIGE_GOLD_THRESHOLD} altına ulaşınca altınını sıfırlayıp kalıcı bir bonus kazanabilirsin.</p>
+        <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;">${tf('Prestij Seviyesi: <b style="color:#f1c40f;">{level}</b> (+%{pct} kalıcı altın kazanımı)', { level: currentPrestigeLevel, pct: bonusPct })}</p>
+        <p style="font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;">${tf('{threshold} altına ulaşınca altınını sıfırlayıp kalıcı bir bonus kazanabilirsin.', { threshold: PRESTIGE_GOLD_THRESHOLD })}</p>
         <button class="action-btn" style="width:100%; margin:0;" ${canPrestige ? '' : 'disabled'} onclick="handlePrestige()">🌟 Prestij Yap (${gold}/${PRESTIGE_GOLD_THRESHOLD} 🪙)</button>
     `;
 }
 
 async function handlePrestige() {
-    if (!confirm(`Prestij yaparsan altının 0'a sıfırlanacak ama kalıcı olarak +%5 daha fazla altın kazanacaksın. Devam etmek istiyor musun?`)) return;
+    if (!confirm(t("Prestij yaparsan altının 0'a sıfırlanacak ama kalıcı olarak +%5 daha fazla altın kazanacaksın. Devam etmek istiyor musun?"))) return;
     let newLevel = await doPrestige();
     if (newLevel !== null) {
         if (typeof fetchWallet === 'function') await fetchWallet();
-        if (typeof log === 'function') log(`Prestij ${newLevel}. seviyeye ulaştın! Artık +%${newLevel * 5} kalıcı altın kazanıyorsun.`, 'log-turn');
+        if (typeof log === 'function') log(tf('Prestij {level}. seviyeye ulaştın! Artık +%{pct} kalıcı altın kazanıyorsun.', { level: newLevel, pct: newLevel * 5 }), 'log-turn');
         renderPrestigePanel();
     } else {
-        alert('Prestij yapılamadı - yeterli altının olmayabilir.');
+        alert(t('Prestij yapılamadı - yeterli altının olmayabilir.'));
     }
 }
 
