@@ -52,57 +52,60 @@
 <body>
     <div id="auth-gate" style="display:none; position:fixed; inset:0; z-index:90; background:#0f1720; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
         <div style="max-width:380px; width:100%; background:#1b2735; border:1px solid #34495e; border-radius:10px; padding:24px; box-sizing:border-box;">
-            <h2 style="color:var(--accent); margin-top:0;">🗡️ Pixel Dungeon</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="color:var(--accent); margin:0;">🗡️ Pixel Dungeon</h2>
+                <button class="help-btn lang-toggle-btn" onclick="toggleLanguage()" title="Dili değiştir / Switch language">🇬🇧 EN</button>
+            </div>
             <p id="gate-status-msg" style="font-size:0.8rem; color:#f1c40f; min-height:1.1em;"></p>
             <div id="gate-turnstile" style="display:flex; justify-content:center; margin-bottom:8px;"></div>
 
             <div id="gate-view-choice">
-                <p style="font-size:0.85rem; color:#bdc3c7;">Devam etmeden önce bir seçenek belirle - böylece mevcut bir hesabın varsa ilerlemene hemen ulaşabilirsin.</p>
-                <button class="action-btn" onclick="showGateView('login')">Giriş Yap</button>
-                <button class="action-btn" onclick="showGateView('register')" style="background:#34495e; color:#fff;">Hesap Oluştur</button>
-                <button class="loot-btn" style="width:100%;" onclick="gateContinueAsGuest()">Misafir Olarak Devam Et</button>
+                <p data-i18n-en="Pick an option before continuing - so if you already have an account, you can jump straight to your progress." style="font-size:0.85rem; color:#bdc3c7;">Devam etmeden önce bir seçenek belirle - böylece mevcut bir hesabın varsa ilerlemene hemen ulaşabilirsin.</p>
+                <button data-i18n-en="Log In" class="action-btn" onclick="showGateView('login')">Giriş Yap</button>
+                <button data-i18n-en="Create Account" class="action-btn" onclick="showGateView('register')" style="background:#34495e; color:#fff;">Hesap Oluştur</button>
+                <button data-i18n-en="Continue as Guest" class="loot-btn" style="width:100%;" onclick="gateContinueAsGuest()">Misafir Olarak Devam Et</button>
                 <p style="text-align:center; margin-top:10px;">
-                    <a href="#" onclick="toggleModal('privacy-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">🔒 Gizlilik Politikası</a>
+                    <a href="#" data-i18n-en="🔒 Privacy Policy" onclick="toggleModal('privacy-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">🔒 Gizlilik Politikası</a>
                     <span style="color:#7f8c8d; font-size:0.75rem;"> · </span>
-                    <a href="#" onclick="toggleModal('terms-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">📜 Kullanım Şartları</a>
+                    <a href="#" data-i18n-en="📜 Terms of Service" onclick="toggleModal('terms-modal'); return false;" style="color:#7f8c8d; font-size:0.75rem;">📜 Kullanım Şartları</a>
                 </p>
             </div>
 
             <div id="gate-view-login" style="display:none;">
-                <input id="gate-login-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <input id="gate-login-password" type="password" placeholder="Şifre" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="action-btn" onclick="handleGateLogin()">Giriş Yap</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('forgot')">Şifremi Unuttum</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
+                <input id="gate-login-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <input id="gate-login-password" type="password" placeholder="Şifre" data-i18n-placeholder-en="Password" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Log In" class="action-btn" onclick="handleGateLogin()">Giriş Yap</button>
+                <button data-i18n-en="Forgot Password" class="loot-btn" style="width:100%;" onclick="showGateView('forgot')">Şifremi Unuttum</button>
+                <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
             </div>
 
             <div id="gate-view-register" style="display:none;">
-                <input id="gate-register-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <input id="gate-register-password" type="password" placeholder="Şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="action-btn" onclick="handleGateRegister()">Kod Gönder</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
+                <input id="gate-register-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <input id="gate-register-password" type="password" placeholder="Şifre (en az 6 karakter)" data-i18n-placeholder-en="Password (min. 6 characters)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Send Code" class="action-btn" onclick="handleGateRegister()">Kod Gönder</button>
+                <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
             </div>
 
             <div id="gate-view-verify" style="display:none;">
-                <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine gönderilen kodu gir.</p>
-                <input id="gate-verify-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="action-btn" onclick="handleGateVerify()">Doğrula</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
+                <p data-i18n-en="Enter the code sent to your email." style="font-size:0.8rem; color:#bdc3c7;">Email adresine gönderilen kodu gir.</p>
+                <input id="gate-verify-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" data-i18n-placeholder-en="Code" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Verify" class="action-btn" onclick="handleGateVerify()">Doğrula</button>
+                <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showGateView('choice')">◀ Geri</button>
             </div>
 
             <div id="gate-view-forgot" style="display:none;">
-                <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine bir sıfırlama kodu gönderelim.</p>
-                <input id="gate-forgot-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="action-btn" onclick="handleGateForgotPassword()">Kod Gönder</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('login')">◀ Geri</button>
+                <p data-i18n-en="We'll send a reset code to your email." style="font-size:0.8rem; color:#bdc3c7;">Email adresine bir sıfırlama kodu gönderelim.</p>
+                <input id="gate-forgot-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Send Code" class="action-btn" onclick="handleGateForgotPassword()">Kod Gönder</button>
+                <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showGateView('login')">◀ Geri</button>
             </div>
 
             <div id="gate-view-reset" style="display:none;">
-                <p style="font-size:0.8rem; color:#bdc3c7;">Email'ine gelen kodu ve yeni şifreni gir.</p>
-                <input id="gate-reset-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <input id="gate-reset-password" type="password" placeholder="Yeni şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="action-btn" onclick="handleGateResetPassword()">Şifreyi Değiştir</button>
-                <button class="loot-btn" style="width:100%;" onclick="showGateView('login')">◀ Geri</button>
+                <p data-i18n-en="Enter the code you received and your new password." style="font-size:0.8rem; color:#bdc3c7;">Email'ine gelen kodu ve yeni şifreni gir.</p>
+                <input id="gate-reset-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" data-i18n-placeholder-en="Code" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <input id="gate-reset-password" type="password" placeholder="Yeni şifre (en az 6 karakter)" data-i18n-placeholder-en="New password (min. 6 characters)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Change Password" class="action-btn" onclick="handleGateResetPassword()">Şifreyi Değiştir</button>
+                <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showGateView('login')">◀ Geri</button>
             </div>
         </div>
     </div>
@@ -113,234 +116,234 @@
             <span class="close-modal" onclick="toggleModal('info-modal')">×</span>
 
             <div class="modal-section">
-                <h2 class="modal-title">📜 SAVAŞ KILAVUZU</h2>
-                <p><b>Pixel Dungeon</b>'a hoş geldin. Amacın sonsuz canavar dalgalarını yenmek. Canın 0'a düşerse kaybedersin.</p>
-                <div class="tip-box">
+                <h2 class="modal-title" data-i18n-en="📜 BATTLE MANUAL">📜 SAVAŞ KILAVUZU</h2>
+                <p data-i18n-en="Welcome to <b>Pixel Dungeon</b>. Your goal is to defeat endless waves of monsters. You lose if your health reaches 0."><b>Pixel Dungeon</b>'a hoş geldin. Amacın sonsuz canavar dalgalarını yenmek. Canın 0'a düşerse kaybedersin.</p>
+                <div class="tip-box" data-i18n-en="<b>Core Loop:</b> Pick a Class ➡ Fight ➡ Win ➡ Choose an item to boost your stats ➡ Repeat.">
                     <b>Çekirdek Döngü:</b> Sınıf Seç ➡ Savaş ➡ Kazan ➡ Statlarını yükseltecek eşya seç ➡ Tekrarla.
                 </div>
-                <button class="action-btn" style="margin-top:8px;" onclick="replayTutorial()">🔰 Hızlı Başlangıç Turunu Tekrar Göster</button>
+                <button data-i18n-en="🔰 Show Quick Start Tour Again" class="action-btn" style="margin-top:8px;" onclick="replayTutorial()">🔰 Hızlı Başlangıç Turunu Tekrar Göster</button>
             </div>
 
             <div class="modal-section">
-                <h4>🦸 KAHRAMAN SINIFLARI</h4>
+                <h4 data-i18n-en="🦸 HERO CLASSES">🦸 KAHRAMAN SINIFLARI</h4>
                 <table class="class-table">
                     <tr>
                         <td class="class-icon">🛡️</td>
-                        <td><b>Warrior (Tank)</b><br>Bonus Zırh ile başlar. Ult, Zırhına göre hasar verir.</td>
+                        <td data-i18n-en="<b>Warrior (Tank)</b><br>Starts with bonus Armor. Ult deals damage based on your Armor."><b>Warrior (Tank)</b><br>Bonus Zırh ile başlar. Ult, Zırhına göre hasar verir.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🪓</td>
-                        <td><b>Berserker (Risk)</b><br>Yüksek hasar, ama +%25 hasar alır. Ult kendine zarar verip çift hasar verir.</td>
+                        <td data-i18n-en="<b>Berserker (Risk)</b><br>High damage, but takes +25% damage. Ult hurts itself for double damage."><b>Berserker (Risk)</b><br>Yüksek hasar, ama +%25 hasar alır. Ult kendine zarar verip çift hasar verir.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🗡️</td>
-                        <td><b>Rogue (Kombo)</b><br>Hızlı Enerji kazanır. Ult, <b>Anlık Ekstra Tur</b> tetikler.</td>
+                        <td data-i18n-en="<b>Rogue (Combo)</b><br>Gains Energy fast. Ult triggers an <b>Instant Extra Turn</b>."><b>Rogue (Kombo)</b><br>Hızlı Enerji kazanır. Ult, <b>Anlık Ekstra Tur</b> tetikler.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🏹</td>
-                        <td><b>Archer (Nişancı)</b><br>%20 Savuşturma Şansı. Ult, <b>Zırhı Yok Sayar</b> (Doğrudan Can Hasarı).</td>
+                        <td data-i18n-en="<b>Archer (Marksman)</b><br>20% Dodge Chance. Ult <b>Ignores Armor</b> (Direct HP Damage)."><b>Archer (Nişancı)</b><br>%20 Savuşturma Şansı. Ult, <b>Zırhı Yok Sayar</b> (Doğrudan Can Hasarı).</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🧙</td>
-                        <td><b>Mage (Ölçekleyici)</b><br>Ult, her kullanımda <b>+10 Kalıcı Güç</b> kazanır.</td>
+                        <td data-i18n-en="<b>Mage (Scaler)</b><br>Ult gains <b>+10 Permanent Power</b> every time it's used."><b>Mage (Ölçekleyici)</b><br>Ult, her kullanımda <b>+10 Kalıcı Güç</b> kazanır.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">🧟</td>
-                        <td><b>Necromancer (Can Emme)</b><br>+%3 Can Çalma, +8 Kafatası Hasarı. Ult hasar verir ve <b>yarısını iyileştirir</b>.</td>
+                        <td data-i18n-en="<b>Necromancer (Lifesteal)</b><br>+3% Lifesteal, +8 Skull Damage. Ult deals damage and <b>heals half of it back</b>."><b>Necromancer (Can Emme)</b><br>+%3 Can Çalma, +8 Kafatası Hasarı. Ult hasar verir ve <b>yarısını iyileştirir</b>.</td>
                     </tr>
                     <tr>
                         <td class="class-icon">⚜️</td>
-                        <td><b>Paladin (Kalkan)</b><br>+3 Zırh, +3 İyileşme, <b>%15 daha az</b> hasar alır. Ult büyük iyileştirir, biraz hasar verir.</td>
+                        <td data-i18n-en="<b>Paladin (Shield)</b><br>+3 Armor, +3 Healing, takes <b>15% less</b> damage. Ult heals a lot, deals a bit of damage."><b>Paladin (Kalkan)</b><br>+3 Zırh, +3 İyileşme, <b>%15 daha az</b> hasar alır. Ult büyük iyileştirir, biraz hasar verir.</td>
                     </tr>
                 </table>
             </div>
 
             <div class="modal-section">
-                <h4>💠 TAŞ EFEKTLERİ</h4>
+                <h4 data-i18n-en="💠 TILE EFFECTS">💠 TAŞ EFEKTLERİ</h4>
                 <div class="manual-grid">
                     <div class="manual-tile">
                         <div class="manual-icon">⚔️</div>
-                        <div class="manual-desc"><b>KILIÇ</b><br>Fiziksel hasar verir. Zırh tarafından engellenir.</div>
+                        <div class="manual-desc" data-i18n-en="<b>SWORD</b><br>Deals physical damage. Blocked by Armor."><b>KILIÇ</b><br>Fiziksel hasar verir. Zırh tarafından engellenir.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">🛡️</div>
-                        <div class="manual-desc"><b>KALKAN</b><br>Zırh ekler. Zırh, candan önce hasar alır.</div>
+                        <div class="manual-desc" data-i18n-en="<b>SHIELD</b><br>Adds Armor. Armor takes damage before HP."><b>KALKAN</b><br>Zırh ekler. Zırh, candan önce hasar alır.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">💖</div>
-                        <div class="manual-desc"><b>KALP</b><br>Canını iyileştirir. Maksimum Canı geçemez.</div>
+                        <div class="manual-desc" data-i18n-en="<b>HEART</b><br>Heals your HP. Can't exceed Max HP."><b>KALP</b><br>Canını iyileştirir. Maksimum Canı geçemez.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">⚡</div>
-                        <div class="manual-desc"><b>ENERJİ</b><br>Ultimate'i şarj eder. <br><b style="color:#e74c3c;">(Düşmanlar bunu YİYEREK iyileşir!)</b></div>
+                        <div class="manual-desc" data-i18n-en="<b>ENERGY</b><br>Charges your Ultimate. <br><b style='color:#e74c3c;'>(Enemies heal by EATING this!)</b>"><b>ENERJİ</b><br>Ultimate'i şarj eder. <br><b style="color:#e74c3c;">(Düşmanlar bunu YİYEREK iyileşir!)</b></div>
                     </div>
                 </div>
                 <div class="manual-tile" style="margin-top: 5px; border-color: #e74c3c;">
                     <div class="manual-icon">💀</div>
-                    <div class="manual-desc"><b>KAFATASI (Yüksek Risk)</b><br>Düşmana büyük hasar verir, ama sana da <b>Geri Tepme Hasarı</b> verir. Canın azken dikkatli ol!</div>
+                    <div class="manual-desc" data-i18n-en="<b>SKULL (High Risk)</b><br>Deals huge damage to the enemy, but also deals <b>Recoil Damage</b> to you. Be careful when your HP is low!"><b>KAFATASI (Yüksek Risk)</b><br>Düşmana büyük hasar verir, ama sana da <b>Geri Tepme Hasarı</b> verir. Canın azken dikkatli ol!</div>
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>📊 STATLAR AÇIKLAMASI</h4>
+                <h4 data-i18n-en="📊 STAT EXPLANATIONS">📊 STATLAR AÇIKLAMASI</h4>
                 <div class="stat-explain">
-                    <div><b>⚔️ Kılıç:</b> Taş başına hasar.</div>
-                    <div><b>🛡️ Kalkan:</b> Taş başına zırh kazancı.</div>
-                    <div><b>💖 Kalp:</b> Taş başına iyileşme.</div>
-                    <div><b>⚡ Enerji:</b> Taş başına Ult Şarj %.</div>
-                    <div><b>💀 Kafatası Hasarı:</b> Kafatasıyla rakibe verdiğin hasar.</div>
-                    <div><b>☠️ Kafatası Öz Hasarı:</b> Kafatasıyla kendine verdiğin hasar.</div>
-                    <div><b>💥 Ult Gücü:</b> Ultimate'in temel hasarı.</div>
-                    <div><b>🧛 Can Çalma:</b> Verilen hasarın % kaçı cana döner.</div>
+                    <div data-i18n-en="<b>⚔️ Sword:</b> Damage per tile."><b>⚔️ Kılıç:</b> Taş başına hasar.</div>
+                    <div data-i18n-en="<b>🛡️ Shield:</b> Armor gained per tile."><b>🛡️ Kalkan:</b> Taş başına zırh kazancı.</div>
+                    <div data-i18n-en="<b>💖 Heart:</b> Healing per tile."><b>💖 Kalp:</b> Taş başına iyileşme.</div>
+                    <div data-i18n-en="<b>⚡ Energy:</b> Ult Charge % per tile."><b>⚡ Enerji:</b> Taş başına Ult Şarj %.</div>
+                    <div data-i18n-en="<b>💀 Skull Damage:</b> Damage you deal to the opponent with a Skull."><b>💀 Kafatası Hasarı:</b> Kafatasıyla rakibe verdiğin hasar.</div>
+                    <div data-i18n-en="<b>☠️ Skull Self-Damage:</b> Damage you deal to yourself with a Skull."><b>☠️ Kafatası Öz Hasarı:</b> Kafatasıyla kendine verdiğin hasar.</div>
+                    <div data-i18n-en="<b>💥 Ult Power:</b> The Ultimate's base damage."><b>💥 Ult Gücü:</b> Ultimate'in temel hasarı.</div>
+                    <div data-i18n-en="<b>🧛 Lifesteal:</b> % of damage dealt that returns as HP."><b>🧛 Can Çalma:</b> Verilen hasarın % kaçı cana döner.</div>
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🔥 KOMBOLAR & TURLAR (KRİTİK!)</h4>
-                <p>Kombolara hakim olmak, yüksek seviyelerde hayatta kalmanın tek yolu.</p>
+                <h4 data-i18n-en="🔥 COMBOS & TURNS (CRITICAL!)">🔥 KOMBOLAR & TURLAR (KRİTİK!)</h4>
+                <p data-i18n-en="Mastering combos is the only way to survive at higher levels.">Kombolara hakim olmak, yüksek seviyelerde hayatta kalmanın tek yolu.</p>
                 <table class="stat-table">
                     <tr>
-                        <td>3'lü Eşleşme</td>
-                        <td>1x Etki. Tur düşmana geçer.</td>
+                        <td data-i18n-en="3-Match">3'lü Eşleşme</td>
+                        <td data-i18n-en="1x Effect. Turn passes to opponent.">1x Etki. Tur düşmana geçer.</td>
                     </tr>
                     <tr>
-                        <td>4'lü Eşleşme</td>
-                        <td><b>2x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
+                        <td data-i18n-en="4-Match">4'lü Eşleşme</td>
+                        <td data-i18n-en="<b>2x Effect</b> + <b style='color:#2ecc71'>EXTRA TURN</b>."><b>2x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>L / T Şekli</td>
-                        <td><b>2.5x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
+                        <td data-i18n-en="L / T Shape">L / T Şekli</td>
+                        <td data-i18n-en="<b>2.5x Effect</b> + <b style='color:#2ecc71'>EXTRA TURN</b>."><b>2.5x Etki</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>5'li Eşleşme</td>
-                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%30</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
+                        <td data-i18n-en="5-Match">5'li Eşleşme</td>
+                        <td data-i18n-en="<b>3x Effect</b> + <b style='color:#f1c40f'>ULT +30%</b> + <b style='color:#2ecc71'>EXTRA TURN</b>."><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%30</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>6'lı Eşleşme</td>
-                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%60</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
+                        <td data-i18n-en="6-Match">6'lı Eşleşme</td>
+                        <td data-i18n-en="<b>3x Effect</b> + <b style='color:#f1c40f'>ULT +60%</b> + <b style='color:#2ecc71'>EXTRA TURN</b>."><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%60</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                     <tr>
-                        <td>7'li Eşleşme</td>
-                        <td><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%90</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
+                        <td data-i18n-en="7-Match">7'li Eşleşme</td>
+                        <td data-i18n-en="<b>3x Effect</b> + <b style='color:#f1c40f'>ULT +90%</b> + <b style='color:#2ecc71'>EXTRA TURN</b>."><b>3x Etki</b> + <b style="color:#f1c40f">ULT +%90</b> + <b style="color:#2ecc71">EKSTRA TUR</b>.</td>
                     </tr>
                 </table>
             </div>
 
             <div class="modal-section">
-                <h4>⚡ HIZ BONUSU</h4>
-                <p>Sıran geldiği anda bir geri sayım başlar. Hamleni ne kadar hızlı yaparsan, o hamlenin (ve tetiklediği zincirleme etkilerin) çarpanı o kadar büyür - <b>x2.0</b>'a kadar.</p>
-                <div class="tip-box">
+                <h4 data-i18n-en="⚡ SPEED BONUS">⚡ HIZ BONUSU</h4>
+                <p data-i18n-en="A countdown starts the moment it's your turn. The faster you make your move, the bigger the multiplier on it (and any chain reaction it triggers) - up to <b>x2.0</b>.">Sıran geldiği anda bir geri sayım başlar. Hamleni ne kadar hızlı yaparsan, o hamlenin (ve tetiklediği zincirleme etkilerin) çarpanı o kadar büyür - <b>x2.0</b>'a kadar.</p>
+                <div class="tip-box" data-i18n-en="<b>No Pressure:</b> Running out of time doesn't cost your turn - the bonus just resets to a neutral x1. Play fast for big hits, or take your time. This bonus is yours alone; enemies never get it.">
                     <b>Baskı Yok:</b> Sürenin dolması turunu kaybettirmez - bonus sadece nötr x1'e geri döner. Büyük vuruşlar için hızlı oyna, ya da vaktini al. Bu bonus sadece sana ait; düşmanlar bunu alamaz.
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🧠 DÜŞMAN YAPAY ZEKASI</h4>
+                <h4 data-i18n-en="🧠 ENEMY AI">🧠 DÜŞMAN YAPAY ZEKASI</h4>
                 <ul>
-                    <li><b>Canavarlar:</b> Rastgele hamleler yapar. İyi bir hamleyi kaçırma şansı %30.</li>
-                    <li><b>Boss'lar (Sv. 5, 10...):</b> Oldukça zeki. 4'lü eşleşmeleri ve Kafatasını önceliklendirir.</li>
-                    <li><b>Bağımsız Statlar:</b> Düşmanların kendi Kılıç/Kalkan/İyileşme/Enerji/Kafatası statları var, seviyeyle birlikte ölçeklenir (boss'larda daha da sıçrar) - senin eşya yükseltmelerin sadece seni güçlendirir, onları değil.</li>
-                    <li><b>Zırh:</b> Bir düşmanın Zırhı varsa (Gri bar), canına (Kırmızı bar) zarar vermeden önce onu kırmalısın.</li>
-                    <li><b>Enerji Engeli:</b> Düşmanlar Ultimate KULLANAMAZ. ⚡ Enerji eşleştirirlerse, bunun yerine <b>İyileşir</b>. Onlara Enerji bırakma!</li>
+                    <li data-i18n-en="<b>Monsters:</b> Make random moves. 30% chance to miss a good move."><b>Canavarlar:</b> Rastgele hamleler yapar. İyi bir hamleyi kaçırma şansı %30.</li>
+                    <li data-i18n-en="<b>Bosses (Lvl. 5, 10...):</b> Quite smart. Prioritizes 4-matches and Skulls."><b>Boss'lar (Sv. 5, 10...):</b> Oldukça zeki. 4'lü eşleşmeleri ve Kafatasını önceliklendirir.</li>
+                    <li data-i18n-en="<b>Independent Stats:</b> Enemies have their own Sword/Shield/Heal/Energy/Skull stats that scale with level (jumping even more on bosses) - your item upgrades only make YOU stronger, not them."><b>Bağımsız Statlar:</b> Düşmanların kendi Kılıç/Kalkan/İyileşme/Enerji/Kafatası statları var, seviyeyle birlikte ölçeklenir (boss'larda daha da sıçrar) - senin eşya yükseltmelerin sadece seni güçlendirir, onları değil.</li>
+                    <li data-i18n-en="<b>Armor:</b> If an enemy has Armor (gray bar), you must break it before it starts taking HP damage (red bar)."><b>Zırh:</b> Bir düşmanın Zırhı varsa (Gri bar), canına (Kırmızı bar) zarar vermeden önce onu kırmalısın.</li>
+                    <li data-i18n-en="<b>Energy Block:</b> Enemies CANNOT use their Ultimate. If they match ⚡ Energy, they <b>Heal</b> instead. Don't leave Energy lying around for them!"><b>Enerji Engeli:</b> Düşmanlar Ultimate KULLANAMAZ. ⚡ Enerji eşleştirirlerse, bunun yerine <b>İyileşir</b>. Onlara Enerji bırakma!</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🎁 ÖDÜLLER & EŞYALAR</h4>
-                <p>Kazandıktan sonra eşya seçersin. Kalitesi performansına bağlı:</p>
+                <h4 data-i18n-en="🎁 REWARDS & ITEMS">🎁 ÖDÜLLER & EŞYALAR</h4>
+                <p data-i18n-en="After winning, you pick an item. Its quality depends on your performance:">Kazandıktan sonra eşya seçersin. Kalitesi performansına bağlı:</p>
                 <ul style="font-size: 0.85rem;">
-                    <li><b>Kusursuz (%100 Can):</b> 3 Eşya Seç (Ölçeklenme için en iyisi).</li>
-                    <li><b>İyi Zafer (%75+ Can):</b> 2 Eşya Seç.</li>
-                    <li><b>Standart Zafer:</b> 1 Eşya Seç.</li>
-                    <li><b>Ölüme Yakın (<%10 Can):</b> 3 Eşya Seç (Geri dönüş mekaniği).</li>
-                    <li><b>Son Nefes (<%1 Can):</b> 5 Eşya Seç (Geri dönüş mekaniği).</li>
-                    <li><b>Boss Öldürme Bonusu:</b> Yukarıdakine ek +1 Eşya.</li>
+                    <li data-i18n-en="<b>Flawless (100% HP):</b> Choose 3 Items (best for scaling)."><b>Kusursuz (%100 Can):</b> 3 Eşya Seç (Ölçeklenme için en iyisi).</li>
+                    <li data-i18n-en="<b>Good Victory (75%+ HP):</b> Choose 2 Items."><b>İyi Zafer (%75+ Can):</b> 2 Eşya Seç.</li>
+                    <li data-i18n-en="<b>Standard Victory:</b> Choose 1 Item."><b>Standart Zafer:</b> 1 Eşya Seç.</li>
+                    <li data-i18n-en="<b>Near Death (&lt;10% HP):</b> Choose 3 Items (comeback mechanic)."><b>Ölüme Yakın (<%10 Can):</b> 3 Eşya Seç (Geri dönüş mekaniği).</li>
+                    <li data-i18n-en="<b>Last Breath (&lt;1% HP):</b> Choose 5 Items (comeback mechanic)."><b>Son Nefes (<%1 Can):</b> 5 Eşya Seç (Geri dönüş mekaniği).</li>
+                    <li data-i18n-en="<b>Boss Kill Bonus:</b> +1 Item on top of the above."><b>Boss Öldürme Bonusu:</b> Yukarıdakine ek +1 Eşya.</li>
                 </ul>
-                <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;">
+                <div class="tip-box" style="margin-top:5px; color:#bdc3c7; border-color:#bdc3c7;" data-i18n-en="<b>Rarities:</b> <span style='color:#9d9d9d'>● Common</span>, <span style='color:#e8e8e8'>◐ Normal</span>, <span style='color:#3b82f6'>◆ Magic</span>, <span style='color:#eab308'>★ Rare</span>, <span style='color:#22c55e'>⬡ Set</span>, <span style='color:#f97316'>✦ Legendary</span>, <span style='color:#ef4444'>▲ Primal Legendary</span>, <span style='color:#14b8a6'>✧ Ethereal</span>.">
                     <b>Nadirlikler:</b> <span style="color:#9d9d9d">● Adi</span>, <span style="color:#e8e8e8">◐ Normal</span>, <span style="color:#3b82f6">◆ Sihirli</span>, <span style="color:#eab308">★ Nadir</span>, <span style="color:#22c55e">⬡ Set</span>, <span style="color:#f97316">✦ Efsanevi</span>, <span style="color:#ef4444">▲ İlksel Efsanevi</span>, <span style="color:#14b8a6">✧ Ethereal</span>.
                 </div>
-                <div class="tip-box" style="margin-top:5px;">
+                <div class="tip-box" style="margin-top:5px;" data-i18n-en="<b>Rest:</b> Before every new level, you recover 50% of your missing HP.">
                     <b>Dinlenme:</b> Her yeni seviyeden önce eksik canının %50'sini geri kazanırsın.
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🗺️ OYUN MODLARI</h4>
-                <p>Üç farklı şekilde oynayabilirsin, üstteki menüden seçersin:</p>
+                <h4 data-i18n-en="🗺️ GAME MODES">🗺️ OYUN MODLARI</h4>
+                <p data-i18n-en="You can play three different ways, pick from the top menu:">Üç farklı şekilde oynayabilirsin, üstteki menüden seçersin:</p>
                 <ul style="font-size:0.85rem;">
-                    <li><b>Solo:</b> Tek başına, sonsuz canavar dalgasına karşı. Her 5. seviyede bir boss çıkar.</li>
-                    <li><b>Co-op:</b> Bir arkadaşınla aynı zindanda, paylaşımlı tahtada omuz omuza savaşırsınız.</li>
-                    <li><b>PvP:</b> Gerçek zamanlı 1v1 düello - tek oyunculu ile aynı kurallar (eşleşme çarpanları, kombolar, sınıf ultimateleri) geçerli, ama rakibin canı sana gizli.</li>
+                    <li data-i18n-en="<b>Solo:</b> Alone, against an endless wave of monsters. A boss appears every 5th level."><b>Solo:</b> Tek başına, sonsuz canavar dalgasına karşı. Her 5. seviyede bir boss çıkar.</li>
+                    <li data-i18n-en="<b>Co-op:</b> Fight side by side with a friend in the same dungeon, on a shared board."><b>Co-op:</b> Bir arkadaşınla aynı zindanda, paylaşımlı tahtada omuz omuza savaşırsınız.</li>
+                    <li data-i18n-en="<b>PvP:</b> Real-time 1v1 duel - same rules as solo (match multipliers, combos, class ultimates) apply, but your opponent's HP is hidden from you."><b>PvP:</b> Gerçek zamanlı 1v1 düello - tek oyunculu ile aynı kurallar (eşleşme çarpanları, kombolar, sınıf ultimateleri) geçerli, ama rakibin canı sana gizli.</li>
                 </ul>
-                <div class="warning-box">
+                <div class="warning-box" data-i18n-en="<b>Watch out in Co-op:</b> A secret vote opens before every boss. Sometimes this vote can drag you into a small PvP duel against your friend - staying loyal and betraying both have their own cost/reward. We won't spoil the details here, but don't be surprised when it happens!">
                     <b>Co-op'ta dikkat:</b> Her boss öncesi gizli bir oylama açılır. Bazen bu oylama seni arkadaşına karşı küçük bir PvP düellosuna sürükleyebilir - sadık kalmanın da ihanet etmenin de kendine göre bir bedeli/ödülü var. Sürpriz bozulmasın diye detayını burada vermiyoruz, ama karşına çıkınca şaşırma!
                 </div>
             </div>
 
             <div class="modal-section">
-                <h4>🎒 EŞYA SİSTEMİ</h4>
+                <h4 data-i18n-en="🎒 ITEM SYSTEM">🎒 EŞYA SİSTEMİ</h4>
                 <ul style="font-size:0.85rem;">
-                    <li>8 kuşam yeri var: Silah, Kalkan, Miğfer, Zırh, Omuzluk, Eldiven, Çizme, Takı. <b>Sadece KUŞANDIĞIN</b> eşyaların statları sayılır - envanterinde durması yetmez.</li>
-                    <li>İsimler rastgele ama anlamlı seçilir: "Kanlı Balta" gibi önek, eşyanın en güçlü olduğu stat'a göre gelir (kan/hasar temalı önekler hasar eşyalarına, şifa temalı önekler can eşyalarına düşer).</li>
-                    <li>Her eşyanın yanında bir <b>💎 Güç</b> puanı görürsün - eşyaları hızlıca karşılaştırmanı sağlar. Kuşandıklarının toplamı Envanter ekranının üstünde yazar.</li>
-                    <li><b>⬆️ Yükselt:</b> Altın + hammadde karşılığında eşyayı bir üst nadirliğe taşır (statları yeniden belirlenir, daha güçlü olur).</li>
-                    <li><b>♻️ Hurdaya Çevir:</b> İşine yaramayan bir eşyayi hammaddeye çevirir.</li>
-                    <li><b>Set & Efsanevi eşyalar:</b> Sabit isim ve statlara sahip, çok nadir düşerler. Bir setin TÜM parçalarını kuşanınca ekstra bir bonus açılır.</li>
-                    <li><b>✨ Pasifler:</b> Her Efsanevi (turuncu), İlksel Efsanevi (kırmızı) ve Ethereal (turkuaz) eşyanın kendine has, savaş sırasında otomatik tetiklenen özel bir pasif özelliği vardır - açıklaması eşyanın üzerinde ✨ ile gösterilir.</li>
+                    <li data-i18n-en="There are 8 equip slots: Weapon, Shield, Helmet, Armor, Shoulder, Gloves, Boots, Trinket. <b>Only EQUIPPED</b> items' stats count - sitting in your inventory isn't enough.">8 kuşam yeri var: Silah, Kalkan, Miğfer, Zırh, Omuzluk, Eldiven, Çizme, Takı. <b>Sadece KUŞANDIĞIN</b> eşyaların statları sayılır - envanterinde durması yetmez.</li>
+                    <li data-i18n-en="Names are random but meaningful: a prefix like &quot;Bloody Axe&quot; comes from the item's strongest stat (blood/damage-themed prefixes go on damage items, healing-themed prefixes go on HP items).">İsimler rastgele ama anlamlı seçilir: "Kanlı Balta" gibi önek, eşyanın en güçlü olduğu stat'a göre gelir (kan/hasar temalı önekler hasar eşyalarına, şifa temalı önekler can eşyalarına düşer).</li>
+                    <li data-i18n-en="You'll see a <b>💎 Power</b> score next to every item - lets you quickly compare items. The total of what you have equipped shows above the Inventory screen.">Her eşyanın yanında bir <b>💎 Güç</b> puanı görürsün - eşyaları hızlıca karşılaştırmanı sağlar. Kuşandıklarının toplamı Envanter ekranının üstünde yazar.</li>
+                    <li data-i18n-en="<b>⬆️ Upgrade:</b> Moves an item to the next rarity tier in exchange for gold + materials (stats reroll, becomes stronger)."><b>⬆️ Yükselt:</b> Altın + hammadde karşılığında eşyayı bir üst nadirliğe taşır (statları yeniden belirlenir, daha güçlü olur).</li>
+                    <li data-i18n-en="<b>♻️ Scrap:</b> Turns an item you don't need into materials."><b>♻️ Hurdaya Çevir:</b> İşine yaramayan bir eşyayi hammaddeye çevirir.</li>
+                    <li data-i18n-en="<b>Set & Legendary items:</b> Have a fixed name and stats, drop very rarely. Equipping ALL pieces of a set unlocks an extra bonus."><b>Set & Efsanevi eşyalar:</b> Sabit isim ve statlara sahip, çok nadir düşerler. Bir setin TÜM parçalarını kuşanınca ekstra bir bonus açılır.</li>
+                    <li data-i18n-en="<b>✨ Passives:</b> Every Legendary (orange), Primal Legendary (red), and Ethereal (teal) item has its own unique passive that triggers automatically in combat - its description is shown on the item with a ✨."><b>✨ Pasifler:</b> Her Efsanevi (turuncu), İlksel Efsanevi (kırmızı) ve Ethereal (turkuaz) eşyanın kendine has, savaş sırasında otomatik tetiklenen özel bir pasif özelliği vardır - açıklaması eşyanın üzerinde ✨ ile gösterilir.</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🌳 KALICI İLERLEME</h4>
-                <p style="font-size:0.85rem;">Bu ikisi tek bir koşuyla sınırlı değil - kazandığın bonus HER koşunda seninle gelir.</p>
+                <h4 data-i18n-en="🌳 PERMANENT PROGRESSION">🌳 KALICI İLERLEME</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="These two aren't limited to a single run - the bonus you earn comes with you on EVERY run.">Bu ikisi tek bir koşuyla sınırlı değil - kazandığın bonus HER koşunda seninle gelir.</p>
                 <ul style="font-size:0.85rem;">
-                    <li><b>Yetenek Ağacı</b> (👤 Profil > Yetenekler): PvP galibiyetleri ve tamamladığın günlük görevler "yetenek puanı" kazandırır. Bu puanlarla küçük ama kalıcı bonuslar (örn. +2 Kılıç) öğrenebilirsin.</li>
-                    <li><b>Prestij</b> (🛒 Dükkan > Prestij sekmesi): 1000 altına ulaşınca açılır. Altının sıfırlanır, karşılığında kalıcı olarak daha fazla altın kazanmaya başlarsın (her prestij seviyesi bu bonusu büyütür). İstersen tekrar tekrar yapabilirsin.</li>
+                    <li data-i18n-en="<b>Talent Tree</b> (👤 Profile > Talents): PvP wins and completed daily quests earn &quot;talent points&quot;. Use these points to learn small but permanent bonuses (e.g. +2 Sword)."><b>Yetenek Ağacı</b> (👤 Profil > Yetenekler): PvP galibiyetleri ve tamamladığın günlük görevler "yetenek puanı" kazandırır. Bu puanlarla küçük ama kalıcı bonuslar (örn. +2 Kılıç) öğrenebilirsin.</li>
+                    <li data-i18n-en="<b>Prestige</b> (🛒 Shop > Prestige tab): Unlocks once you reach 1000 gold. Your gold resets, but in exchange you start permanently earning more gold (each prestige level grows this bonus). You can do it again and again if you want."><b>Prestij</b> (🛒 Dükkan > Prestij sekmesi): 1000 altına ulaşınca açılır. Altının sıfırlanır, karşılığında kalıcı olarak daha fazla altın kazanmaya başlarsın (her prestij seviyesi bu bonusu büyütür). İstersen tekrar tekrar yapabilirsin.</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🎁 GÜNLÜK & ÖZEL ETKİNLİKLER</h4>
+                <h4 data-i18n-en="🎁 DAILY & SPECIAL EVENTS">🎁 GÜNLÜK & ÖZEL ETKİNLİKLER</h4>
                 <ul style="font-size:0.85rem;">
-                    <li><b>Günlük Ödül:</b> Her gün giriş yap, seri arttıkça ödül büyür (7. günden sonra sabitlenir). Bir gün atlarsan seri sıfırlanır.</li>
-                    <li><b>Günlük Görevler:</b> Her gün yenilenen küçük hedefler (bir boss öldür, bir PvP maçı kazan, ultimate kullan) - tamamlayınca altın kazandırır, aynı zamanda yetenek puanı sayılır.</li>
-                    <li><b>Sezonluk Etkinlikler:</b> Zaman zaman sınırlı süreli özel etkinlikler açılır, ekranın üst kısmında sarı bir bantla duyurulur - kaçırmadan katıl!</li>
+                    <li data-i18n-en="<b>Daily Reward:</b> Log in every day, the reward grows as your streak grows (caps after day 7). Missing a day resets the streak."><b>Günlük Ödül:</b> Her gün giriş yap, seri arttıkça ödül büyür (7. günden sonra sabitlenir). Bir gün atlarsan seri sıfırlanır.</li>
+                    <li data-i18n-en="<b>Daily Quests:</b> Small goals that refresh every day (kill a boss, win a PvP match, use your ultimate) - completing them grants gold and also counts as talent points."><b>Günlük Görevler:</b> Her gün yenilenen küçük hedefler (bir boss öldür, bir PvP maçı kazan, ultimate kullan) - tamamlayınca altın kazandırır, aynı zamanda yetenek puanı sayılır.</li>
+                    <li data-i18n-en="<b>Seasonal Events:</b> Limited-time special events open up now and then, announced with a yellow banner at the top of the screen - don't miss out!"><b>Sezonluk Etkinlikler:</b> Zaman zaman sınırlı süreli özel etkinlikler açılır, ekranın üst kısmında sarı bir bantla duyurulur - kaçırmadan katıl!</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>👥 ARKADAŞLAR, LONCA & TAKAS</h4>
+                <h4 data-i18n-en="👥 FRIENDS, GUILD & TRADE">👥 ARKADAŞLAR, LONCA & TAKAS</h4>
                 <ul style="font-size:0.85rem;">
-                    <li><b>Arkadaş Ekle:</b> Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için önce kendi takma adını Lider Tablosu'ndan belirlemen gerekir.</li>
-                    <li><b>Mesajlaşma:</b> Kabul ettiğin arkadaşlarınla sohbet edebilirsin (💬 simgesi).</li>
-                    <li><b>Lonca:</b> Bir lonca kur ya da mevcut birine katıl - aynı anda sadece bir loncada olabilirsin.</li>
-                    <li><b>Takas:</b> Bir arkadaşınla eşya ve/veya altın takas edebilirsin (🔄 simgesi) - o an envanterinde neler olduğunu görüp karşılığında bir şey isteyebilirsin.</li>
+                    <li data-i18n-en="<b>Add Friend:</b> Type a player's nickname and send a request. For friends to find you, you first need to set your own nickname from the Leaderboard."><b>Arkadaş Ekle:</b> Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için önce kendi takma adını Lider Tablosu'ndan belirlemen gerekir.</li>
+                    <li data-i18n-en="<b>Messaging:</b> You can chat with friends you've accepted (💬 icon)."><b>Mesajlaşma:</b> Kabul ettiğin arkadaşlarınla sohbet edebilirsin (💬 simgesi).</li>
+                    <li data-i18n-en="<b>Guild:</b> Found a guild or join an existing one - you can only be in one guild at a time."><b>Lonca:</b> Bir lonca kur ya da mevcut birine katıl - aynı anda sadece bir loncada olabilirsin.</li>
+                    <li data-i18n-en="<b>Trade:</b> Trade items and/or gold with a friend (🔄 icon) - see what's currently in their inventory and ask for something in return."><b>Takas:</b> Bir arkadaşınla eşya ve/veya altın takas edebilirsin (🔄 simgesi) - o an envanterinde neler olduğunu görüp karşılığında bir şey isteyebilirsin.</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🗡️ PvP DETAYLARI</h4>
+                <h4 data-i18n-en="🗡️ PvP DETAILS">🗡️ PvP DETAYLARI</h4>
                 <ul style="font-size:0.85rem;">
-                    <li><b>⚡ Hızlı Eşleşme:</b> Tek tuşla rastgele bir rakip ara - sıraya girersin, uygun biri bulununca otomatik eşleşirsin.</li>
-                    <li><b>Oda Kodu:</b> Bir arkadaşınla önceden kararlaştırdığınız bir kodu ikiniz de yazarsanız otomatik eşleşirsiniz.</li>
-                    <li><b>Derece (Rating):</b> Her PvP maçı derecenizi değiştirir - kazanınca artar, kaybedince azalır. Değişim miktarı rakibinizin gücüne göre farklılık gösterir (güçlü birini yenmek daha çok puan kazandırır).</li>
-                    <li><b>👁️ İzleyici Modu:</b> Devam eden bir maçı sadece izlemek istersen, oda kodunu yazıp "İzle"ye basman yeterli - oynayamazsın ama canlı takip edebilirsin.</li>
+                    <li data-i18n-en="<b>⚡ Quick Match:</b> Search for a random opponent with one button - you join a queue, and are matched automatically once someone suitable is found."><b>⚡ Hızlı Eşleşme:</b> Tek tuşla rastgele bir rakip ara - sıraya girersin, uygun biri bulununca otomatik eşleşirsin.</li>
+                    <li data-i18n-en="<b>Room Code:</b> Agree on a code with a friend beforehand - if you both type it, you're matched automatically."><b>Oda Kodu:</b> Bir arkadaşınla önceden kararlaştırdığınız bir kodu ikiniz de yazarsanız otomatik eşleşirsiniz.</li>
+                    <li data-i18n-en="<b>Rating:</b> Every PvP match changes your rating - it goes up on a win, down on a loss. The amount depends on your opponent's strength (beating a stronger player earns more points)."><b>Derece (Rating):</b> Her PvP maçı derecenizi değiştirir - kazanınca artar, kaybedince azalır. Değişim miktarı rakibinizin gücüne göre farklılık gösterir (güçlü birini yenmek daha çok puan kazandırır).</li>
+                    <li data-i18n-en="<b>👁️ Spectator Mode:</b> If you just want to watch an ongoing match, type the room code and press &quot;Watch&quot; - you can't play, but you can follow along live."><b>👁️ İzleyici Modu:</b> Devam eden bir maçı sadece izlemek istersen, oda kodunu yazıp "İzle"ye basman yeterli - oynayamazsın ama canlı takip edebilirsin.</li>
                 </ul>
             </div>
 
             <div class="modal-section">
-                <h4>🏅 UNVANLAR, SIRALAMALAR & BAŞARIMLAR</h4>
+                <h4 data-i18n-en="🏅 TITLES, RANKINGS & ACHIEVEMENTS">🏅 UNVANLAR, SIRALAMALAR & BAŞARIMLAR</h4>
                 <ul style="font-size:0.85rem;">
-                    <li><b>Unvanlar:</b> Belirli hedefleri tutturunca (yüksek PvP derecesi, çok altın, lonca lideri olmak, bir arkadaş edinmek...) yeni bir unvan açılır. Beğendiğini kuşanabilirsin - adının yanında herkese görünür.</li>
-                    <li><b>Lider Tablosu:</b> En çok altına sahip 10 oyuncu.</li>
-                    <li><b>PvP Sıralaması:</b> En yüksek PvP derecesine sahip 10 oyuncu.</li>
-                    <li><b>Başarımlar:</b> Zorlu anları başardığında (bir boss öldürmek, %100 canla kazanmak...) kalıcı olarak kaydedilir ve küçük bir stat bonusu verir. Bu bonus sadece <b>o anki koşunda</b> aktiftir - ölünce sıfırlanır, ama bir dahaki koşunda aynı şeyi tekrar başarırsan geri gelir.</li>
+                    <li data-i18n-en="<b>Titles:</b> Hitting certain milestones (high PvP rating, lots of gold, being a guild leader, making a friend...) unlocks a new title. You can equip the one you like - it shows next to your name for everyone to see."><b>Unvanlar:</b> Belirli hedefleri tutturunca (yüksek PvP derecesi, çok altın, lonca lideri olmak, bir arkadaş edinmek...) yeni bir unvan açılır. Beğendiğini kuşanabilirsin - adının yanında herkese görünür.</li>
+                    <li data-i18n-en="<b>Leaderboard:</b> The top 10 players with the most gold."><b>Lider Tablosu:</b> En çok altına sahip 10 oyuncu.</li>
+                    <li data-i18n-en="<b>PvP Ranking:</b> The top 10 players with the highest PvP rating."><b>PvP Sıralaması:</b> En yüksek PvP derecesine sahip 10 oyuncu.</li>
+                    <li data-i18n-en="<b>Achievements:</b> Pulling off a tough moment (killing a boss, winning at 100% HP...) is recorded permanently and gives a small stat bonus. This bonus is only active <b>during that run</b> - it resets when you die, but comes back if you pull off the same feat again on your next run."><b>Başarımlar:</b> Zorlu anları başardığında (bir boss öldürmek, %100 canla kazanmak...) kalıcı olarak kaydedilir ve küçük bir stat bonusu verir. Bu bonus sadece <b>o anki koşunda</b> aktiftir - ölünce sıfırlanır, ama bir dahaki koşunda aynı şeyi tekrar başarırsan geri gelir.</li>
                 </ul>
             </div>
 
             <div class="modal-section" style="border-bottom:none;">
-                <h4>👤 NEREDE NE VAR?</h4>
-                <p style="font-size:0.85rem;">Üst menüde çok fazla buton birikmesin diye bazı ekranlar <b>"👤 Profil"</b> menüsünün altında toplandı: Lider Tablosu, Arkadaşlar, Lonca, Unvanlar, Yetenekler, Takaslar, Başarımlar ve Loot/Stats oradan açılır.</p>
+                <h4 data-i18n-en="👤 WHERE'S WHAT?">👤 NEREDE NE VAR?</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="So the top menu doesn't get cluttered with buttons, some screens were moved under the <b>&quot;👤 Profile&quot;</b> menu: Leaderboard, Friends, Guild, Titles, Talents, Trades, Achievements, and Loot/Stats all open from there.">Üst menüde çok fazla buton birikmesin diye bazı ekranlar <b>"👤 Profil"</b> menüsünün altında toplandı: Lider Tablosu, Arkadaşlar, Lonca, Unvanlar, Yetenekler, Takaslar, Başarımlar ve Loot/Stats oradan açılır.</p>
             </div>
         </div>
     </div>
@@ -350,56 +353,56 @@
             <span class="close-modal" onclick="tutorialSkip()">×</span>
 
             <div class="tutorial-step" data-step="1">
-                <h2 class="modal-title">👋 Pixel Dungeon'a Hoş Geldin</h2>
-                <p>Bu, taşları eşleştirerek savaştığın bir zindan macerası. Amacın sonsuz canavar dalgalarını yenmek - canın 0'a düşerse macera biter.</p>
-                <div class="tip-box">5 adımlık kısa bir tur ile başlayalım. İstersen ✕'e basıp atlayabilir, sonradan Yardım menüsünden tekrar açabilirsin.</div>
+                <h2 class="modal-title" data-i18n-en="👋 Welcome to Pixel Dungeon">👋 Pixel Dungeon'a Hoş Geldin</h2>
+                <p data-i18n-en="This is a dungeon adventure where you fight by matching tiles. Your goal is to defeat endless waves of monsters - the adventure ends if your HP reaches 0.">Bu, taşları eşleştirerek savaştığın bir zindan macerası. Amacın sonsuz canavar dalgalarını yenmek - canın 0'a düşerse macera biter.</p>
+                <div class="tip-box" data-i18n-en="Let's start with a short 5-step tour. You can press ✕ to skip it, and reopen it later from the Help menu.">5 adımlık kısa bir tur ile başlayalım. İstersen ✕'e basıp atlayabilir, sonradan Yardım menüsünden tekrar açabilirsin.</div>
             </div>
 
             <div class="tutorial-step" data-step="2" style="display:none;">
-                <h2 class="modal-title">💠 Taşları Eşleştir</h2>
+                <h2 class="modal-title" data-i18n-en="💠 Match Tiles">💠 Taşları Eşleştir</h2>
                 <div class="manual-grid">
                     <div class="manual-tile">
                         <div class="manual-icon">⚔️</div>
-                        <div class="manual-desc"><b>KILIÇ</b><br>Düşmana hasar verir.</div>
+                        <div class="manual-desc" data-i18n-en="<b>SWORD</b><br>Deals damage to the enemy."><b>KILIÇ</b><br>Düşmana hasar verir.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">🛡️</div>
-                        <div class="manual-desc"><b>KALKAN</b><br>Sana Zırh ekler.</div>
+                        <div class="manual-desc" data-i18n-en="<b>SHIELD</b><br>Adds Armor to you."><b>KALKAN</b><br>Sana Zırh ekler.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">💖</div>
-                        <div class="manual-desc"><b>KALP</b><br>Canını iyileştirir.</div>
+                        <div class="manual-desc" data-i18n-en="<b>HEART</b><br>Heals your HP."><b>KALP</b><br>Canını iyileştirir.</div>
                     </div>
                     <div class="manual-tile">
                         <div class="manual-icon">⚡</div>
-                        <div class="manual-desc"><b>ENERJİ</b><br>Ultimate'i şarj eder.</div>
+                        <div class="manual-desc" data-i18n-en="<b>ENERGY</b><br>Charges your Ultimate."><b>ENERJİ</b><br>Ultimate'i şarj eder.</div>
                     </div>
                 </div>
-                <div class="tip-box">3 veya daha fazla aynı taşı yan yana getirerek eşleştir - ne kadar çok taş, o kadar güçlü etki!</div>
+                <div class="tip-box" data-i18n-en="Match 3 or more of the same tile next to each other - the more tiles, the stronger the effect!">3 veya daha fazla aynı taşı yan yana getirerek eşleştir - ne kadar çok taş, o kadar güçlü etki!</div>
             </div>
 
             <div class="tutorial-step" data-step="3" style="display:none;">
-                <h2 class="modal-title">🦸 Bir Sınıf Seç</h2>
-                <p>Her sınıfın kendine has bir oynanışı var: Warrior tank gibi dayanır, Rogue ekstra tur kazanır, Mage ultimate'iyle güçlenir ve daha fazlası.</p>
-                <div class="tip-box">Hangisini seçtiğin önemli değil - istediğin an yeni bir koşu (run) başlatıp farklı bir sınıf deneyebilirsin.</div>
+                <h2 class="modal-title" data-i18n-en="🦸 Pick a Class">🦸 Bir Sınıf Seç</h2>
+                <p data-i18n-en="Every class has its own playstyle: Warrior tanks hits, Rogue gains extra turns, Mage grows stronger with its ultimate, and more.">Her sınıfın kendine has bir oynanışı var: Warrior tank gibi dayanır, Rogue ekstra tur kazanır, Mage ultimate'iyle güçlenir ve daha fazlası.</p>
+                <div class="tip-box" data-i18n-en="It doesn't matter which one you pick - you can start a new run anytime and try a different class.">Hangisini seçtiğin önemli değil - istediğin an yeni bir koşu (run) başlatıp farklı bir sınıf deneyebilirsin.</div>
             </div>
 
             <div class="tutorial-step" data-step="4" style="display:none;">
-                <h2 class="modal-title">🌀 Enerji ve Ultimate</h2>
-                <p>Üstteki <b>ULT</b> barı Enerji taşlarıyla dolar. %100'e ulaşınca Ultimate'i kullanabilirsin - her sınıfın ultimate'i farklı bir avantaj sağlar.</p>
-                <div class="tip-box">Dikkat: Düşmanlar da Enerji taşı yiyerek iyileşebilir!</div>
+                <h2 class="modal-title" data-i18n-en="🌀 Energy and Ultimate">🌀 Enerji ve Ultimate</h2>
+                <p data-i18n-en="The <b>ULT</b> bar at the top fills up with Energy tiles. Once it reaches 100% you can use your Ultimate - every class's ultimate gives a different advantage.">Üstteki <b>ULT</b> barı Enerji taşlarıyla dolar. %100'e ulaşınca Ultimate'i kullanabilirsin - her sınıfın ultimate'i farklı bir avantaj sağlar.</p>
+                <div class="tip-box" data-i18n-en="Watch out: enemies can also heal by eating Energy tiles!">Dikkat: Düşmanlar da Enerji taşı yiyerek iyileşebilir!</div>
             </div>
 
             <div class="tutorial-step" data-step="5" style="display:none;">
-                <h2 class="modal-title">🎁 Ödüller ve İlerleme</h2>
-                <p>Üstteki menüden <b>Günlük Ödül</b>, <b>Dükkan</b>, <b>Başarımlar</b> ve <b>Lider Tablosu</b>'na zindan dışındayken göz atabilirsin. Kazandığın altın ve eşyalar hesabına kalıcı olarak işlenir.</p>
-                <div class="tip-box">Hazırsan bir sınıf seçip maceraya başlayalım!</div>
+                <h2 class="modal-title" data-i18n-en="🎁 Rewards and Progression">🎁 Ödüller ve İlerleme</h2>
+                <p data-i18n-en="From the top menu you can check out <b>Daily Reward</b>, <b>Shop</b>, <b>Achievements</b>, and the <b>Leaderboard</b> while outside the dungeon. The gold and items you earn are saved to your account permanently.">Üstteki menüden <b>Günlük Ödül</b>, <b>Dükkan</b>, <b>Başarımlar</b> ve <b>Lider Tablosu</b>'na zindan dışındayken göz atabilirsin. Kazandığın altın ve eşyalar hesabına kalıcı olarak işlenir.</p>
+                <div class="tip-box" data-i18n-en="If you're ready, let's pick a class and start the adventure!">Hazırsan bir sınıf seçip maceraya başlayalım!</div>
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 15px;">
-                <button class="action-btn" id="tutorial-back-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialBack()">◀ Geri</button>
+                <button data-i18n-en="◀ Back" class="action-btn" id="tutorial-back-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialBack()">◀ Geri</button>
                 <span id="tutorial-progress" style="color:#bdc3c7; font-size:0.85rem;">1 / 5</span>
-                <button class="action-btn" id="tutorial-next-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialNext()">İleri ▶</button>
+                <button data-i18n-en="Next ▶" class="action-btn" id="tutorial-next-btn" style="width:auto; padding: 8px 16px;" onclick="tutorialNext()">İleri ▶</button>
             </div>
         </div>
     </div>
@@ -408,18 +411,18 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('profile-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">👤 PROFİL</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Sosyal, ilerleme ve ekonomi ekranların - üst bar kalabalıklaşmasın diye buraya taşındı.</p>
+                <h2 class="modal-title" data-i18n-en="👤 PROFILE">👤 PROFİL</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Your social, progression, and economy screens - moved here so the top bar doesn't get crowded.">Sosyal, ilerleme ve ekonomi ekranların - üst bar kalabalıklaşmasın diye buraya taşındı.</p>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('friends-modal')">👥 Arkadaşlar</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('guild-modal')">🛡️ Lonca</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('titles-modal')">🎖️ Unvanlar</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('talents-modal')">🌳 Yetenekler</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('trade-modal')">🔄 Takaslar</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('achievements-modal')">🏆 Başarımlar</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('history-modal')">🎒 Loot / Stats</button>
-                    <button class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('account-modal')">🔑 Hesap</button>
+                    <button data-i18n-en="🏅 Leaderboard" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('leaderboard-modal')">🏅 Lider Tablosu</button>
+                    <button data-i18n-en="👥 Friends" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('friends-modal')">👥 Arkadaşlar</button>
+                    <button data-i18n-en="🛡️ Guild" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('guild-modal')">🛡️ Lonca</button>
+                    <button data-i18n-en="🎖️ Titles" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('titles-modal')">🎖️ Unvanlar</button>
+                    <button data-i18n-en="🌳 Talents" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('talents-modal')">🌳 Yetenekler</button>
+                    <button data-i18n-en="🔄 Trades" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('trade-modal')">🔄 Takaslar</button>
+                    <button data-i18n-en="🏆 Achievements" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('achievements-modal')">🏆 Başarımlar</button>
+                    <button data-i18n-en="🎒 Loot / Stats" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('history-modal')">🎒 Loot / Stats</button>
+                    <button data-i18n-en="🔑 Account" class="loot-btn" style="flex:1 1 auto;" onclick="toggleModal('profile-modal'); toggleModal('account-modal')">🔑 Hesap</button>
                 </div>
             </div>
         </div>
@@ -429,55 +432,55 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('account-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🔑 HESAP</h2>
+                <h2 class="modal-title" data-i18n-en="🔑 ACCOUNT">🔑 HESAP</h2>
                 <p id="account-status-msg" style="font-size:0.8rem; color:#bdc3c7; min-height:1.1em;"></p>
 
                 <div id="account-view-status">
                     <p id="account-status-detail" style="font-size:0.85rem;"></p>
-                    <button class="action-btn" id="account-upgrade-btn" onclick="showAccountView('register')">Hesap Oluştur</button>
-                    <button class="action-btn" id="account-switch-btn" onclick="showAccountView('login')" style="background:#34495e; color:#fff;">Farklı Hesapla Giriş Yap</button>
-                    <button class="action-btn" id="account-logout-btn" onclick="handleAccountLogout()" style="background:#7f2020; color:#fff; display:none;">Çıkış Yap</button>
-                    <button class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('privacy-modal')">🔒 Gizlilik Politikası</button>
-                    <button class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('terms-modal')">📜 Kullanım Şartları</button>
-                    <button class="action-btn" onclick="handleDeleteAccount()" style="background:#7f2020; color:#fff; margin-top:4px;">🗑️ Hesabımı Kalıcı Olarak Sil</button>
+                    <button data-i18n-en="Create Account" class="action-btn" id="account-upgrade-btn" onclick="showAccountView('register')">Hesap Oluştur</button>
+                    <button data-i18n-en="Log In With a Different Account" class="action-btn" id="account-switch-btn" onclick="showAccountView('login')" style="background:#34495e; color:#fff;">Farklı Hesapla Giriş Yap</button>
+                    <button data-i18n-en="Log Out" class="action-btn" id="account-logout-btn" onclick="handleAccountLogout()" style="background:#7f2020; color:#fff; display:none;">Çıkış Yap</button>
+                    <button data-i18n-en="🔒 Privacy Policy" class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('privacy-modal')">🔒 Gizlilik Politikası</button>
+                    <button data-i18n-en="📜 Terms of Service" class="loot-btn" style="width:100%; margin-top:4px;" onclick="toggleModal('account-modal'); toggleModal('terms-modal')">📜 Kullanım Şartları</button>
+                    <button data-i18n-en="🗑️ Permanently Delete My Account" class="action-btn" onclick="handleDeleteAccount()" style="background:#7f2020; color:#fff; margin-top:4px;">🗑️ Hesabımı Kalıcı Olarak Sil</button>
                 </div>
 
                 <div id="account-view-register" style="display:none;">
-                    <p style="font-size:0.8rem; color:#bdc3c7;">Email ve şifre belirle - ilerlemen (altın, eşyalar, PvP derecesi) aynen korunur.</p>
-                    <input id="account-register-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <input id="account-register-password" type="password" placeholder="Şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" onclick="handleAccountRegister()">Kod Gönder</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                    <p data-i18n-en="Set an email and password - your progress (gold, items, PvP rating) is fully preserved." style="font-size:0.8rem; color:#bdc3c7;">Email ve şifre belirle - ilerlemen (altın, eşyalar, PvP derecesi) aynen korunur.</p>
+                    <input id="account-register-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-register-password" type="password" placeholder="Şifre (en az 6 karakter)" data-i18n-placeholder-en="Password (min. 6 characters)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Send Code" class="action-btn" onclick="handleAccountRegister()">Kod Gönder</button>
+                    <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
                 </div>
 
                 <div id="account-view-verify" style="display:none;">
-                    <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine gönderilen kodu gir.</p>
-                    <input id="account-verify-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" onclick="handleAccountVerify()">Doğrula</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                    <p data-i18n-en="Enter the code sent to your email." style="font-size:0.8rem; color:#bdc3c7;">Email adresine gönderilen kodu gir.</p>
+                    <input id="account-verify-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" data-i18n-placeholder-en="Code" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Verify" class="action-btn" onclick="handleAccountVerify()">Doğrula</button>
+                    <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
                 </div>
 
                 <div id="account-view-login" style="display:none;">
-                    <input id="account-login-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <input id="account-login-password" type="password" placeholder="Şifre" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" onclick="handleAccountLogin()">Giriş Yap</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('forgot')">Şifremi Unuttum</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
+                    <input id="account-login-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-login-password" type="password" placeholder="Şifre" data-i18n-placeholder-en="Password" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Log In" class="action-btn" onclick="handleAccountLogin()">Giriş Yap</button>
+                    <button data-i18n-en="Forgot Password" class="loot-btn" style="width:100%;" onclick="showAccountView('forgot')">Şifremi Unuttum</button>
+                    <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showAccountView('status')">◀ Geri</button>
                 </div>
 
                 <div id="account-view-forgot" style="display:none;">
-                    <p style="font-size:0.8rem; color:#bdc3c7;">Email adresine bir sıfırlama kodu gönderelim.</p>
-                    <input id="account-forgot-email" type="email" placeholder="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" onclick="handleAccountForgotPassword()">Kod Gönder</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
+                    <p data-i18n-en="We'll send a reset code to your email." style="font-size:0.8rem; color:#bdc3c7;">Email adresine bir sıfırlama kodu gönderelim.</p>
+                    <input id="account-forgot-email" type="email" placeholder="Email" data-i18n-placeholder-en="Email" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Send Code" class="action-btn" onclick="handleAccountForgotPassword()">Kod Gönder</button>
+                    <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
                 </div>
 
                 <div id="account-view-reset" style="display:none;">
-                    <p style="font-size:0.8rem; color:#bdc3c7;">Email'ine gelen kodu ve yeni şifreni gir.</p>
-                    <input id="account-reset-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <input id="account-reset-password" type="password" placeholder="Yeni şifre (en az 6 karakter)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" onclick="handleAccountResetPassword()">Şifreyi Değiştir</button>
-                    <button class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
+                    <p data-i18n-en="Enter the code you received and your new password." style="font-size:0.8rem; color:#bdc3c7;">Email'ine gelen kodu ve yeni şifreni gir.</p>
+                    <input id="account-reset-code" type="text" inputmode="numeric" maxlength="10" placeholder="Kod" data-i18n-placeholder-en="Code" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <input id="account-reset-password" type="password" placeholder="Yeni şifre (en az 6 karakter)" data-i18n-placeholder-en="New password (min. 6 characters)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Change Password" class="action-btn" onclick="handleAccountResetPassword()">Şifreyi Değiştir</button>
+                    <button data-i18n-en="◀ Back" class="loot-btn" style="width:100%;" onclick="showAccountView('login')">◀ Geri</button>
                 </div>
             </div>
         </div>
@@ -487,23 +490,23 @@
         <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal" onclick="toggleModal('privacy-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🔒 GİZLİLİK POLİTİKASI</h2>
+                <h2 class="modal-title" data-i18n-en="🔒 PRIVACY POLICY">🔒 GİZLİLİK POLİTİKASI</h2>
 
-                <h4>Hangi veriler toplanıyor?</h4>
+                <h4 data-i18n-en="What data is collected?">Hangi veriler toplanıyor?</h4>
                 <ul style="font-size:0.85rem;">
-                    <li>Bir hesap oluşturursan: email adresin ve şifren (şifren bize hiçbir zaman düz metin olarak ulaşmaz, Supabase tarafından güvenli şekilde saklanır).</li>
-                    <li>Oyun ilerlemen: altın, eşyalar, PvP derecen, takma adın, arkadaş/lonca bağlantıların, gönderdiğin arkadaş mesajları.</li>
-                    <li>Teknik hata kayıtları: bir şey bozulduğunda, hatayı düzeltebilmemiz için tarayıcı/sayfa bilgisi kaydedilir - bu kayıtlar kimliğinle eşleştirilmez.</li>
+                    <li data-i18n-en="If you create an account: your email address and password (your password never reaches us as plain text - it's stored securely by Supabase).">Bir hesap oluşturursan: email adresin ve şifren (şifren bize hiçbir zaman düz metin olarak ulaşmaz, Supabase tarafından güvenli şekilde saklanır).</li>
+                    <li data-i18n-en="Your game progress: gold, items, PvP rating, nickname, friend/guild connections, friend messages you send.">Oyun ilerlemen: altın, eşyalar, PvP derecen, takma adın, arkadaş/lonca bağlantıların, gönderdiğin arkadaş mesajları.</li>
+                    <li data-i18n-en="Technical error logs: when something breaks, browser/page info is recorded so we can fix it - these logs are never linked to your identity.">Teknik hata kayıtları: bir şey bozulduğunda, hatayı düzeltebilmemiz için tarayıcı/sayfa bilgisi kaydedilir - bu kayıtlar kimliğinle eşleştirilmez.</li>
                 </ul>
 
-                <h4>Veriler nerede saklanıyor?</h4>
-                <p style="font-size:0.85rem;">Tüm veriler Supabase (üçüncü taraf bir altyapı sağlayıcısı) üzerinde barındırılır. Hesap doğrulama/şifre sıfırlama emailleri Resend üzerinden gönderilir. Verilerin hiçbiri reklam amacıyla satılmaz veya başka bir üçüncü tarafla paylaşılmaz.</p>
+                <h4 data-i18n-en="Where is data stored?">Veriler nerede saklanıyor?</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="All data is hosted on Supabase (a third-party infrastructure provider). Account verification/password reset emails are sent via Resend. None of your data is sold for advertising or shared with any other third party.">Tüm veriler Supabase (üçüncü taraf bir altyapı sağlayıcısı) üzerinde barındırılır. Hesap doğrulama/şifre sıfırlama emailleri Resend üzerinden gönderilir. Verilerin hiçbiri reklam amacıyla satılmaz veya başka bir üçüncü tarafla paylaşılmaz.</p>
 
-                <h4>Haklarım neler?</h4>
-                <p style="font-size:0.85rem;">👤 Profil → 🔑 Hesap ekranındaki <b>"Hesabımı Kalıcı Olarak Sil"</b> butonuyla hesabını ve tüm ilerlemeni (altın, eşyalar, arkadaşlar, mesajlar, PvP geçmişi) kalıcı ve geri dönüşsüz şekilde silebilirsin. Misafir (email eklenmemiş) hesaplar için de aynı buton geçerlidir.</p>
+                <h4 data-i18n-en="What are my rights?">Haklarım neler?</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="You can permanently and irreversibly delete your account and all your progress (gold, items, friends, messages, PvP history) using the <b>&quot;Permanently Delete My Account&quot;</b> button on the 👤 Profile → 🔑 Account screen. The same button applies to guest (no email added) accounts too.">👤 Profil → 🔑 Hesap ekranındaki <b>"Hesabımı Kalıcı Olarak Sil"</b> butonuyla hesabını ve tüm ilerlemeni (altın, eşyalar, arkadaşlar, mesajlar, PvP geçmişi) kalıcı ve geri dönüşsüz şekilde silebilirsin. Misafir (email eklenmemiş) hesaplar için de aynı buton geçerlidir.</p>
 
-                <h4>Sorular</h4>
-                <p style="font-size:0.85rem;">Bu proje açık kaynaklı bir hobi projesidir. Bir hata bulduysan, bir önerin varsa ya da bir sorun yaşadıysan <a href="https://github.com/Recreatives/match3-rpg-basic/issues/new?template=oyuncu-geri-bildirimi.yml" target="_blank" rel="noopener" style="color:var(--accent);">buradan bildirebilirsin</a>.</p>
+                <h4 data-i18n-en="Questions">Sorular</h4>
+                <p style="font-size:0.85rem;" data-i18n-en='This is an open-source hobby project. If you found a bug, have a suggestion, or ran into a problem, you can <a href="https://github.com/Recreatives/match3-rpg-basic/issues/new?template=oyuncu-geri-bildirimi.yml" target="_blank" rel="noopener" style="color:var(--accent);">report it here</a>.'>Bu proje açık kaynaklı bir hobi projesidir. Bir hata bulduysan, bir önerin varsa ya da bir sorun yaşadıysan <a href="https://github.com/Recreatives/match3-rpg-basic/issues/new?template=oyuncu-geri-bildirimi.yml" target="_blank" rel="noopener" style="color:var(--accent);">buradan bildirebilirsin</a>.</p>
             </div>
         </div>
     </div>
@@ -512,28 +515,28 @@
         <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal" onclick="toggleModal('terms-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">📜 KULLANIM ŞARTLARI</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Bu oyunu oynayarak aşağıdaki şartları kabul etmiş olursun. Bu, küçük bir hobi projesi için yazılmış basit bir metindir - amaç seni korkutmak değil, herkes için adil bir zemin oluşturmak.</p>
+                <h2 class="modal-title" data-i18n-en="📜 TERMS OF SERVICE">📜 KULLANIM ŞARTLARI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="By playing this game, you accept the terms below. This is a simple text written for a small hobby project - the goal isn't to scare you, it's to set a fair ground for everyone.">Bu oyunu oynayarak aşağıdaki şartları kabul etmiş olursun. Bu, küçük bir hobi projesi için yazılmış basit bir metindir - amaç seni korkutmak değil, herkes için adil bir zemin oluşturmak.</p>
 
-                <h4>Hesabın senin sorumluluğun</h4>
-                <p style="font-size:0.85rem;">Şifreni kimseyle paylaşma. Hesabından yapılan işlemlerden sen sorumlusun.</p>
+                <h4 data-i18n-en="Your account is your responsibility">Hesabın senin sorumluluğun</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="Don't share your password with anyone. You're responsible for anything done through your account.">Şifreni kimseyle paylaşma. Hesabından yapılan işlemlerden sen sorumlusun.</p>
 
-                <h4>Kabul edilemez davranışlar</h4>
+                <h4 data-i18n-en="Unacceptable behavior">Kabul edilemez davranışlar</h4>
                 <ul style="font-size:0.85rem;">
-                    <li>Diğer oyunculara taciz, zorbalık ya da uygunsuz içerik göndermek.</li>
-                    <li>Hile, bug istismarı veya oyunun ekonomisini bozmaya yönelik kötüye kullanım.</li>
-                    <li>Uygunsuz takma ad / lonca ismi kullanmak.</li>
+                    <li data-i18n-en="Harassing, bullying, or sending inappropriate content to other players.">Diğer oyunculara taciz, zorbalık ya da uygunsuz içerik göndermek.</li>
+                    <li data-i18n-en="Cheating, exploiting bugs, or otherwise abusing the game's economy.">Hile, bug istismarı veya oyunun ekonomisini bozmaya yönelik kötüye kullanım.</li>
+                    <li data-i18n-en="Using an inappropriate nickname / guild name.">Uygunsuz takma ad / lonca ismi kullanmak.</li>
                 </ul>
-                <p style="font-size:0.85rem;">Bunları fark edersek, önceden haber vermeden hesabını askıya alabilir ya da kalıcı olarak silebiliriz. 🚩 Şikayet Et butonuyla bunları bize bildirebilirsin.</p>
+                <p style="font-size:0.85rem;" data-i18n-en="If we notice any of this, we may suspend or permanently delete your account without prior notice. You can report these to us with the 🚩 Report button.">Bunları fark edersek, önceden haber vermeden hesabını askıya alabilir ya da kalıcı olarak silebiliriz. 🚩 Şikayet Et butonuyla bunları bize bildirebilirsin.</p>
 
-                <h4>Sanal eşyalar gerçek para değildir</h4>
-                <p style="font-size:0.85rem;">Altın, eşyalar, PvP derecesi gibi oyun içi her şeyin gerçek dünyada parasal bir değeri yoktur, gerçek parayla satılamaz/devredilemez ve gerekirse (bir hata, kötüye kullanım ya da dengeleme nedeniyle) tarafımızca sıfırlanabilir veya değiştirilebilir.</p>
+                <h4 data-i18n-en="Virtual items are not real money">Sanal eşyalar gerçek para değildir</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="Gold, items, PvP rating, and everything else in-game have no real-world monetary value, cannot be sold/transferred for real money, and may be reset or changed by us if necessary (due to a bug, abuse, or balancing).">Altın, eşyalar, PvP derecesi gibi oyun içi her şeyin gerçek dünyada parasal bir değeri yoktur, gerçek parayla satılamaz/devredilemez ve gerekirse (bir hata, kötüye kullanım ya da dengeleme nedeniyle) tarafımızca sıfırlanabilir veya değiştirilebilir.</p>
 
-                <h4>Hizmet garantisi yok</h4>
-                <p style="font-size:0.85rem;">Bu bir hobi projesi - sürekli çalışacağının, hatasız olacağının ya da süresiz devam edeceğinin garantisini veremeyiz. Elimizden geldiğince düzenli yedek alıyoruz (bkz. Gizlilik Politikası) ama veri kaybı riskini tamamen ortadan kaldıramayız. Proje istediğimiz zaman durdurulabilir veya kapatılabilir - böyle bir durumda burada duyururuz.</p>
+                <h4 data-i18n-en="No service guarantee">Hizmet garantisi yok</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="This is a hobby project - we can't guarantee it will always be running, be bug-free, or continue indefinitely. We take regular backups as best we can (see Privacy Policy) but can't fully eliminate the risk of data loss. The project can be paused or shut down at any time - we'll announce it here if that happens.">Bu bir hobi projesi - sürekli çalışacağının, hatasız olacağının ya da süresiz devam edeceğinin garantisini veremeyiz. Elimizden geldiğince düzenli yedek alıyoruz (bkz. Gizlilik Politikası) ama veri kaybı riskini tamamen ortadan kaldıramayız. Proje istediğimiz zaman durdurulabilir veya kapatılabilir - böyle bir durumda burada duyururuz.</p>
 
-                <h4>Değişiklikler</h4>
-                <p style="font-size:0.85rem;">Bu şartlar zaman zaman güncellenebilir. Önemli değişiklikleri oyun içinde duyururuz.</p>
+                <h4 data-i18n-en="Changes">Değişiklikler</h4>
+                <p style="font-size:0.85rem;" data-i18n-en="These terms may be updated from time to time. We'll announce significant changes in-game.">Bu şartlar zaman zaman güncellenebilir. Önemli değişiklikleri oyun içinde duyururuz.</p>
             </div>
         </div>
     </div>
@@ -542,17 +545,17 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('report-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🚩 ŞİKAYET ET</h2>
+                <h2 class="modal-title" data-i18n-en="🚩 REPORT">🚩 ŞİKAYET ET</h2>
                 <p id="report-target-label" style="font-size:0.85rem; color:#bdc3c7;"></p>
                 <select id="report-reason-select" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <option value="Taciz / Zorbalık">Taciz / Zorbalık</option>
-                    <option value="Spam">Spam</option>
-                    <option value="Uygunsuz İsim">Uygunsuz İsim</option>
-                    <option value="Hile / Kötüye Kullanım">Hile / Kötüye Kullanım</option>
-                    <option value="Diğer">Diğer</option>
+                    <option value="Taciz / Zorbalık" data-i18n-en="Harassment / Bullying">Taciz / Zorbalık</option>
+                    <option value="Spam" data-i18n-en="Spam">Spam</option>
+                    <option value="Uygunsuz İsim" data-i18n-en="Inappropriate Name">Uygunsuz İsim</option>
+                    <option value="Hile / Kötüye Kullanım" data-i18n-en="Cheating / Abuse">Hile / Kötüye Kullanım</option>
+                    <option value="Diğer" data-i18n-en="Other">Diğer</option>
                 </select>
-                <textarea id="report-detail-input" placeholder="Detay yaz (opsiyonel)" maxlength="450" rows="3" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; resize:vertical;"></textarea>
-                <button class="action-btn" onclick="submitReport()" style="background:#7f2020; color:#fff;">Şikayet Gönder</button>
+                <textarea id="report-detail-input" placeholder="Detay yaz (opsiyonel)" data-i18n-placeholder-en="Add detail (optional)" maxlength="450" rows="3" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; resize:vertical;"></textarea>
+                <button data-i18n-en="Submit Report" class="action-btn" onclick="submitReport()" style="background:#7f2020; color:#fff;">Şikayet Gönder</button>
                 <p id="report-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
             </div>
         </div>
@@ -562,9 +565,9 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('history-modal')">×</span>
             <div class="modal-section">
-                <h2 class="modal-title">📊 STATLAR & EŞYALAR</h2>
+                <h2 class="modal-title" data-i18n-en="📊 STATS & ITEMS">📊 STATLAR & EŞYALAR</h2>
 
-                <h4>CÜZDAN <span id="wallet-status" style="font-weight:normal; color:#7f8c8d; font-size:0.75rem;"></span></h4>
+                <h4 data-i18n-en="WALLET">CÜZDAN <span id="wallet-status" style="font-weight:normal; color:#7f8c8d; font-size:0.75rem;"></span></h4>
                 <div class="stats-bar" style="grid-template-columns: repeat(2, 1fr);">
                     <div class="stat-item" title="Altın"><span>🪙</span><span id="wallet-gold" class="stat-val">–</span></div>
                     <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials" class="stat-val">–</span></div>
@@ -573,13 +576,13 @@
             </div>
             <div class="modal-section" id="history-equipped-slots"></div>
             <div class="modal-section">
-                <h4>🎒 BU KOŞUDA KAZANILAN STATLAR</h4>
-                <p style="font-size:0.75rem; color:#7f8c8d; margin-top:-4px;">Kalıcı eşyalarınla karıştırma - bunlar sadece bu koşuya (run) özel, ölünce sıfırlanan geçici seçimler.</p>
-                <p>Bu run'da eşyalardan kazanılan toplam statlar:</p>
+                <h4 data-i18n-en="🎒 STATS EARNED THIS RUN">🎒 BU KOŞUDA KAZANILAN STATLAR</h4>
+                <p style="font-size:0.75rem; color:#7f8c8d; margin-top:-4px;" data-i18n-en="Don't confuse this with your permanent items - these are temporary picks for this run (run) only, reset when you die.">Kalıcı eşyalarınla karıştırma - bunlar sadece bu koşuya (run) özel, ölünce sıfırlanan geçici seçimler.</p>
+                <p data-i18n-en="Total stats earned from items this run:">Bu run'da eşyalardan kazanılan toplam statlar:</p>
                 <div id="total-stats-summary" class="history-summary">
                     </div>
 
-                <h4>EŞYA KAYDI</h4>
+                <h4 data-i18n-en="ITEM LOG">EŞYA KAYDI</h4>
                 <div id="history-list-container" class="history-list">
                     </div>
             </div>
@@ -590,8 +593,8 @@
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('shop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🛒 DÜKKAN & ENVANTER</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Sadece KUŞANILAN eşyaların statları geçerli - sahip olmak yetmez. Bir setin tüm parçalarını kuşanınca ekstra set bonusu açılır. Grey/White/Blue dükkandan alınabilir; Yellow/Green/Orange/Red/Teal sadece savaş sonrası şansla düşer.</p>
+                <h2 class="modal-title" data-i18n-en="🛒 SHOP & INVENTORY">🛒 DÜKKAN & ENVANTER</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Only EQUIPPED items' stats count - owning them isn't enough. Equipping all pieces of a set unlocks an extra set bonus. Grey/White/Blue can be bought from the shop; Yellow/Green/Orange/Red/Teal only drop by chance after battle.">Sadece KUŞANILAN eşyaların statları geçerli - sahip olmak yetmez. Bir setin tüm parçalarını kuşanınca ekstra set bonusu açılır. Grey/White/Blue dükkandan alınabilir; Yellow/Green/Orange/Red/Teal sadece savaş sonrası şansla düşer.</p>
                 <!-- Sticky so the gold/materials total and tab switcher stay
                      visible while scrolled through a long shop/inventory
                      list - otherwise buying something scrolled far down
@@ -606,9 +609,9 @@
                         <div class="stat-item" title="Hammadde"><span>🪨</span><span id="wallet-materials-shop" class="stat-val">–</span></div>
                     </div>
                     <div style="display:flex; gap:6px; margin-bottom:10px;">
-                        <button id="shop-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
-                        <button id="inventory-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
-                        <button id="prestige-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('prestige')">🌟 Prestij</button>
+                        <button data-i18n-en="🛒 Shop" id="shop-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1;" onclick="switchShopTab('shop')">🛒 Dükkan</button>
+                        <button data-i18n-en="🎒 Inventory" id="inventory-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('inventory')">🎒 Envanter</button>
+                        <button data-i18n-en="🌟 Prestige" id="prestige-tab-btn" class="action-btn" style="margin:0; width:auto; flex:1; background:#555; color:#ccc;" onclick="switchShopTab('prestige')">🌟 Prestij</button>
                     </div>
                     <p id="shop-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em; margin:0;"></p>
                 </div>
@@ -623,14 +626,14 @@
         <div class="modal-content" style="max-width: 380px; text-align:center;">
             <span class="close-modal" onclick="toggleModal('daily-login-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🎁 GÜNLÜK ÖDÜL</h2>
+                <h2 class="modal-title" data-i18n-en="🎁 DAILY REWARD">🎁 GÜNLÜK ÖDÜL</h2>
                 <p id="daily-login-streak" style="font-size:0.9rem; color:#bdc3c7;">Seri: 0 gün</p>
-                <p style="font-size:0.8rem; color:#7f8c8d;">Her gün giriş yap, ödülün 7. güne kadar büyüsün (sonra sabit kalır).</p>
-                <button id="daily-login-claim-btn" class="overlay-btn" style="width:100%; margin-top:10px;" onclick="handleClaimDailyReward()">Ödülü Al</button>
+                <p style="font-size:0.8rem; color:#7f8c8d;" data-i18n-en="Log in every day, your reward grows until day 7 (then stays fixed).">Her gün giriş yap, ödülün 7. güne kadar büyüsün (sonra sabit kalır).</p>
+                <button data-i18n-en="Claim Reward" id="daily-login-claim-btn" class="overlay-btn" style="width:100%; margin-top:10px;" onclick="handleClaimDailyReward()">Ödülü Al</button>
                 <p id="daily-login-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px; min-height:1.2em;"></p>
             </div>
             <div class="modal-section" style="border-bottom:none; text-align:left;">
-                <h4>📋 GÜNLÜK GÖREVLER</h4>
+                <h4 data-i18n-en="📋 DAILY QUESTS">📋 GÜNLÜK GÖREVLER</h4>
                 <div id="daily-quest-list"></div>
             </div>
         </div>
@@ -640,18 +643,18 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('leaderboard-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🏅 ALTIN SIRALAMASI</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">En çok altına sahip 10 oyuncu.</p>
+                <h2 class="modal-title" data-i18n-en="🏅 GOLD LEADERBOARD">🏅 ALTIN SIRALAMASI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="The 10 players with the most gold.">En çok altına sahip 10 oyuncu.</p>
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
-                    <input id="display-name-input" type="text" placeholder="Takma adın (opsiyonel)" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" style="width:auto; margin:0;" onclick="submitDisplayName()">Kaydet</button>
+                    <input id="display-name-input" type="text" placeholder="Takma adın (opsiyonel)" data-i18n-placeholder-en="Your nickname (optional)" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Save" class="action-btn" style="width:auto; margin:0;" onclick="submitDisplayName()">Kaydet</button>
                 </div>
                 <p id="leaderboard-name-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
                 <div id="leaderboard-list"></div>
             </div>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🗡️ PvP SIRALAMASI</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Kazanılan her PvP maçı derece (rating) kazandırır, kaybedilen düşürür.</p>
+                <h2 class="modal-title" data-i18n-en="🗡️ PvP RANKING">🗡️ PvP SIRALAMASI</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Every PvP match won raises your rating, every loss lowers it.">Kazanılan her PvP maçı derece (rating) kazandırır, kaybedilen düşürür.</p>
                 <div id="pvp-leaderboard-list"></div>
             </div>
         </div>
@@ -661,37 +664,37 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('friends-modal')">×</span>
             <div id="friends-roster-view" class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">👥 ARKADAŞLAR</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için Lider Tablosu'ndan önce kendi takma adını belirlemelisin.</p>
+                <h2 class="modal-title" data-i18n-en="👥 FRIENDS">👥 ARKADAŞLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Type a player's nickname and send a request. For friends to find you, you must first set your own nickname on the Leaderboard.">Bir oyuncunun takma adını yazıp istek gönder. Arkadaşların seni bulabilmesi için Lider Tablosu'ndan önce kendi takma adını belirlemelisin.</p>
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
-                    <input id="friend-request-input" type="text" placeholder="Arkadaşının takma adı" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                    <button class="action-btn" style="width:auto; margin:0;" onclick="submitFriendRequest()">Ekle</button>
+                    <input id="friend-request-input" type="text" placeholder="Arkadaşının takma adı" data-i18n-placeholder-en="Your friend's nickname" maxlength="24" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                    <button data-i18n-en="Add" class="action-btn" style="width:auto; margin:0;" onclick="submitFriendRequest()">Ekle</button>
                 </div>
                 <p id="friends-status" style="font-size:0.75rem; color:#f1c40f; min-height:1.1em;"></p>
                 <div id="friends-list"></div>
             </div>
 
             <div id="friend-chat-view" class="modal-section" style="border-bottom:none; display:none;">
-                <button class="action-btn" style="width:auto; margin:0 0 8px; padding:4px 10px; font-size:0.8rem;" onclick="closeConversation()">◀ Geri</button>
-                <button class="action-btn" style="width:auto; margin:0 0 8px 6px; padding:4px 10px; font-size:0.8rem; background:#7f2020; color:#fff;" onclick="openReportModal(dmActiveFriendId, document.getElementById('friend-chat-name').innerText, 'mesaj')">🚩 Şikayet Et</button>
+                <button data-i18n-en="◀ Back" class="action-btn" style="width:auto; margin:0 0 8px; padding:4px 10px; font-size:0.8rem;" onclick="closeConversation()">◀ Geri</button>
+                <button data-i18n-en="🚩 Report" class="action-btn" style="width:auto; margin:0 0 8px 6px; padding:4px 10px; font-size:0.8rem; background:#7f2020; color:#fff;" onclick="openReportModal(dmActiveFriendId, document.getElementById('friend-chat-name').innerText, 'mesaj')">🚩 Şikayet Et</button>
                 <h2 class="modal-title" id="friend-chat-name" style="font-size:1.1rem;"></h2>
                 <div id="chat-messages" style="height:220px; overflow-y:auto; background:rgba(0,0,0,0.2); border-radius:6px; padding:8px; margin-bottom:8px;"></div>
                 <div style="display:flex; gap:6px;">
-                    <input id="chat-input" type="text" placeholder="Bir mesaj yaz…" maxlength="500" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;" onkeydown="if(event.key==='Enter') submitChatMessage();">
-                    <button class="action-btn" style="width:auto; margin:0;" onclick="submitChatMessage()">Gönder</button>
+                    <input id="chat-input" type="text" placeholder="Bir mesaj yaz…" data-i18n-placeholder-en="Write a message…" maxlength="500" style="flex:1; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;" onkeydown="if(event.key==='Enter') submitChatMessage();">
+                    <button data-i18n-en="Send" class="action-btn" style="width:auto; margin:0;" onclick="submitChatMessage()">Gönder</button>
                 </div>
             </div>
 
             <div id="trade-compose-view" class="modal-section" style="border-bottom:none; display:none;">
-                <button class="action-btn" style="width:auto; margin:0 0 8px; padding:4px 10px; font-size:0.8rem;" onclick="closeTradeComposer()">◀ Geri</button>
+                <button data-i18n-en="◀ Back" class="action-btn" style="width:auto; margin:0 0 8px; padding:4px 10px; font-size:0.8rem;" onclick="closeTradeComposer()">◀ Geri</button>
                 <h2 class="modal-title" id="trade-compose-name" style="font-size:1.1rem;"></h2>
-                <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;">Senin verdiğin:</p>
+                <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;" data-i18n-en="You're giving:">Senin verdiğin:</p>
                 <select id="trade-my-item-select" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;"></select>
-                <input id="trade-my-gold-input" type="number" min="0" placeholder="+ Altın (opsiyonel)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:12px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;">Karşılığında istediğin:</p>
+                <input id="trade-my-gold-input" type="number" min="0" placeholder="+ Altın (opsiyonel)" data-i18n-placeholder-en="+ Gold (optional)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:12px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <p style="font-size:0.8rem; color:#bdc3c7; margin:0 0 6px;" data-i18n-en="You want in return:">Karşılığında istediğin:</p>
                 <select id="trade-their-item-select" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;"></select>
-                <input id="trade-their-gold-input" type="number" min="0" placeholder="+ Altın (opsiyonel)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
-                <button class="overlay-btn" style="width:100%; margin:0;" onclick="submitTradeOffer()">Teklifi Gönder</button>
+                <input id="trade-their-gold-input" type="number" min="0" placeholder="+ Altın (opsiyonel)" data-i18n-placeholder-en="+ Gold (optional)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <button data-i18n-en="Send Offer" class="overlay-btn" style="width:100%; margin:0;" onclick="submitTradeOffer()">Teklifi Gönder</button>
                 <p id="trade-compose-status" style="font-size:0.75rem; color:#f1c40f; margin-top:8px; min-height:1.1em;"></p>
             </div>
         </div>
@@ -701,8 +704,8 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('trade-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🔄 TAKASLAR</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Bekleyen takas tekliflerin. Yeni bir teklif göndermek için Arkadaşlar'dan bir arkadaşının yanındaki 🔄'ya bas.</p>
+                <h2 class="modal-title" data-i18n-en="🔄 TRADES">🔄 TAKASLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Your pending trade offers. To send a new offer, press the 🔄 next to a friend in Friends.">Bekleyen takas tekliflerin. Yeni bir teklif göndermek için Arkadaşlar'dan bir arkadaşının yanındaki 🔄'ya bas.</p>
                 <div id="trade-offers-list"></div>
             </div>
         </div>
@@ -712,8 +715,8 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('guild-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🛡️ LONCA</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Bir lonca kur ya da mevcut birine katıl. Aynı anda sadece bir loncada olabilirsin.</p>
+                <h2 class="modal-title" data-i18n-en="🛡️ GUILD">🛡️ LONCA</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Found a guild or join an existing one. You can only be in one guild at a time.">Bir lonca kur ya da mevcut birine katıl. Aynı anda sadece bir loncada olabilirsin.</p>
                 <div id="guild-panel"></div>
             </div>
         </div>
@@ -723,8 +726,8 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('titles-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🎖️ UNVANLAR</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Başarıların sayesinde açılan unvanları kuşan - Lider Tablosu, PvP Sıralaması ve Arkadaşlar'da adının yanında görünür.</p>
+                <h2 class="modal-title" data-i18n-en="🎖️ TITLES">🎖️ UNVANLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Equip titles unlocked through your achievements - shown next to your name on the Leaderboard, PvP Ranking, and Friends.">Başarıların sayesinde açılan unvanları kuşan - Lider Tablosu, PvP Sıralaması ve Arkadaşlar'da adının yanında görünür.</p>
                 <div id="titles-list"></div>
             </div>
         </div>
@@ -734,8 +737,8 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('talents-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🌳 YETENEKLER</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Kalıcı bonuslar - bir kez öğrenilince her koşuda (run) aktif kalır. Puanlar PvP galibiyeti ve tamamlanan günlük görevlerle kazanılır.</p>
+                <h2 class="modal-title" data-i18n-en="🌳 TALENTS">🌳 YETENEKLER</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="Permanent bonuses - once learned, they stay active on every run (run). Points are earned from PvP wins and completed daily quests.">Kalıcı bonuslar - bir kez öğrenilince her koşuda (run) aktif kalır. Puanlar PvP galibiyeti ve tamamlanan günlük görevlerle kazanılır.</p>
                 <div id="talents-list"></div>
             </div>
         </div>
@@ -745,8 +748,8 @@
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="toggleModal('achievements-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🏆 BAŞARIMLAR</h2>
-                <p style="font-size:0.8rem; color:#bdc3c7;">Bir kez kazanılan rozet listende kalıcı kalır, ama stat bonusu sadece AKTİFKEN geçerli - öldüğünde/kaybettiğinde bonuslar sıfırlanır, aynı anı tekrar yaşayarak yeniden aktif etmen gerekir.</p>
+                <h2 class="modal-title" data-i18n-en="🏆 ACHIEVEMENTS">🏆 BAŞARIMLAR</h2>
+                <p style="font-size:0.8rem; color:#bdc3c7;" data-i18n-en="A badge earned once stays on your list permanently, but its stat bonus only applies while ACTIVE - dying/losing resets the bonuses, you need to pull off the same feat again to reactivate it.">Bir kez kazanılan rozet listende kalıcı kalır, ama stat bonusu sadece AKTİFKEN geçerli - öldüğünde/kaybettiğinde bonuslar sıfırlanır, aynı anı tekrar yaşayarak yeniden aktif etmen gerekir.</p>
                 <div id="achievement-list"></div>
             </div>
         </div>
@@ -756,38 +759,38 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('pvp-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🗡️ PVP DÜELLOSU</h2>
-                <p style="font-size:0.85rem; color:#bdc3c7;">Gerçek zamanlı 1v1 - tek oyunculu ile aynı kurallar (eşleşme çarpanları, L/T şekilleri, ekstra tur, sınıf ultimateleri). Ana menüde seçtiğin sınıfla savaşırsın. Rakibin canı bilerek gizli.</p>
+                <h2 class="modal-title" data-i18n-en="🗡️ PvP DUEL">🗡️ PVP DÜELLOSU</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;" data-i18n-en="Real-time 1v1 - same rules as solo (match multipliers, L/T shapes, extra turns, class ultimates). You fight with the class you picked in the main menu. Your opponent's HP is deliberately hidden.">Gerçek zamanlı 1v1 - tek oyunculu ile aynı kurallar (eşleşme çarpanları, L/T şekilleri, ekstra tur, sınıf ultimateleri). Ana menüde seçtiğin sınıfla savaşırsın. Rakibin canı bilerek gizli.</p>
 
                 <div id="pvp-setup">
-                    <button id="pvp-quickmatch-btn" class="overlay-btn" style="width:100%; margin:0 0 6px;" onclick="pvpStartQuickMatch()">⚡ Hızlı Eşleşme</button>
-                    <button id="pvp-cancel-quickmatch-btn" class="action-btn" style="width:100%; margin:0 0 10px; display:none;" onclick="pvpCancelQuickMatch()">Aramayı İptal Et</button>
-                    <p style="font-size:0.75rem; color:#7f8c8d; text-align:center; margin:0 0 10px;">— veya bir arkadaşınla oda kodu paylaş —</p>
-                    <input id="pvp-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
+                    <button data-i18n-en="⚡ Quick Match" id="pvp-quickmatch-btn" class="overlay-btn" style="width:100%; margin:0 0 6px;" onclick="pvpStartQuickMatch()">⚡ Hızlı Eşleşme</button>
+                    <button data-i18n-en="Cancel Search" id="pvp-cancel-quickmatch-btn" class="action-btn" style="width:100%; margin:0 0 10px; display:none;" onclick="pvpCancelQuickMatch()">Aramayı İptal Et</button>
+                    <p style="font-size:0.75rem; color:#7f8c8d; text-align:center; margin:0 0 10px;" data-i18n-en="— or share a room code with a friend —">— veya bir arkadaşınla oda kodu paylaş —</p>
+                    <input id="pvp-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" data-i18n-placeholder-en="ROOM CODE (e.g. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
                     <div style="display:flex; gap:6px;">
-                        <button class="overlay-btn" style="flex:1; margin:0;" onclick="pvpJoinRoom()">Odaya Katıl</button>
-                        <button class="action-btn" style="flex:1; margin:0;" onclick="pvpWatchRoom()">👁️ İzle</button>
+                        <button data-i18n-en="Join Room" class="overlay-btn" style="flex:1; margin:0;" onclick="pvpJoinRoom()">Odaya Katıl</button>
+                        <button data-i18n-en="👁️ Watch" class="action-btn" style="flex:1; margin:0;" onclick="pvpWatchRoom()">👁️ İzle</button>
                     </div>
                     <p id="pvp-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px;"></p>
-                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar. Bir maçı sadece izlemek istersen kodu yazıp "İzle"ye bas.</p>
+                    <p style="font-size:0.75rem; color:#7f8c8d;" data-i18n-en='Once both of you type the same code, the match starts automatically. To just watch a match, type the code and press "Watch".'>İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar. Bir maçı sadece izlemek istersen kodu yazıp "İzle"ye bas.</p>
                 </div>
 
                 <div id="pvp-spectate-view" style="display:none;">
-                    <p style="text-align:center; font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;">👁️ İzleyici modu - sadece izliyorsun, oynayamazsın.</p>
+                    <p style="text-align:center; font-size:0.75rem; color:#7f8c8d; margin:0 0 8px;" data-i18n-en="👁️ Spectator mode - you're only watching, you can't play.">👁️ İzleyici modu - sadece izliyorsun, oynayamazsın.</p>
                     <div id="pvp-spectate-status"></div>
                     <div class="grid mp-grid" id="pvp-spectate-grid" style="margin: 0 auto 10px;"></div>
-                    <button class="action-btn" style="width:100%; margin:0;" onclick="pvpStopWatching()">İzlemeyi Bırak</button>
+                    <button data-i18n-en="Stop Watching" class="action-btn" style="width:100%; margin:0;" onclick="pvpStopWatching()">İzlemeyi Bırak</button>
                 </div>
 
                 <div id="pvp-battle" style="display:none;">
-                    <p id="pvp-connection-badge" style="text-align:center; font-size:0.75rem; color:#2ecc71; margin:0 0 6px;">🟢 Rakip bağlı</p>
+                    <p id="pvp-connection-badge" style="text-align:center; font-size:0.75rem; color:#2ecc71; margin:0 0 6px;" data-i18n-en="🟢 Opponent connected">🟢 Rakip bağlı</p>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
-                        <div>SEN</div>
+                        <div data-i18n-en="YOU">SEN</div>
                         <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="pvp-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
-                        <div>RAKİP</div>
+                        <div data-i18n-en="OPPONENT">RAKİP</div>
                         <div class="bar-container"><div id="pvp-opp-status-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
                         <span id="pvp-opp-status-text" class="hp-text">AYAKTA</span>
                     </div>
@@ -795,7 +798,7 @@
                     <div style="text-align:center; margin-bottom:6px;">
                         <div id="pvp-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
                         <div class="stats-peek-wrap" onmouseenter="renderStatsTooltip(document.getElementById('stats-tooltip-pvp'), null)">
-                            <button class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-pvp', null)">📊 Statların</button>
+                            <button data-i18n-en="📊 Your Stats" class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-pvp', null)">📊 Statların</button>
                             <div class="stats-tooltip" id="stats-tooltip-pvp"></div>
                         </div>
                     </div>
@@ -816,30 +819,30 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-modal" onclick="toggleModal('coop-modal')">×</span>
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">🤝 CO-OP ZİNDANI</h2>
-                <p style="font-size:0.85rem; color:#bdc3c7;">İki oyuncu aynı tahta üzerinde sırayla oynayarak zindanda ilerler (her 5 levelde bir boss) - hamlelerin karşılıklı canlı görünür. Düşman canı ortak, takım arkadaşının canı ise gizli (sadece bayılıp bayılmadığı görünür). Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
+                <h2 class="modal-title" data-i18n-en="🤝 CO-OP DUNGEON">🤝 CO-OP ZİNDANI</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;" data-i18n-en="Two players take turns advancing through the dungeon on the same board (a boss every 5 levels) - each other's moves appear live. Enemy HP is shared, while your teammate's HP is hidden (only whether they're down or not is shown). If one goes down, the other reviving them 30% HP by completing their next move.">İki oyuncu aynı tahta üzerinde sırayla oynayarak zindanda ilerler (her 5 levelde bir boss) - hamlelerin karşılıklı canlı görünür. Düşman canı ortak, takım arkadaşının canı ise gizli (sadece bayılıp bayılmadığı görünür). Biri bayılırsa diğeri hayatta kalıp bir sonraki hamlesini tamamlayınca onu %30 canla ayağa kaldırır.</p>
 
                 <div id="coop-setup">
-                    <input id="coop-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
-                    <button class="overlay-btn" style="width:100%; margin:0;" onclick="coopJoinRoom()">Odaya Katıl</button>
+                    <input id="coop-room-input" type="text" placeholder="ODA KODU (örn. TEST1)" data-i18n-placeholder-en="ROOM CODE (e.g. TEST1)" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff; text-transform:uppercase;">
+                    <button data-i18n-en="Join Room" class="overlay-btn" style="width:100%; margin:0;" onclick="coopJoinRoom()">Odaya Katıl</button>
                     <p id="coop-status" style="font-size:0.8rem; color:#f1c40f; margin-top:8px;"></p>
-                    <p style="font-size:0.75rem; color:#7f8c8d;">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar.</p>
+                    <p style="font-size:0.75rem; color:#7f8c8d;" data-i18n-en="Once both of you type the same code, the match starts automatically.">İki kişi de aynı kodu yazıp katılınca eşleşme otomatik başlar.</p>
                 </div>
 
                 <div id="coop-battle" style="display:none;">
                     <p id="coop-level-label" style="text-align:center; font-size:0.85rem; color:#bdc3c7; margin:0 0 6px;">Lvl 1</p>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
-                        <div>DÜŞMAN</div>
+                        <div data-i18n-en="ENEMY">DÜŞMAN</div>
                         <div class="bar-container"><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
                         <span id="coop-boss-hp-text" class="hp-text">0/0</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
-                        <div>SEN</div>
+                        <div data-i18n-en="YOU">SEN</div>
                         <div class="bar-container"><div id="coop-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="coop-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
-                        <div>TAKIM ARKADAŞI</div>
+                        <div data-i18n-en="TEAMMATE">TAKIM ARKADAŞI</div>
                         <div class="bar-container"><div id="coop-ally-hp-bar" class="bar" style="background-color:#3498db; width:100%;"></div></div>
                         <span id="coop-ally-hp-text" class="hp-text">AYAKTA</span>
                     </div>
@@ -847,7 +850,7 @@
                     <div style="text-align:center; margin-bottom:6px;">
                         <div id="coop-speed-bonus" class="speed-bonus" style="display:none;">⚡x2.0</div>
                         <div class="stats-peek-wrap" onmouseenter="renderStatsTooltip(document.getElementById('stats-tooltip-coop'), coopEnemyStats)">
-                            <button class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-coop', () => coopEnemyStats)">📊 Statların</button>
+                            <button data-i18n-en="📊 Your Stats" class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-coop', () => coopEnemyStats)">📊 Statların</button>
                             <div class="stats-tooltip" id="stats-tooltip-coop"></div>
                         </div>
                     </div>
@@ -867,11 +870,11 @@
     <div id="betrayal-summary-modal" class="modal-overlay" style="z-index:210;">
         <div class="modal-content" style="max-width: 380px; text-align:center;">
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title" id="betrayal-summary-title">⚔️ DÜELLO SONUCU</h2>
+                <h2 class="modal-title" id="betrayal-summary-title" data-i18n-en="⚔️ DUEL RESULT">⚔️ DÜELLO SONUCU</h2>
                 <p id="betrayal-summary-outcome" style="font-size:1.4rem; font-weight:bold; margin:4px 0;"></p>
                 <p id="betrayal-summary-detail" style="font-size:0.9rem; color:#bdc3c7;"></p>
                 <p id="betrayal-summary-wallet" style="font-size:0.9rem; color:#f1c40f; margin-top:8px;"></p>
-                <button class="overlay-btn" style="width:100%; margin-top:12px;" onclick="pvpCloseBetrayalSummary()">Ana Menüye Dön</button>
+                <button data-i18n-en="Return to Main Menu" class="overlay-btn" style="width:100%; margin-top:12px;" onclick="pvpCloseBetrayalSummary()">Ana Menüye Dön</button>
             </div>
         </div>
     </div>
@@ -880,8 +883,8 @@
     <div id="coop-reward-modal" class="modal-overlay" style="z-index:150;">
         <div class="modal-content" style="max-width: 400px; text-align:center;">
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title">✨ BİR GÜÇ SEÇ</h2>
-                <p style="font-size:0.85rem; color:#bdc3c7;">Sadece bu run için geçerli - zindan bitince sıfırlanır. Takım arkadaşın kendi seçimini kendi ekranında yapıyor.</p>
+                <h2 class="modal-title" data-i18n-en="✨ CHOOSE A POWER">✨ BİR GÜÇ SEÇ</h2>
+                <p style="font-size:0.85rem; color:#bdc3c7;" data-i18n-en="Only applies to this run - resets when the dungeon ends. Your teammate makes their own choice on their own screen.">Sadece bu run için geçerli - zindan bitince sıfırlanır. Takım arkadaşın kendi seçimini kendi ekranında yapıyor.</p>
                 <div id="coop-reward-options" class="reward-container"></div>
             </div>
         </div>
@@ -890,7 +893,7 @@
     <div id="hidden-vote-modal" class="modal-overlay" style="z-index:200;">
         <div class="modal-content" style="max-width: 360px; text-align:center;">
             <div class="modal-section" style="border-bottom:none;">
-                <h2 class="modal-title" id="hidden-vote-title">🗳️ GİZLİ OY</h2>
+                <h2 class="modal-title" id="hidden-vote-title" data-i18n-en="🗳️ SECRET VOTE">🗳️ GİZLİ OY</h2>
                 <p id="hidden-vote-desc" style="font-size:0.9rem; color:#bdc3c7;"></p>
                 <button id="hidden-vote-btn-a" class="overlay-btn" style="width:100%; margin:6px 0;" onclick="coopSubmitVote(this.dataset.choice)"></button>
                 <button id="hidden-vote-btn-b" class="overlay-btn" style="width:100%; margin:6px 0;" onclick="coopSubmitVote(this.dataset.choice)"></button>
@@ -903,11 +906,12 @@
         <div class="version">v1.06 Add Terms of Service and player-feedback link</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
-            <button class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
-            <button class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
+            <button data-i18n-en="🎁 Daily Reward" class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
+            <button data-i18n-en="🛒 Shop" class="loot-btn" onclick="toggleModal('shop-modal')">🛒 Dükkan</button>
             <button class="loot-btn" onclick="toggleModal('coop-modal')">🤝 Co-op</button>
             <button class="loot-btn" onclick="toggleModal('pvp-modal')">🗡️ PvP</button>
             <button class="loot-btn" onclick="toggleModal('profile-modal')">👤 Profil</button>
+            <button class="help-btn lang-toggle-btn" onclick="toggleLanguage()" title="Dili değiştir / Switch language">🇬🇧 EN</button>
             <button class="help-btn" onclick="toggleModal('info-modal')">Help</button>
         </div>
     </div>
@@ -920,7 +924,7 @@
             <span id="enemy-name">Slime Lvl 1</span>
         </div>
         <div class="turn-status">
-            <div id="turn-banner" class="turn-indicator turn-player">BEKLENİYOR...</div>
+            <div id="turn-banner" class="turn-indicator turn-player" data-i18n-en="WAITING...">BEKLENİYOR...</div>
             <div id="speed-bonus" class="speed-bonus">⚡x2.0</div>
             <div class="stats-peek-wrap" onmouseenter="renderStatsTooltip(document.getElementById('stats-tooltip-solo'), ENEMY_TILE_STATS)">
                 <button class="stats-peek-btn" onclick="toggleStatsTooltipTouch('stats-tooltip-solo', () => ENEMY_TILE_STATS)">📊</button>
@@ -944,7 +948,7 @@
         </div>
 
         <div class="stat-box">
-            <div>DÜŞMAN</div>
+            <div data-i18n-en="ENEMY">DÜŞMAN</div>
             <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
             <span id="enemy-hp-text" class="hp-text">50/50</span>
@@ -954,13 +958,13 @@
     <div class="grid" id="grid">
         <div class="ai-cursor" id="ai-cursor"></div>
         <div id="game-overlay" class="game-overlay visible">
-            <h1 id="overlay-title" class="overlay-title">SELECT YOUR HERO</h1>
+            <h1 id="overlay-title" class="overlay-title" data-i18n-en="SELECT YOUR HERO">KAHRAMANINI SEÇ</h1>
             <div id="class-selection" class="reward-container"></div>
             <div id="mode-selection" class="reward-container" style="display:none;"></div>
 
             <div id="reward-area" class="reward-container" style="display:none;"></div>
             <div id="boss-checkpoint" class="reward-container" style="display:none;"></div>
-            <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()">SAVAŞA BAŞLA</button>
+            <button id="overlay-btn" class="overlay-btn" style="display:none;" onclick="handleOverlayClick()" data-i18n-en="START BATTLE">SAVAŞA BAŞLA</button>
         </div>
     </div>
 
@@ -970,10 +974,12 @@
         <span class="log-chevron">▼</span>
     </div>
     <div id="log"></div>
-    <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled>ULTİMATE KULLAN (%100 Gerekli)</button>
+    <button onclick="useUltimate()" id="ult-btn" class="action-btn" disabled data-i18n-en="USE ULTIMATE (100% Required)">ULTİMATE KULLAN (%100 Gerekli)</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="i18n.js?v=1.06"></script>
+    <script src="i18n-dict.js?v=1.06"></script>
     <script src="sound.js?v=1.06"></script>
     <script src="economy.js?v=1.06"></script>
     <script src="items.js?v=1.06"></script>
