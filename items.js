@@ -293,35 +293,35 @@ const UNIQUE_PASSIVES = {
     // --- Orange (Efsanevi) ---------------------------------------------------
     uniq_nights_lament: { // Gecenin Ağıtı - Kan Zırhı
         hook: 'sword',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return `✨ Kan Zırhı: +${b} Zırh`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return tf('✨ Kan Zırhı: +{b} Zırh', { b }); }
     },
     uniq_shield_of_eternity: { // Sonsuzluk Kalkanı - Sonsuz Dayanıklılık
         hook: 'shield',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.healSelf(b); return `✨ Sonsuz Dayanıklılık: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Sonsuz Dayanıklılık: +{b} can', { b }); }
     },
     uniq_oracles_crown: { // Kahinin Tacı - Kehanet
         hook: 'energy',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Kehanet: +${b}% ult`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return tf('✨ Kehanet: +{b}% ult', { b }); }
     },
     uniq_dragonheart_plate: { // Ejderha Yürek Zırhı - Ejderha Kalbi
         hook: 'heart',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return `✨ Ejderha Kalbi: +${b} Zırh`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addArmor(b); return tf('✨ Ejderha Kalbi: +{b} Zırh', { b }); }
     },
     uniq_storm_eagle_pauldrons: { // Fırtına Kartalı Omuzluğu - Fırtına Hızı
         hook: 'sword',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Fırtına Hızı: +${b}% ult`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addEnergy(b); return tf('✨ Fırtına Hızı: +{b}% ult', { b }); }
     },
     uniq_butchers_claws: { // Kasabın Pençeleri - Kasap İçgüdüsü
         hook: 'skull',
-        effect: (ctx, p) => { let b = Math.floor(p.recoil * 0.5); if (b <= 0) return null; ctx.healSelf(b); return `✨ Kasap İçgüdüsü: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.recoil * 0.5); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Kasap İçgüdüsü: +{b} can', { b }); }
     },
     uniq_windwalkers: { // Rüzgar Yürüyüşü - Rüzgar Adımı
         hook: 'energy',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addArmor(b); return `✨ Rüzgar Adımı: +${b} Zırh`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.addArmor(b); return tf('✨ Rüzgar Adımı: +{b} Zırh', { b }); }
     },
     uniq_ring_of_ancient_wisdom: { // Kadim Bilgelik Halkası - Kadim Bilgelik
         hook: 'ultimate',
-        effect: (ctx) => { ctx.addEnergy(10); return `✨ Kadim Bilgelik: +10% ult`; }
+        effect: (ctx) => { ctx.addEnergy(10); return t('✨ Kadim Bilgelik: +10% ult'); }
     },
 
     // --- Red (İlksel Efsanevi) ------------------------------------------------
@@ -334,7 +334,7 @@ const UNIQUE_PASSIVES = {
         effect: (ctx, p) => {
             if (ctx.getSelfHP() >= ctx.getMaxHP() * 0.3) return null;
             let b = Math.floor(p.amount * 0.5); if (b <= 0) return null;
-            ctx.addArmor(b); return `✨ Son Savunma: +${b} Zırh`;
+            ctx.addArmor(b); return tf('✨ Son Savunma: +{b} Zırh', { b });
         }
     },
     uniq_starfall_helm: { // Yıldız Düşüren Miğfer - Yıldız Yağmuru
@@ -342,12 +342,12 @@ const UNIQUE_PASSIVES = {
         effect: (ctx) => {
             let dmg = Math.floor((typeof TILE_STATS !== 'undefined' ? TILE_STATS.ult_dmg : 0) * 0.2);
             if (dmg <= 0) return null;
-            ctx.dealDirectDamageToOpponent(dmg); return `✨ Yıldız Yağmuru: ${dmg} ekstra hasar`;
+            ctx.dealDirectDamageToOpponent(dmg); return tf('✨ Yıldız Yağmuru: {dmg} ekstra hasar', { dmg });
         }
     },
     uniq_titans_hide: { // Titan'ın Derisi - Titan Zırhı
         hook: 'sword',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return `✨ Titan Zırhı: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Titan Zırhı: +{b} can', { b }); }
     },
     uniq_doomwings: { // Kıyamet Kanatları - Kıyamet
         hook: 'skull',
@@ -355,33 +355,33 @@ const UNIQUE_PASSIVES = {
     },
     uniq_the_throatreaver: { // Boğazlayıcı - Boğaz Kesen
         hook: 'skull',
-        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.25); if (b <= 0) return null; ctx.healSelf(b); return `✨ Boğaz Kesen: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.25); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Boğaz Kesen: +{b} can', { b }); }
     },
     uniq_timestep_striders: { // Zaman Adımı - Zaman Bükümü
         hook: 'ultimate',
-        effect: (ctx) => { ctx.addEnergy(20); return `✨ Zaman Bükümü: +20% ult`; }
+        effect: (ctx) => { ctx.addEnergy(20); return t('✨ Zaman Bükümü: +20% ult'); }
     },
     uniq_eternity_core: { // Sonsuzluk Çekirdeği - Sonsuzluk Çekirdeği
         hook: 'ultimate',
-        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.15); if (heal <= 0) return null; ctx.healSelf(heal); return `✨ Sonsuzluk Çekirdeği: +${heal} can`; }
+        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.15); if (heal <= 0) return null; ctx.healSelf(heal); return tf('✨ Sonsuzluk Çekirdeği: +{heal} can', { heal }); }
     },
 
     // --- Teal (Ethereal) -------------------------------------------------------
     uniq_whisper_of_the_void: { // Hiçliğin Fısıltısı - Boşluk Yankısı
         hook: 'ultimate',
-        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.1); if (heal <= 0) return null; ctx.healSelf(heal); return `✨ Boşluk Yankısı: +${heal} can`; }
+        effect: (ctx) => { let heal = Math.floor(ctx.getMaxHP() * 0.1); if (heal <= 0) return null; ctx.healSelf(heal); return tf('✨ Boşluk Yankısı: +{heal} can', { heal }); }
     },
     uniq_shattered_time_aegis: { // Kırık Zaman Kalkanı - Kırık Zaman
         hook: 'shield',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Kırık Zaman: +${b}% ult`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return tf('✨ Kırık Zaman: +{b}% ult', { b }); }
     },
     uniq_astral_sight: { // Astral Görüş - Astral Görüş
         hook: 'energy',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Astral Görüş: +${b}% ult`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.25); if (b <= 0) return null; ctx.addEnergy(b); return tf('✨ Astral Görüş: +{b}% ult', { b }); }
     },
     uniq_shroud_of_shadows: { // Gölge Örtüsü - Gölge Örtüsü
         hook: 'sword',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return `✨ Gölge Örtüsü: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.15); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Gölge Örtüsü: +{b} can', { b }); }
     },
     uniq_cosmic_wings: { // Kozmik Kanatlar - Kozmik Rüzgar
         hook: 'skull',
@@ -389,15 +389,15 @@ const UNIQUE_PASSIVES = {
     },
     uniq_soul_rending_claws: { // Ruh Emici Pençeler - Ruh Emme
         hook: 'skull',
-        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.2); if (b <= 0) return null; ctx.healSelf(b); return `✨ Ruh Emme: +${b} can`; }
+        effect: (ctx, p) => { let b = Math.floor(p.dmgToOpponent * 0.2); if (b <= 0) return null; ctx.healSelf(b); return tf('✨ Ruh Emme: +{b} can', { b }); }
     },
     uniq_voidstep: { // Boşluk Adımı - Boşluk Sıçraması
         hook: 'sword',
-        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return `✨ Boşluk Sıçraması: +${b}% ult`; }
+        effect: (ctx, p) => { let b = Math.floor(p.amount * 0.2); if (b <= 0) return null; ctx.addEnergy(b); return tf('✨ Boşluk Sıçraması: +{b}% ult', { b }); }
     },
     uniq_eye_of_infinity: { // Sonsuzluk Gözü - Sonsuzluk Gözü
         hook: 'ultimate',
-        effect: (ctx) => { ctx.addEnergy(15); return `✨ Sonsuzluk Gözü: +15% ult`; }
+        effect: (ctx) => { ctx.addEnergy(15); return t('✨ Sonsuzluk Gözü: +15% ult'); }
     }
 };
 
@@ -473,7 +473,7 @@ function generateItem(slot, rarityKey, opts) {
 
     return {
         base_id: base.id, slot, rarity: rarityKey,
-        name: `${flavorName} (${rarity.label})`, emoji: base.emoji,
+        name: `${flavorName} (${t(rarity.label)})`, emoji: base.emoji,
         rolled_stats: stats, set_key: null,
         cost: rarity.shopAvailable ? Math.round(20 * rarity.costMult) : null
     };
@@ -512,18 +512,18 @@ function rollLootDrop(ownedItems) {
 function itemDisplayInfo(item) {
     if (item.set_key) {
         let piece = ITEM_SETS[item.set_key].pieces[item.base_id];
-        return { name: piece.name, emoji: piece.emoji };
+        return { name: t(piece.name), emoji: piece.emoji };
     }
     let rarity = RARITY_DEFS[item.rarity];
     if (rarity && rarity.isUnique) {
         let uniq = UNIQUE_LEGENDARIES[item.rarity][item.slot];
-        return { name: uniq.name, emoji: uniq.emoji, passiveDesc: uniq.passiveDesc || null };
+        return { name: t(uniq.name), emoji: uniq.emoji, passiveDesc: uniq.passiveDesc ? t(uniq.passiveDesc) : null };
     }
     let base = ITEM_BASES[item.slot] && ITEM_BASES[item.slot].find(b => b.id === item.base_id);
     if (!base) return { name: item.base_id, emoji: '❓' };
     let prefixPool = ITEM_PREFIXES[base.primaryStat];
     let prefix = prefixPool ? prefixPool[stableItemSeed(item) % prefixPool.length] : null;
-    return { name: prefix ? `${prefix} ${base.name}` : base.name, emoji: base.emoji };
+    return { name: prefix ? `${t(prefix)} ${t(base.name)}` : t(base.name), emoji: base.emoji };
 }
 
 function formatRolledStats(stats) {
@@ -561,7 +561,7 @@ function renderShop() {
         let section = document.createElement('div');
         section.className = 'modal-section';
         let header = document.createElement('h4');
-        header.innerText = SLOT_LABELS[slot];
+        header.innerText = t(SLOT_LABELS[slot]);
         section.appendChild(header);
 
         ['grey', 'white', 'blue'].forEach(rarityKey => {
@@ -573,7 +573,7 @@ function renderShop() {
             let desc = document.createElement('div');
             desc.className = 'manual-desc';
             desc.style.color = rarity.color;
-            desc.innerHTML = `<b>${rarity.mark} ${rarity.name}</b> ${rarity.label} - rastgele ${rarity.affixCount} stat`;
+            desc.innerHTML = `<b>${rarity.mark} ${rarity.name}</b> ${t(rarity.label)} - ${tf('rastgele {n} stat', { n: rarity.affixCount })}`;
             row.appendChild(desc);
 
             let btn = document.createElement('button');
@@ -627,13 +627,16 @@ function renderEquippedSlotsInto(containerId) {
         setSummary.innerHTML = setKeys.map(key => {
             let p = setProgress[key];
             let icon = p.isActive ? '✅' : '⏳';
-            return `${icon} <b>${p.name}</b> (${p.equippedCount}/${p.totalCount})${p.isActive ? ` - <span style="color:#22c55e;">aktif: ${p.bonusDesc}</span>` : ` - tümü kuşanılınca: ${p.bonusDesc}`}`;
+            let suffix = p.isActive
+                ? ` - <span style="color:#22c55e;">${tf('aktif: {desc}', { desc: t(p.bonusDesc) })}</span>`
+                : ` - ${tf('tümü kuşanılınca: {desc}', { desc: t(p.bonusDesc) })}`;
+            return `${icon} <b>${t(p.name)}</b> (${p.equippedCount}/${p.totalCount})${suffix}`;
         }).join('<br>');
         container.appendChild(setSummary);
     }
 
     let header = document.createElement('h4');
-    header.innerHTML = `Kuşanılanlar <span style="color:var(--accent); font-size:0.85rem;">💎 Toplam Güç: ${totalEquippedPower(currentOwnedItems)}</span>`;
+    header.innerHTML = `${t('Kuşanılanlar')} <span style="color:var(--accent); font-size:0.85rem;">${tf('💎 Toplam Güç: {n}', { n: totalEquippedPower(currentOwnedItems) })}</span>`;
     container.appendChild(header);
 
     ITEM_SLOTS.forEach(slot => {
@@ -645,9 +648,9 @@ function renderEquippedSlotsInto(containerId) {
             let info = itemDisplayInfo(equipped);
             let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
             row.innerHTML = `<span class="manual-icon">${info.emoji}</span>
-                <div class="manual-desc" style="color:${rarity.color};"><b>${SLOT_LABELS[slot]}: ${info.name} (${rarity.mark} ${rarity.label})</b>${formatRolledStats(equipped.rolled_stats)} · 💎${itemPower(equipped)}${passiveLine}</div>`;
+                <div class="manual-desc" style="color:${rarity.color};"><b>${t(SLOT_LABELS[slot])}: ${info.name} (${rarity.mark} ${t(rarity.label)})</b>${formatRolledStats(equipped.rolled_stats)} · 💎${itemPower(equipped)}${passiveLine}</div>`;
         } else {
-            row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${SLOT_LABELS[slot]}: Boş</b></div>`;
+            row.innerHTML = `<span class="manual-icon">➖</span><div class="manual-desc" style="color:#7f8c8d;"><b>${t(SLOT_LABELS[slot])}: ${t('Boş')}</b></div>`;
         }
         container.appendChild(row);
     });
@@ -666,9 +669,9 @@ function renderInventory() {
 
     let listDiv = document.createElement('div');
     listDiv.className = 'modal-section';
-    listDiv.innerHTML = '<h4>Envanter</h4>';
+    listDiv.innerHTML = `<h4>${t('Envanter')}</h4>`;
     if (currentOwnedItems.length === 0) {
-        listDiv.innerHTML += '<p style="color:#7f8c8d; font-size:0.8rem;">Henüz eşyan yok.</p>';
+        listDiv.innerHTML += `<p style="color:#7f8c8d; font-size:0.8rem;">${t('Henüz eşyan yok.')}</p>`;
     }
 
     function buildInventoryRow(item) {
@@ -706,10 +709,10 @@ function renderInventory() {
             // on the item itself - previously this only said the set's NAME,
             // with no indication of how many pieces it needs or what
             // equipping them all actually does.
-            setLine = ` · Set: ${set.name} (${equippedCount}/${totalCount}) → ${set.bonusDesc}`;
+            setLine = ' · ' + tf('Set: {name} ({eq}/{total}) → {bonus}', { name: t(set.name), eq: equippedCount, total: totalCount, bonus: t(set.bonusDesc) });
         }
         let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
-        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${rarity.label}) · 💎${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
+        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${t(rarity.label)}) · 💎${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
         row.appendChild(desc);
 
         let btnWrap = document.createElement('div');
@@ -719,8 +722,8 @@ function renderInventory() {
         let btn = document.createElement('button');
         btn.className = 'action-btn';
         btn.style.width = 'auto'; btn.style.margin = '0';
-        if (item.equipped_slot) { btn.innerText = 'ÇIKAR'; btn.onclick = () => unequipItem(item.id); }
-        else { btn.innerText = 'KUŞAN'; btn.onclick = () => equipItem(item.id); }
+        if (item.equipped_slot) { btn.innerText = t('ÇIKAR'); btn.onclick = () => unequipItem(item.id); }
+        else { btn.innerText = t('KUŞAN'); btn.onclick = () => equipItem(item.id); }
         btnWrap.appendChild(btn);
 
         // Scrap/upgrade only make sense for an item that's just sitting in
@@ -742,7 +745,7 @@ function renderInventory() {
             scrapBtn.className = 'action-btn';
             scrapBtn.style.width = 'auto'; scrapBtn.style.margin = '0'; scrapBtn.style.background = '#7f8c8d';
             scrapBtn.innerText = `♻️ +${ITEM_SCRAP_VALUES[item.rarity] || 1}🪨`;
-            scrapBtn.title = 'Hurdaya çevir';
+            scrapBtn.title = t('Hurdaya çevir');
             scrapBtn.onclick = () => scrapItem(item.id);
             btnWrap.appendChild(scrapBtn);
         }
@@ -766,7 +769,7 @@ function renderInventory() {
 
         let slotHeader = document.createElement('div');
         slotHeader.style.cssText = 'font-size:0.75rem; color:#7f8c8d; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; font-weight:bold;';
-        slotHeader.innerText = `${SLOT_LABELS[slot]} (${itemsInSlot.length})`;
+        slotHeader.innerText = `${t(SLOT_LABELS[slot])} (${itemsInSlot.length})`;
         listDiv.appendChild(slotHeader);
 
         itemsInSlot.forEach(item => listDiv.appendChild(buildInventoryRow(item)));
@@ -779,7 +782,7 @@ function showLootToast(item) {
     let el = document.createElement('div');
     el.className = 'achievement-toast';
     el.style.borderColor = rarity.color;
-    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${rarity.label} DÜŞTÜ</b><br>${item.name}${item.set_key || (RARITY_DEFS[item.rarity] && RARITY_DEFS[item.rarity].isUnique) ? '' : ` · 💎${itemPower(item)}`}`;
+    el.innerHTML = `<b style="color:${rarity.color};">${item.emoji} ${rarity.mark} ${tf('{rarity} DÜŞTÜ', { rarity: t(rarity.label) })}</b><br>${item.name}${item.set_key || (RARITY_DEFS[item.rarity] && RARITY_DEFS[item.rarity].isUnique) ? '' : ` · 💎${itemPower(item)}`}`;
     document.body.appendChild(el);
     setTimeout(() => el.classList.add('visible'), 10);
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 3500);
