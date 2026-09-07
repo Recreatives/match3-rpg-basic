@@ -1106,6 +1106,16 @@ function soloPlayHit(sideStr, tileType) {
     if (stage) stage.playHit(tileType);
 }
 
+// Sword/skull actually damage the receiving side - a real knockback, not
+// just the gentle self-buff shake soloPlayHit above plays for shield/heart/
+// energy. See graphics.js's playHitReaction for why this needed its own
+// method instead of reusing playHit for every tile type.
+function soloPlayHitReaction(sideStr, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
+    if (stage) stage.playHitReaction(tileType);
+}
+
 function applyRPGEffects(type, multiplier) {
     if (currentState !== STATE.PLAYING) return;
 
@@ -1124,13 +1134,13 @@ function applyRPGEffects(type, multiplier) {
     // has no class, so the enemy's own turn never triggers this.
     if (isPlayerTurn && selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('player-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type);
     }
 
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
-        soloPlayHit(target, 'sword');
+        soloPlayHitReaction(target, 'sword');
         log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
@@ -1185,7 +1195,7 @@ function applyRPGEffects(type, multiplier) {
         let self = isPlayerTurn ? 'player' : 'enemy';
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
-        soloPlayHit(target, 'skull');
+        soloPlayHitReaction(target, 'skull');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         if (typeof playSound === 'function') playSound('crit');

@@ -43,22 +43,75 @@ const IDLE_FRAME_COUNT = 4;
 
 // No attack spritesheet exists in the free art this project uses (see
 // assets/CREDITS.md) - the character/monster packs only ship idle/walk/run.
-// Rather than leave every class's "hit" looking identical, each class gets a
-// hand-authored procedural motion (position/rotation/scale offsets from the
-// portrait's resting pose, as a function of t in [0,1]) played on top of the
-// idle animation whenever THAT class's own tile match lands. Chosen to echo
-// each class's own combat identity: Warrior bashes forward, Berserker throws
-// two wild hits, Rogue darts in low and fast, Archer draws back then
-// releases, Mage rises and pulses, Necromancer dips down to channel, Paladin
-// winds up and slams down.
+// Rather than leave every class's every tile type looking identical, each
+// class gets its own motion PER TILE TYPE (35 combinations total), built
+// from a small set of reusable primitives below rather than 35 fully
+// bespoke curves. Every primitive is a function of t in [0,1] returning
+// {dx, dy, rot, scale} offsets from the portrait's resting pose.
+const MOTION = {
+    // forward-and-back lunge (attack)
+    lunge: (amp, rotAmp = 0) => t => ({ dx: Math.sin(t * Math.PI) * amp, dy: 0, rot: Math.sin(t * Math.PI) * rotAmp, scale: 1 + Math.sin(t * Math.PI) * 0.08 }),
+    // two rapid back-to-back lunges (frenzied attack)
+    doubleLunge: (amp, rotAmp = 0) => t => ({ dx: Math.sin(t * Math.PI * 2) * amp, dy: 0, rot: Math.sin(t * Math.PI * 2) * rotAmp, scale: 1 }),
+    // diagonal dart forward-up and back (rogue-style quick strike)
+    dash: (dx, dy) => t => ({ dx: Math.sin(t * Math.PI) * dx, dy: -Math.sin(t * Math.PI) * dy, rot: -Math.sin(t * Math.PI) * 0.2, scale: 1 - Math.sin(t * Math.PI) * 0.08 }),
+    // pull back (anticipation) then snap forward past origin (bow release)
+    pullRelease: (back, forward) => t => ({ dx: t < 0.35 ? -back * (t / 0.35) : forward * Math.sin(((t - 0.35) / 0.65) * Math.PI), dy: 0, rot: 0, scale: 1 }),
+    // rise up with a light rotational wobble and scale pulse (arcane cast)
+    riseAndPulse: (amp, rotAmp = 0.06) => t => ({ dx: 0, dy: -Math.sin(t * Math.PI) * amp, rot: Math.sin(t * Math.PI * 2) * rotAmp, scale: 1 + Math.sin(t * Math.PI) * 0.06 }),
+    // dip down then rise back (channeling/drawing essence inward)
+    dipAndRise: (amp, scaleAmp = 0.07) => t => ({ dx: 0, dy: Math.sin(t * Math.PI) * amp, rot: 0, scale: 1 - Math.sin(t * Math.PI) * scaleAmp }),
+    // wind up (rise) then slam down hard with a squash on landing
+    windUpSlam: (up, down, squash = 0.12) => t => ({ dx: 0, dy: t < 0.45 ? -up * (t / 0.45) : down * ((t - 0.45) / 0.55), rot: 0, scale: t > 0.45 ? 1 + ((t - 0.45) / 0.55) * squash : 1 }),
+    // raise up and hold, bracing (shield block)
+    raiseGuard: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI * 0.9), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.05 }),
+    // duck/crouch low (taking cover instead of blocking)
+    duckLow: amp => t => ({ dx: 0, dy: amp * Math.sin(t * Math.PI), rot: 0, scale: 1 - Math.sin(t * Math.PI) * 0.06 }),
+    // quick lateral dodge and return (evasive block)
+    sidestep: amp => t => ({ dx: Math.sin(t * Math.PI) * amp, dy: 0, rot: Math.sin(t * Math.PI) * 0.1, scale: 1 }),
+    // brief resisting flinch then settle (shrugging off / bracing)
+    shrinkFlinch: amp => t => ({ dx: 0, dy: 0, rot: 0, scale: 1 - Math.sin(t * Math.PI) * amp }),
+    // gentle radiant float (healing glow)
+    glowFloat: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.08 }),
+    // small steady hold, minimal motion (calm/composed)
+    steady: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.03 }),
+};
+
+// Chosen to echo each class's own combat identity, AND to make the same
+// tile type read differently class to class (the user specifically asked
+// for Archer's and Warrior's own shield/armor reaction to look different
+// from each other, not just attacks) - e.g. shield: Warrior/Paladin raise
+// an actual guard, Rogue dodges instead of blocking (matches its own dodge-
+// chance passive), Archer ducks for cover, Mage/Necromancer conjure a ward.
 const CLASS_MOTIONS = {
-    warrior: t => ({ dx: Math.sin(t * Math.PI) * 12, dy: 0, rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.1 }),
-    berserker: t => ({ dx: Math.sin(t * Math.PI * 2) * 10, dy: 0, rot: Math.sin(t * Math.PI * 2) * 0.08, scale: 1 }),
-    rogue: t => ({ dx: Math.sin(t * Math.PI) * 16, dy: -Math.sin(t * Math.PI) * 7, rot: -Math.sin(t * Math.PI) * 0.2, scale: 1 - Math.sin(t * Math.PI) * 0.08 }),
-    archer: t => ({ dx: t < 0.35 ? -7 * (t / 0.35) : 11 * Math.sin(((t - 0.35) / 0.65) * Math.PI), dy: 0, rot: 0, scale: 1 }),
-    mage: t => ({ dx: 0, dy: -Math.sin(t * Math.PI) * 9, rot: Math.sin(t * Math.PI * 2) * 0.06, scale: 1 + Math.sin(t * Math.PI) * 0.06 }),
-    necromancer: t => ({ dx: 0, dy: Math.sin(t * Math.PI) * 7, rot: 0, scale: 1 - Math.sin(t * Math.PI) * 0.07 }),
-    paladin: t => ({ dx: 0, dy: t < 0.45 ? -9 * (t / 0.45) : 13 * ((t - 0.45) / 0.55), rot: 0, scale: t > 0.45 ? 1 + ((t - 0.45) / 0.55) * 0.12 : 1 }),
+    warrior: {
+        sword: MOTION.lunge(12), skull: MOTION.lunge(17, 0.05),
+        shield: MOTION.raiseGuard(9), heart: MOTION.dipAndRise(5, 0.05), energy: MOTION.riseAndPulse(3, 0.03),
+    },
+    berserker: {
+        sword: MOTION.doubleLunge(10), skull: MOTION.doubleLunge(15, 0.12),
+        shield: MOTION.shrinkFlinch(0.1), heart: MOTION.doubleLunge(5), energy: MOTION.doubleLunge(6, 0.08),
+    },
+    rogue: {
+        sword: MOTION.dash(16, 7), skull: MOTION.dash(20, 9),
+        shield: MOTION.sidestep(14), heart: MOTION.dipAndRise(4, 0.04), energy: MOTION.sidestep(6),
+    },
+    archer: {
+        sword: MOTION.pullRelease(7, 11), skull: MOTION.pullRelease(9, 15),
+        shield: MOTION.duckLow(8), heart: MOTION.steady(4), energy: MOTION.pullRelease(3, 4),
+    },
+    mage: {
+        sword: MOTION.riseAndPulse(9), skull: MOTION.riseAndPulse(12, 0.1),
+        shield: MOTION.glowFloat(6), heart: MOTION.glowFloat(9), energy: MOTION.riseAndPulse(5, 0.12),
+    },
+    necromancer: {
+        sword: MOTION.dipAndRise(7), skull: MOTION.dipAndRise(10, 0.1),
+        shield: MOTION.shrinkFlinch(0.06), heart: MOTION.dipAndRise(8, 0.05), energy: MOTION.dipAndRise(4, 0.06),
+    },
+    paladin: {
+        sword: MOTION.windUpSlam(9, 13), skull: MOTION.windUpSlam(11, 17, 0.16),
+        shield: MOTION.raiseGuard(13), heart: MOTION.riseAndPulse(10, 0.04), energy: MOTION.raiseGuard(5),
+    },
 };
 
 // Kenney's particle pack ships neutral grayscale/white masks meant to be
@@ -190,14 +243,31 @@ class CombatStage {
     }
 
     // A quick shake + white hit-flash on the portrait itself, plus a small
-    // type-specific burst sprite - this is the "vuruş efekti" the user asked
-    // for, and it fires on every ordinary tile match, not just ultimates.
+    // type-specific burst sprite - used for a SELF-buff tile (shield/heart/
+    // energy), where nobody is actually being hit, just a gentle "something
+    // happened to me" cue. For sword/skull, which actually damage someone,
+    // see playHitReaction instead - a shake reads as far too mild for "I
+    // just got hit," which is exactly the gap the user called out.
     async playHit(tileType) {
         await this.ready;
         this._shake(this.portraitSprite, 6, 220);
         this._flash(this.portraitSprite, 120);
         const effect = HIT_EFFECT_SPRITES[tileType];
         if (effect) this._burst([effect], 1.1, 380);
+    }
+
+    // Played on the DEFENDER whenever a sword/skull match actually damages
+    // them - a real knockback (pushed back and staggered, not just jittered
+    // in place) plus a stronger flash, so landing a hit is unmistakable
+    // instead of reading as a generic sparkle. skull hits knock back harder
+    // than sword, matching its bigger damage number.
+    async playHitReaction(tileType) {
+        await this.ready;
+        const severity = tileType === 'skull' ? 1.5 : 1;
+        this._knockback(this.portraitSprite, 15 * severity, 280);
+        this._flash(this.portraitSprite, 180);
+        const effect = HIT_EFFECT_SPRITES[tileType];
+        if (effect) this._burst([effect], 1.2 * severity, 400);
     }
 
     // The one big moment per class - a two-layer particle burst plus a
@@ -212,15 +282,18 @@ class CombatStage {
         this._burst(effects, 1.9, 650);
     }
 
-    // Played on the ATTACKER's own portrait (as opposed to playHit, which
-    // plays on whoever's getting hit) whenever that class's own tile match
-    // lands - see CLASS_MOTIONS' header comment for why this is procedural
-    // rather than a real attack spritesheet. Silently does nothing for an
-    // unrecognized/missing key (a monster has no class) rather than
-    // guessing at a fallback motion that wouldn't mean anything for it.
-    async playClassMotion(classKey) {
+    // Played on the ATTACKER's own portrait (as opposed to playHit/
+    // playHitReaction, which play on whoever's getting hit) whenever that
+    // class's own tile match lands - `tileType` picks which of that class's
+    // 5 motions plays (see CLASS_MOTIONS), so the SAME class visibly does a
+    // different thing for a sword match than a shield match, and two
+    // different classes doing the same tile type still look distinct from
+    // each other. Silently does nothing for an unrecognized class (a
+    // monster has no class) or tile type rather than guessing at a
+    // fallback motion that wouldn't mean anything for it.
+    async playClassMotion(classKey, tileType) {
         await this.ready;
-        const fn = CLASS_MOTIONS[classKey];
+        const fn = CLASS_MOTIONS[classKey] && CLASS_MOTIONS[classKey][tileType];
         if (!fn) return;
         const baseX = this.app.screen.width / 2;
         const baseY = this.app.screen.height;
@@ -277,6 +350,19 @@ class CombatStage {
             const decay = 1 - t;
             target.x = originX + (Math.random() * 2 - 1) * magnitude * decay;
         }, () => { target.x = originX; });
+    }
+
+    // A sharp push away from rest plus a stagger tilt, unlike _shake's small
+    // random jitter - meant to read as "that landed," not just "something
+    // happened." Snaps out fast then eases back, with a brief rotational
+    // stagger layered on top.
+    _knockback(target, magnitude, durationMs) {
+        const originX = this.app.screen.width / 2;
+        this._tween(durationMs, t => {
+            const push = magnitude * Math.sin(t * Math.PI) * (1 - t * 0.3);
+            target.x = originX + push;
+            target.rotation = Math.sin(t * Math.PI) * 0.18;
+        }, () => { target.x = originX; target.rotation = 0; });
     }
 
     _flash(target, durationMs) {

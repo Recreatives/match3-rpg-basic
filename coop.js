@@ -621,6 +621,7 @@ function coopApplyIncomingDamage(amount, drainUlt) {
     if (coopMyArmor >= amount) coopMyArmor -= amount;
     else { coopMyHP -= (amount - coopMyArmor); coopMyArmor = 0; }
 
+    coopPlayHitReaction('me', 'sword');
     showFloatingText(`-${amount}`, document.getElementById('coop-my-hp-bar'), '#e74c3c');
     coopLog(tf('Düşman sana {val} hasar verdi.', { val: amount }));
     coopSyncSelfState();
@@ -1075,6 +1076,16 @@ function coopPlayHit(side, tileType) {
     if (stage) stage.playHit(tileType);
 }
 
+// Sword/skull actually damage the shared enemy - see game.js's
+// soloPlayHitReaction for why this needs its own (knockback) method rather
+// than reusing coopPlayHit's gentle self-buff shake.
+function coopPlayHitReaction(side, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
+    let stage = cgGetStage(id);
+    if (stage) stage.playHitReaction(tileType);
+}
+
 function coopResolveMatches(isInitial) {
     let groups = findMatchGroups(coopTiles, COOP_WIDTH);
     if (groups.length === 0) {
@@ -1119,7 +1130,7 @@ function coopApplyGroupEffect(group, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('coop-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -1135,13 +1146,13 @@ function coopApplyGroupEffect(group, isInitial) {
                 recoil = payload.recoil;
             }
             coopApplyDamageToEnemy(amount);
-            coopPlayHit('enemy', 'skull');
+            coopPlayHitReaction('enemy', 'skull');
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
             coopMyTurnStats.selfDamage += recoil;
             coopSyncSelfState();
         } else {
             coopApplyDamageToEnemy(amount);
-            coopPlayHit('enemy', 'sword');
+            coopPlayHitReaction('enemy', 'sword');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {

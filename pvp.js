@@ -512,18 +512,27 @@ function pvpPlayHit(side, tileType) {
     if (stage) stage.playHit(tileType);
 }
 
+// Sword/skull actually damage the receiving side - see game.js's
+// soloPlayHitReaction for why this needs its own (knockback) method rather
+// than reusing pvpPlayHit's gentle self-buff shake.
+function pvpPlayHitReaction(side, tileType) {
+    if (typeof cgGetStage !== 'function') return;
+    let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
+    if (stage) stage.playHitReaction(tileType);
+}
+
 function pvpReceiveAttack(payload) {
     if (pvpMatchOver) return;
     if (payload.type === 'ult') {
         let stage = typeof cgGetStage === 'function' ? cgGetStage('pvp-my-sprite') : null;
         if (stage) stage.playUlt(pvpOpponentClassName || 'warrior');
     } else {
-        pvpPlayHit('me', payload.type || 'sword');
+        pvpPlayHitReaction('me', payload.type || 'sword');
         // The opponent's own class motion, played on THEIR portrait (as I see
         // it) - the only signal I get of their own matches at all is this
         // attack broadcast, so this is the one place it can fire.
         let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
-        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName);
+        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName, payload.type || 'sword');
     }
     pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
@@ -863,7 +872,7 @@ function pvpApplyGroupEffect(group, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('pvp-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase());
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -883,13 +892,13 @@ function pvpApplyGroupEffect(group, isInitial) {
             }
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
-            pvpPlayHit('opp', 'skull');
+            pvpPlayHitReaction('opp', 'skull');
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
         } else {
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
-            pvpPlayHit('opp', 'sword');
+            pvpPlayHitReaction('opp', 'sword');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
