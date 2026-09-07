@@ -92,21 +92,30 @@ create policy "update own wallet" on public.wallets
 -- that specific transfer, instead of two clients each updating their own row
 -- and hoping they agree.
 
--- 6. betrayal currency transfer ------------------------------------------------
+-- 6. betrayal currency + item transfer ------------------------------------------
 -- Called by the WINNING client only (see coop.js/pvp.js - the loser's client
--- never calls this, it just observes the resulting balance next time it
--- fetches its own wallet). Moves loss_percent of the loser's gold+materials
--- to the winner. security definer is what lets this one function touch a
--- row that isn't the caller's own, despite the RLS policies above - every
+-- never calls this, it just observes the resulting balance/inventory next
+-- time it fetches them). Moves loss_percent of the loser's gold+materials to
+-- the winner, AND (new) transfers one random EQUIPPED item from the loser to
+-- the winner as a betrayal spoil - unequipped on arrival, since the winner
+-- may not even play a class that slot suits; it just joins their bag like
+-- any other loot. security definer is what lets this one function touch
+-- rows that aren't the caller's own, despite the RLS policies above - every
 -- other write path in this schema still goes through auth.uid() as normal.
+-- Returns the stolen item's display-relevant columns (or null fields if the
+-- loser had nothing equipped) so the winner's client can log what it got;
+-- the loser's client only ever finds out via pvp.js's own betrayal-item-
+-- stolen broadcast, not from this return value (it's the loser it never
+-- reaches).
 create or replace function public.resolve_betrayal(winner_id uuid, loser_id uuid, loss_percent numeric)
-returns void
+returns jsonb
 language plpgsql
 security definer set search_path = public
 as $$
 declare
     lost_gold integer;
     lost_materials integer;
+    v_item public.player_items;
 begin
     if auth.uid() is null or auth.uid() <> winner_id then
         raise exception 'only the winner can resolve a betrayal payout';
@@ -126,6 +135,23 @@ begin
         where player_id = loser_id;
     update public.wallets set gold = gold + lost_gold, materials = materials + lost_materials
         where player_id = winner_id;
+
+    select * into v_item from public.player_items
+        where player_id = loser_id and equipped_slot is not null
+        order by random() limit 1;
+
+    if v_item.id is not null then
+        update public.player_items set player_id = winner_id, equipped_slot = null
+            where id = v_item.id;
+    end if;
+
+    return jsonb_build_object(
+        'lost_gold', lost_gold,
+        'lost_materials', lost_materials,
+        'stolen_item', case when v_item.id is not null then jsonb_build_object(
+            'base_id', v_item.base_id, 'slot', v_item.slot, 'rarity', v_item.rarity, 'set_key', v_item.set_key
+        ) else null end
+    );
 end;
 $$;
 
@@ -782,6 +808,54 @@ begin
     update public.wallets w set materials = w.materials + v_materials, updated_at = now() where w.player_id = auth.uid();
 
     return v_materials;
+end;
+$$;
+
+-- Alternative to scrapping - converts an unwanted item to gold instead of
+-- materials, so a player who's flush on materials but short on gold (or
+-- vice versa) has a real choice instead of only ever getting materials back.
+-- Values are flat per rarity rather than a fraction of purchase_item's cost,
+-- since orange/red/teal/green are never purchasable at all (see items.js's
+-- RARITY_DEFS) and still need a sensible sell price.
+create table if not exists public.item_sell_values (
+    rarity text primary key,
+    gold   integer not null
+);
+insert into public.item_sell_values (rarity, gold) values
+    ('grey', 5), ('white', 15), ('blue', 35), ('yellow', 80),
+    ('green', 150), ('orange', 200), ('red', 300), ('teal', 400)
+on conflict (rarity) do update set gold = excluded.gold;
+
+alter table public.item_sell_values enable row level security;
+drop policy if exists "read item sell values" on public.item_sell_values;
+create policy "read item sell values" on public.item_sell_values for select using (true);
+
+-- Mirrors scrap_item exactly, just paying gold from item_sell_values
+-- instead of materials from item_scrap_values.
+create or replace function public.sell_item(p_item_id uuid)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_item public.player_items;
+    v_gold integer;
+begin
+    select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid();
+    if not found then
+        raise exception 'sell_item: item not found or not yours';
+    end if;
+    if v_item.equipped_slot is not null then
+        raise exception 'sell_item: unequip it first';
+    end if;
+
+    select gold into v_gold from public.item_sell_values where rarity = v_item.rarity;
+    v_gold := coalesce(v_gold, 1);
+
+    delete from public.player_items where id = p_item_id and player_id = auth.uid();
+    update public.wallets w set gold = w.gold + v_gold, updated_at = now() where w.player_id = auth.uid();
+
+    return v_gold;
 end;
 $$;
 

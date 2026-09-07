@@ -395,6 +395,18 @@ function handleOverlayClick() {
     }
 }
 
+// Brings the pick-a-mode overlay back after closing PvP/co-op with no solo
+// run active - see toggleModal's call site for why this is needed at all.
+// A class is always already picked by the time either modal was reachable
+// (mode-selection only shows after class selection), so this always goes
+// straight to mode-selection, never back to square one at class-selection.
+function restoreMainMenuOverlay() {
+    if (currentState !== STATE.START) return;
+    overlay.classList.add('visible');
+    document.getElementById('class-selection').style.display = 'none';
+    renderModeButtons();
+}
+
 function resetGame() {
     playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
@@ -1587,6 +1599,16 @@ function toggleModal(modalId) {
         if (modalId === 'friends-modal') {
             if (typeof closeConversation === 'function') closeConversation();
             if (typeof closeTradeComposer === 'function') closeTradeComposer();
+        }
+        // Picking Co-op/PvP from the mode-selection screen hides the solo
+        // game-overlay (renderModeButtons' own action callbacks) and NOTHING
+        // ever brought it back afterward - only actually starting/ending a
+        // SOLO run touches its 'visible' class (startLevel/triggerGameOver/
+        // showBossCheckpoint/winLevel). Closing either modal with no solo
+        // run in progress is exactly the "stuck with no mode to pick, not
+        // even solo" bug - restore the overlay here instead.
+        if ((modalId === 'pvp-modal' || modalId === 'coop-modal') && currentState === STATE.START) {
+            restoreMainMenuOverlay();
         }
     } else {
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon

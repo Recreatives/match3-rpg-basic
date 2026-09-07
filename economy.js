@@ -486,18 +486,23 @@ async function adjustWallet(goldDelta, materialsDelta) {
     return currentWallet;
 }
 
-// Betrayal PvP currency steal (see supabase/schema.sql's resolve_betrayal).
-// Called ONLY by the winning client - the loser's client never calls this,
-// it just sees the resulting balance next time it fetches its own wallet.
-// A security definer Postgres function does the actual transfer since RLS
-// correctly blocks a client from writing to someone else's wallet row.
+// Betrayal PvP currency + item steal (see supabase/schema.sql's
+// resolve_betrayal). Called ONLY by the winning client - the loser's client
+// never calls this, it just sees the resulting balance/inventory next time
+// it fetches them (or via pvp.js's own betrayal-item-stolen broadcast for
+// the exact item). A security definer Postgres function does the actual
+// transfer since RLS correctly blocks a client from writing to someone
+// else's wallet/item rows. Returns the RPC's {lost_gold, lost_materials,
+// stolen_item} payload (or null on failure) rather than a bare boolean, so
+// the caller can log/broadcast exactly what was taken.
 async function resolveBetrayal(winnerId, loserId, lossPercent) {
-    const { error } = await sb.rpc('resolve_betrayal', {
+    const { data, error } = await sb.rpc('resolve_betrayal', {
         winner_id: winnerId, loser_id: loserId, loss_percent: lossPercent
     });
-    if (error) { console.error('resolve_betrayal failed:', error.message); return false; }
+    if (error) { console.error('resolve_betrayal failed:', error.message); return null; }
     await fetchWallet();
-    return true;
+    if (data && data.stolen_item && typeof fetchOwnedItems === 'function') await fetchOwnedItems();
+    return data;
 }
 
 // currentOwnedItems holds full row objects now (id, base_id, slot, rarity,
@@ -606,6 +611,22 @@ async function scrapItem(itemId) {
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
     await fetchWallet();
     setShopStatus(tf('🪨 +{val} hammadde kazandın.', { val: data }));
+    if (typeof renderInventory === 'function') renderInventory();
+    return true;
+}
+
+// Same idea as scrapItem, just paying gold (sell_item, security definer)
+// instead of materials - see items.js's Sat button.
+async function sellItem(itemId) {
+    const { data, error } = await sb.rpc('sell_item', { p_item_id: itemId });
+    if (error) {
+        console.error('sell_item failed:', error.message);
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Satılamadı.'));
+        return false;
+    }
+    currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
+    await fetchWallet();
+    setShopStatus(tf('🪙 +{val} altın kazandın.', { val: data }));
     if (typeof renderInventory === 'function') renderInventory();
     return true;
 }

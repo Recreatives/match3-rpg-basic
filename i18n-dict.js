@@ -183,6 +183,8 @@ const EN_DICT = {
     'İhanete uğradın - düello hazırlanıyor…': 'You were betrayed - preparing the duel…',
     'Rakibinden %{pct} çaldın.': "You stole {pct}% from your opponent.",
     'Ödül aktarımı başarısız oldu.': 'Reward transfer failed.',
+    'Ayrıca rakibinin kuşandığı bir eşyayı da aldın: {name}': "You also took an item your opponent had equipped: {name}",
+    'Rakibin kuşandığın bir eşyanı da aldı: {name}': 'Your opponent also took an item you had equipped: {name}',
 
     // === coop.js ===
     'Takım arkadaşın oynuyor': 'Your teammate is playing',
@@ -252,6 +254,8 @@ const EN_DICT = {
     'Önce çıkarman lazım.': 'You need to unequip it first.',
     'Hurdaya çevrilemedi.': 'Could not be scrapped.',
     '🪨 +{val} hammadde kazandın.': '🪨 +{val} materials earned.',
+    'Satılamadı.': 'Could not be sold.',
+    '🪙 +{val} altın kazandın.': '🪙 +{val} gold earned.',
     'Yeterli altın/hammadde yok.': 'Not enough gold/materials.',
     'Geliştirilemedi.': 'Could not be upgraded.',
     '{mark} {name} seviyesine yükseltildi!': 'Upgraded to {mark} {name}!',
@@ -437,6 +441,7 @@ const EN_DICT = {
     'ÇIKAR': 'UNEQUIP',
     'KUŞAN': 'EQUIP',
     'Hurdaya çevir': 'Scrap',
+    'Sat': 'Sell',
     '{rarity} DÜŞTÜ': '{rarity} DROPPED',
 
     // === final sweep additions (game.js stats tooltip / history screen) ===

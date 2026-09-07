@@ -342,6 +342,16 @@ async function pvpConnectChannel(code) {
     pvpChannel.on('broadcast', { event: 'defeated' }, () => pvpOnOpponentDefeated());
     pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
     pvpChannel.on('broadcast', { event: 'status-update' }, ({ payload }) => pvpApplyOpponentStatus(payload));
+    // The winner's resolve_betrayal already moved the row server-side - this
+    // is purely so the LOSER's own log can name what was taken instead of
+    // just noticing a smaller inventory next time they open it.
+    pvpChannel.on('broadcast', { event: 'betrayal-item-stolen' }, ({ payload }) => {
+        if (typeof fetchOwnedItems === 'function') fetchOwnedItems();
+        if (payload.item && typeof itemDisplayInfo === 'function') {
+            let info = itemDisplayInfo(payload.item);
+            pvpLog(tf('Rakibin kuşandığın bir eşyanı da aldı: {name}', { name: `${info.emoji} ${info.name}` }));
+        }
+    });
     // One shared board now (sharedboard.js) - this only ever fires on the
     // PASSIVE side, since broadcast self:false means the active mover never
     // gets its own step back.
@@ -592,7 +602,7 @@ function pvpOnOpponentDefeated() {
 // client can't just write the other player's wallet row directly.
 function pvpBetrayalLossPercent() {
     if (!pvpBetrayalMode) return 0;
-    return pvpBetrayalMode.isMutual ? 0.25 : 0.15;
+    return 0.4;
 }
 
 function pvpResolveBetrayalPayoutIfNeeded() {
@@ -609,10 +619,19 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 
     if (pvpBetrayalMode.isMutual || pvpBetrayalMode.isBetrayer) {
         // Mutual winner either way, or the betrayer winning their one-sided
-        // duel: steal currency from the loser.
+        // duel: steal currency AND one random equipped item from the loser
+        // (resolve_betrayal, supabase/schema.sql).
         let pct = pvpBetrayalLossPercent();
-        return resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(ok => {
-            pvpLog(ok ? tf('Rakibinden %{pct} çaldın.', { pct: Math.round(pct * 100) }) : t('Ödül aktarımı başarısız oldu.'));
+        return resolveBetrayal(pvpMyId, pvpOpponentId, pct).then(result => {
+            if (!result) { pvpLog(t('Ödül aktarımı başarısız oldu.')); return; }
+            pvpLog(tf('Rakibinden %{pct} çaldın.', { pct: Math.round(pct * 100) }));
+            if (result.stolen_item && typeof itemDisplayInfo === 'function') {
+                let info = itemDisplayInfo(result.stolen_item);
+                pvpLog(tf('Ayrıca rakibinin kuşandığı bir eşyayı da aldın: {name}', { name: `${info.emoji} ${info.name}` }));
+                // The loser has no other way to find out WHICH item - they
+                // never call this RPC themselves, only see the aftermath.
+                if (pvpChannel) pvpChannel.send({ type: 'broadcast', event: 'betrayal-item-stolen', payload: { item: result.stolen_item } });
+            }
         });
     } else {
         // The loyal player winning against a betrayer - deliberately tiny,
@@ -692,6 +711,13 @@ function pvpCloseBetrayalSummary() {
     document.getElementById('pvp-modal').style.display = 'none';
     pvpBetrayalMode = null;
     pvpForcedFirstMoverId = null;
+    // This closes pvp-modal directly (not via toggleModal), so it needs the
+    // same overlay-restoration toggleModal's own pvp-modal/coop-modal branch
+    // does - otherwise "Ana Menüye Dön" from a betrayal duel is exactly the
+    // same "stuck, no mode to pick" bug the co-op modal had.
+    if (typeof restoreMainMenuOverlay === 'function' && typeof currentState !== 'undefined' && currentState === STATE.START) {
+        restoreMainMenuOverlay();
+    }
 }
 
 // --- ULTIMATE ----------------------------------------------------------------

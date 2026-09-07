@@ -111,10 +111,11 @@ const RARITY_DEFS = {
 };
 
 // Display-only mirrors of supabase/schema.sql's item_scrap_values /
-// item_upgrade_costs - the actual amounts are enforced server-side
-// (scrap_item/upgrade_item), these just label the buttons correctly. Keep
-// in sync with that file if the numbers ever change.
+// item_sell_values / item_upgrade_costs - the actual amounts are enforced
+// server-side (scrap_item/sell_item/upgrade_item), these just label the
+// buttons correctly. Keep in sync with that file if the numbers ever change.
 const ITEM_SCRAP_VALUES = { grey: 1, white: 2, blue: 4, yellow: 8, green: 15, orange: 15, red: 15, teal: 15 };
+const ITEM_SELL_VALUES = { grey: 5, white: 15, blue: 35, yellow: 80, green: 150, orange: 200, red: 300, teal: 400 };
 const ITEM_UPGRADE_COSTS = {
     grey: { to: 'white', gold: 20, materials: 2 },
     white: { to: 'blue', gold: 50, materials: 5 },
@@ -748,6 +749,18 @@ function renderInventory() {
             scrapBtn.title = t('Hurdaya çevir');
             scrapBtn.onclick = () => scrapItem(item.id);
             btnWrap.appendChild(scrapBtn);
+
+            // Sat (sell for gold) sits next to Hurdaya çevir (scrap for
+            // materials) - same item, two different currencies, so a player
+            // short on gold vs. short on materials has an actual choice
+            // instead of always getting materials back.
+            let sellBtn = document.createElement('button');
+            sellBtn.className = 'action-btn';
+            sellBtn.style.width = 'auto'; sellBtn.style.margin = '0'; sellBtn.style.background = '#b8860b';
+            sellBtn.innerText = `💰 +${ITEM_SELL_VALUES[item.rarity] || 1}🪙`;
+            sellBtn.title = t('Sat');
+            sellBtn.onclick = () => sellItem(item.id);
+            btnWrap.appendChild(sellBtn);
         }
         row.appendChild(btnWrap);
         return row;
