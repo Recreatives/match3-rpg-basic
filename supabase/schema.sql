@@ -1165,6 +1165,12 @@ grant execute on function public.leave_pvp_queue() to authenticated;
 -- collide. If this fails, it means two existing players already share a
 -- name - whoever set theirs more recently will need to change it (leaderboard
 -- modal, "Kaydet") before this can be re-run.
+--
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so a plain re-run of this
+-- file fails with "already exists" (42P07) once this constraint has been
+-- created once - drop-then-add, same idempotent shape as this file's
+-- function definitions.
+alter table public.players drop constraint if exists players_display_name_unique;
 alter table public.players add constraint players_display_name_unique unique (display_name);
 
 -- A client can only ever SELECT its own player row ("read own player row"),
