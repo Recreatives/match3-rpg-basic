@@ -252,6 +252,7 @@ create policy "insert own achievements" on public.player_achievements
 -- display_name is nullable and defaults to null - "update own player row"
 -- already lets a client set it on their own row, no new policy needed for
 -- that part).
+drop function if exists public.get_leaderboard(integer);
 create or replace function public.get_leaderboard(limit_count integer default 10)
 returns table(display_name text, gold integer)
 language sql
@@ -333,6 +334,7 @@ drop policy if exists "update own wallet" on public.wallets;
 -- far below 500 even at very high levels) - raise them if the reward
 -- formulas ever scale past that, but a client can never hand itself more
 -- than these hard limits in one call regardless of what it claims earned it.
+drop function if exists public.earn_currency(integer, integer);
 create or replace function public.earn_currency(p_gold integer default 0, p_materials integer default 0)
 returns table(gold integer, materials integer)
 language plpgsql
@@ -646,6 +648,7 @@ create policy "read own daily login" on public.daily_login
 -- ambiguous" runtime error earn_currency shipped with initially (see that
 -- function's own comment) - avoided here by construction instead of by a
 -- table alias.
+drop function if exists public.claim_daily_reward();
 create or replace function public.claim_daily_reward()
 returns table(new_gold integer, new_streak integer, reward_gold integer)
 language plpgsql
@@ -705,6 +708,7 @@ create policy "read own daily quests" on public.daily_quests
 -- Output column deliberately not named gold/reward_gold in a way that could
 -- collide with a table column or another local var - see earn_currency's
 -- own comment for why this matters (a real bug there, not a hypothetical).
+drop function if exists public.claim_daily_quest(text);
 create or replace function public.claim_daily_quest(p_quest_key text)
 returns table(quest_gold integer, already_claimed boolean)
 language plpgsql
@@ -1005,6 +1009,7 @@ create policy "read own pvp rating" on public.pvp_ratings
 -- Standard ELO with K=32, floored at a minimum +1 gain for the winner (and
 -- a matching loss for the loser) so a huge rating gap can never round down
 -- to a 0-point match - every match has to move the needle a little.
+drop function if exists public.resolve_pvp_match(uuid);
 create or replace function public.resolve_pvp_match(p_loser_id uuid)
 returns table(new_winner_rating integer, new_loser_rating integer, rating_delta integer)
 language plpgsql
@@ -1046,6 +1051,7 @@ grant execute on function public.resolve_pvp_match(uuid) to authenticated;
 
 -- Same "security definer function is the only cross-player read" pattern as
 -- get_leaderboard above - never exposes a player id, just name + record.
+drop function if exists public.get_pvp_leaderboard(integer);
 create or replace function public.get_pvp_leaderboard(limit_count integer default 10)
 returns table(display_name text, rating integer, wins integer, losses integer)
 language sql
@@ -1246,6 +1252,7 @@ grant execute on function public.respond_friend_request(uuid, boolean) to authen
 -- whether a pending row is an incoming request (someone else waiting on ME)
 -- so the client can tell "waiting for them to accept" apart from "they're
 -- waiting on me to respond".
+drop function if exists public.get_friends_list();
 create or replace function public.get_friends_list()
 returns table(friend_id uuid, display_name text, status text, is_incoming_request boolean)
 language sql
@@ -1410,6 +1417,7 @@ grant execute on function public.leave_guild() to authenticated;
 -- guild_name repeats on every row (denormalized) rather than needing a
 -- second round trip - cheap for a roster that's realistically a handful of
 -- rows, and keeps the client to one call for the whole guild panel.
+drop function if exists public.get_my_guild_roster();
 create or replace function public.get_my_guild_roster()
 returns table(player_id uuid, display_name text, role text, joined_at timestamptz, guild_name text)
 language sql
@@ -1426,6 +1434,7 @@ $$;
 
 grant execute on function public.get_my_guild_roster() to authenticated;
 
+drop function if exists public.get_guild_list(integer);
 create or replace function public.get_guild_list(limit_count integer default 20)
 returns table(guild_id uuid, name text, member_count bigint)
 language sql
@@ -1504,6 +1513,7 @@ grant execute on function public.send_direct_message(uuid, text) to authenticate
 -- every other cross-player function in this file: "read own messages"
 -- above already scopes this correctly for the calling user, so there's
 -- nothing to bypass and no reason to widen the trusted surface.
+drop function if exists public.get_conversation(uuid, integer);
 create or replace function public.get_conversation(p_friend_id uuid, limit_count integer default 50)
 returns table(sender_id uuid, body text, created_at timestamptz)
 language sql
@@ -1527,6 +1537,7 @@ grant execute on function public.get_conversation(uuid, integer) to authenticate
 -- stored, on players itself.
 alter table public.players add column if not exists equipped_title text;
 
+drop function if exists public.get_available_titles();
 create or replace function public.get_available_titles()
 returns table(title text, description text, unlocked boolean)
 language sql
@@ -1832,6 +1843,7 @@ grant execute on function public.cancel_trade_offer(uuid) to authenticated;
 -- SQL error, it's a client-side crash the first time a real row comes back
 -- (caught by testing this with synthetic data before the real RPC existed
 -- to test against).
+drop function if exists public.get_my_trade_offers();
 create or replace function public.get_my_trade_offers()
 returns table(
     id uuid, direction text, counterparty_name text,
@@ -1871,6 +1883,7 @@ grant execute on function public.get_my_trade_offers() to authenticated;
 -- a friend actually has. This opens that up, but ONLY between accepted
 -- friends (re-checked here, not just trusted from the client) - the same
 -- opt-in-mutual-connection gating as chat/guilds/trading itself.
+drop function if exists public.get_friend_items(uuid);
 create or replace function public.get_friend_items(p_friend_id uuid)
 returns table(id uuid, base_id text, slot text, rarity text, rolled_stats jsonb)
 language sql
@@ -1953,6 +1966,7 @@ grant execute on function public.claim_seasonal_event(text) to authenticated;
 -- Lets the client show/hide the event banner without hardcoding the dates
 -- twice (once here, once in the UI) - still just a display hint though,
 -- claim_seasonal_event above is what actually enforces the window.
+drop function if exists public.get_active_seasonal_events();
 create or replace function public.get_active_seasonal_events()
 returns table(event_key text, name text, description text, ends_at timestamptz, already_claimed boolean)
 language sql
@@ -2004,6 +2018,7 @@ drop policy if exists "read talent defs" on public.talent_defs;
 create policy "read talent defs" on public.talent_defs
     for select using (true);
 
+drop function if exists public.get_talent_status();
 create or replace function public.get_talent_status()
 returns table(earned_points integer, spent_points integer, learned_ids text[])
 language sql
