@@ -107,6 +107,14 @@ create policy "update own wallet" on public.wallets
 -- the loser's client only ever finds out via pvp.js's own betrayal-item-
 -- stolen broadcast, not from this return value (it's the loser it never
 -- reaches).
+--
+-- The DROP below is required, not just belt-and-suspenders: this function
+-- used to `returns void`, and Postgres refuses `create or replace` across a
+-- return-type change (42P13) - re-running this file against a database that
+-- still has the old version fails here without it, aborting the whole
+-- script partway through and silently leaving everything after this point
+-- (including item_sell_values/sell_item further down) never applied.
+drop function if exists public.resolve_betrayal(uuid, uuid, numeric);
 create or replace function public.resolve_betrayal(winner_id uuid, loser_id uuid, loss_percent numeric)
 returns jsonb
 language plpgsql
