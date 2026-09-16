@@ -162,6 +162,29 @@ function cgPreloadAll() {
     Object.values(ULT_EFFECT_SPRITES).forEach(list => list.forEach(e => cgLoadTexture(e.sprite)));
 }
 
+// Resolves --portrait-w/--portrait-h (style.css, tied to --tile-size) to
+// actual pixel numbers, via a hidden probe element rather than
+// canvasEl.getBoundingClientRect() directly - PvP/co-op stages are first
+// created while their modal is still display:none (see CLAUDE.md's note on
+// pvp-modal/coop-modal sitting hidden earlier in index.html), and a hidden
+// ancestor makes getBoundingClientRect report 0x0. The probe is appended
+// straight to <body> (never inside a modal) and hidden with
+// visibility:hidden rather than display:none, so it always participates in
+// layout and its computed size is real - unlike reading the custom property
+// text itself (getComputedStyle on an untyped custom property returns the
+// clamp()/calc() source string, NOT the resolved number).
+let cgSizeProbe = null;
+function cgPortraitSize(canvasEl) {
+    if (!cgSizeProbe) {
+        cgSizeProbe = document.createElement('div');
+        cgSizeProbe.style.cssText = 'position:absolute; top:0; left:0; visibility:hidden; pointer-events:none; width:var(--portrait-w); height:var(--portrait-h);';
+        document.body.appendChild(cgSizeProbe);
+    }
+    const rect = cgSizeProbe.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return [rect.width, rect.height];
+    return [canvasEl.width || 56, canvasEl.height || 70];
+}
+
 // One CombatStage per portrait slot (solo's player/enemy, PvP's me/opponent,
 // co-op's me/ally/enemy - up to 7 across the whole app). Each owns exactly one
 // PIXI.Application mounted into `canvasEl`.
@@ -175,11 +198,12 @@ class CombatStage {
     }
 
     async _init() {
+        const [w, h] = cgPortraitSize(this.canvasEl);
         const app = new PIXI.Application();
         await app.init({
             canvas: this.canvasEl,
-            width: this.canvasEl.width || 96,
-            height: this.canvasEl.height || 96,
+            width: w,
+            height: h,
             backgroundAlpha: 0,
             antialias: false, // crisp pixel art, not smoothed
             resolution: Math.min(window.devicePixelRatio || 1, 2),

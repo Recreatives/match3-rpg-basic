@@ -29,6 +29,21 @@
     --board-size: clamp(270px, 80dvmin, 560px);
     --tile-size: calc(var(--board-size) / 8);
     --panel-width: calc(var(--board-size) + 8px); /* board content + its 2x4px border */
+
+    /* Combat portrait canvas size (graphics.js resolves these to real px via
+       a hidden probe element - see cgPortraitSize - and sizes each
+       PIXI.Application accordingly; see CombatStage._init). Tied to
+       --tile-size, NOT a flat px value, so it inherits the same viewport-safe
+       clamping the rest of the UI already has: on a small phone --tile-size
+       sits near its floor and the multiplier below lands almost exactly on
+       the OLD hardcoded 56x70, so there's no new overflow risk there; on a
+       roomy viewport --tile-size grows toward its ceiling and portraits grow
+       meaningfully with it. The 92px/115px ceiling is deliberately kept under
+       .stat-box's fixed 100px width (see .stat-box below) so the canvas never
+       has to spill out of its box even on desktop. Aspect ratio (0.8) matches
+       the original 56:70 art crop at both ends of the clamp. */
+    --portrait-w: clamp(56px, calc(var(--tile-size) * 1.5), 92px);
+    --portrait-h: clamp(70px, calc(var(--tile-size) * 1.875), 115px);
 }
 /* html/body are a fixed, non-scrolling shell. On iOS Safari, letting body
    itself be the scrolling element means every swipe on the board can be
