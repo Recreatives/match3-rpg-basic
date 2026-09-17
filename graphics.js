@@ -129,17 +129,23 @@ const HIT_EFFECT_SPRITES = {
     energy: { sprite: 'assets/effects/star_04.png', tint: 0xf1c40f },
 };
 
-// Two-layer bursts (a base shape + an accent) for the one big moment each
-// class's ultimate is - chosen to echo that class's own flavor (see the
-// class_asset_plan.png shared with the user during asset selection).
+// Three-layer bursts (a base shape + an accent + a Faz 4 (graphics roadmap)
+// "impact ring" 3rd layer) for the one big moment each class's ultimate is -
+// chosen to echo that class's own flavor (see the class_asset_plan.png
+// shared with the user during asset selection). The 3rd layer deliberately
+// reuses a sprite ALREADY used by a different class/slot above rather than
+// pulling in new art (this project's whole effect pool is the 14 files in
+// assets/effects/ - see assets/CREDITS.md) - _burst below already
+// randomizes each instance's own rotation, so the same base file still
+// reads as a fresh shape each time it's reused.
 const ULT_EFFECT_SPRITES = {
-    warrior: [{ sprite: 'assets/effects/scorch_01.png', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }],
-    berserker: [{ sprite: 'assets/effects/flame_04.png', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.png', tint: 0xff8c00 }],
-    rogue: [{ sprite: 'assets/effects/slash_04.png', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.png', tint: 0xe0c3fc }],
-    archer: [{ sprite: 'assets/effects/muzzle_02.png', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }],
-    mage: [{ sprite: 'assets/effects/magic_03.png', tint: 0x3498db }, { sprite: 'assets/effects/star_04.png', tint: 0x00d4ff }],
-    necromancer: [{ sprite: 'assets/effects/symbol_01.png', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.png', tint: 0x2c3e50 }],
-    paladin: [{ sprite: 'assets/effects/light_01.png', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.png', tint: 0xffd700 }],
+    warrior: [{ sprite: 'assets/effects/scorch_01.png', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_03.png', tint: 0xecf0f1 }],
+    berserker: [{ sprite: 'assets/effects/flame_04.png', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.png', tint: 0xff8c00 }, { sprite: 'assets/effects/smoke_04.png', tint: 0x8b0000 }],
+    rogue: [{ sprite: 'assets/effects/slash_04.png', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.png', tint: 0xe0c3fc }, { sprite: 'assets/effects/star_04.png', tint: 0xd6a4ff }],
+    archer: [{ sprite: 'assets/effects/muzzle_02.png', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_04.png', tint: 0x27ae60 }],
+    mage: [{ sprite: 'assets/effects/magic_03.png', tint: 0x3498db }, { sprite: 'assets/effects/star_04.png', tint: 0x00d4ff }, { sprite: 'assets/effects/spark_06.png', tint: 0x00eaff }],
+    necromancer: [{ sprite: 'assets/effects/symbol_01.png', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.png', tint: 0x2c3e50 }, { sprite: 'assets/effects/circle_03.png', tint: 0x4a148c }],
+    paladin: [{ sprite: 'assets/effects/light_01.png', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.png', tint: 0xffd700 }, { sprite: 'assets/effects/star_04.png', tint: 0xfff9c4 }],
 };
 
 // Every texture is tiny (character portraits are a few KB, effects ~50-100KB)
