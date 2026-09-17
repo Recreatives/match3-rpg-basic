@@ -485,10 +485,14 @@ function triggerDeathSequence(who) {
         log(t("DÜŞMAN YENİLDİ!"), "log-crit");
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('victory');
+        // Faz 3 - a boss kill (every 5th level) gets a bigger confetti burst
+        // than an ordinary minion kill.
+        if (typeof cgCelebrate === 'function') cgCelebrate('victory', level % 5 === 0);
         setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
     } else {
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('defeat');
+        if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
         setTimeout(() => { gridDisplay.classList.remove('shake'); gameOver(); }, 1500);
     }
 }

@@ -534,6 +534,7 @@ function coopApplySessionResume(state) {
 function coopOnEnemyDefeated(payload) {
     coopLog(payload.isBoss ? tf('Boss (Lvl {level}) yenildi!', { level: payload.level }) : tf('Minion (Lvl {level}) yenildi!', { level: payload.level }));
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof cgCelebrate === 'function') cgCelebrate('victory', payload.isBoss);
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
@@ -945,6 +946,7 @@ function coopApplyTurnSet(role) {
 function coopOnPartyWiped() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
+    if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
     coopMatchOver = true;
     coopStopThinkingAnimation();
     coopSetStatus(tf("İKİNİZ DE DÜŞTÜNÜZ - Lvl {level}'de YENİLGİ", { level: coopLevel }));

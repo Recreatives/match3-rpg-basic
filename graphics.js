@@ -468,6 +468,47 @@ function cgTileBurst(tileEl, tileType) {
     setTimeout(() => burst.remove(), 600);
 }
 
+// Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
+// previously got only a sound cue and a log line: winning (an enemy/boss/
+// PvP opponent goes down) and losing (game over, party wipe, PvP loss).
+// `kind` is 'victory' or 'defeat'; `big` (boss kills, not ordinary minion
+// kills) makes the victory confetti burst noticeably larger. Every element
+// this creates is position:fixed + transform/opacity-only and self-removes
+// on a timeout, the same disposable-DOM-node pattern cgTileBurst above
+// uses, so a mode never has to remember to clean this up itself.
+function cgCelebrate(kind, big) {
+    if (kind === 'victory') cgConfettiBurst(big);
+    else if (kind === 'defeat') cgDefeatVignette();
+}
+
+const CG_CONFETTI_COLORS = ['#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#e67e22'];
+function cgConfettiBurst(big) {
+    const count = big ? 40 : 22;
+    const layer = document.createElement('div');
+    layer.className = 'cg-confetti-layer';
+    for (let i = 0; i < count; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'cg-confetti-piece';
+        piece.style.left = (Math.random() * 100) + 'vw';
+        piece.style.setProperty('--drift', (Math.random() * 140 - 70) + 'px');
+        piece.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+        piece.style.backgroundColor = CG_CONFETTI_COLORS[i % CG_CONFETTI_COLORS.length];
+        piece.style.animationDelay = (Math.random() * 0.3) + 's';
+        piece.style.animationDuration = (1.4 + Math.random() * 0.8) + 's';
+        layer.appendChild(piece);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 2600);
+}
+
+function cgDefeatVignette() {
+    const el = document.createElement('div');
+    el.className = 'cg-defeat-vignette';
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('visible'));
+    setTimeout(() => el.remove(), 1600);
+}
+
 // Faz 1 (graphics roadmap) - board-wide "that landed" feedback for a big
 // match, on top of the per-portrait hit effects above. Takes the grid
 // element itself (caller's job to getElementById the right one - see

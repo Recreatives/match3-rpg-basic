@@ -572,6 +572,7 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus(t('KAZANDIN!'));
     pvpLog(t('Rakip yenildi - kazandın!'));
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof cgCelebrate === 'function') cgCelebrate('victory');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'win', betrayal: !!pvpBetrayalMode });
     if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
     // Ranked rating - same "only the winner calls it" rule as the betrayal
@@ -648,6 +649,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 function pvpOnDefeat() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
+    if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'loss', betrayal: !!pvpBetrayalMode });
     // The winner's resolve_pvp_match call needs a moment to land server-side
     // before this fetch would see the updated row - same timing concern as

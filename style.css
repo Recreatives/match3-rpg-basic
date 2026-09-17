@@ -402,6 +402,30 @@ body {
     100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
 }
 
+/* Faz 3 (graphics roadmap) - cgCelebrate's victory/defeat overlays
+   (graphics.js). position:fixed (viewport-relative, not page-relative like
+   .pop-text/.cg-tile-burst above) since these are whole-screen moments, not
+   tied to any one board position. transform/opacity only. */
+.cg-confetti-layer {
+    position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden;
+}
+.cg-confetti-piece {
+    position: absolute; top: -12px; width: 8px; height: 14px;
+    animation: cgConfettiFall linear forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgConfettiFall {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: 0.9; }
+}
+
+.cg-defeat-vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 199;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(80,0,0,0.55) 100%);
+    opacity: 0; transition: opacity 0.7s ease;
+}
+.cg-defeat-vignette.visible { opacity: 1; }
+
 /* Overlay Content */
 .overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
 .overlay-btn {
