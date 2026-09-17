@@ -311,7 +311,14 @@ body {
 .grid {
     width: var(--board-size); height: var(--board-size);
     display: flex; flex-wrap: wrap;
-    background-color: var(--board-bg);
+    /* Faz 5 (graphics roadmap) - a subtle radial gradient instead of the old
+       flat --board-bg fill, for a little depth. Still a single static
+       background (no animation, no extra paint per frame), so it costs
+       nothing beyond the very first paint - same perf budget as before.
+       Fixed hex stops (not color-mix()) - this project's mobile testing
+       has included older Android GPUs (see .tile's perf comments below),
+       and color-mix() support there isn't guaranteed. */
+    background: radial-gradient(ellipse at 50% 35%, #3e5568 0%, var(--board-bg) 60%, #29394a 100%);
     border-radius: 8px; border: 4px solid #1a252f;
     box-shadow: inset 0 2px 10px rgba(0,0,0,0.45);
     overflow: hidden; position: relative;
@@ -319,6 +326,13 @@ body {
     transition: opacity 0.5s ease;
     flex-shrink: 0;
 }
+/* Faz 5 - PvP/co-op each get a faint border tint (on top of the shared
+   .grid look above) so the same board reads as a slightly different place
+   depending on mode, without a full separate theme per mode. Border only,
+   not a background-color override, so .mp-grid's own inherited gradient
+   above stays identical across all three modes. */
+#pvp-grid { border-color: #7a3b3b; }
+#coop-grid { border-color: #3b7a6e; }
 /* opacity, not filter:grayscale - a filter on this container forces the
    browser to flatten the whole board (all 64 tiles, mid-animation or not)
    into one offscreen layer and re-filter it every frame for as long as the
