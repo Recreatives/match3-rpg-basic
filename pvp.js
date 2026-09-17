@@ -1005,7 +1005,11 @@ function pvpDropAndRefill(isInitial) {
             let i = col + row * PVP_WIDTH;
             pvpTiles[i].dataset.type = colTiles[row].type;
             pvpTiles[i].innerHTML = colTiles[row].html;
-            pvpTiles[i].classList.remove('matched');
+            // See game.js's fillBoard for why matched-big must be cleared
+            // here too, not just 'matched' - its forwards-filled end state
+            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
+            // and hides whatever new tile gravity just assigned it.
+            pvpTiles[i].classList.remove('matched', 'matched-big');
         }
     }
     sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle

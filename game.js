@@ -1363,7 +1363,14 @@ function fillBoard(isInitial) {
             if (tiles[index].dataset.type !== tileData.type || tileData.isNew) {
                 tiles[index].dataset.type = tileData.type;
                 tiles[index].innerHTML = tileData.html;
-                tiles[index].classList.remove('matched');
+                // matched-big (Faz 1, style.css) ends its animation with
+                // `forwards` fill mode - scale(0)/opacity:0 as the very last
+                // keyframe - which otherwise stays stuck on this DOM node
+                // (tiles are a reused fixed pool, not recreated per match)
+                // even after gravity hands it a brand new tile type, making
+                // that new tile permanently invisible. Must be cleared
+                // alongside 'matched' every time a tile gets recycled here.
+                tiles[index].classList.remove('matched', 'matched-big');
                 if (!isInitial) {
                     tiles[index].classList.remove('falling');
                     tilesToAnimate.push(tiles[index]);

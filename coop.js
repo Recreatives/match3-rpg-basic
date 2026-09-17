@@ -1244,7 +1244,11 @@ function coopDropAndRefill(isInitial) {
             let i = col + row * COOP_WIDTH;
             coopTiles[i].dataset.type = colTiles[row].type;
             coopTiles[i].innerHTML = colTiles[row].html;
-            coopTiles[i].classList.remove('matched');
+            // See game.js's fillBoard for why matched-big must be cleared
+            // here too, not just 'matched' - its forwards-filled end state
+            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
+            // and hides whatever new tile gravity just assigned it.
+            coopTiles[i].classList.remove('matched', 'matched-big');
         }
     }
     sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the refilled board settle
