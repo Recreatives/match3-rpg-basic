@@ -1141,7 +1141,14 @@ function setMyPortraitEverywhere(classKey) {
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
         let stage = cgGetStage(id);
         if (stage) stage.setPortrait(url);
+        // Faz 10 (graphics roadmap, 2nd wave) - class identity glow, synced
+        // here alongside the portrait art itself.
+        if (typeof cgSetClassGlow === 'function') cgSetClassGlow(id, classKey);
     });
+    // A freshly (re)created portrait canvas has no aura yet even if a
+    // unique item was already equipped before this class pick - re-sync
+    // rather than relying only on equipItem/fetchOwnedItems' own calls.
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
 }
 
 // Small visual feedback layer (graphics.js) on top of the actual combat math

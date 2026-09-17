@@ -657,6 +657,39 @@ body {
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
 }
+/* Faz 10 (graphics roadmap, 2nd wave) - cgSetClassGlow's per-class rings
+   (graphics.js), applied to the player's OWN combat-portrait canvas. A
+   static box-shadow, not an animation - this sits on a canvas element that
+   may already carry other classes (.enemy-display's float never applies
+   to a player's own portrait, but keeping this animation-free avoids ever
+   risking the same animation-shorthand collision the matched/matched-big
+   and boss-entrance fixes both had to work around elsewhere on this
+   branch). border-radius:50% since these are humanoid portraits, not
+   monster silhouettes - a circular glow reads as "aura around a person"
+   rather than a rectangular highlight. */
+.combat-portrait.class-glow-warrior { box-shadow: 0 0 10px 3px rgba(149, 165, 166, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-berserker { box-shadow: 0 0 10px 3px rgba(231, 76, 60, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-rogue { box-shadow: 0 0 10px 3px rgba(155, 89, 182, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-archer { box-shadow: 0 0 10px 3px rgba(39, 174, 96, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-mage { box-shadow: 0 0 10px 3px rgba(52, 152, 219, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-necromancer { box-shadow: 0 0 10px 3px rgba(142, 68, 173, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-paladin { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.65); border-radius: 50%; }
+
+/* Faz 10 - cgSetLegendaryAura's persistent pulse (graphics.js) for an
+   equipped orange/red/teal unique item - unlike the class glow above,
+   this DOES pulse, since it's meant to keep reading as "you're wearing
+   something rare" for the whole time it's equipped, not just register
+   once. --legendary-aura-color is set inline per-instance by
+   cgSetLegendaryAura (the item's own RARITY_DEFS color); the fallback here
+   only matters if that custom property somehow never got set. */
+.combat-portrait.cg-legendary-aura {
+    animation: cgLegendaryAuraPulse 2.2s ease-in-out infinite;
+}
+@keyframes cgLegendaryAuraPulse {
+    0%, 100% { box-shadow: 0 0 6px 1px var(--legendary-aura-color, #f97316); }
+    50% { box-shadow: 0 0 18px 6px var(--legendary-aura-color, #f97316); }
+}
+
 /* Monster Display - the enemy portrait keeps the same float/enraged animation
    the old emoji-based version had (see game.js's use of enemySprite.classList) -
    these apply to the canvas element's box exactly the same way they did to a

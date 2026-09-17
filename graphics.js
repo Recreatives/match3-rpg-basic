@@ -542,6 +542,39 @@ function cgBossEnrageTransition(gridEl) {
     setTimeout(() => flash.remove(), 700);
 }
 
+// Faz 10 (graphics roadmap, 2nd wave) - a per-class glow ring around the
+// player's OWN portrait, not the shared board (Faz 5 already gave
+// #pvp-grid/#coop-grid their own MODE-identity border tint - stacking a
+// second, class-based tint on the same shared board would fight that
+// signal instead of adding to it; the player's own portrait belongs to
+// them alone in every mode, so it's the right place for CLASS identity).
+const CLASS_GLOW_KEYS = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+function cgSetClassGlow(canvasId, classKey) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    CLASS_GLOW_KEYS.forEach(k => el.classList.remove('class-glow-' + k));
+    if (classKey && CLASS_GLOW_KEYS.includes(classKey)) el.classList.add('class-glow-' + classKey);
+}
+
+// Faz 10 - a persistent aura on the player's own portrait while an
+// orange/red/teal unique item (items.js's RARITY_DEFS - the isUnique tier,
+// this project's actual "legendary" vocabulary; the reward-pool's own
+// common/uncommon/rare/epic/legendary strings from Faz 9 are a DIFFERENT,
+// unrelated system for temporary per-run stat picks) is equipped in any
+// slot. `rarityKey` is null to clear it. Uses the item's own RARITY_DEFS
+// color (single source of truth) rather than a second hardcoded palette.
+function cgSetLegendaryAura(canvasId, rarityKey) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    if (rarityKey && typeof RARITY_DEFS !== 'undefined' && RARITY_DEFS[rarityKey]) {
+        el.style.setProperty('--legendary-aura-color', RARITY_DEFS[rarityKey].color);
+        el.classList.add('cg-legendary-aura');
+    } else {
+        el.classList.remove('cg-legendary-aura');
+        el.style.removeProperty('--legendary-aura-color');
+    }
+}
+
 // Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
 // previously got only a sound cue and a log line: winning (an enemy/boss/
 // PvP opponent goes down) and losing (game over, party wipe, PvP loss).
