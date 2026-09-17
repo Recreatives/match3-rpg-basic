@@ -985,3 +985,19 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Faz 12 (graphics roadmap, 2nd wave) - manual low-graphics mode
+   (cgToggleLowGraphics, graphics.js). Same universal reset as the
+   prefers-reduced-motion block above, but gated on a class instead of an
+   OS media feature - see graphics.js's own comment for why these are two
+   different motivations that deserve two different toggles. The JS-side
+   guards (cgEffectsEnabled) already stop the expensive DOM churn (confetti/
+   tile-burst/board-shake) from being created at all; this CSS half only
+   matters for the handful of effects that don't go through that check
+   (e.g. matched-big's own pop, the class-glow/legendary-aura statics
+   staying instant rather than easing in). */
+html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mode *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+}

@@ -16,6 +16,35 @@
 // Character/monster art credit: Batareya (FreePixel.art). Effect art credit:
 // Kenney (kenney.nl). See assets/CREDITS.md.
 
+// Faz 12 (graphics roadmap, 2nd wave) - a manual "low graphics mode",
+// independent of the OS's prefers-reduced-motion (Faz 6, style.css).
+// Reduced-motion means "this motion bothers me" (a vestibular/accessibility
+// signal) - a completely different motivation from "my device is weak, I
+// want the extra flourish effects off", which a player with zero motion
+// sensitivity on a strong phone would never set, and a player on a weak
+// phone with no motion sensitivity has no OS setting for at all. Gates the
+// actual JS-side DOM churn (confetti pieces, tile bursts, board shakes,
+// boss flashes), not just their CSS animation duration - Faz 6's reset
+// alone still pays the cost of CREATING dozens of short-lived elements per
+// event, which is the real performance line item on a weak GPU, not how
+// long they visually animate for.
+const CG_LOW_GRAPHICS_KEY = 'pixelDungeonLowGraphics';
+let cgLowGraphics = localStorage.getItem(CG_LOW_GRAPHICS_KEY) === 'true';
+
+function cgEffectsEnabled() { return !cgLowGraphics; }
+
+function cgApplyLowGraphicsState() {
+    document.documentElement.classList.toggle('low-graphics-mode', cgLowGraphics);
+    let btn = document.getElementById('low-graphics-btn');
+    if (btn) btn.innerText = cgLowGraphics ? '🐢' : '🎨';
+}
+
+function cgToggleLowGraphics() {
+    cgLowGraphics = !cgLowGraphics;
+    localStorage.setItem(CG_LOW_GRAPHICS_KEY, String(cgLowGraphics));
+    cgApplyLowGraphicsState();
+}
+
 // Each file is a 4-frame horizontal idle-animation strip (cropped from the
 // artist's 8-direction spritesheet's front-facing row - see
 // scratchpad-era CREDITS.md notes) rather than one static frame, so the
@@ -455,7 +484,7 @@ const TILE_BURST_COLORS = {
     sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f'
 };
 function cgTileBurst(tileEl, tileType) {
-    if (!tileEl) return;
+    if (!tileEl || !cgEffectsEnabled()) return;
     const color = TILE_BURST_COLORS[tileType];
     if (!color) return;
     const rect = tileEl.getBoundingClientRect();
@@ -514,6 +543,7 @@ function cgSetUltReady(containerEl, isReady) {
 // commit), leaving cg-boss-entrance on permanently would silently kill the
 // float animation for good, not just for its own 0.6s.
 function cgBossIntro(portraitId) {
+    if (!cgEffectsEnabled()) return;
     const flash = document.createElement('div');
     flash.className = 'cg-boss-flash';
     document.body.appendChild(flash);
@@ -536,6 +566,7 @@ function cgBossIntro(portraitId) {
 // variant.
 function cgBossEnrageTransition(gridEl) {
     if (typeof cgBoardImpact === 'function') cgBoardImpact(gridEl, 3);
+    if (!cgEffectsEnabled()) return;
     const flash = document.createElement('div');
     flash.className = 'cg-boss-flash';
     document.body.appendChild(flash);
@@ -638,6 +669,7 @@ function cgCelebrate(kind, big) {
 
 const CG_CONFETTI_COLORS = ['#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#e67e22'];
 function cgConfettiBurst(big) {
+    if (!cgEffectsEnabled()) return;
     const count = big ? 40 : 22;
     const layer = document.createElement('div');
     layer.className = 'cg-confetti-layer';
@@ -675,7 +707,7 @@ function cgDefeatVignette() {
 // 4=7!!) - below 2 (a plain 3-match) gets no shake at all, matching how the
 // board has always felt for the common case.
 function cgBoardImpact(gridEl, maxMultiplier) {
-    if (!gridEl || !maxMultiplier || maxMultiplier < 2) return;
+    if (!gridEl || !maxMultiplier || maxMultiplier < 2 || !cgEffectsEnabled()) return;
     const cls = maxMultiplier >= 3 ? 'shake-big' : 'shake';
     gridEl.classList.remove('shake', 'shake-big');
     void gridEl.offsetWidth; // force reflow so re-adding the class restarts the animation
@@ -683,3 +715,4 @@ function cgBoardImpact(gridEl, maxMultiplier) {
 }
 
 document.addEventListener('DOMContentLoaded', cgPreloadAll);
+document.addEventListener('DOMContentLoaded', cgApplyLowGraphicsState);
