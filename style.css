@@ -796,3 +796,30 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
     opacity: 1;
     transform: translate(-50%, 0);
 }
+
+/* Faz 6 (graphics roadmap) - prefers-reduced-motion support, added last so
+   it covers every animation/transition already in this file (the .dying,
+   .shake/.shake-big, .falling, .matched/.matched-big, .pop-text, .float,
+   .enrage-pulse, .cg-tile-burst, .cg-confetti-piece, .cg-defeat-vignette,
+   .achievement-toast rules above included) in one place, rather than
+   editing each rule individually. Collapsing duration to ~0 instead of
+   using `animation: none` keeps each animation's END STATE (the one at
+   100%) actually applied - a tile still visibly clears, a toast still
+   ends up visible - `none` would freeze everything at its START state
+   instead, which reads as broken, not calm.
+   Known limitation: a few flows (triggerDeathSequence's 1.5s pause before
+   winLevel()/gameOver(), the achievement toast's 3.5s visible hold) pace
+   themselves with their own JS setTimeout independent of the CSS duration
+   here - those still wait their original real time even with reduced
+   motion on, so the screen briefly holds still rather than that wait
+   shrinking too. Not visually jarring (nothing is moving during it), just
+   not shortened - fixing that would mean threading a "skip the delay"
+   flag through every such setTimeout across game.js/pvp.js/coop.js, a
+   bigger change than this pass. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
