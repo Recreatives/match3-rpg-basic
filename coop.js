@@ -1293,9 +1293,12 @@ function coopEndOwnTurn() {
 
 function coopUpdateUI() {
     let hpPct = Math.max(0, (coopMyHP / COOP_MAX_HP) * 100);
-    let hpBar = document.getElementById('coop-my-hp-bar');
     let hpText = document.getElementById('coop-my-hp-text');
-    if (hpBar) hpBar.style.width = hpPct + '%';
+    // Faz 7 (graphics roadmap, 2nd wave) - ghost-trail + low-HP pulse, same
+    // helpers game.js's updateUI uses (see graphics.js).
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('coop-my-hp-bar', hpPct);
+    else { let hpBar = document.getElementById('coop-my-hp-bar'); if (hpBar) hpBar.style.width = hpPct + '%'; }
+    if (typeof cgSetLowHpWarning === 'function') cgSetLowHpWarning(document.getElementById('coop-my-hp-bar-container'), hpPct > 0 && hpPct < 25 && !coopMyDown);
     if (hpText) hpText.innerText = coopMyDown
         ? 'BAYILDIN'
         : `${Math.max(0, Math.floor(coopMyHP))}/${COOP_MAX_HP}` + (coopMyArmor > 0 ? ` [+${coopMyArmor}]` : '');
@@ -1312,9 +1315,9 @@ function coopUpdateUI() {
     if (allyText) allyText.innerText = coopAllyDown ? t('BAYILDI - KURTAR!') : t(allyTier.text);
 
     let enemyPct = coopEnemyMaxHP > 0 ? Math.max(0, (coopEnemyHP / coopEnemyMaxHP) * 100) : 0;
-    let enemyBar = document.getElementById('coop-boss-hp-bar');
     let enemyText = document.getElementById('coop-boss-hp-text');
-    if (enemyBar) enemyBar.style.width = enemyPct + '%';
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('coop-boss-hp-bar', enemyPct);
+    else { let enemyBar = document.getElementById('coop-boss-hp-bar'); if (enemyBar) enemyBar.style.width = enemyPct + '%'; }
     if (enemyText) enemyText.innerText = `${Math.max(0, Math.floor(coopEnemyHP))}/${coopEnemyMaxHP}` + (coopEnemyArmor > 0 ? ` [+${coopEnemyArmor}]` : '');
 
     let levelLabel = document.getElementById('coop-level-label');
@@ -1326,6 +1329,7 @@ function coopUpdateUI() {
     let ultText = document.getElementById('coop-ult-text');
     if (ultBar) ultBar.style.width = coopUltCharge + '%';
     if (ultText) ultText.innerText = `${Math.floor(coopUltCharge)}%`;
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('coop-ult-bar-container'), coopUltCharge >= 100);
 
     let ultBtn = document.getElementById('coop-ult-btn');
     if (ultBtn) {

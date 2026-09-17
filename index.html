@@ -39,7 +39,7 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
-    <link rel="stylesheet" href="style.css?v=1.20">
+    <link rel="stylesheet" href="style.css?v=1.21">
     <!-- Cloudflare Turnstile - explicit render mode (explicit.js), not the
          default auto-scanning api.js: the gate's widget container starts
          out inside a display:none element (#auth-gate, until boot() shows
@@ -795,7 +795,7 @@
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <canvas class="combat-portrait" id="pvp-my-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="YOU">SEN</div>
-                        <div class="bar-container"><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
+                        <div class="bar-container" id="pvp-my-hp-bar-container"><div class="bar-ghost" id="pvp-my-hp-bar-ghost"></div><div id="pvp-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="pvp-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
@@ -815,7 +815,7 @@
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="pvp-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
-                        <div class="bar-container"><div id="pvp-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
+                        <div class="bar-container" id="pvp-ult-bar-container"><div id="pvp-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
                     </div>
                     <div class="grid mp-grid" id="pvp-grid" style="margin: 0 auto 10px;"></div>
                     <button id="pvp-ult-btn" class="action-btn" style="width:100%; margin:0 0 10px;" disabled onclick="pvpUseUltimate()">ULT (sınıf seçilmedi)</button>
@@ -844,13 +844,13 @@
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
                         <canvas class="combat-portrait" id="coop-enemy-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="ENEMY">DÜŞMAN</div>
-                        <div class="bar-container"><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
+                        <div class="bar-container" id="coop-boss-hp-bar-container"><div class="bar-ghost" id="coop-boss-hp-bar-ghost"></div><div id="coop-boss-hp-bar" class="bar" style="background-color:#9b59b6; width:100%;"></div></div>
                         <span id="coop-boss-hp-text" class="hp-text">0/0</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
                         <canvas class="combat-portrait" id="coop-my-sprite" width="56" height="70"></canvas>
                         <div data-i18n-en="YOU">SEN</div>
-                        <div class="bar-container"><div id="coop-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
+                        <div class="bar-container" id="coop-my-hp-bar-container"><div class="bar-ghost" id="coop-my-hp-bar-ghost"></div><div id="coop-my-hp-bar" class="bar" style="background-color:#2ecc71; width:100%;"></div></div>
                         <span id="coop-my-hp-text" class="hp-text">100/100</span>
                     </div>
                     <div class="stat-box" style="width:100%; margin-bottom:8px;">
@@ -870,7 +870,7 @@
                     <div class="stat-box" style="width:100%; margin-bottom:10px;">
                         <div>ULT</div>
                         <span id="coop-ult-text" class="hp-text" style="color: var(--accent);">0%</span>
-                        <div class="bar-container"><div id="coop-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
+                        <div class="bar-container" id="coop-ult-bar-container"><div id="coop-ult-bar" class="bar" style="background-color:#f1c40f; width:0%;"></div></div>
                     </div>
                     <div class="grid mp-grid" id="coop-grid" style="margin: 0 auto 10px;"></div>
                     <button id="coop-ult-btn" class="action-btn" style="width:100%; margin:0 0 10px;" disabled onclick="coopUseUltimate()">ULT (sınıf seçilmedi)</button>
@@ -916,7 +916,7 @@
     </div>
 
     <div class="top-bar">
-        <div class="version">v1.20 Fix: matched-big left tiles permanently invisible after refill</div>
+        <div class="version">v1.21 HP bar ghost-trail, low-HP pulse, ULT-ready glow (Faz 7)</div>
         <div class="top-bar-buttons">
             <button class="help-btn" id="sound-mute-btn" onclick="toggleSoundMute()" title="Sesi aç/kapat">🔊</button>
             <button data-i18n-en="🎁 Daily Reward" class="loot-btn" id="daily-login-btn" onclick="toggleModal('daily-login-modal')">🎁 Günlük Ödül</button>
@@ -949,7 +949,7 @@
         <div class="stat-box">
             <canvas class="combat-portrait" id="player-sprite" width="56" height="70"></canvas>
             <div id="player-class-label">SEN</div>
-            <div class="bar-container"><div id="player-hp-bar" class="bar"></div></div>
+            <div class="bar-container" id="player-hp-bar-container"><div class="bar-ghost" id="player-hp-bar-ghost"></div><div id="player-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="player-armor-bar" class="bar"></div></div>
             <span id="hp-text" class="hp-text">100/100</span>
         </div>
@@ -957,13 +957,13 @@
         <div class="stat-box" style="width: 80px;">
             <div>ULT</div>
             <span id="ult-text" class="hp-text" style="color: var(--accent);">0%</span>
-            <div class="bar-container"><div id="ult-bar" class="bar"></div></div>
+            <div class="bar-container" id="ult-bar-container"><div id="ult-bar" class="bar"></div></div>
         </div>
 
         <div class="stat-box">
             <canvas class="enemy-display combat-portrait" id="enemy-sprite" width="56" height="70"></canvas>
             <div data-i18n-en="ENEMY">DÜŞMAN</div>
-            <div class="bar-container"><div id="enemy-hp-bar" class="bar"></div></div>
+            <div class="bar-container" id="enemy-hp-bar-container"><div class="bar-ghost" id="enemy-hp-bar-ghost"></div><div id="enemy-hp-bar" class="bar"></div></div>
             <div class="armor-container"><div id="enemy-armor-bar" class="bar"></div></div>
             <span id="enemy-hp-text" class="hp-text">50/50</span>
         </div>
@@ -993,17 +993,17 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
-    <script src="graphics.js?v=1.20"></script>
-    <script src="i18n.js?v=1.20"></script>
-    <script src="i18n-dict.js?v=1.20"></script>
-    <script src="sound.js?v=1.20"></script>
-    <script src="economy.js?v=1.20"></script>
-    <script src="items.js?v=1.20"></script>
-    <script src="achievements.js?v=1.20"></script>
-    <script src="game.js?v=1.20"></script>
-    <script src="sharedboard.js?v=1.20"></script>
-    <script src="pvp.js?v=1.20"></script>
-    <script src="coop.js?v=1.20"></script>
+    <script src="graphics.js?v=1.21"></script>
+    <script src="i18n.js?v=1.21"></script>
+    <script src="i18n-dict.js?v=1.21"></script>
+    <script src="sound.js?v=1.21"></script>
+    <script src="economy.js?v=1.21"></script>
+    <script src="items.js?v=1.21"></script>
+    <script src="achievements.js?v=1.21"></script>
+    <script src="game.js?v=1.21"></script>
+    <script src="sharedboard.js?v=1.21"></script>
+    <script src="pvp.js?v=1.21"></script>
+    <script src="coop.js?v=1.21"></script>
     <script>
         // Registration only - sw.js itself is network-first (see its own
         // header comment for why), so this never risks serving stale code.

@@ -260,7 +260,12 @@ body {
     width: 100%; height: 6px; background: #333;
     border-radius: 3px; overflow: hidden; margin-top: 2px;
 }
-.bar { height: 100%; transition: width 0.3s; }
+/* Faz 7 (graphics roadmap, 2nd wave) - position:relative + z-index puts
+   .bar in its own stacking context ABOVE .bar-ghost below (a
+   position:absolute sibling would otherwise paint above a plain in-flow
+   .bar by default, the opposite of what's needed here). No-op for a bar
+   with no ghost sibling (armor/ult/etc.) - safe as a shared base rule. */
+.bar { height: 100%; transition: width 0.2s ease; position: relative; z-index: 1; }
 #player-hp-bar { background-color: #2ecc71; width: 100%; }
 #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
 #ult-bar { background-color: #f1c40f; width: 0%; }
@@ -268,6 +273,43 @@ body {
 #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
 .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
 .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
+
+/* Faz 7 - "ghost trail" damage feedback. cgSetBarWithGhost (graphics.js)
+   sets BOTH bars to the same new width at the same instant - the trick is
+   entirely in the transition timing, no JS "previous value" bookkeeping
+   needed: .bar snaps down fast (0.2s, no delay) while .bar-ghost holds its
+   old rendered width for a beat (0.35s delay) before catching down more
+   slowly (0.6s), so a hit visibly leaves a brief bright afterimage of how
+   much was just lost - the flash IS the ghost's own light color, no
+   separate flash effect needed on top of it. Absolute positioning only
+   inside .bar-container (already position:relative) - transform/opacity
+   are not involved, but width transitions on a small fixed-height bar are
+   a cheap, well-contained repaint, nothing like the 64-tile board case. */
+.bar-ghost {
+    position: absolute; top: 0; left: 0; height: 100%; z-index: 0;
+    background: rgba(255, 255, 255, 0.45);
+    transition: width 0.6s ease 0.35s;
+}
+
+/* Faz 7 - low-HP pulse, reusing enrage-pulse's own scale keyframe (style.css,
+   near .enemy-display.enraged) rather than inventing a new one. */
+.bar-container.low-hp {
+    animation: barLowHpPulse 1s ease-in-out infinite;
+}
+@keyframes barLowHpPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(231, 76, 60, 0); }
+    50% { box-shadow: 0 0 8px 2px rgba(231, 76, 60, 0.75); }
+}
+
+/* Faz 7 - ULT bar's own container gets a "ready, use me" glow at 100%
+   charge (cgSetUltReady, graphics.js) instead of sitting there static. */
+.bar-container.ult-ready {
+    animation: barUltReadyPulse 1.2s ease-in-out infinite;
+}
+@keyframes barUltReadyPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(241, 196, 15, 0); }
+    50% { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.85); }
+}
 
 /* --- STATS BAR (GRID) --- */
 /* Used inside the Stats/Loot modal (#history-modal) rather than the main

@@ -474,6 +474,34 @@ function cgTileBurst(tileEl, tileType) {
     setTimeout(() => burst.remove(), 600);
 }
 
+// Faz 7 (graphics roadmap, 2nd wave) - sets a bar AND its ghost-trail
+// sibling (see .bar-ghost, style.css) to the same target width. Safe to
+// call on any bar id, ghost or not - a bar with no `${barId}-ghost`
+// element in the DOM (armor bars, ult bars, the tiered opponent/ally
+// status bars) just silently skips that half, so this can be dropped in
+// anywhere a bar's width was previously set directly.
+function cgSetBarWithGhost(barId, pct) {
+    const bar = document.getElementById(barId);
+    if (bar) bar.style.width = pct + '%';
+    const ghost = document.getElementById(barId + '-ghost');
+    if (ghost) ghost.style.width = pct + '%';
+}
+
+// Faz 7 - toggles the low-HP pulse (style.css's .low-hp) on a bar's own
+// .bar-container. `containerEl` (not an id) since the three modes don't
+// all reach their HP bar's container the same way - callers already have
+// the element in hand more often than not.
+function cgSetLowHpWarning(containerEl, isLow) {
+    if (!containerEl) return;
+    containerEl.classList.toggle('low-hp', !!isLow);
+}
+
+// Faz 7 - toggles the ULT-ready glow (style.css's .ult-ready).
+function cgSetUltReady(containerEl, isReady) {
+    if (!containerEl) return;
+    containerEl.classList.toggle('ult-ready', !!isReady);
+}
+
 // Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
 // previously got only a sound cue and a log line: winning (an enemy/boss/
 // PvP opponent goes down) and losing (game over, party wipe, PvP loss).

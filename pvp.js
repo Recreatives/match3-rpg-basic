@@ -1054,9 +1054,12 @@ function pvpApplyOpponentStatus(tier) {
 
 function pvpUpdateUI() {
     let hpPct = Math.max(0, (pvpMyHP / PVP_MAX_HP) * 100);
-    let hpBar = document.getElementById('pvp-my-hp-bar');
     let hpText = document.getElementById('pvp-my-hp-text');
-    if (hpBar) hpBar.style.width = hpPct + '%';
+    // Faz 7 (graphics roadmap, 2nd wave) - ghost-trail + low-HP pulse, same
+    // helpers game.js's updateUI uses (see graphics.js).
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('pvp-my-hp-bar', hpPct);
+    else { let hpBar = document.getElementById('pvp-my-hp-bar'); if (hpBar) hpBar.style.width = hpPct + '%'; }
+    if (typeof cgSetLowHpWarning === 'function') cgSetLowHpWarning(document.getElementById('pvp-my-hp-bar-container'), hpPct > 0 && hpPct < 25);
     if (hpText) hpText.innerText = `${Math.max(0, Math.floor(pvpMyHP))}/${PVP_MAX_HP}` + (pvpMyArmor > 0 ? ` [+${pvpMyArmor}]` : '');
 
     // Tell the opponent how banged-up I am (see sbHealthTier) - my own HP
@@ -1079,6 +1082,7 @@ function pvpUpdateUI() {
     let ultText = document.getElementById('pvp-ult-text');
     if (ultBar) ultBar.style.width = pvpUltCharge + '%';
     if (ultText) ultText.innerText = `${Math.floor(pvpUltCharge)}%`;
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('pvp-ult-bar-container'), pvpUltCharge >= 100);
 
     let ultBtn = document.getElementById('pvp-ult-btn');
     if (ultBtn) {

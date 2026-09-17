@@ -1601,11 +1601,24 @@ function updateUI() {
     const pArmPct = Math.min(100, (playerArmor / maxPlayerHP) * 100);
     const eArmPct = Math.min(100, (enemyArmor / maxEnemyHP) * 100);
 
-    document.getElementById('player-hp-bar').style.width = `${pPct}%`;
-    document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
+    // Faz 7 (graphics roadmap, 2nd wave) - cgSetBarWithGhost also drives the
+    // ghost-trail sibling (see .bar-ghost, style.css); falls back to a
+    // plain width set if graphics.js somehow didn't load.
+    if (typeof cgSetBarWithGhost === 'function') {
+        cgSetBarWithGhost('player-hp-bar', pPct);
+        cgSetBarWithGhost('enemy-hp-bar', ePct);
+    } else {
+        document.getElementById('player-hp-bar').style.width = `${pPct}%`;
+        document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
+    }
     document.getElementById('ult-bar').style.width = `${ultCharge}%`;
     document.getElementById('player-armor-bar').style.width = `${pArmPct}%`;
     document.getElementById('enemy-armor-bar').style.width = `${eArmPct}%`;
+    if (typeof cgSetLowHpWarning === 'function') {
+        cgSetLowHpWarning(document.getElementById('player-hp-bar-container'), pPct > 0 && pPct < 25);
+        cgSetLowHpWarning(document.getElementById('enemy-hp-bar-container'), ePct > 0 && ePct < 25);
+    }
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('ult-bar-container'), ultCharge >= 100);
 
     let pArmorText = playerArmor > 0 ? ` <span class="armor-text">[+${playerArmor}]</span>` : "";
     let eArmorText = enemyArmor > 0 ? ` <span class="armor-text">[+${enemyArmor}]</span>` : "";
