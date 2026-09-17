@@ -90,6 +90,7 @@ function pvpUpdateSpeedBonusUI() {
     if (!pvpTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('pvp-speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function pvpStartSpeedTimer() {
@@ -705,12 +706,18 @@ async function pvpShowBetrayalSummary(iWon) {
     outcomeEl.style.color = iWon ? '#2ecc71' : '#e74c3c';
     document.getElementById('betrayal-summary-detail').innerText = detail;
     document.getElementById('betrayal-summary-wallet').innerText = walletLine;
-    document.getElementById('betrayal-summary-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('betrayal-summary-modal'), true);
+    else document.getElementById('betrayal-summary-modal').style.display = 'flex';
 }
 
 function pvpCloseBetrayalSummary() {
-    document.getElementById('betrayal-summary-modal').style.display = 'none';
-    document.getElementById('pvp-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') {
+        cgAnimateModal(document.getElementById('betrayal-summary-modal'), false);
+        cgAnimateModal(document.getElementById('pvp-modal'), false);
+    } else {
+        document.getElementById('betrayal-summary-modal').style.display = 'none';
+        document.getElementById('pvp-modal').style.display = 'none';
+    }
     pvpBetrayalMode = null;
     pvpForcedFirstMoverId = null;
     // This closes pvp-modal directly (not via toggleModal), so it needs the

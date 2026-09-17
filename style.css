@@ -234,11 +234,33 @@ body {
 
 .speed-bonus {
     display: none;
+    position: relative; overflow: hidden;
     font-size: 0.75rem; font-weight: bold; color: var(--accent);
     background: rgba(241, 196, 15, 0.12);
     border: 1px solid var(--accent);
     padding: 3px 8px; border-radius: 10px;
     white-space: nowrap;
+}
+/* Faz 11 (graphics roadmap, 2nd wave) - cgSetSpeedBonusProgress's (graphics.js)
+   depleting underline, driven by the --speed-progress custom property. */
+.speed-bonus::after {
+    content: '';
+    position: absolute; left: 0; bottom: 0; height: 3px;
+    width: var(--speed-progress, 100%);
+    background: var(--accent);
+    transition: width 0.1s linear;
+}
+
+/* Faz 11 - cgLevelTransition's own element (graphics.js). */
+.cg-level-curtain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 197;
+    background: #000;
+    animation: cgLevelCurtain 0.5s ease-in-out forwards;
+}
+@keyframes cgLevelCurtain {
+    0% { opacity: 0; }
+    40% { opacity: 0.85; }
+    100% { opacity: 0; }
 }
 
 .hud {
@@ -772,7 +794,20 @@ body {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: var(--modal-bg); z-index: 100; display: none;
     justify-content: center; align-items: center;
+    /* Faz 11 (graphics roadmap, 2nd wave) - cgAnimateModal (graphics.js)
+       toggles .visible a frame after setting display:flex/before the
+       eventual display:none, so this can actually transition instead of
+       hard-snapping. Every modal already shares this one class, so this
+       one rule covers all of them at once. */
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
+.modal-overlay.visible { opacity: 1; }
+.modal-overlay .modal-content {
+    transform: scale(0.94) translateY(8px);
+    transition: transform 0.2s ease;
+}
+.modal-overlay.visible .modal-content { transform: scale(1) translateY(0); }
 .modal-content {
     background: #34495e; width: 90%; max-width: 400px;
     box-sizing: border-box;

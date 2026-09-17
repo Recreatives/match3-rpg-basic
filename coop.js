@@ -135,6 +135,7 @@ function coopUpdateSpeedBonusUI() {
     if (!coopTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('coop-speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function coopStartSpeedTimer() {
@@ -584,11 +585,11 @@ function coopShowRewardPick() {
         btn.onclick = () => {
             applyReward(reward);
             coopLog(tf('Güç seçildi: {name} ({desc}) - sadece bu run için.', { name: t(reward.name), desc: t(reward.desc) }));
-            modal.style.display = 'none';
+            if (typeof cgAnimateModal === 'function') cgAnimateModal(modal, false); else modal.style.display = 'none';
         };
         container.appendChild(btn);
     }
-    modal.style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(modal, true); else modal.style.display = 'flex';
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------
@@ -749,7 +750,8 @@ function coopOpenVote(kind, context) {
     document.getElementById('hidden-vote-status').innerText = '';
 
     document.getElementById('coop-battle').style.display = 'none';
-    document.getElementById('hidden-vote-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('hidden-vote-modal'), true);
+    else document.getElementById('hidden-vote-modal').style.display = 'flex';
 
     coopLog(kind === 'betrayal'
         ? tf('⚠️ Lvl {level} BOSS öncesi gizli oy zamanı!', { level: context.level })
@@ -784,7 +786,8 @@ function coopMaybeResolveVotes() {
 }
 
 function coopApplyVoteResult(result) {
-    document.getElementById('hidden-vote-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('hidden-vote-modal'), false);
+    else document.getElementById('hidden-vote-modal').style.display = 'none';
     coopVoteOpen = false;
     coopVotes = {};
     if (result.kind === 'exit') coopApplyExitVoteResult(result);

@@ -137,6 +137,8 @@ function updateSpeedBonusUI() {
     }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    // Faz 11 (graphics roadmap, 2nd wave) - depleting progress underline.
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function startPlayerTimer() {
@@ -579,6 +581,9 @@ function updateRewardTitle() {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
             log(tf('Savaş öncesi dinlenme: +{healed} Can', { healed }), 'log-heal');
         }
+        // Faz 11 (graphics roadmap, 2nd wave) - a brief curtain instead of
+        // snapping straight to the new board.
+        if (typeof cgLevelTransition === 'function') cgLevelTransition();
         level++;
         startLevel();
     };
@@ -1655,8 +1660,14 @@ function updateUI() {
 
 function toggleModal(modalId) {
     let m = document.getElementById(modalId);
-    if(m.style.display === 'flex') {
-        m.style.display = 'none';
+    // Checks .visible, not raw display - cgAnimateModal's close path only
+    // commits display:none after a 220ms fade (see graphics.js), so
+    // display alone would still read 'flex' during that window and a
+    // rapid re-toggle would misread "still open" as "needs closing" again
+    // instead of reopening. .visible flips synchronously both ways.
+    let isOpen = typeof cgAnimateModal === 'function' ? m.classList.contains('visible') : (m.style.display === 'flex');
+    if (isOpen) {
+        if (typeof cgAnimateModal === 'function') cgAnimateModal(m, false); else m.style.display = 'none';
         // Closing the PvP modal mid-search shouldn't leave the player sitting
         // in the matchmaking queue until the server's 90s staleness cleanup
         // catches up - cancel immediately so a re-open starts fresh.
@@ -1689,7 +1700,7 @@ function toggleModal(modalId) {
             log(t('Dükkana sadece zindan dışındayken girebilirsin.'), 'log-turn');
             return;
         }
-        m.style.display = 'flex';
+        if (typeof cgAnimateModal === 'function') cgAnimateModal(m, true); else m.style.display = 'flex';
         // Only render history if opening history modal
         if(modalId === 'history-modal') {
             renderHistory();
@@ -1903,7 +1914,8 @@ function tutorialSkip() {
 }
 
 function closeTutorial(completed) {
-    document.getElementById('tutorial-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), false);
+    else document.getElementById('tutorial-modal').style.display = 'none';
     localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
     if (typeof trackEvent === 'function') trackEvent('tutorial_closed', { completed });
 }
@@ -1912,14 +1924,16 @@ function replayTutorial() {
     toggleModal('info-modal');
     tutorialStep = 1;
     showTutorialStep(1);
-    document.getElementById('tutorial-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), true);
+    else document.getElementById('tutorial-modal').style.display = 'flex';
 }
 
 function maybeShowTutorial() {
     if (localStorage.getItem(TUTORIAL_SEEN_KEY) === 'true') return;
     tutorialStep = 1;
     showTutorialStep(1);
-    document.getElementById('tutorial-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), true);
+    else document.getElementById('tutorial-modal').style.display = 'flex';
     if (typeof trackEvent === 'function') trackEvent('tutorial_started', {});
 }
 

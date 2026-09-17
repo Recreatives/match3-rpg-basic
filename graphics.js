@@ -575,6 +575,54 @@ function cgSetLegendaryAura(canvasId, rarityKey) {
     }
 }
 
+// Faz 11 (graphics roadmap, 2nd wave) - every modal in this project opened/
+// closed with a hard display:none<->flex snap (no transition possible on
+// `display` itself). This fades+scales it instead, using the same
+// "add .visible a frame after display is set, remove it before the
+// eventual display:none" pattern .cg-defeat-vignette and .achievement-toast
+// already use elsewhere in this file/achievements.js - not a new
+// technique, just applied to modals too. `opening=false`'s setTimeout only
+// commits display:none if nothing re-opened the SAME modal in the
+// meantime (checks .visible is still absent), so a fast close-then-reopen
+// (e.g. a player double-tapping) can't get stuck hidden.
+function cgAnimateModal(modalEl, opening) {
+    if (!modalEl) return;
+    if (opening) {
+        modalEl.style.display = 'flex';
+        void modalEl.offsetWidth;
+        modalEl.classList.add('visible');
+    } else {
+        modalEl.classList.remove('visible');
+        setTimeout(() => {
+            if (!modalEl.classList.contains('visible')) modalEl.style.display = 'none';
+        }, 220);
+    }
+}
+
+// Faz 11 (graphics roadmap, 2nd wave) - a depleting progress underline on
+// the speed-bonus badge (⚡x2.0 etc.), so how much of the window is left
+// reads at a glance instead of only from the multiplier number itself.
+// Simpler than a true circular countdown ring - the badge is a pill, not
+// a circle, and a conic-gradient ring wrapped around non-circular text
+// adds real visual complexity for the same "time's running out" read a
+// linear depletion bar already gives cleanly. `ratio` is 1 (full window
+// left) down to 0 (about to expire).
+function cgSetSpeedBonusProgress(elId, ratio) {
+    const el = document.getElementById(elId);
+    if (el) el.style.setProperty('--speed-progress', (Math.max(0, Math.min(1, ratio)) * 100) + '%');
+}
+
+// Faz 11 - see cgAnimateModal below for the full rationale; this one is a
+// brief full-screen dark curtain for the reward-screen -> next-level
+// transition (the "SONRAKİ SEVİYE" button's onclick, game.js), which
+// previously swapped straight to the new board with no transition at all.
+function cgLevelTransition() {
+    const curtain = document.createElement('div');
+    curtain.className = 'cg-level-curtain';
+    document.body.appendChild(curtain);
+    setTimeout(() => curtain.remove(), 500);
+}
+
 // Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
 // previously got only a sound cue and a log line: winning (an enemy/boss/
 // PvP opponent goes down) and losing (game over, party wipe, PvP loss).
