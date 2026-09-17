@@ -383,6 +383,25 @@ body {
     100% { transform: scale(0); opacity: 0; }
 }
 
+/* Faz 2 (graphics roadmap) - cgTileBurst's (graphics.js) own element. Fixed
+   position + left/top set inline per-instance in JS (viewport coordinates
+   from getBoundingClientRect, matching .pop-text's own positioning
+   approach). transform+opacity only - see cgTileBurst's comment for why. */
+.cg-tile-burst {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--burst-color) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 15;
+    animation: cgTileBurst 0.45s ease-out forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgTileBurst {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.85; }
+    100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+}
+
 /* Overlay Content */
 .overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
 .overlay-btn {

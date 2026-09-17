@@ -892,6 +892,7 @@ function pvpApplyGroupEffect(group, isInitial) {
         if (!isInitial) {
             pvpTiles[i].classList.add('matched');
             if (shapeMultiplier >= 2) pvpTiles[i].classList.add('matched-big');
+            if (typeof cgTileBurst === 'function') cgTileBurst(pvpTiles[i], group.type);
         }
         else pvpTiles[i].innerHTML = '';
         pvpTiles[i].dataset.type = '';

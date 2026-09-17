@@ -436,6 +436,38 @@ function cgGetStage(canvasId) {
     return stage;
 }
 
+// Faz 2 (graphics roadmap) - a tiny colored burst AT THE MATCHED TILE'S OWN
+// POSITION, tinted per tile type (same palette as HIT_EFFECT_SPRITES above,
+// so the board and the portrait hit effects read as the same visual
+// language). Deliberately plain DOM/CSS, not another PixiJS stage - a match
+// can clear up to 7-8 tiles at once on a 64-tile board, and one PIXI.Application
+// per tile would be a real cost for something this small; a radial-gradient
+// div animated with transform+opacity only is compositor-cheap and matches
+// this project's existing mobile-GPU-perf discipline (see .tile's own
+// comment in style.css on why filter/box-shadow are avoided at board scale).
+const TILE_BURST_COLORS = {
+    sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f'
+};
+function cgTileBurst(tileEl, tileType) {
+    if (!tileEl) return;
+    const color = TILE_BURST_COLORS[tileType];
+    if (!color) return;
+    const rect = tileEl.getBoundingClientRect();
+    const burst = document.createElement('div');
+    burst.className = 'cg-tile-burst';
+    burst.style.left = (rect.left + rect.width / 2 + window.scrollX) + 'px';
+    burst.style.top = (rect.top + rect.height / 2 + window.scrollY) + 'px';
+    burst.style.width = rect.width + 'px';
+    burst.style.height = rect.height + 'px';
+    burst.style.setProperty('--burst-color', color);
+    document.body.appendChild(burst);
+    // animationend is the normal path; the timeout is only a safety net in
+    // case the element gets display:none'd (e.g. a fast overlay swap) before
+    // the animation ever fires that event.
+    burst.addEventListener('animationend', () => burst.remove());
+    setTimeout(() => burst.remove(), 600);
+}
+
 // Faz 1 (graphics roadmap) - board-wide "that landed" feedback for a big
 // match, on top of the per-portrait hit effects above. Takes the grid
 // element itself (caller's job to getElementById the right one - see

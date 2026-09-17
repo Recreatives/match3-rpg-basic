@@ -1124,6 +1124,7 @@ function coopApplyGroupEffect(group, isInitial) {
         if (!isInitial) {
             coopTiles[i].classList.add('matched');
             if (shapeMultiplier >= 2) coopTiles[i].classList.add('matched-big');
+            if (typeof cgTileBurst === 'function') cgTileBurst(coopTiles[i], group.type);
         }
         else coopTiles[i].innerHTML = '';
         coopTiles[i].dataset.type = '';

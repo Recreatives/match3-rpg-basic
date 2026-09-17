@@ -1090,6 +1090,8 @@ function processMatch(group, isInitial) {
                 // style.css) than the everyday 3-match, ON TOP OF .matched
                 // rather than instead of it.
                 if (multiplier >= 2) tiles[index].classList.add('matched-big');
+                // Faz 2 - a small tile-type-colored burst right at this tile.
+                if (typeof cgTileBurst === 'function') cgTileBurst(tiles[index], group.type);
             }
             else tiles[index].innerHTML = '';
             tiles[index].dataset.type = '';
