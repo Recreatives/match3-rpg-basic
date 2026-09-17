@@ -576,7 +576,10 @@ function coopShowRewardPick() {
     for (let i = 0; i < 3; i++) {
         let reward = rollOneReward();
         let btn = document.createElement('button');
-        btn.className = `reward-btn rarity-${reward.tier}`;
+        // Faz 9 (graphics roadmap, 2nd wave) - same staggered reveal +
+        // legendary shimmer as solo's generateRewards (game.js).
+        btn.className = `reward-btn rarity-${reward.tier} reward-btn-reveal${reward.tier === 'legendary' ? ' reward-btn-legendary-reveal' : ''}`;
+        btn.style.animationDelay = (i * 0.12) + 's';
         btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
             applyReward(reward);
