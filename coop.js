@@ -411,6 +411,12 @@ function coopOnLevelStart(payload) {
         let stage = cgGetStage('coop-enemy-sprite');
         if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
     }
+    // Faz 8 (graphics roadmap, 2nd wave) - same boss-entrance beat solo gets
+    // (game.js's startLevel), mirrored here since co-op has boss levels too.
+    // Only here, not in the resync/rejoin path below - that's an existing
+    // player reconnecting to state that's already in progress, not a fresh
+    // boss appearing.
+    if (payload.isBoss && typeof cgBossIntro === 'function') cgBossIntro('coop-enemy-sprite');
 
     // One shared board per level (see sharedboard.js) - the host is always
     // the one-time authority for a fresh level's board (randomizes +

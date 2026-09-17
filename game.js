@@ -454,7 +454,10 @@ function startLevel() {
     }
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
-    if (isBoss) log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
+    if (isBoss) {
+        log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
+        if (typeof cgBossIntro === 'function') cgBossIntro('enemy-sprite');
+    }
     else if (MINION_LOG[currentMinionType]) log(t(MINION_LOG[currentMinionType]), "log-enemy");
 
     turnBanner.innerText = t("OYUNCU SIRASI");
@@ -1272,6 +1275,11 @@ function checkBossEnrage() {
         ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
         enemySprite.classList.add('enraged');
         log(t('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!'), 'log-crit');
+        // Faz 8 (graphics roadmap, 2nd wave) - a one-time flash+shake for the
+        // TRANSITION itself, on top of the ongoing .enraged pulse this
+        // classList.add already started (that pulse alone only communicates
+        // "now more dangerous", not the moment it happened).
+        if (typeof cgBossEnrageTransition === 'function') cgBossEnrageTransition(gridDisplay);
     }
 }
 

@@ -482,6 +482,27 @@ body {
 }
 .cg-defeat-vignette.visible { opacity: 1; }
 
+/* Faz 8 (graphics roadmap, 2nd wave) - cgBossIntro/cgBossEnrageTransition's
+   own elements (graphics.js). */
+.cg-boss-flash {
+    position: fixed; inset: 0; pointer-events: none; z-index: 198;
+    background: radial-gradient(ellipse at center, rgba(231, 76, 60, 0.55) 0%, rgba(231, 76, 60, 0) 70%);
+    animation: cgBossFlash 0.7s ease-out forwards;
+}
+@keyframes cgBossFlash {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.cg-boss-entrance {
+    animation: cgBossEntrance 0.6s cubic-bezier(.34, 1.56, .64, 1);
+}
+@keyframes cgBossEntrance {
+    0% { transform: scale(0.3) rotate(-8deg); }
+    60% { transform: scale(1.25) rotate(3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
 /* Overlay Content */
 .overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
 .overlay-btn {

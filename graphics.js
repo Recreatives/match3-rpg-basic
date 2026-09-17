@@ -502,6 +502,46 @@ function cgSetUltReady(containerEl, isReady) {
     containerEl.classList.toggle('ult-ready', !!isReady);
 }
 
+// Faz 8 (graphics roadmap, 2nd wave) - a boss level's entrance (a red
+// full-screen flash + the boss's own portrait bouncing into view) instead
+// of just a log line and a bigger stat block. `portraitId` is the mode's
+// own enemy canvas ('enemy-sprite' solo, 'coop-enemy-sprite' co-op - PvP
+// has no boss concept, it's 1v1 duels). The entrance class is removed
+// after its own animation finishes rather than left on the element - solo's
+// enemy-sprite ALSO carries .enemy-display's permanent float bob, and since
+// two animation-shorthand classes on one element don't combine (the later
+// one wins outright, same lesson as matched/matched-big - see that fix's
+// commit), leaving cg-boss-entrance on permanently would silently kill the
+// float animation for good, not just for its own 0.6s.
+function cgBossIntro(portraitId) {
+    const flash = document.createElement('div');
+    flash.className = 'cg-boss-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+
+    const portrait = document.getElementById(portraitId);
+    if (portrait) {
+        portrait.classList.remove('cg-boss-entrance');
+        void portrait.offsetWidth;
+        portrait.classList.add('cg-boss-entrance');
+        setTimeout(() => portrait.classList.remove('cg-boss-entrance'), 650);
+    }
+}
+
+// Faz 8 - a ONE-TIME dramatic beat for the moment a boss enrages, on top of
+// checkBossEnrage's (game.js) existing ONGOING .enraged pulse - that pulse
+// communicates "this is now more dangerous" for the rest of the fight, but
+// never actually announced the TRANSITION itself. Reuses cgBoardImpact's
+// own shake for the "impact" half rather than inventing a third shake
+// variant.
+function cgBossEnrageTransition(gridEl) {
+    if (typeof cgBoardImpact === 'function') cgBoardImpact(gridEl, 3);
+    const flash = document.createElement('div');
+    flash.className = 'cg-boss-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+}
+
 // Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
 // previously got only a sound cue and a log line: winning (an enemy/boss/
 // PvP opponent goes down) and losing (game over, party wipe, PvP loss).
