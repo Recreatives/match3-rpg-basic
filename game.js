@@ -1022,18 +1022,33 @@ function getMatchShapeInfo(count, isCross) {
     return { shapeLabel: '3', multiplier: 1, extraTurn: false, ultBonus: 0 };
 }
 
+// Faz 1 (graphics roadmap) - counts how many resolution steps deep the
+// CURRENT chain reaction is (2nd+ step = a real cascade, not just the
+// player's own initial match). Reset whenever a step finds no matches -
+// that's the natural end of a chain, whether the chain was the player's own
+// combo or just a one-off reshuffle-triggered match (see checkForMatches'
+// else branch) - so a reshuffle never inflates a REAL combo's count, and a
+// genuine cascade always starts counting fresh.
+let soloCascadeDepth = 0;
+
 function checkForMatches(isInitial) {
     if (!isInitial && currentState !== STATE.PLAYING) return false;
     let finalGroups = findMatchGroups(tiles, width);
 
     if (finalGroups.length > 0) {
+        if (!isInitial) {
+            soloCascadeDepth++;
+            let maxMultiplier = Math.max(...finalGroups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+            if (typeof cgBoardImpact === 'function') cgBoardImpact(gridDisplay, maxMultiplier);
+            if (soloCascadeDepth >= 2) showFloatingText(`KOMBO x${soloCascadeDepth}`, gridDisplay, '#ff9f1c');
+        }
         finalGroups.forEach(group => processMatch(group, isInitial));
         if (currentState === STATE.PLAYING || isInitial) {
             setTimeout(() => fillBoard(isInitial), 400);
         }
         return true;
     } else {
-        if (!isInitial) isProcessing = false;
+        if (!isInitial) { isProcessing = false; soloCascadeDepth = 0; }
         return false;
     }
 }
@@ -1069,7 +1084,13 @@ function processMatch(group, isInitial) {
     let validTiles = 0;
     group.indices.forEach(index => {
         if (tiles[index].dataset.type !== '') {
-            if (!isInitial) tiles[index].classList.add('matched');
+            if (!isInitial) {
+                tiles[index].classList.add('matched');
+                // Faz 1 - a 4+/cross match pops bigger/brighter (matched-big,
+                // style.css) than the everyday 3-match, ON TOP OF .matched
+                // rather than instead of it.
+                if (multiplier >= 2) tiles[index].classList.add('matched-big');
+            }
             else tiles[index].innerHTML = '';
             tiles[index].dataset.type = '';
             validTiles++;

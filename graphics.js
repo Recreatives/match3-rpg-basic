@@ -436,4 +436,22 @@ function cgGetStage(canvasId) {
     return stage;
 }
 
+// Faz 1 (graphics roadmap) - board-wide "that landed" feedback for a big
+// match, on top of the per-portrait hit effects above. Takes the grid
+// element itself (caller's job to getElementById the right one - see
+// CLAUDE.md's hard rule on why this file never guesses a selector) and the
+// STRONGEST getMatchShapeInfo multiplier among the groups resolved this
+// step, so a step with several simultaneous matches shakes at its biggest
+// match's intensity, not its smallest. multiplier thresholds mirror
+// getMatchShapeInfo's own tiers (1=3-match, 2=4, 2.5=cross, 3=5, 3.5=6,
+// 4=7!!) - below 2 (a plain 3-match) gets no shake at all, matching how the
+// board has always felt for the common case.
+function cgBoardImpact(gridEl, maxMultiplier) {
+    if (!gridEl || !maxMultiplier || maxMultiplier < 2) return;
+    const cls = maxMultiplier >= 3 ? 'shake-big' : 'shake';
+    gridEl.classList.remove('shake', 'shake-big');
+    void gridEl.offsetWidth; // force reflow so re-adding the class restarts the animation
+    gridEl.classList.add(cls);
+}
+
 document.addEventListener('DOMContentLoaded', cgPreloadAll);

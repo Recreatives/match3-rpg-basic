@@ -112,6 +112,22 @@ body {
     40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
+/* Faz 1 (graphics roadmap) - a stronger board-wide shake for a 5+/cross/6/7!!
+   match (see cgBoardImpact in graphics.js), reusing .shake's own transform-
+   only approach (no filter/box-shadow) so it stays cheap on weak mobile
+   GPUs - see .tile's comment above for why that matters in this project.
+   Also nudges vertically, not just horizontally, so it reads as distinctly
+   bigger than the plain .shake used for a 4-match or a direct-damage hit. */
+.shake-big {
+    animation: shakeBig 0.6s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes shakeBig {
+    10%, 90% { transform: translate3d(-2px, 1px, 0); }
+    20%, 80% { transform: translate3d(4px, -1px, 0); }
+    30%, 50%, 70% { transform: translate3d(-8px, 2px, 0); }
+    40%, 60% { transform: translate3d(8px, -2px, 0); }
+}
+
 .game-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
@@ -349,6 +365,21 @@ body {
        just triggered on the matched subset instead of all 64 tiles. */
     0% { transform: scale(1); filter: brightness(2); text-shadow: 0 0 6px #fff; background-color: rgba(255,255,255,0.4); }
     40% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(0); opacity: 0; }
+}
+/* Faz 1 - a 4+/cross match (getMatchShapeInfo's multiplier >= 2) pops
+   noticeably bigger/brighter than a plain 3-match, applied ALONGSIDE
+   .matched (both classes on the same tile - see processMatch/
+   pvpApplyGroupEffect/coopApplyGroupEffect) rather than replacing it, so a
+   big match still gets .matched's own timing/z-index for free. Same
+   transform+filter:brightness-only budget as matchPop, no new expensive
+   properties. */
+.matched-big {
+    animation: matchPopBig 0.45s forwards ease-in-out;
+}
+@keyframes matchPopBig {
+    0% { transform: scale(1); filter: brightness(2.6); text-shadow: 0 0 10px #fff; background-color: rgba(255,255,255,0.55); }
+    40% { transform: scale(1.65); opacity: 1; }
     100% { transform: scale(0); opacity: 0; }
 }
 

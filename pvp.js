@@ -850,13 +850,25 @@ function pvpAttemptSwap(tile1, tile2) {
     }
 }
 
+// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
+// rationale (same per-mode counter, mirrored here since this file
+// duplicates game.js's board logic rather than sharing it).
+let pvpCascadeDepth = 0;
+
 function pvpResolveMatches(isInitial) {
     // Same match-detection (including L/T cross-shapes) single-player uses,
     // just pointed at pvpTiles instead of the single-player `tiles` array.
     let groups = findMatchGroups(pvpTiles, PVP_WIDTH);
     if (groups.length === 0) {
-        if (!isInitial) pvpProcessing = false;
+        if (!isInitial) { pvpProcessing = false; pvpCascadeDepth = 0; }
         return false;
+    }
+
+    if (!isInitial) {
+        pvpCascadeDepth++;
+        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('pvp-grid'), maxMultiplier);
+        if (pvpCascadeDepth >= 2) showFloatingText(`KOMBO x${pvpCascadeDepth}`, document.getElementById('pvp-grid'), '#ff9f1c');
     }
 
     groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
@@ -877,7 +889,10 @@ function pvpApplyGroupEffect(group, isInitial) {
     if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
-        if (!isInitial) pvpTiles[i].classList.add('matched');
+        if (!isInitial) {
+            pvpTiles[i].classList.add('matched');
+            if (shapeMultiplier >= 2) pvpTiles[i].classList.add('matched-big');
+        }
         else pvpTiles[i].innerHTML = '';
         pvpTiles[i].dataset.type = '';
     });

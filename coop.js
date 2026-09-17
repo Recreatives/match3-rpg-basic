@@ -1086,11 +1086,23 @@ function coopPlayHitReaction(side, tileType) {
     if (stage) stage.playHitReaction(tileType);
 }
 
+// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
+// rationale (same per-mode counter, mirrored here since this file
+// duplicates game.js's board logic rather than sharing it).
+let coopCascadeDepth = 0;
+
 function coopResolveMatches(isInitial) {
     let groups = findMatchGroups(coopTiles, COOP_WIDTH);
     if (groups.length === 0) {
-        if (!isInitial) coopProcessing = false;
+        if (!isInitial) { coopProcessing = false; coopCascadeDepth = 0; }
         return false;
+    }
+
+    if (!isInitial) {
+        coopCascadeDepth++;
+        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('coop-grid'), maxMultiplier);
+        if (coopCascadeDepth >= 2) showFloatingText(`KOMBO x${coopCascadeDepth}`, document.getElementById('coop-grid'), '#ff9f1c');
     }
 
     groups.forEach(g => coopApplyGroupEffect(g, isInitial));
@@ -1109,7 +1121,10 @@ function coopApplyGroupEffect(group, isInitial) {
     if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
-        if (!isInitial) coopTiles[i].classList.add('matched');
+        if (!isInitial) {
+            coopTiles[i].classList.add('matched');
+            if (shapeMultiplier >= 2) coopTiles[i].classList.add('matched-big');
+        }
         else coopTiles[i].innerHTML = '';
         coopTiles[i].dataset.type = '';
     });
