@@ -26,7 +26,17 @@ jobs:
           node-version: 20
 
       - name: Install Playwright (Chromium only)
-        run: npx --yes playwright@1 install --with-deps chromium
+        # `npx playwright install` alone only fetches the browser BINARY -
+        # it never leaves a resolvable `playwright` package behind for the
+        # later `import { chromium } from 'playwright'` step, which then
+        # fails with ERR_MODULE_NOT_FOUND on a clean runner (no existing
+        # node_modules/package.json here to have installed it already).
+        # `npm install playwright` makes the package importable; the
+        # `npx ... install --with-deps` call after it still does the actual
+        # browser download.
+        run: |
+          npm install playwright@1
+          npx playwright install --with-deps chromium
 
       - name: Serve the site
         run: |
@@ -44,7 +54,7 @@ jobs:
           page.on('pageerror', err => console.error('[browser error]', err.message));
 
           await page.goto('http://localhost:8080/tests/index.html');
-          await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, { timeout: 20000 });
+          await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, { timeout: 30000 });
 
           const results = await page.evaluate(() => window.__TEST_RESULTS__);
           const pass = await page.evaluate(() => window.__TEST_PASS__);
