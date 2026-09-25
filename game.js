@@ -1967,3 +1967,33 @@ function bootGame() {
         bootGame();
     }
 })();
+
+// --- TEST HOOKS (tests/fixture.html) -----------------------------------
+// tiles/gridDisplay/width/STATE are declared with let/const, which (unlike
+// var or a function declaration) never become a window.X property on their
+// own - the existing pure-function tests (findMatchGroups, reshuffleBoard,
+// ...) work around that by building their own throwaway tiles array rather
+// than touching the real board. checkForMatches/processMatch/fillBoard
+// don't take tiles as a parameter though - they close over these
+// module-scope bindings directly - so exercising THEM against a regression
+// scenario (e.g. "a 4+ match's tile must end up visible again after
+// gravity refills it", the exact bug a missing matched-big cleanup caused
+// once already on this project) needs the real bindings, not a copy.
+// tiles/gridDisplay/width are exposed once, by reference: tiles is mutated
+// in place (push/length=0, never reassigned) so this stays live;
+// gridDisplay/width never change at all. currentState IS reassigned
+// throughout this file, so a raw snapshot would go stale immediately - the
+// getter/setter pair lets a test both read and force it (e.g. into
+// STATE.PLAYING) without driving a full class-select + startLevel() flow
+// just to test board-resolution logic in isolation.
+window.tiles = tiles;
+window.gridDisplay = gridDisplay;
+window.width = width;
+window.STATE = STATE;
+Object.defineProperty(window, 'currentState', {
+    get: () => currentState,
+    set: (v) => { currentState = v; }
+});
+window.checkForMatches = checkForMatches;
+window.processMatch = processMatch;
+window.fillBoard = fillBoard;
