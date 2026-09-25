@@ -27,3 +27,5 @@ in-game character art (see graphics.js's IDLE_FRAME_COUNT).
 
 Source: [Kenney Particle Pack](https://kenney.nl/assets/particle-pack) by Kenney.
 License: CC0 (public domain) - no attribution required, included anyway as thanks.
+The shipped files are downscaled from the pack's 512x512 PNGs to 256x256 lossless WebP
+(they never render larger than ~260 device pixels in a portrait) - 869 KB -> 263 KB total.

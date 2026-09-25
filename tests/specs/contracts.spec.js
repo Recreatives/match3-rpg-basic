@@ -280,6 +280,12 @@ describe('DOM rules from CLAUDE.md', { world: { pixi: false } }, function () {
         }
     });
 
+    it('sw.js precaches every local script index.html loads', async function () {
+        var sw = await readSource('sw.js');
+        var scripts = (html.match(/<script src="(?!https?:)([^"?]+)/g) || []).map(function (t) { return t.replace('<script src="', ''); });
+        scripts.forEach(function (f) { expect(sw, 'sw.js APP_SHELL').toContain("'./" + f + "'"); });
+    });
+
     it('every asset graphics.js references exists', async function () {
         var g = src['graphics.js'], refs = g.match(/assets\/[\w\/.-]+\.(png|webp|json)/g) || [];
         refs = refs.filter(function (r, i) { return refs.indexOf(r) === i; });

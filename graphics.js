@@ -6,12 +6,9 @@
 // tile match resolves (cgStage.playHit), and when an ultimate fires
 // (cgStage.playUlt). Nothing here assumes which mode is calling it.
 //
-// A PIXI.Application keeps its ticker running (and burning a little CPU/GPU)
-// even while its canvas is display:none - multiplied across solo/PvP/co-op's
-// several portrait slots, that adds up to real waste for screens the player
-// isn't even looking at. cgCreateStage() is deliberately lazy (the caller
-// decides when to instantiate) and every stage exposes pause()/resume() so a
-// mode can stop the ticker the moment its modal closes.
+// All stages share ONE WebGL renderer and ticker (see cgShared below) and
+// only repaint while visible and actually changing - a portrait sitting in
+// a closed PvP/co-op modal costs nothing.
 //
 // Character/monster art credit: Batareya (FreePixel.art). Effect art credit:
 // Kenney (kenney.nl). See assets/CREDITS.md.
@@ -151,11 +148,11 @@ const CLASS_MOTIONS = {
 // every match, not just ultimates, so "vuruş efektleri" (hit effects) are
 // felt on ordinary turns too.
 const HIT_EFFECT_SPRITES = {
-    sword: { sprite: 'assets/effects/scorch_01.png', tint: 0xffffff },
-    skull: { sprite: 'assets/effects/scorch_01.png', tint: 0xe74c3c },
-    shield: { sprite: 'assets/effects/circle_03.png', tint: 0x3b82f6 },
-    heart: { sprite: 'assets/effects/light_02.png', tint: 0xff6b9d },
-    energy: { sprite: 'assets/effects/star_04.png', tint: 0xf1c40f },
+    sword: { sprite: 'assets/effects/scorch_01.webp', tint: 0xffffff },
+    skull: { sprite: 'assets/effects/scorch_01.webp', tint: 0xe74c3c },
+    shield: { sprite: 'assets/effects/circle_03.webp', tint: 0x3b82f6 },
+    heart: { sprite: 'assets/effects/light_02.webp', tint: 0xff6b9d },
+    energy: { sprite: 'assets/effects/star_04.webp', tint: 0xf1c40f },
 };
 
 // Three-layer bursts (a base shape + an accent + a Faz 4 (graphics roadmap)
@@ -168,18 +165,18 @@ const HIT_EFFECT_SPRITES = {
 // randomizes each instance's own rotation, so the same base file still
 // reads as a fresh shape each time it's reused.
 const ULT_EFFECT_SPRITES = {
-    warrior: [{ sprite: 'assets/effects/scorch_01.png', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_03.png', tint: 0xecf0f1 }],
-    berserker: [{ sprite: 'assets/effects/flame_04.png', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.png', tint: 0xff8c00 }, { sprite: 'assets/effects/smoke_04.png', tint: 0x8b0000 }],
-    rogue: [{ sprite: 'assets/effects/slash_04.png', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.png', tint: 0xe0c3fc }, { sprite: 'assets/effects/star_04.png', tint: 0xd6a4ff }],
-    archer: [{ sprite: 'assets/effects/muzzle_02.png', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_04.png', tint: 0x27ae60 }],
-    mage: [{ sprite: 'assets/effects/magic_03.png', tint: 0x3498db }, { sprite: 'assets/effects/star_04.png', tint: 0x00d4ff }, { sprite: 'assets/effects/spark_06.png', tint: 0x00eaff }],
-    necromancer: [{ sprite: 'assets/effects/symbol_01.png', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.png', tint: 0x2c3e50 }, { sprite: 'assets/effects/circle_03.png', tint: 0x4a148c }],
-    paladin: [{ sprite: 'assets/effects/light_01.png', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.png', tint: 0xffd700 }, { sprite: 'assets/effects/star_04.png', tint: 0xfff9c4 }],
+    warrior: [{ sprite: 'assets/effects/scorch_01.webp', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.webp', tint: 0xffffff }, { sprite: 'assets/effects/circle_03.webp', tint: 0xecf0f1 }],
+    berserker: [{ sprite: 'assets/effects/flame_04.webp', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.webp', tint: 0xff8c00 }, { sprite: 'assets/effects/smoke_04.webp', tint: 0x8b0000 }],
+    rogue: [{ sprite: 'assets/effects/slash_04.webp', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.webp', tint: 0xe0c3fc }, { sprite: 'assets/effects/star_04.webp', tint: 0xd6a4ff }],
+    archer: [{ sprite: 'assets/effects/muzzle_02.webp', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.webp', tint: 0xffffff }, { sprite: 'assets/effects/circle_04.webp', tint: 0x27ae60 }],
+    mage: [{ sprite: 'assets/effects/magic_03.webp', tint: 0x3498db }, { sprite: 'assets/effects/star_04.webp', tint: 0x00d4ff }, { sprite: 'assets/effects/spark_06.webp', tint: 0x00eaff }],
+    necromancer: [{ sprite: 'assets/effects/symbol_01.webp', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.webp', tint: 0x2c3e50 }, { sprite: 'assets/effects/circle_03.webp', tint: 0x4a148c }],
+    paladin: [{ sprite: 'assets/effects/light_01.webp', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.webp', tint: 0xffd700 }, { sprite: 'assets/effects/star_04.webp', tint: 0xfff9c4 }],
 };
 
-// Every texture is tiny (character portraits are a few KB, effects ~50-100KB)
-// and reused across every stage/mode, so one shared, load-once cache beats
-// each stage fetching its own copies.
+// Every texture is tiny (character portraits are a few KB, effects ~20KB of
+// 256px WebP) and reused across every stage/mode, so one shared, load-once
+// cache beats each stage fetching its own copies.
 let cgTextureCache = {};
 async function cgLoadTexture(url) {
     if (!cgTextureCache[url]) cgTextureCache[url] = PIXI.Assets.load(url);
@@ -209,64 +206,196 @@ function cgPreloadAll() {
 // text itself (getComputedStyle on an untyped custom property returns the
 // clamp()/calc() source string, NOT the resolved number).
 let cgSizeProbe = null;
-function cgPortraitSize(canvasEl) {
+function cgPortraitSize() {
     if (!cgSizeProbe) {
         cgSizeProbe = document.createElement('div');
         cgSizeProbe.style.cssText = 'position:absolute; top:0; left:0; visibility:hidden; pointer-events:none; width:var(--portrait-w); height:var(--portrait-h);';
         document.body.appendChild(cgSizeProbe);
     }
     const rect = cgSizeProbe.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) return [rect.width, rect.height];
-    return [canvasEl.width || 56, canvasEl.height || 70];
+    if (rect.width > 0 && rect.height > 0) return [Math.round(rect.width), Math.round(rect.height)];
+    return [56, 70];
+}
+
+// --- ONE SHARED RENDERER (G0, graphics roadmap v2) ---------------------------
+// This used to be one PIXI.Application per portrait slot: up to 7 WebGL
+// contexts (solo 2 + PvP 2 + co-op 3), each with its own always-running
+// 60fps ticker - even for PvP/co-op portraits sitting in a closed modal
+// (pause()/resume() existed but were never actually called anywhere).
+// Mobile browsers cap live WebGL contexts (iOS Safari especially) and drop
+// the oldest when over the limit, and each one costs its own GPU memory.
+//
+// Now there is exactly ONE WebGL renderer, drawing into an offscreen canvas.
+// Every portrait <canvas> is a plain 2D canvas; each frame, a stage that is
+// (a) actually visible and (b) actually changed renders its own container
+// into the shared renderer and copies the result over with drawImage. An
+// idle portrait only changes when its 4-frame idle strip flips frames (a few
+// times a second), so a calm screen does a handful of tiny renders per
+// second instead of 7 full-rate ones.
+const cgShared = {
+    renderer: null,
+    ticker: null,
+    ready: null,
+    size: [56, 70],
+    resolution: 1,
+    lost: false,
+    stages: [],
+    stats: { renders: 0, frames: 0 }
+};
+
+function cgInitShared() {
+    if (cgShared.ready) return cgShared.ready;
+    cgShared.ready = (async () => {
+        cgShared.size = cgPortraitSize();
+        cgShared.resolution = Math.min(window.devicePixelRatio || 1, 2);
+        const renderer = await PIXI.autoDetectRenderer({
+            preference: 'webgl',
+            width: cgShared.size[0],
+            height: cgShared.size[1],
+            backgroundAlpha: 0,
+            antialias: false, // crisp pixel art, not smoothed
+            resolution: cgShared.resolution,
+            autoDensity: false,
+        });
+        cgShared.renderer = renderer;
+        // Context loss (GPU reset, too many contexts elsewhere, a mobile
+        // browser reclaiming memory in the background): PixiJS re-uploads
+        // its textures on restore by itself; all this layer has to do is
+        // stop drawing garbage in between and repaint everything after.
+        renderer.canvas.addEventListener('webglcontextlost', () => { cgShared.lost = true; });
+        renderer.canvas.addEventListener('webglcontextrestored', () => {
+            cgShared.lost = false;
+            cgShared.stages.forEach(s => { s.needsRender = true; });
+        });
+
+        const ticker = new PIXI.Ticker();
+        ticker.add(cgFrame);
+        ticker.start();
+        cgShared.ticker = ticker;
+
+        // Rotating a phone or resizing the window changes --portrait-w/h
+        // (they're tied to the viewport via --tile-size). Every stage
+        // re-lays itself out at the new size instead of staying stuck at
+        // whatever size the page first loaded with.
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(cgHandleResize, 150);
+        });
+        return renderer;
+    })();
+    return cgShared.ready;
+}
+
+function cgHandleResize() {
+    if (!cgShared.renderer) return;
+    const size = cgPortraitSize();
+    if (size[0] === cgShared.size[0] && size[1] === cgShared.size[1]) return;
+    cgShared.size = size;
+    cgShared.stages.forEach(s => s._layout());
+}
+
+// A canvas inside a display:none modal (or a closed screen) has no
+// offsetParent - skip it entirely, it can't be seen.
+function cgIsVisible(el) {
+    return !!el && el.isConnected && el.offsetParent !== null;
+}
+
+function cgFrame(ticker) {
+    cgShared.stats.frames++;
+    const renderer = cgShared.renderer;
+    for (const stage of cgShared.stages) {
+        if (stage.paused || !stage.portraitSprite) continue;
+        if (!cgIsVisible(stage.canvasEl)) continue;
+        stage.portraitSprite.update(ticker);
+        const frame = stage.portraitSprite.currentFrame;
+        if (frame !== stage.lastFrame) { stage.lastFrame = frame; stage.needsRender = true; }
+        if (!stage.needsRender && stage.activeTweens === 0) continue;
+        if (cgShared.lost) continue;
+        const [w, h] = stage.size;
+        if (renderer.width !== w || renderer.height !== h) renderer.resize(w, h);
+        renderer.render({ container: stage.root, clear: true });
+        const ctx = stage.ctx;
+        ctx.clearRect(0, 0, stage.canvasEl.width, stage.canvasEl.height);
+        ctx.drawImage(renderer.canvas, 0, 0, renderer.canvas.width, renderer.canvas.height, 0, 0, stage.canvasEl.width, stage.canvasEl.height);
+        stage.needsRender = false;
+        stage.renderCount++;
+        cgShared.stats.renders++;
+    }
 }
 
 // One CombatStage per portrait slot (solo's player/enemy, PvP's me/opponent,
-// co-op's me/ally/enemy - up to 7 across the whole app). Each owns exactly one
-// PIXI.Application mounted into `canvasEl`.
+// co-op's me/ally/enemy - up to 7 across the whole app). Owns a scene graph
+// (root -> portrait sprite + effect layer) and a 2D canvas to show it in;
+// the WebGL work all happens in the one shared renderer above.
 class CombatStage {
     constructor(canvasEl) {
         this.canvasEl = canvasEl;
-        this.app = null;
+        this.ctx = null;
+        this.root = null;
         this.portraitSprite = null;
         this.effectLayer = null;
+        this.url = null;
+        this.size = cgShared.size;
+        this.paused = false;
+        this.needsRender = true;
+        this.activeTweens = 0;
+        this.lastFrame = -1;
+        this.renderCount = 0;
         this.ready = this._init();
     }
 
     async _init() {
-        const [w, h] = cgPortraitSize(this.canvasEl);
-        const app = new PIXI.Application();
-        await app.init({
-            canvas: this.canvasEl,
-            width: w,
-            height: h,
-            backgroundAlpha: 0,
-            antialias: false, // crisp pixel art, not smoothed
-            resolution: Math.min(window.devicePixelRatio || 1, 2),
-            autoDensity: true,
-        });
-        this.app = app;
-
+        await cgInitShared();
+        this.ctx = this.canvasEl.getContext('2d');
+        this.root = new PIXI.Container();
         // An AnimatedSprite (not a plain Sprite) so setPortrait can hand it a
         // 4-frame idle strip and have it actually play - see IDLE_FRAME_COUNT.
-        // autoUpdate:false + the manual app.ticker.add below, rather than
-        // AnimatedSprite's own default behavior of self-subscribing to
-        // PIXI.Ticker.shared - each Application here owns its OWN ticker
-        // (confirmed distinct from Ticker.shared), and Ticker.shared is never
-        // separately driven anywhere in this file, so a sprite left on
-        // autoUpdate's default silently never advances past frame 0.
+        // autoUpdate:false - cgFrame advances it from the shared ticker, and
+        // only while the stage is visible.
         this.portraitSprite = new PIXI.AnimatedSprite([PIXI.Texture.EMPTY]);
         this.portraitSprite.autoUpdate = false;
         this.portraitSprite.anchor.set(0.5, 1);
-        this.portraitSprite.x = app.screen.width / 2;
-        this.portraitSprite.y = app.screen.height;
-        this.portraitSprite.scale.set(1);
         this.portraitBaseScale = 1;
-        app.stage.addChild(this.portraitSprite);
-        app.ticker.add(() => this.portraitSprite.update(app.ticker));
-
+        this.root.addChild(this.portraitSprite);
         this.effectLayer = new PIXI.Container();
-        app.stage.addChild(this.effectLayer);
+        this.root.addChild(this.effectLayer);
+        cgShared.stages.push(this);
+        this._layout();
         return this;
+    }
+
+    // (Re)sizes the 2D canvas to the current shared portrait size and
+    // re-fits the portrait - on creation and on every viewport resize.
+    _layout() {
+        this.size = cgShared.size;
+        const [w, h] = this.size;
+        const res = cgShared.resolution;
+        this.canvasEl.width = Math.round(w * res);
+        this.canvasEl.height = Math.round(h * res);
+        this.canvasEl.style.width = w + 'px';
+        this.canvasEl.style.height = h + 'px';
+        if (this.ctx) this.ctx.imageSmoothingEnabled = false;
+        this._fitPortrait();
+        this.needsRender = true;
+    }
+
+    _fitPortrait() {
+        const [w, h] = this.size;
+        const sprite = this.portraitSprite;
+        this.baseX = w / 2;
+        this.baseY = h;
+        sprite.x = this.baseX;
+        sprite.y = this.baseY;
+        sprite.rotation = 0;
+        if (this.stripW) {
+            // Fit within the canvas while preserving aspect ratio - source
+            // art varies a few px in width/height per character (see
+            // assets/CREDITS.md).
+            const scale = Math.min((h * 0.95) / this.stripH, (w * 0.9) / this.stripW, 4);
+            this.portraitBaseScale = scale;
+        }
+        sprite.scale.set(this.portraitBaseScale);
     }
 
     // Swaps which character/monster art this stage shows. Safe to call before
@@ -278,7 +407,9 @@ class CombatStage {
     // stage showing that character (solo + PvP + co-op can all show a Mage).
     async setPortrait(url) {
         await this.ready;
+        this.url = url;
         const strip = await cgLoadTexture(url);
+        if (this.url !== url) return; // a newer setPortrait won the race
         strip.source.scaleMode = 'nearest';
         const frameW = strip.width / IDLE_FRAME_COUNT;
         const frames = [];
@@ -288,17 +419,11 @@ class CombatStage {
         this.portraitSprite.textures = frames;
         this.portraitSprite.animationSpeed = 0.06; // slow, calm bob - not a run cycle
         this.portraitSprite.play();
-        // Fit within the canvas height while preserving aspect ratio - source
-        // art varies a few px in width/height per character (see assets/CREDITS.md).
-        const maxH = this.app.screen.height * 0.95;
-        const maxW = this.app.screen.width * 0.9;
-        const scale = Math.min(maxH / strip.height, maxW / frameW, 4);
-        this.portraitBaseScale = scale;
-        this.portraitSprite.scale.set(scale);
-        this.portraitSprite.x = this.app.screen.width / 2;
-        this.portraitSprite.y = this.app.screen.height;
-        this.portraitSprite.rotation = 0;
+        this.stripW = frameW;
+        this.stripH = strip.height;
         this.portraitSprite.tint = 0xffffff;
+        this._fitPortrait();
+        this.needsRender = true;
     }
 
     // A quick shake + white hit-flash on the portrait itself, plus a small
@@ -329,7 +454,7 @@ class CombatStage {
         if (effect) this._burst([effect], 1.2 * severity, 400);
     }
 
-    // The one big moment per class - a two-layer particle burst plus a
+    // The one big moment per class - a three-layer particle burst plus a
     // stronger shake/flash. `classKey` picks the effect combo (see
     // ULT_EFFECT_SPRITES); falls back to a generic spark burst for an
     // unrecognized key rather than silently doing nothing.
@@ -354,35 +479,35 @@ class CombatStage {
         await this.ready;
         const fn = CLASS_MOTIONS[classKey] && CLASS_MOTIONS[classKey][tileType];
         if (!fn) return;
-        const baseX = this.app.screen.width / 2;
-        const baseY = this.app.screen.height;
-        const baseScale = this.portraitBaseScale;
+        const sprite = this.portraitSprite;
         this._tween(420, t => {
             const m = fn(t);
-            this.portraitSprite.x = baseX + m.dx;
-            this.portraitSprite.y = baseY + m.dy;
-            this.portraitSprite.rotation = m.rot;
-            this.portraitSprite.scale.set(baseScale * m.scale);
+            sprite.x = this.baseX + m.dx;
+            sprite.y = this.baseY + m.dy;
+            sprite.rotation = m.rot;
+            sprite.scale.set(this.portraitBaseScale * m.scale);
         }, () => {
-            this.portraitSprite.x = baseX;
-            this.portraitSprite.y = baseY;
-            this.portraitSprite.rotation = 0;
-            this.portraitSprite.scale.set(baseScale);
+            sprite.x = this.baseX;
+            sprite.y = this.baseY;
+            sprite.rotation = 0;
+            sprite.scale.set(this.portraitBaseScale);
         });
     }
 
     // `effects` is a list of {sprite, tint} - see HIT_EFFECT_SPRITES/
     // ULT_EFFECT_SPRITES' header comment for why every burst carries a tint
     // (the source art is a neutral grayscale mask, not colored art).
+    // Skipped entirely in low-graphics mode (the portrait's own shake/flash
+    // still plays, so the hit still reads).
     async _burst(effects, scaleTo, durationMs) {
+        if (!cgEffectsEnabled()) return;
         const textures = await Promise.all(effects.map(e => cgLoadTexture(e.sprite)));
-        const cx = this.app.screen.width / 2;
-        const cy = this.app.screen.height * 0.55;
+        const [w, h] = this.size;
         textures.forEach((texture, i) => {
             const sprite = new PIXI.Sprite(texture);
             sprite.anchor.set(0.5);
-            sprite.x = cx;
-            sprite.y = cy;
+            sprite.x = w / 2;
+            sprite.y = h * 0.55;
             sprite.alpha = 0.95;
             // 'normal' rather than 'add' - additive blending only reads
             // correctly for near-white tints (its brightness contribution
@@ -393,22 +518,21 @@ class CombatStage {
             sprite.blendMode = 'normal';
             sprite.tint = effects[i].tint;
             sprite.rotation = Math.random() * Math.PI * 2;
-            const baseScale = (this.app.screen.height / texture.height) * 0.5;
+            const baseScale = (h / texture.height) * 0.5;
             sprite.scale.set(baseScale * 0.4);
             this.effectLayer.addChild(sprite);
             this._tween(durationMs + i * 80, t => {
                 sprite.scale.set(baseScale * (0.4 + scaleTo * t));
                 sprite.alpha = 0.95 * (1 - t);
-            }, () => this.effectLayer.removeChild(sprite));
+            }, () => { this.effectLayer.removeChild(sprite); sprite.destroy(); });
         });
     }
 
     _shake(target, magnitude, durationMs) {
-        const originX = this.app.screen.width / 2;
         this._tween(durationMs, t => {
             const decay = 1 - t;
-            target.x = originX + (Math.random() * 2 - 1) * magnitude * decay;
-        }, () => { target.x = originX; });
+            target.x = this.baseX + (Math.random() * 2 - 1) * magnitude * decay;
+        }, () => { target.x = this.baseX; });
     }
 
     // A sharp push away from rest plus a stagger tilt, unlike _shake's small
@@ -416,12 +540,11 @@ class CombatStage {
     // happened." Snaps out fast then eases back, with a brief rotational
     // stagger layered on top.
     _knockback(target, magnitude, durationMs) {
-        const originX = this.app.screen.width / 2;
         this._tween(durationMs, t => {
             const push = magnitude * Math.sin(t * Math.PI) * (1 - t * 0.3);
-            target.x = originX + push;
+            target.x = this.baseX + push;
             target.rotation = Math.sin(t * Math.PI) * 0.18;
-        }, () => { target.x = originX; target.rotation = 0; });
+        }, () => { target.x = this.baseX; target.rotation = 0; });
     }
 
     _flash(target, durationMs) {
@@ -434,23 +557,28 @@ class CombatStage {
 
     // A tiny hand-rolled tween instead of pulling in a whole animation
     // library - every effect here is "interpolate one value over N ms then
-    // clean up", which a single ticker callback covers completely.
+    // clean up", which a single ticker callback covers completely. Counted
+    // in activeTweens so cgFrame knows this stage needs repainting while it
+    // runs (and can go back to near-idle the moment it's done).
     _tween(durationMs, onFrame, onDone) {
         const start = performance.now();
-        const ticker = this.app.ticker;
+        const ticker = cgShared.ticker;
+        this.activeTweens++;
         const step = () => {
             const t = Math.min(1, (performance.now() - start) / durationMs);
             onFrame(t);
             if (t >= 1) {
                 ticker.remove(step);
+                this.activeTweens--;
+                this.needsRender = true; // paint the final resting pose
                 if (onDone) onDone();
             }
         };
         ticker.add(step);
     }
 
-    pause() { if (this.app) this.app.ticker.stop(); }
-    resume() { if (this.app) this.app.ticker.start(); }
+    pause() { this.paused = true; }
+    resume() { this.paused = false; this.needsRender = true; }
 }
 
 // Registry so a mode can fetch its own stage by canvas id without holding a
@@ -470,6 +598,31 @@ function cgGetStage(canvasId) {
     cgStages[canvasId] = stage;
     return stage;
 }
+
+// ?debug=1 - a small live overlay: page FPS (real requestAnimationFrame
+// rate, not just the Pixi ticker's), portrait renders per second, DOM node
+// count and the number of live WebGL contexts this module owns. Meant for
+// checking a weak phone (e.g. the Galaxy A50 this project's perf notes
+// mention) without devtools attached.
+function cgStartDebugOverlay() {
+    const el = document.createElement('div');
+    el.id = 'cg-debug-overlay';
+    el.style.cssText = 'position:fixed; right:4px; bottom:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#2ecc71; font:11px monospace; padding:4px 6px; border-radius:4px; pointer-events:none; white-space:pre;';
+    document.body.appendChild(el);
+    let frames = 0, last = performance.now(), lastRenders = 0;
+    const loop = (now) => {
+        frames++;
+        if (now - last >= 1000) {
+            const renders = cgShared.stats.renders - lastRenders;
+            lastRenders = cgShared.stats.renders;
+            el.textContent = `FPS ${Math.round(frames * 1000 / (now - last))}\nrenders/s ${renders}\nstages ${cgShared.stages.length} · webgl ${cgShared.renderer ? 1 : 0}\nDOM ${document.getElementsByTagName('*').length}\nquality ${typeof cgQualityLevel === 'function' ? cgQualityLevel() : '-'}`;
+            frames = 0; last = now;
+        }
+        requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+}
+if (/[?&]debug=1\b/.test(location.search)) document.addEventListener('DOMContentLoaded', cgStartDebugOverlay);
 
 // Faz 2 (graphics roadmap) - a tiny colored burst AT THE MATCHED TILE'S OWN
 // POSITION, tinted per tile type (same palette as HIT_EFFECT_SPRITES above,
