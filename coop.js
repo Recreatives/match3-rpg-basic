@@ -398,6 +398,7 @@ function coopOnLevelStart(payload) {
     else coopApplyLevelClearHeal();
 
     coopLevel = payload.level;
+    coopCascadeDepth = 0; // see startLevel's soloCascadeDepth reset (game.js)
     coopIsBossLevel = payload.isBoss;
     coopEnemyHP = payload.enemyHP;
     coopEnemyMaxHP = payload.enemyMaxHP;

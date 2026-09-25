@@ -66,7 +66,7 @@ const EN_DICT = {
 
     // game.js: class descriptions (CLASSES catalog)
     '<b>Tank:</b> +2 Bonus Zırh kazanır. Ult, Zırhına göre hasar verir.': '<b>Tank:</b> Gains +2 Bonus Armor. Ult deals damage based on your Armor.',
-    '<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%35 DAHA FAZLA HASAR</b> alır.': '<b>DPS:</b> +5 Sword / +15 Skull Damage, but takes <b>35% MORE DAMAGE</b>.',
+    '<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%25 DAHA FAZLA HASAR</b> alır.': '<b>DPS:</b> +5 Sword / +15 Skull Damage, but takes <b>25% MORE DAMAGE</b>.',
     '<b>Kombo:</b> Hızlı Enerji kazanır. Ult, <b>EKSTRA TUR</b> verir.': '<b>Combo:</b> Gains Energy fast. Ult grants an <b>EXTRA TURN</b>.',
     '<b>Delici:</b> <b>%20 Savuşturma</b>. Ult, Zırhı yok sayıp doğrudan can hasarı verir.': '<b>Marksman:</b> <b>20% Dodge</b>. Ult ignores Armor and deals direct HP damage.',
     '<b>Ölçeklenme:</b> Ult her kullanımda <b>+10 Güç</b> kazanır.': '<b>Scaler:</b> Ult gains <b>+10 Power</b> every time it\'s used.',

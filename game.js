@@ -190,7 +190,7 @@ const CLASSES = {
     },
     BERSERKER: {
         name: "Berserker", emoji: "🪓",
-        desc: "<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%35 DAHA FAZLA HASAR</b> alır.",
+        desc: "<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%25 DAHA FAZLA HASAR</b> alır.",
         passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
         dodgeChance: 0, incomingDmgMult: 1.25,
         ultName: "BLOOD LUST",
@@ -467,6 +467,10 @@ function startLevel() {
     isPlayerTurn = true;
     isProcessing = false;
     extraTurnTriggered = false;
+    // A chain cut short by the enemy dying mid-cascade never reaches
+    // checkForMatches' "no more matches" reset - without this the next
+    // level's very first match would pop a stale "KOMBO x4".
+    soloCascadeDepth = 0;
 
     createBoard();
     updateUI();
@@ -1078,8 +1082,15 @@ function processMatch(group, isInitial) {
     let isCross = (group.subShape === 'cross');
     let { shapeLabel, multiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
 
-    if (extraTurn) extraTurnTriggered = true;
-    if (ultBonus > 0 && isPlayerTurn) ultCharge += ultBonus;
+    // Never for isInitial: the board's own setup cascade (createBoard ->
+    // fillBoard(true)) can land a 4+/5 match by pure chance, and counting it
+    // used to hand the player a free extra turn (and +30% ult for a 5) on
+    // their first move of the level - pvpApplyGroupEffect/
+    // coopApplyGroupEffect already skip isInitial the same way.
+    if (!isInitial) {
+        if (extraTurn) extraTurnTriggered = true;
+        if (ultBonus > 0 && isPlayerTurn) ultCharge = Math.min(ultCharge + ultBonus, 100);
+    }
 
     // Speed Bonus: the player's own moves (and any chain reaction they
     // trigger) are further scaled by how fast the swap was made.
@@ -1967,33 +1978,3 @@ function bootGame() {
         bootGame();
     }
 })();
-
-// --- TEST HOOKS (tests/fixture.html) -----------------------------------
-// tiles/gridDisplay/width/STATE are declared with let/const, which (unlike
-// var or a function declaration) never become a window.X property on their
-// own - the existing pure-function tests (findMatchGroups, reshuffleBoard,
-// ...) work around that by building their own throwaway tiles array rather
-// than touching the real board. checkForMatches/processMatch/fillBoard
-// don't take tiles as a parameter though - they close over these
-// module-scope bindings directly - so exercising THEM against a regression
-// scenario (e.g. "a 4+ match's tile must end up visible again after
-// gravity refills it", the exact bug a missing matched-big cleanup caused
-// once already on this project) needs the real bindings, not a copy.
-// tiles/gridDisplay/width are exposed once, by reference: tiles is mutated
-// in place (push/length=0, never reassigned) so this stays live;
-// gridDisplay/width never change at all. currentState IS reassigned
-// throughout this file, so a raw snapshot would go stale immediately - the
-// getter/setter pair lets a test both read and force it (e.g. into
-// STATE.PLAYING) without driving a full class-select + startLevel() flow
-// just to test board-resolution logic in isolation.
-window.tiles = tiles;
-window.gridDisplay = gridDisplay;
-window.width = width;
-window.STATE = STATE;
-Object.defineProperty(window, 'currentState', {
-    get: () => currentState,
-    set: (v) => { currentState = v; }
-});
-window.checkForMatches = checkForMatches;
-window.processMatch = processMatch;
-window.fillBoard = fillBoard;

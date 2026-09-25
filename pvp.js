@@ -319,6 +319,7 @@ function pvpResetSessionState() {
     pvpMoveTimeMultiplier = 1;
     pvpUltCharge = 0;
     pvpExtraTurnTriggered = false;
+    pvpCascadeDepth = 0; // see startLevel's soloCascadeDepth reset (game.js)
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
     pvpIncomingStats = { damage: 0 };
     pvpOpponentId = null;
