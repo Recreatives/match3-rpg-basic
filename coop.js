@@ -132,6 +132,7 @@ function coopUpdateSpeedBonusUI() {
     let el = document.getElementById('coop-speed-bonus');
     if (!el) return;
     let mult = coopGetTimeMultiplier();
+    if (coopTurnStartTime && coopMyTurn && !coopProcessing && !coopMatchOver) sbMaybeShowHint(coopBoard, Date.now() - coopTurnStartTime);
     if (!coopTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
@@ -147,6 +148,7 @@ function coopStartSpeedTimer() {
 }
 
 function coopStopSpeedTimer() {
+    if (typeof sbClearHint === 'function') sbClearHint(coopBoard);
     clearInterval(coopSpeedBonusInterval);
     coopSpeedBonusInterval = null;
     coopTurnStartTime = null;
@@ -398,7 +400,7 @@ function coopOnLevelStart(payload) {
     else coopApplyLevelClearHeal();
 
     coopLevel = payload.level;
-    coopCascadeDepth = 0; // see startLevel's soloCascadeDepth reset (game.js)
+    coopBoard.cascadeDepth = 0; // see startLevel's cascadeDepth reset (game.js)
     coopIsBossLevel = payload.isBoss;
     coopEnemyHP = payload.enemyHP;
     coopEnemyMaxHP = payload.enemyMaxHP;
@@ -427,10 +429,7 @@ function coopOnLevelStart(payload) {
     // empty grid and waits for that broadcast.
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
-    if (coopIsHost) {
-        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
-        coopResolveMatches(true);
-    }
+    if (coopIsHost) sbDealBoard(coopBoard);
     coopUpdateUI();
     coopLog(payload.isBoss ? tf('⚠️ BOSS - Lvl {level} başlıyor!', { level: payload.level }) : tf('Lvl {level} başlıyor. {minion}', { level: payload.level, minion: t(COOP_MINION_LOG[coopMinionType]) }));
     if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus(t('Senin sıran!')); coopStartSpeedTimer(); }
@@ -524,10 +523,7 @@ function coopApplySessionResume(state) {
     // just gets a fresh board, authored by the host same as any other level.
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
-    if (coopIsHost) {
-        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
-        coopResolveMatches(true);
-    }
+    if (coopIsHost) sbDealBoard(coopBoard);
     // Whose turn it was isn't persisted either - the host simply takes the
     // next turn after a resume, the same simple default this file already
     // uses whenever turn continuity doesn't matter enough to track.
@@ -1060,25 +1056,13 @@ function coopAttemptSwap(tile1, tile2) {
     // the countdown is about how fast the decision was made.
     coopMoveTimeMultiplier = coopGetTimeMultiplier();
     coopStopSpeedTimer();
-
     coopProcessing = true;
-    let t = tile1.dataset.type, h = tile1.innerHTML;
-    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-    tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(coopChannel, coopTiles, 'swap'); // teammate sees the swap as it happens
-
-    let matched = coopResolveMatches(false);
-    if (!matched) {
-        setTimeout(() => {
-            let t2 = tile1.dataset.type, h2 = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = t2; tile2.innerHTML = h2;
-            coopProcessing = false;
-            sbBroadcastStep(coopChannel, coopTiles, 'swap'); // ...and the revert too, if it wasn't a match
-            // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
-            coopStartSpeedTimer();
-        }, 150);
-    }
+    // Slide, commit, broadcast, resolve (sharedboard.js). An invalid swap
+    // slides back and doesn't cost the turn - fresh speed-bonus window.
+    sbTrySwap(coopBoard, tile1, tile2, () => {
+        coopProcessing = false;
+        coopStartSpeedTimer();
+    });
 }
 
 // Mirrors game.js's soloPlayHit for co-op's three-canvas layout. 'ally'
@@ -1101,52 +1085,34 @@ function coopPlayHitReaction(side, tileType) {
     if (stage) stage.playHitReaction(tileType);
 }
 
-// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
-// rationale (same per-mode counter, mirrored here since this file
-// duplicates game.js's board logic rather than sharing it).
-let coopCascadeDepth = 0;
+// --- CO-OP BOARD (sharedboard.js's engine) ---
+// Only the current mover's client runs this; every step is broadcast so the
+// teammate paints the same board. The host deals each level's board.
+const coopBoard = {
+    tiles: coopTiles, width: COOP_WIDTH, pool: COOP_TILE_TYPES,
+    gridEl: () => document.getElementById('coop-grid'),
+    clearDelayMs: 350,
+    initialDelayMs: 0,
+    channel: () => coopChannel,
+    cascadeDepth: 0,
+    isLive: () => !coopMatchOver,
+    applyGroup: (group, shape, isInitial) => coopApplyGroupEffect(group, shape, isInitial),
+    onChainEnd: () => { coopLogTurnSummary(); coopProcessing = false; coopEndOwnTurn(); },
+    onNoMatch: () => { coopProcessing = false; },
+    onReshuffle: () => coopLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!')),
+    setBusy: (busy) => { coopProcessing = busy; }
+};
 
-function coopResolveMatches(isInitial) {
-    let groups = findMatchGroups(coopTiles, COOP_WIDTH);
-    if (groups.length === 0) {
-        if (!isInitial) { coopProcessing = false; coopCascadeDepth = 0; }
-        return false;
-    }
-
-    if (!isInitial) {
-        coopCascadeDepth++;
-        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
-        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('coop-grid'), maxMultiplier);
-        if (coopCascadeDepth >= 2) showFloatingText(`KOMBO x${coopCascadeDepth}`, document.getElementById('coop-grid'), '#ff9f1c');
-    }
-
-    groups.forEach(g => coopApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(coopChannel, coopTiles, 'clear'); // teammate sees the matched tiles clear
-    setTimeout(() => coopDropAndRefill(isInitial), isInitial ? 0 : 350);
-    return true;
-}
-
-function coopApplyGroupEffect(group, isInitial) {
-    let count = group.indices.length;
-    let isCross = (group.subShape === 'cross');
-    // The speed bonus scales the tile EFFECT the same way single-player does
-    // (game.js's processMatch) - ultBonus stays a flat add, not scaled by it.
-    let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
-    let multiplier = shapeMultiplier * coopMoveTimeMultiplier;
-    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
-
-    group.indices.forEach(i => {
-        if (!isInitial) {
-            coopTiles[i].classList.add('matched');
-            if (shapeMultiplier >= 2) coopTiles[i].classList.add('matched-big');
-            if (typeof cgTileBurst === 'function') cgTileBurst(coopTiles[i], group.type);
-        }
-        else coopTiles[i].innerHTML = '';
-        coopTiles[i].dataset.type = '';
-    });
-
+// Co-op's game effects for one matched group (the engine has already
+// popped the tiles). The speed bonus scales the tile EFFECT the same way
+// single-player does (game.js's soloApplyGroup) - ultBonus stays a flat add.
+function coopApplyGroupEffect(group, shape, isInitial) {
     if (isInitial) return;
     if (coopMatchOver) return;
+    let count = group.indices.length;
+    let { extraTurn, ultBonus } = shape;
+    let multiplier = shape.multiplier * coopMoveTimeMultiplier;
+    if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     if (extraTurn) coopExtraTurnTriggered = true;
     if (ultBonus > 0) {
@@ -1239,44 +1205,6 @@ function coopLogTurnSummary() {
     if (coopMyTurnStats.teamHeal > 0) parts.push(tf('takım arkadaşını {val} can iyileştirdin', { val: coopMyTurnStats.teamHeal }));
     coopLog(parts.length > 0 ? tf('Hamlen: {parts}.', { parts: parts.join(', ') }) : t('Hamlen bir etki yaratmadı.'));
     coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
-}
-
-function coopDropAndRefill(isInitial) {
-    for (let col = 0; col < COOP_WIDTH; col++) {
-        let colTiles = [];
-        for (let row = 0; row < COOP_WIDTH; row++) {
-            let i = col + row * COOP_WIDTH;
-            if (coopTiles[i].dataset.type !== '') colTiles.push({ type: coopTiles[i].dataset.type, html: coopTiles[i].innerHTML });
-        }
-        let missing = COOP_WIDTH - colTiles.length;
-        for (let i = 0; i < missing; i++) {
-            let rt = COOP_TILE_TYPES[Math.floor(Math.random() * COOP_TILE_TYPES.length)];
-            colTiles.unshift({ type: rt.type, html: rt.symbol });
-        }
-        for (let row = 0; row < COOP_WIDTH; row++) {
-            let i = col + row * COOP_WIDTH;
-            coopTiles[i].dataset.type = colTiles[row].type;
-            coopTiles[i].innerHTML = colTiles[row].html;
-            // See game.js's fillBoard for why matched-big must be cleared
-            // here too, not just 'matched' - its forwards-filled end state
-            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
-            // and hides whatever new tile gravity just assigned it.
-            coopTiles[i].classList.remove('matched', 'matched-big');
-        }
-    }
-    sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the refilled board settle
-    let chained = coopResolveMatches(isInitial);
-    if (!chained && !coopMatchOver && !boardHasValidMove(coopTiles, COOP_WIDTH)) {
-        reshuffleBoard(coopTiles, COOP_WIDTH, COOP_TILE_TYPES);
-        sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the reshuffled board too
-        coopLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
-        chained = coopResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
-    }
-    if (chained || isInitial || coopMatchOver) return;
-
-    coopLogTurnSummary();
-    coopProcessing = false;
-    coopEndOwnTurn();
 }
 
 // Common "my move is fully done" tail, reached both from a normal cascade

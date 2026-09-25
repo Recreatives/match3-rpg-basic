@@ -144,7 +144,8 @@
             storage: opts.storage,
             fakeTimers: opts.fakeTimers,
             realtimeBus: opts.realtimeBus,
-            noSession: opts.noSession
+            noSession: opts.noSession,
+            epoch: opts.epoch || Date.UTC(2026, 0, 1, 12, 0, 0)
         };
         var html = rewriteIndexHtml(await readSource('index.html'), id, opts);
         if (!worldHost) {

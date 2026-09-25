@@ -66,7 +66,10 @@
 
     var realSetTimeout = window.setTimeout.bind(window);
     var realDateNow = Date.now.bind(Date);
-    var epoch = realDateNow();
+    // A fixed epoch (the harness passes one) keeps Date.now() identical
+    // across machines and runs - presence join order, for one, is decided
+    // by comparing joined_at timestamps.
+    var epoch = cfg.epoch || realDateNow();
     var clock = { now: 0, queue: [], nextId: 1 };
 
     function schedule(fn, delay, args, repeat) {

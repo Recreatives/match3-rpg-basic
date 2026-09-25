@@ -56,3 +56,12 @@ function freezeEnemyTurn(world) {
 }
 
 function makeBus() { return { channels: {}, queue: [] }; }
+
+// Replaces a world's Math.random with a fixed cycle - used right before a
+// scripted move so gravity's refill can't randomly chain into extra matches
+// and blur what the test is measuring. [0.05, 0.45, 0.85] deals
+// sword, shield, skull, sword, ... (tileTypes order).
+function scriptRandom(world, values) {
+    var i = 0;
+    world.win.Math.random = function () { return values[i++ % values.length]; };
+}

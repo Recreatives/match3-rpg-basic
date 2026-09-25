@@ -87,6 +87,7 @@ function pvpUpdateSpeedBonusUI() {
     let el = document.getElementById('pvp-speed-bonus');
     if (!el) return;
     let mult = pvpGetTimeMultiplier();
+    if (pvpTurnStartTime && pvpMyTurn && !pvpProcessing && !pvpMatchOver) sbMaybeShowHint(pvpBoard, Date.now() - pvpTurnStartTime);
     if (!pvpTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
@@ -102,6 +103,7 @@ function pvpStartSpeedTimer() {
 }
 
 function pvpStopSpeedTimer() {
+    if (typeof sbClearHint === 'function') sbClearHint(pvpBoard);
     clearInterval(pvpSpeedBonusInterval);
     pvpSpeedBonusInterval = null;
     pvpTurnStartTime = null;
@@ -319,7 +321,7 @@ function pvpResetSessionState() {
     pvpMoveTimeMultiplier = 1;
     pvpUltCharge = 0;
     pvpExtraTurnTriggered = false;
-    pvpCascadeDepth = 0; // see startLevel's soloCascadeDepth reset (game.js)
+    pvpBoard.cascadeDepth = 0; // see startLevel's cascadeDepth reset (game.js)
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
     pvpIncomingStats = { damage: 0 };
     pvpOpponentId = null;
@@ -434,10 +436,8 @@ function pvpStartMatch() {
     // the same empty grid and waits for that broadcast - see sharedboard.js.
     sbCreateBoardDOM('pvp-grid', 'pvp-tile-', pvpTiles, pvpHandleTap);
     pvpSelectedTile = null;
-    if (pvpMyTurn) {
-        sbRandomizeBoard(pvpTiles);
-        pvpResolveMatches(true);
-    }
+    pvpBoard.cascadeDepth = 0;
+    if (pvpMyTurn) sbDealBoard(pvpBoard);
     pvpUpdateUI();
     pvpLog(pvpBetrayalMode ? t('⚔️ İhanet düellosu başladı.') : t('🟢 Rakip bağlı - eşleşme başladı.'));
     if (pvpMyTurn) {
@@ -839,76 +839,43 @@ function pvpAttemptSwap(tile1, tile2) {
     // the countdown is about how fast the decision was made.
     pvpMoveTimeMultiplier = pvpGetTimeMultiplier();
     pvpStopSpeedTimer();
-
     pvpProcessing = true;
-    let t = tile1.dataset.type, h = tile1.innerHTML;
-    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-    tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // opponent sees the swap as it happens
-
-    let matched = pvpResolveMatches(false);
-    if (!matched) {
-        setTimeout(() => {
-            let t2 = tile1.dataset.type, h2 = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = t2; tile2.innerHTML = h2;
-            pvpProcessing = false;
-            sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // ...and the revert too, if it wasn't a match
-            // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
-            pvpStartSpeedTimer();
-        }, 150);
-    }
-}
-
-// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
-// rationale (same per-mode counter, mirrored here since this file
-// duplicates game.js's board logic rather than sharing it).
-let pvpCascadeDepth = 0;
-
-function pvpResolveMatches(isInitial) {
-    // Same match-detection (including L/T cross-shapes) single-player uses,
-    // just pointed at pvpTiles instead of the single-player `tiles` array.
-    let groups = findMatchGroups(pvpTiles, PVP_WIDTH);
-    if (groups.length === 0) {
-        if (!isInitial) { pvpProcessing = false; pvpCascadeDepth = 0; }
-        return false;
-    }
-
-    if (!isInitial) {
-        pvpCascadeDepth++;
-        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
-        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('pvp-grid'), maxMultiplier);
-        if (pvpCascadeDepth >= 2) showFloatingText(`KOMBO x${pvpCascadeDepth}`, document.getElementById('pvp-grid'), '#ff9f1c');
-    }
-
-    groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(pvpChannel, pvpTiles, 'clear'); // opponent sees the matched tiles clear
-    setTimeout(() => pvpDropAndRefill(isInitial), isInitial ? 0 : 350);
-    return true;
-}
-
-function pvpApplyGroupEffect(group, isInitial) {
-    let count = group.indices.length;
-    let isCross = (group.subShape === 'cross');
-    // Same size/shape -> multiplier/extra-turn/ult-charge priority rules as
-    // single-player (getMatchShapeInfo lives in game.js). The speed bonus
-    // scales the tile EFFECT the same way single-player does - ultBonus
-    // stays a flat add, not scaled by it (matching game.js's processMatch).
-    let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
-    let multiplier = shapeMultiplier * pvpMoveTimeMultiplier;
-    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
-
-    group.indices.forEach(i => {
-        if (!isInitial) {
-            pvpTiles[i].classList.add('matched');
-            if (shapeMultiplier >= 2) pvpTiles[i].classList.add('matched-big');
-            if (typeof cgTileBurst === 'function') cgTileBurst(pvpTiles[i], group.type);
-        }
-        else pvpTiles[i].innerHTML = '';
-        pvpTiles[i].dataset.type = '';
+    // Slide, commit, broadcast, resolve (sharedboard.js). An invalid swap
+    // slides back and doesn't cost the turn - fresh speed-bonus window.
+    sbTrySwap(pvpBoard, tile1, tile2, () => {
+        pvpProcessing = false;
+        pvpStartSpeedTimer();
     });
+}
 
+// --- PVP BOARD (sharedboard.js's engine) ---
+// Only the active mover's client ever runs this; every step is broadcast
+// (channel) so the other client paints the same board.
+const pvpBoard = {
+    tiles: pvpTiles, width: PVP_WIDTH, pool: tileTypes,
+    gridEl: () => document.getElementById('pvp-grid'),
+    clearDelayMs: 350,
+    initialDelayMs: 0,
+    channel: () => pvpChannel,
+    cascadeDepth: 0,
+    isLive: () => !pvpMatchOver,
+    applyGroup: (group, shape, isInitial) => pvpApplyGroupEffect(group, shape, isInitial),
+    onChainEnd: () => pvpOnChainEnd(),
+    onNoMatch: () => { pvpProcessing = false; },
+    onReshuffle: () => pvpLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!')),
+    setBusy: (busy) => { pvpProcessing = busy; }
+};
+
+// PvP's game effects for one matched group (the engine has already popped
+// the tiles). Same size/shape -> multiplier/extra-turn/ult-charge rules as
+// single-player (getMatchShapeInfo); the speed bonus scales the tile EFFECT,
+// ultBonus stays a flat add (matching game.js's soloApplyGroup).
+function pvpApplyGroupEffect(group, shape, isInitial) {
     if (isInitial) return;
+    let count = group.indices.length;
+    let { extraTurn, ultBonus } = shape;
+    let multiplier = shape.multiplier * pvpMoveTimeMultiplier;
+    if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     if (extraTurn) pvpExtraTurnTriggered = true;
     if (ultBonus > 0) {
@@ -997,39 +964,9 @@ function pvpLogTurnSummary() {
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 }
 
-function pvpDropAndRefill(isInitial) {
-    for (let col = 0; col < PVP_WIDTH; col++) {
-        let colTiles = [];
-        for (let row = 0; row < PVP_WIDTH; row++) {
-            let i = col + row * PVP_WIDTH;
-            if (pvpTiles[i].dataset.type !== '') colTiles.push({ type: pvpTiles[i].dataset.type, html: pvpTiles[i].innerHTML });
-        }
-        let missing = PVP_WIDTH - colTiles.length;
-        for (let i = 0; i < missing; i++) {
-            let rt = tileTypes[Math.floor(Math.random() * tileTypes.length)];
-            colTiles.unshift({ type: rt.type, html: rt.symbol });
-        }
-        for (let row = 0; row < PVP_WIDTH; row++) {
-            let i = col + row * PVP_WIDTH;
-            pvpTiles[i].dataset.type = colTiles[row].type;
-            pvpTiles[i].innerHTML = colTiles[row].html;
-            // See game.js's fillBoard for why matched-big must be cleared
-            // here too, not just 'matched' - its forwards-filled end state
-            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
-            // and hides whatever new tile gravity just assigned it.
-            pvpTiles[i].classList.remove('matched', 'matched-big');
-        }
-    }
-    sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle
-    let chained = pvpResolveMatches(isInitial);
-    if (!chained && !pvpMatchOver && !boardHasValidMove(pvpTiles, PVP_WIDTH)) {
-        reshuffleBoard(pvpTiles, PVP_WIDTH, tileTypes);
-        sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the reshuffled board too
-        pvpLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
-        chained = pvpResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
-    }
-    if (chained || isInitial || pvpMatchOver) return;
-
+// The whole move (including cascades) has resolved and the fight is still
+// on: extra turn, or hand the turn over.
+function pvpOnChainEnd() {
     pvpLogTurnSummary();
     pvpProcessing = false;
 

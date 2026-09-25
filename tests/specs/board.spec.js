@@ -178,9 +178,9 @@ describe('Solo board resolution (live board, fake clock)', { isolate: 'each' }, 
 
     it('regression: a new level never inherits a cut-short cascade count', async function (ctx) {
         var w = ctx.world;
-        w.g('soloCascadeDepth = 3; startLevel()');
+        w.g('soloBoard.cascadeDepth = 3; startLevel()');
         await w.settle(5000);
-        expect(w.g('soloCascadeDepth')).toBe(0);
+        expect(w.g('soloBoard.cascadeDepth')).toBe(0);
     });
 
     it('cascade counter resets after the chain ends', async function (ctx) {
@@ -188,7 +188,7 @@ describe('Solo board resolution (live board, fake clock)', { isolate: 'each' }, 
         setBoard(w, b);
         w.g('checkForMatches(false)');
         await w.settle(10000);
-        expect(w.g('soloCascadeDepth')).toBe(0);
+        expect(w.g('soloBoard.cascadeDepth')).toBe(0);
     });
 });
 

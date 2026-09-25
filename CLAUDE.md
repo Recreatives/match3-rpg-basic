@@ -1,6 +1,6 @@
 # Pixel Dungeon (MUB) - match3-rpg-basic
 
-Vanilla HTML/CSS/JS match-3 RPG (solo/PvP/co-op) backed by Supabase (anon auth, Realtime, Postgres+RLS). No build step, no bundler - every file is a plain `<script>` tag in `index.html`, loaded in this order: `economy.js`, `items.js`, `achievements.js`, `game.js`, `sharedboard.js`, `pvp.js`, `coop.js`.
+Vanilla HTML/CSS/JS match-3 RPG (solo/PvP/co-op) backed by Supabase (anon auth, Realtime, Postgres+RLS). No build step, no bundler - every file is a plain `<script>` tag in `index.html`, loaded in this order: `graphics.js`, `i18n.js`, `i18n-dict.js`, `sound.js`, `economy.js`, `items.js`, `achievements.js`, `sharedboard.js` (the board engine all three modes use - must load before `game.js`, whose boot runs in a microtask right after it), `game.js`, `pvp.js`, `coop.js`.
 
 ## Hard rules, learned the expensive way
 
