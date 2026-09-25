@@ -25,15 +25,19 @@
 <div id="summary">Running...</div>
 <div id="results"></div>
 
-<script src="harness.js"></script>
-<script src="helpers.js"></script>
-<script src="specs/board.spec.js"></script>
-<script src="specs/combat.spec.js"></script>
-<script src="specs/items.spec.js"></script>
-<script src="specs/contracts.spec.js"></script>
-<script src="specs/multiplayer.spec.js"></script>
-<script src="specs/graphics.spec.js"></script>
-<script src="specs/layout.spec.js"></script>
-<script>runAllTests();</script>
+<script>
+// Loaded with a cache-bust so an edited spec/harness is never served stale
+// by a dev server that sends no Cache-Control (python -m http.server).
+// Add new spec files to this list.
+(function () {
+    var files = ['harness.js', 'helpers.js',
+        'specs/board.spec.js', 'specs/combat.spec.js', 'specs/items.spec.js',
+        'specs/contracts.spec.js', 'specs/multiplayer.spec.js',
+        'specs/graphics.spec.js', 'specs/layout.spec.js'];
+    var bust = Date.now().toString(36);
+    files.forEach(function (f) { document.write('<script src="' + f + '?' + bust + '"><\/script>'); });
+    document.write('<script>runAllTests();<\/script>');
+})();
+</script>
 </body>
 </html>

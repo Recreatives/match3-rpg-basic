@@ -455,4 +455,10 @@ const EN_DICT = {
     'İyileşme': 'Heal', 'Enerji': 'Energy', 'Kafatası': 'Skull',
     'Öz Hasar': 'Self Damage', 'Çalma %': 'Lifesteal %', 'Maks Can': 'Max HP',
     'Henüz eşya toplanmadı.': 'No items collected yet.',
+    // Found missing by tests/specs/contracts.spec.js's i18n completeness check.
+    'KAZANDIN': 'YOU WON',
+    'Takım arkadaşın seni ayağa kaldırdı!': 'Your teammate revived you!',
+    'Takım arkadaşını ayağa kaldırdın!': 'You revived your teammate!',
+    'Bu isim zaten alınmış, başka bir isim dene.': 'This name is already taken, try another one.',
+    '<b>{emoji} {title}</b><br>{label} (+{gold} 🪙)': '<b>{emoji} {title}</b><br>{label} (+{gold} 🪙)',
 };

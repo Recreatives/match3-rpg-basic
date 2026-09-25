@@ -47,7 +47,7 @@
 
     // --- expect ------------------------------------------------------------
     function fmt(v) {
-        try { var s = JSON.stringify(v); return s === undefined ? String(v) : (s.length > 300 ? s.slice(0, 300) + '…' : s); }
+        try { var s = JSON.stringify(v); return s === undefined ? String(v) : (s.length > 2000 ? s.slice(0, 2000) + '…' : s); }
         catch (e) { return String(v); }
     }
     function AssertionError(msg) { this.message = msg; this.stack = (new Error(msg)).stack; }
