@@ -137,6 +137,8 @@ function updateSpeedBonusUI() {
     }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    // Faz 11 (graphics roadmap, 2nd wave) - depleting progress underline.
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function startPlayerTimer() {
@@ -454,7 +456,10 @@ function startLevel() {
     }
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
 
-    if (isBoss) log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
+    if (isBoss) {
+        log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
+        if (typeof cgBossIntro === 'function') cgBossIntro('enemy-sprite');
+    }
     else if (MINION_LOG[currentMinionType]) log(t(MINION_LOG[currentMinionType]), "log-enemy");
 
     turnBanner.innerText = t("OYUNCU SIRASI");
@@ -485,10 +490,14 @@ function triggerDeathSequence(who) {
         log(t("DÜŞMAN YENİLDİ!"), "log-crit");
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('victory');
+        // Faz 3 - a boss kill (every 5th level) gets a bigger confetti burst
+        // than an ordinary minion kill.
+        if (typeof cgCelebrate === 'function') cgCelebrate('victory', level % 5 === 0);
         setTimeout(() => { gridDisplay.classList.remove('shake'); winLevel(); }, 1500);
     } else {
         gridDisplay.classList.add('shake');
         if (typeof playSound === 'function') playSound('defeat');
+        if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
         setTimeout(() => { gridDisplay.classList.remove('shake'); gameOver(); }, 1500);
     }
 }
@@ -572,6 +581,9 @@ function updateRewardTitle() {
             playerHP = Math.min(playerHP + healed, maxPlayerHP);
             log(tf('Savaş öncesi dinlenme: +{healed} Can', { healed }), 'log-heal');
         }
+        // Faz 11 (graphics roadmap, 2nd wave) - a brief curtain instead of
+        // snapping straight to the new board.
+        if (typeof cgLevelTransition === 'function') cgLevelTransition();
         level++;
         startLevel();
     };
@@ -725,7 +737,13 @@ function generateRewards() {
         let reward = rollOneReward();
 
         let btn = document.createElement('button');
-        btn.className = `reward-btn rarity-${reward.tier}`;
+        // Faz 9 (graphics roadmap, 2nd wave) - reward-btn-reveal staggers
+        // each of the 3 cards' entrance (see style.css); a legendary pick
+        // additionally gets a one-time shimmer sweep, so pulling the rarest
+        // tier actually feels different from the other four, not just
+        // differently colored.
+        btn.className = `reward-btn rarity-${reward.tier} reward-btn-reveal${reward.tier === 'legendary' ? ' reward-btn-legendary-reveal' : ''}`;
+        btn.style.animationDelay = (i * 0.12) + 's';
         btn.innerHTML = `<b>${t(reward.name)} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${t(REWARD_TIER_LABELS[reward.tier])})</span></b><small>${t(reward.desc)}</small>`;
         btn.onclick = () => {
             applyReward(reward);
@@ -1022,18 +1040,33 @@ function getMatchShapeInfo(count, isCross) {
     return { shapeLabel: '3', multiplier: 1, extraTurn: false, ultBonus: 0 };
 }
 
+// Faz 1 (graphics roadmap) - counts how many resolution steps deep the
+// CURRENT chain reaction is (2nd+ step = a real cascade, not just the
+// player's own initial match). Reset whenever a step finds no matches -
+// that's the natural end of a chain, whether the chain was the player's own
+// combo or just a one-off reshuffle-triggered match (see checkForMatches'
+// else branch) - so a reshuffle never inflates a REAL combo's count, and a
+// genuine cascade always starts counting fresh.
+let soloCascadeDepth = 0;
+
 function checkForMatches(isInitial) {
     if (!isInitial && currentState !== STATE.PLAYING) return false;
     let finalGroups = findMatchGroups(tiles, width);
 
     if (finalGroups.length > 0) {
+        if (!isInitial) {
+            soloCascadeDepth++;
+            let maxMultiplier = Math.max(...finalGroups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+            if (typeof cgBoardImpact === 'function') cgBoardImpact(gridDisplay, maxMultiplier);
+            if (soloCascadeDepth >= 2) showFloatingText(`KOMBO x${soloCascadeDepth}`, gridDisplay, '#ff9f1c');
+        }
         finalGroups.forEach(group => processMatch(group, isInitial));
         if (currentState === STATE.PLAYING || isInitial) {
             setTimeout(() => fillBoard(isInitial), 400);
         }
         return true;
     } else {
-        if (!isInitial) isProcessing = false;
+        if (!isInitial) { isProcessing = false; soloCascadeDepth = 0; }
         return false;
     }
 }
@@ -1069,7 +1102,15 @@ function processMatch(group, isInitial) {
     let validTiles = 0;
     group.indices.forEach(index => {
         if (tiles[index].dataset.type !== '') {
-            if (!isInitial) tiles[index].classList.add('matched');
+            if (!isInitial) {
+                tiles[index].classList.add('matched');
+                // Faz 1 - a 4+/cross match pops bigger/brighter (matched-big,
+                // style.css) than the everyday 3-match, ON TOP OF .matched
+                // rather than instead of it.
+                if (multiplier >= 2) tiles[index].classList.add('matched-big');
+                // Faz 2 - a small tile-type-colored burst right at this tile.
+                if (typeof cgTileBurst === 'function') cgTileBurst(tiles[index], group.type);
+            }
             else tiles[index].innerHTML = '';
             tiles[index].dataset.type = '';
             validTiles++;
@@ -1105,7 +1146,14 @@ function setMyPortraitEverywhere(classKey) {
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
         let stage = cgGetStage(id);
         if (stage) stage.setPortrait(url);
+        // Faz 10 (graphics roadmap, 2nd wave) - class identity glow, synced
+        // here alongside the portrait art itself.
+        if (typeof cgSetClassGlow === 'function') cgSetClassGlow(id, classKey);
     });
+    // A freshly (re)created portrait canvas has no aura yet even if a
+    // unique item was already equipped before this class pick - re-sync
+    // rather than relying only on equipItem/fetchOwnedItems' own calls.
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
 }
 
 // Small visual feedback layer (graphics.js) on top of the actual combat math
@@ -1245,6 +1293,11 @@ function checkBossEnrage() {
         ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
         enemySprite.classList.add('enraged');
         log(t('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!'), 'log-crit');
+        // Faz 8 (graphics roadmap, 2nd wave) - a one-time flash+shake for the
+        // TRANSITION itself, on top of the ongoing .enraged pulse this
+        // classList.add already started (that pulse alone only communicates
+        // "now more dangerous", not the moment it happened).
+        if (typeof cgBossEnrageTransition === 'function') cgBossEnrageTransition(gridDisplay);
     }
 }
 
@@ -1336,7 +1389,14 @@ function fillBoard(isInitial) {
             if (tiles[index].dataset.type !== tileData.type || tileData.isNew) {
                 tiles[index].dataset.type = tileData.type;
                 tiles[index].innerHTML = tileData.html;
-                tiles[index].classList.remove('matched');
+                // matched-big (Faz 1, style.css) ends its animation with
+                // `forwards` fill mode - scale(0)/opacity:0 as the very last
+                // keyframe - which otherwise stays stuck on this DOM node
+                // (tiles are a reused fixed pool, not recreated per match)
+                // even after gravity hands it a brand new tile type, making
+                // that new tile permanently invisible. Must be cleared
+                // alongside 'matched' every time a tile gets recycled here.
+                tiles[index].classList.remove('matched', 'matched-big');
                 if (!isInitial) {
                     tiles[index].classList.remove('falling');
                     tilesToAnimate.push(tiles[index]);
@@ -1567,11 +1627,24 @@ function updateUI() {
     const pArmPct = Math.min(100, (playerArmor / maxPlayerHP) * 100);
     const eArmPct = Math.min(100, (enemyArmor / maxEnemyHP) * 100);
 
-    document.getElementById('player-hp-bar').style.width = `${pPct}%`;
-    document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
+    // Faz 7 (graphics roadmap, 2nd wave) - cgSetBarWithGhost also drives the
+    // ghost-trail sibling (see .bar-ghost, style.css); falls back to a
+    // plain width set if graphics.js somehow didn't load.
+    if (typeof cgSetBarWithGhost === 'function') {
+        cgSetBarWithGhost('player-hp-bar', pPct);
+        cgSetBarWithGhost('enemy-hp-bar', ePct);
+    } else {
+        document.getElementById('player-hp-bar').style.width = `${pPct}%`;
+        document.getElementById('enemy-hp-bar').style.width = `${ePct}%`;
+    }
     document.getElementById('ult-bar').style.width = `${ultCharge}%`;
     document.getElementById('player-armor-bar').style.width = `${pArmPct}%`;
     document.getElementById('enemy-armor-bar').style.width = `${eArmPct}%`;
+    if (typeof cgSetLowHpWarning === 'function') {
+        cgSetLowHpWarning(document.getElementById('player-hp-bar-container'), pPct > 0 && pPct < 25);
+        cgSetLowHpWarning(document.getElementById('enemy-hp-bar-container'), ePct > 0 && ePct < 25);
+    }
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('ult-bar-container'), ultCharge >= 100);
 
     let pArmorText = playerArmor > 0 ? ` <span class="armor-text">[+${playerArmor}]</span>` : "";
     let eArmorText = enemyArmor > 0 ? ` <span class="armor-text">[+${enemyArmor}]</span>` : "";
@@ -1587,8 +1660,14 @@ function updateUI() {
 
 function toggleModal(modalId) {
     let m = document.getElementById(modalId);
-    if(m.style.display === 'flex') {
-        m.style.display = 'none';
+    // Checks .visible, not raw display - cgAnimateModal's close path only
+    // commits display:none after a 220ms fade (see graphics.js), so
+    // display alone would still read 'flex' during that window and a
+    // rapid re-toggle would misread "still open" as "needs closing" again
+    // instead of reopening. .visible flips synchronously both ways.
+    let isOpen = typeof cgAnimateModal === 'function' ? m.classList.contains('visible') : (m.style.display === 'flex');
+    if (isOpen) {
+        if (typeof cgAnimateModal === 'function') cgAnimateModal(m, false); else m.style.display = 'none';
         // Closing the PvP modal mid-search shouldn't leave the player sitting
         // in the matchmaking queue until the server's 90s staleness cleanup
         // catches up - cancel immediately so a re-open starts fresh.
@@ -1621,7 +1700,7 @@ function toggleModal(modalId) {
             log(t('Dükkana sadece zindan dışındayken girebilirsin.'), 'log-turn');
             return;
         }
-        m.style.display = 'flex';
+        if (typeof cgAnimateModal === 'function') cgAnimateModal(m, true); else m.style.display = 'flex';
         // Only render history if opening history modal
         if(modalId === 'history-modal') {
             renderHistory();
@@ -1835,7 +1914,8 @@ function tutorialSkip() {
 }
 
 function closeTutorial(completed) {
-    document.getElementById('tutorial-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), false);
+    else document.getElementById('tutorial-modal').style.display = 'none';
     localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
     if (typeof trackEvent === 'function') trackEvent('tutorial_closed', { completed });
 }
@@ -1844,14 +1924,16 @@ function replayTutorial() {
     toggleModal('info-modal');
     tutorialStep = 1;
     showTutorialStep(1);
-    document.getElementById('tutorial-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), true);
+    else document.getElementById('tutorial-modal').style.display = 'flex';
 }
 
 function maybeShowTutorial() {
     if (localStorage.getItem(TUTORIAL_SEEN_KEY) === 'true') return;
     tutorialStep = 1;
     showTutorialStep(1);
-    document.getElementById('tutorial-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('tutorial-modal'), true);
+    else document.getElementById('tutorial-modal').style.display = 'flex';
     if (typeof trackEvent === 'function') trackEvent('tutorial_started', {});
 }
 
@@ -1885,3 +1967,33 @@ function bootGame() {
         bootGame();
     }
 })();
+
+// --- TEST HOOKS (tests/fixture.html) -----------------------------------
+// tiles/gridDisplay/width/STATE are declared with let/const, which (unlike
+// var or a function declaration) never become a window.X property on their
+// own - the existing pure-function tests (findMatchGroups, reshuffleBoard,
+// ...) work around that by building their own throwaway tiles array rather
+// than touching the real board. checkForMatches/processMatch/fillBoard
+// don't take tiles as a parameter though - they close over these
+// module-scope bindings directly - so exercising THEM against a regression
+// scenario (e.g. "a 4+ match's tile must end up visible again after
+// gravity refills it", the exact bug a missing matched-big cleanup caused
+// once already on this project) needs the real bindings, not a copy.
+// tiles/gridDisplay/width are exposed once, by reference: tiles is mutated
+// in place (push/length=0, never reassigned) so this stays live;
+// gridDisplay/width never change at all. currentState IS reassigned
+// throughout this file, so a raw snapshot would go stale immediately - the
+// getter/setter pair lets a test both read and force it (e.g. into
+// STATE.PLAYING) without driving a full class-select + startLevel() flow
+// just to test board-resolution logic in isolation.
+window.tiles = tiles;
+window.gridDisplay = gridDisplay;
+window.width = width;
+window.STATE = STATE;
+Object.defineProperty(window, 'currentState', {
+    get: () => currentState,
+    set: (v) => { currentState = v; }
+});
+window.checkForMatches = checkForMatches;
+window.processMatch = processMatch;
+window.fillBoard = fillBoard;

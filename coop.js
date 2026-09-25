@@ -135,6 +135,7 @@ function coopUpdateSpeedBonusUI() {
     if (!coopTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('coop-speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function coopStartSpeedTimer() {
@@ -411,6 +412,12 @@ function coopOnLevelStart(payload) {
         let stage = cgGetStage('coop-enemy-sprite');
         if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
     }
+    // Faz 8 (graphics roadmap, 2nd wave) - same boss-entrance beat solo gets
+    // (game.js's startLevel), mirrored here since co-op has boss levels too.
+    // Only here, not in the resync/rejoin path below - that's an existing
+    // player reconnecting to state that's already in progress, not a fresh
+    // boss appearing.
+    if (payload.isBoss && typeof cgBossIntro === 'function') cgBossIntro('coop-enemy-sprite');
 
     // One shared board per level (see sharedboard.js) - the host is always
     // the one-time authority for a fresh level's board (randomizes +
@@ -534,6 +541,7 @@ function coopApplySessionResume(state) {
 function coopOnEnemyDefeated(payload) {
     coopLog(payload.isBoss ? tf('Boss (Lvl {level}) yenildi!', { level: payload.level }) : tf('Minion (Lvl {level}) yenildi!', { level: payload.level }));
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof cgCelebrate === 'function') cgCelebrate('victory', payload.isBoss);
     // Only ever reached via the loyal path (a betrayal vote skips the boss
     // fight entirely), so this always means it was won together.
     if (payload.isBoss) unlockAchievement('dungeon_boss_5');
@@ -569,16 +577,19 @@ function coopShowRewardPick() {
     for (let i = 0; i < 3; i++) {
         let reward = rollOneReward();
         let btn = document.createElement('button');
-        btn.className = `reward-btn rarity-${reward.tier}`;
+        // Faz 9 (graphics roadmap, 2nd wave) - same staggered reveal +
+        // legendary shimmer as solo's generateRewards (game.js).
+        btn.className = `reward-btn rarity-${reward.tier} reward-btn-reveal${reward.tier === 'legendary' ? ' reward-btn-legendary-reveal' : ''}`;
+        btn.style.animationDelay = (i * 0.12) + 's';
         btn.innerHTML = `<b>${reward.name} <span style="font-size:0.7em; text-transform:uppercase; opacity:0.8;">(${REWARD_TIER_LABELS[reward.tier]})</span></b><small>${reward.desc}</small>`;
         btn.onclick = () => {
             applyReward(reward);
             coopLog(tf('Güç seçildi: {name} ({desc}) - sadece bu run için.', { name: t(reward.name), desc: t(reward.desc) }));
-            modal.style.display = 'none';
+            if (typeof cgAnimateModal === 'function') cgAnimateModal(modal, false); else modal.style.display = 'none';
         };
         container.appendChild(btn);
     }
-    modal.style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(modal, true); else modal.style.display = 'flex';
 }
 
 // --- SELF STATE SYNC -----------------------------------------------------------
@@ -739,7 +750,8 @@ function coopOpenVote(kind, context) {
     document.getElementById('hidden-vote-status').innerText = '';
 
     document.getElementById('coop-battle').style.display = 'none';
-    document.getElementById('hidden-vote-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('hidden-vote-modal'), true);
+    else document.getElementById('hidden-vote-modal').style.display = 'flex';
 
     coopLog(kind === 'betrayal'
         ? tf('⚠️ Lvl {level} BOSS öncesi gizli oy zamanı!', { level: context.level })
@@ -774,7 +786,8 @@ function coopMaybeResolveVotes() {
 }
 
 function coopApplyVoteResult(result) {
-    document.getElementById('hidden-vote-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('hidden-vote-modal'), false);
+    else document.getElementById('hidden-vote-modal').style.display = 'none';
     coopVoteOpen = false;
     coopVotes = {};
     if (result.kind === 'exit') coopApplyExitVoteResult(result);
@@ -945,6 +958,7 @@ function coopApplyTurnSet(role) {
 function coopOnPartyWiped() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
+    if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
     coopMatchOver = true;
     coopStopThinkingAnimation();
     coopSetStatus(tf("İKİNİZ DE DÜŞTÜNÜZ - Lvl {level}'de YENİLGİ", { level: coopLevel }));
@@ -1086,11 +1100,23 @@ function coopPlayHitReaction(side, tileType) {
     if (stage) stage.playHitReaction(tileType);
 }
 
+// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
+// rationale (same per-mode counter, mirrored here since this file
+// duplicates game.js's board logic rather than sharing it).
+let coopCascadeDepth = 0;
+
 function coopResolveMatches(isInitial) {
     let groups = findMatchGroups(coopTiles, COOP_WIDTH);
     if (groups.length === 0) {
-        if (!isInitial) coopProcessing = false;
+        if (!isInitial) { coopProcessing = false; coopCascadeDepth = 0; }
         return false;
+    }
+
+    if (!isInitial) {
+        coopCascadeDepth++;
+        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('coop-grid'), maxMultiplier);
+        if (coopCascadeDepth >= 2) showFloatingText(`KOMBO x${coopCascadeDepth}`, document.getElementById('coop-grid'), '#ff9f1c');
     }
 
     groups.forEach(g => coopApplyGroupEffect(g, isInitial));
@@ -1109,7 +1135,11 @@ function coopApplyGroupEffect(group, isInitial) {
     if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
-        if (!isInitial) coopTiles[i].classList.add('matched');
+        if (!isInitial) {
+            coopTiles[i].classList.add('matched');
+            if (shapeMultiplier >= 2) coopTiles[i].classList.add('matched-big');
+            if (typeof cgTileBurst === 'function') cgTileBurst(coopTiles[i], group.type);
+        }
         else coopTiles[i].innerHTML = '';
         coopTiles[i].dataset.type = '';
     });
@@ -1226,7 +1256,11 @@ function coopDropAndRefill(isInitial) {
             let i = col + row * COOP_WIDTH;
             coopTiles[i].dataset.type = colTiles[row].type;
             coopTiles[i].innerHTML = colTiles[row].html;
-            coopTiles[i].classList.remove('matched');
+            // See game.js's fillBoard for why matched-big must be cleared
+            // here too, not just 'matched' - its forwards-filled end state
+            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
+            // and hides whatever new tile gravity just assigned it.
+            coopTiles[i].classList.remove('matched', 'matched-big');
         }
     }
     sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the refilled board settle
@@ -1271,9 +1305,12 @@ function coopEndOwnTurn() {
 
 function coopUpdateUI() {
     let hpPct = Math.max(0, (coopMyHP / COOP_MAX_HP) * 100);
-    let hpBar = document.getElementById('coop-my-hp-bar');
     let hpText = document.getElementById('coop-my-hp-text');
-    if (hpBar) hpBar.style.width = hpPct + '%';
+    // Faz 7 (graphics roadmap, 2nd wave) - ghost-trail + low-HP pulse, same
+    // helpers game.js's updateUI uses (see graphics.js).
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('coop-my-hp-bar', hpPct);
+    else { let hpBar = document.getElementById('coop-my-hp-bar'); if (hpBar) hpBar.style.width = hpPct + '%'; }
+    if (typeof cgSetLowHpWarning === 'function') cgSetLowHpWarning(document.getElementById('coop-my-hp-bar-container'), hpPct > 0 && hpPct < 25 && !coopMyDown);
     if (hpText) hpText.innerText = coopMyDown
         ? 'BAYILDIN'
         : `${Math.max(0, Math.floor(coopMyHP))}/${COOP_MAX_HP}` + (coopMyArmor > 0 ? ` [+${coopMyArmor}]` : '');
@@ -1290,9 +1327,9 @@ function coopUpdateUI() {
     if (allyText) allyText.innerText = coopAllyDown ? t('BAYILDI - KURTAR!') : t(allyTier.text);
 
     let enemyPct = coopEnemyMaxHP > 0 ? Math.max(0, (coopEnemyHP / coopEnemyMaxHP) * 100) : 0;
-    let enemyBar = document.getElementById('coop-boss-hp-bar');
     let enemyText = document.getElementById('coop-boss-hp-text');
-    if (enemyBar) enemyBar.style.width = enemyPct + '%';
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('coop-boss-hp-bar', enemyPct);
+    else { let enemyBar = document.getElementById('coop-boss-hp-bar'); if (enemyBar) enemyBar.style.width = enemyPct + '%'; }
     if (enemyText) enemyText.innerText = `${Math.max(0, Math.floor(coopEnemyHP))}/${coopEnemyMaxHP}` + (coopEnemyArmor > 0 ? ` [+${coopEnemyArmor}]` : '');
 
     let levelLabel = document.getElementById('coop-level-label');
@@ -1304,6 +1341,7 @@ function coopUpdateUI() {
     let ultText = document.getElementById('coop-ult-text');
     if (ultBar) ultBar.style.width = coopUltCharge + '%';
     if (ultText) ultText.innerText = `${Math.floor(coopUltCharge)}%`;
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('coop-ult-bar-container'), coopUltCharge >= 100);
 
     let ultBtn = document.getElementById('coop-ult-btn');
     if (ultBtn) {

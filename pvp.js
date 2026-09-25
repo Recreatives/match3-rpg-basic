@@ -90,6 +90,7 @@ function pvpUpdateSpeedBonusUI() {
     if (!pvpTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
+    if (typeof cgSetSpeedBonusProgress === 'function') cgSetSpeedBonusProgress('pvp-speed-bonus', (mult - 1) / (SPEED_BONUS_MAX_MULT - 1));
 }
 
 function pvpStartSpeedTimer() {
@@ -572,6 +573,7 @@ function pvpOnOpponentDefeated() {
     pvpSetStatus(t('KAZANDIN!'));
     pvpLog(t('Rakip yenildi - kazandın!'));
     if (typeof playSound === 'function') playSound('victory');
+    if (typeof cgCelebrate === 'function') cgCelebrate('victory');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'win', betrayal: !!pvpBetrayalMode });
     if (typeof claimDailyQuest === 'function') claimDailyQuest('win_pvp');
     // Ranked rating - same "only the winner calls it" rule as the betrayal
@@ -648,6 +650,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 function pvpOnDefeat() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
+    if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
     if (typeof trackEvent === 'function') trackEvent('pvp_match_ended', { outcome: 'loss', betrayal: !!pvpBetrayalMode });
     // The winner's resolve_pvp_match call needs a moment to land server-side
     // before this fetch would see the updated row - same timing concern as
@@ -703,12 +706,18 @@ async function pvpShowBetrayalSummary(iWon) {
     outcomeEl.style.color = iWon ? '#2ecc71' : '#e74c3c';
     document.getElementById('betrayal-summary-detail').innerText = detail;
     document.getElementById('betrayal-summary-wallet').innerText = walletLine;
-    document.getElementById('betrayal-summary-modal').style.display = 'flex';
+    if (typeof cgAnimateModal === 'function') cgAnimateModal(document.getElementById('betrayal-summary-modal'), true);
+    else document.getElementById('betrayal-summary-modal').style.display = 'flex';
 }
 
 function pvpCloseBetrayalSummary() {
-    document.getElementById('betrayal-summary-modal').style.display = 'none';
-    document.getElementById('pvp-modal').style.display = 'none';
+    if (typeof cgAnimateModal === 'function') {
+        cgAnimateModal(document.getElementById('betrayal-summary-modal'), false);
+        cgAnimateModal(document.getElementById('pvp-modal'), false);
+    } else {
+        document.getElementById('betrayal-summary-modal').style.display = 'none';
+        document.getElementById('pvp-modal').style.display = 'none';
+    }
     pvpBetrayalMode = null;
     pvpForcedFirstMoverId = null;
     // This closes pvp-modal directly (not via toggleModal), so it needs the
@@ -850,13 +859,25 @@ function pvpAttemptSwap(tile1, tile2) {
     }
 }
 
+// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
+// rationale (same per-mode counter, mirrored here since this file
+// duplicates game.js's board logic rather than sharing it).
+let pvpCascadeDepth = 0;
+
 function pvpResolveMatches(isInitial) {
     // Same match-detection (including L/T cross-shapes) single-player uses,
     // just pointed at pvpTiles instead of the single-player `tiles` array.
     let groups = findMatchGroups(pvpTiles, PVP_WIDTH);
     if (groups.length === 0) {
-        if (!isInitial) pvpProcessing = false;
+        if (!isInitial) { pvpProcessing = false; pvpCascadeDepth = 0; }
         return false;
+    }
+
+    if (!isInitial) {
+        pvpCascadeDepth++;
+        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
+        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('pvp-grid'), maxMultiplier);
+        if (pvpCascadeDepth >= 2) showFloatingText(`KOMBO x${pvpCascadeDepth}`, document.getElementById('pvp-grid'), '#ff9f1c');
     }
 
     groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
@@ -877,7 +898,11 @@ function pvpApplyGroupEffect(group, isInitial) {
     if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
     group.indices.forEach(i => {
-        if (!isInitial) pvpTiles[i].classList.add('matched');
+        if (!isInitial) {
+            pvpTiles[i].classList.add('matched');
+            if (shapeMultiplier >= 2) pvpTiles[i].classList.add('matched-big');
+            if (typeof cgTileBurst === 'function') cgTileBurst(pvpTiles[i], group.type);
+        }
         else pvpTiles[i].innerHTML = '';
         pvpTiles[i].dataset.type = '';
     });
@@ -987,7 +1012,11 @@ function pvpDropAndRefill(isInitial) {
             let i = col + row * PVP_WIDTH;
             pvpTiles[i].dataset.type = colTiles[row].type;
             pvpTiles[i].innerHTML = colTiles[row].html;
-            pvpTiles[i].classList.remove('matched');
+            // See game.js's fillBoard for why matched-big must be cleared
+            // here too, not just 'matched' - its forwards-filled end state
+            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
+            // and hides whatever new tile gravity just assigned it.
+            pvpTiles[i].classList.remove('matched', 'matched-big');
         }
     }
     sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle
@@ -1032,9 +1061,12 @@ function pvpApplyOpponentStatus(tier) {
 
 function pvpUpdateUI() {
     let hpPct = Math.max(0, (pvpMyHP / PVP_MAX_HP) * 100);
-    let hpBar = document.getElementById('pvp-my-hp-bar');
     let hpText = document.getElementById('pvp-my-hp-text');
-    if (hpBar) hpBar.style.width = hpPct + '%';
+    // Faz 7 (graphics roadmap, 2nd wave) - ghost-trail + low-HP pulse, same
+    // helpers game.js's updateUI uses (see graphics.js).
+    if (typeof cgSetBarWithGhost === 'function') cgSetBarWithGhost('pvp-my-hp-bar', hpPct);
+    else { let hpBar = document.getElementById('pvp-my-hp-bar'); if (hpBar) hpBar.style.width = hpPct + '%'; }
+    if (typeof cgSetLowHpWarning === 'function') cgSetLowHpWarning(document.getElementById('pvp-my-hp-bar-container'), hpPct > 0 && hpPct < 25);
     if (hpText) hpText.innerText = `${Math.max(0, Math.floor(pvpMyHP))}/${PVP_MAX_HP}` + (pvpMyArmor > 0 ? ` [+${pvpMyArmor}]` : '');
 
     // Tell the opponent how banged-up I am (see sbHealthTier) - my own HP
@@ -1057,6 +1089,7 @@ function pvpUpdateUI() {
     let ultText = document.getElementById('pvp-ult-text');
     if (ultBar) ultBar.style.width = pvpUltCharge + '%';
     if (ultText) ultText.innerText = `${Math.floor(pvpUltCharge)}%`;
+    if (typeof cgSetUltReady === 'function') cgSetUltReady(document.getElementById('pvp-ult-bar-container'), pvpUltCharge >= 100);
 
     let ultBtn = document.getElementById('pvp-ult-btn');
     if (ultBtn) {

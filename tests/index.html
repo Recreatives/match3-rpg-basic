@@ -31,17 +31,17 @@ function assertEqual(name, actual, expected) {
     assert(name, pass, pass ? '' : ('expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual)));
 }
 
-document.getElementById('game-frame').onload = function () {
+document.getElementById('game-frame').onload = async function () {
     var win = document.getElementById('game-frame').contentWindow;
     try {
-        runTests(win);
+        await runTests(win);
     } catch (e) {
         assert('test harness crashed', false, e.message + '\n' + e.stack);
     }
     render();
 };
 
-function runTests(win) {
+async function runTests(win) {
     // --- Match detection -----------------------------------------------
     (function () {
         var width = 8;
@@ -202,6 +202,82 @@ function runTests(win) {
         ];
         win.applyEquippedItemBonuses(stats2, bothPieces);
         assert('set bonus DOES apply with both pieces equipped', stats2.ult_dmg === 10, JSON.stringify(stats2));
+    })();
+
+    // --- Regression: a matched tile must be visible again after gravity
+    //     refills it, not stuck permanently invisible. Exercises the REAL
+    //     board (win.tiles/checkForMatches/fillBoard - see game.js's "TEST
+    //     HOOKS" block), not a throwaway array, because the bug this guards
+    //     against (missing a 'matched-big' classList.remove alongside
+    //     'matched' in the gravity refill pass, so a DOM node CSS marked
+    //     invisible-until-cleared - see style.css's .matched-big - stayed
+    //     invisible forever once gravity handed it a brand new tile) lives
+    //     in the refill pass's own classList bookkeeping, which a pure
+    //     findMatchGroups-style test never touches. Regression for the
+    //     exact user-reported scenario: a 4-in-a-row energy match whose
+    //     column "completely disappeared" and never came back. ------------
+    await (async function () {
+        win.currentState = win.STATE.PLAYING;
+        // Repeating 5-type cycle (same trick the first test above uses) so
+        // nothing besides the forced match resolves initially.
+        var pattern = ['sword', 'heart', 'shield', 'energy', 'skull_dmg'];
+        for (var i = 0; i < 64; i++) {
+            var ty = pattern[i % pattern.length];
+            win.tiles[i].dataset.type = ty;
+            win.tiles[i].innerHTML = ty;
+            win.tiles[i].className = 'tile';
+        }
+        [0, 1, 2, 3].forEach(function (i) { win.tiles[i].dataset.type = 'energy'; win.tiles[i].innerHTML = '⚡'; });
+
+        win.checkForMatches(false);
+
+        // Poll until the board settles instead of a fixed delay - a
+        // refilled tile can coincidentally chain into another match, and a
+        // fixed wait would be flaky either way.
+        for (var attempt = 0; attempt < 30; attempt++) {
+            await new Promise(function (r) { setTimeout(r, 100); });
+            var stillAnimating = win.tiles.some(function (t) { return t.classList.contains('falling') || t.classList.contains('matched'); });
+            if (!stillAnimating) break;
+        }
+
+        var stuck = [0, 1, 2, 3].filter(function (i) {
+            var el = win.tiles[i];
+            return el.classList.contains('matched-big') || el.classList.contains('matched') || el.dataset.type === '';
+        });
+        assert('regression: 4+ match tiles are visible (no stray matched/matched-big) after gravity refill', stuck.length === 0,
+            stuck.map(function (i) { return i + ':' + win.tiles[i].className + ' type="' + win.tiles[i].dataset.type + '"'; }).join(', '));
+    })();
+
+    // --- A cascade (chain reaction) must not leave the board mid-resolution
+    //     forever - stresses fillBoard's own recursive checkForMatches call
+    //     together with Faz 1's cascade-depth counter (soloCascadeDepth,
+    //     game.js), the other piece of state this session's graphics work
+    //     added to the same resolution loop the bug above lives in. --------
+    await (async function () {
+        win.currentState = win.STATE.PLAYING;
+        var pattern = ['sword', 'heart', 'shield', 'energy', 'skull_dmg'];
+        for (var i = 0; i < 64; i++) {
+            var ty = pattern[i % pattern.length];
+            win.tiles[i].dataset.type = ty;
+            win.tiles[i].innerHTML = ty;
+            win.tiles[i].className = 'tile';
+        }
+        // Two separate 3-matches (cols 0-2 of row 0, cols 5-7 of row 1) so
+        // gravity refilling the first is very likely to still be settling
+        // when the second's own resolution is checked - a real, not
+        // contrived, multi-group single step.
+        [0, 1, 2].forEach(function (i) { win.tiles[i].dataset.type = 'sword'; win.tiles[i].innerHTML = '⚔️'; });
+        [13, 14, 15].forEach(function (i) { win.tiles[i].dataset.type = 'heart'; win.tiles[i].innerHTML = '💖'; });
+
+        win.checkForMatches(false);
+        for (var attempt = 0; attempt < 30; attempt++) {
+            await new Promise(function (r) { setTimeout(r, 100); });
+            var stillAnimating = win.tiles.some(function (t) { return t.classList.contains('falling') || t.classList.contains('matched'); });
+            if (!stillAnimating) break;
+        }
+        var everyTileHasType = win.tiles.every(function (t) { return t.dataset.type !== ''; });
+        assert('regression: a 2-group match step settles with every tile filled (no permanent gaps)', everyTileHasType,
+            win.tiles.filter(function (t) { return t.dataset.type === ''; }).length + ' empty tiles remain');
     })();
 }
 

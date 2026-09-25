@@ -519,6 +519,7 @@ async function fetchOwnedItems() {
     currentOwnedItems = data;
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
     return currentOwnedItems;
 }
 
@@ -580,6 +581,7 @@ async function equipItem(itemRowId) {
     if (error) { console.error('Equip failed:', error.message); return false; }
     item.equipped_slot = item.slot;
     if (typeof renderInventory === 'function') renderInventory();
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
     return true;
 }
 
@@ -593,6 +595,7 @@ async function unequipItem(itemRowId) {
     if (error) { console.error('Unequip failed:', error.message); return false; }
     item.equipped_slot = null;
     if (typeof renderInventory === 'function') renderInventory();
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
     return true;
 }
 

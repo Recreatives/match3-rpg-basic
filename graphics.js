@@ -16,6 +16,35 @@
 // Character/monster art credit: Batareya (FreePixel.art). Effect art credit:
 // Kenney (kenney.nl). See assets/CREDITS.md.
 
+// Faz 12 (graphics roadmap, 2nd wave) - a manual "low graphics mode",
+// independent of the OS's prefers-reduced-motion (Faz 6, style.css).
+// Reduced-motion means "this motion bothers me" (a vestibular/accessibility
+// signal) - a completely different motivation from "my device is weak, I
+// want the extra flourish effects off", which a player with zero motion
+// sensitivity on a strong phone would never set, and a player on a weak
+// phone with no motion sensitivity has no OS setting for at all. Gates the
+// actual JS-side DOM churn (confetti pieces, tile bursts, board shakes,
+// boss flashes), not just their CSS animation duration - Faz 6's reset
+// alone still pays the cost of CREATING dozens of short-lived elements per
+// event, which is the real performance line item on a weak GPU, not how
+// long they visually animate for.
+const CG_LOW_GRAPHICS_KEY = 'pixelDungeonLowGraphics';
+let cgLowGraphics = localStorage.getItem(CG_LOW_GRAPHICS_KEY) === 'true';
+
+function cgEffectsEnabled() { return !cgLowGraphics; }
+
+function cgApplyLowGraphicsState() {
+    document.documentElement.classList.toggle('low-graphics-mode', cgLowGraphics);
+    let btn = document.getElementById('low-graphics-btn');
+    if (btn) btn.innerText = cgLowGraphics ? '🐢' : '🎨';
+}
+
+function cgToggleLowGraphics() {
+    cgLowGraphics = !cgLowGraphics;
+    localStorage.setItem(CG_LOW_GRAPHICS_KEY, String(cgLowGraphics));
+    cgApplyLowGraphicsState();
+}
+
 // Each file is a 4-frame horizontal idle-animation strip (cropped from the
 // artist's 8-direction spritesheet's front-facing row - see
 // scratchpad-era CREDITS.md notes) rather than one static frame, so the
@@ -129,17 +158,23 @@ const HIT_EFFECT_SPRITES = {
     energy: { sprite: 'assets/effects/star_04.png', tint: 0xf1c40f },
 };
 
-// Two-layer bursts (a base shape + an accent) for the one big moment each
-// class's ultimate is - chosen to echo that class's own flavor (see the
-// class_asset_plan.png shared with the user during asset selection).
+// Three-layer bursts (a base shape + an accent + a Faz 4 (graphics roadmap)
+// "impact ring" 3rd layer) for the one big moment each class's ultimate is -
+// chosen to echo that class's own flavor (see the class_asset_plan.png
+// shared with the user during asset selection). The 3rd layer deliberately
+// reuses a sprite ALREADY used by a different class/slot above rather than
+// pulling in new art (this project's whole effect pool is the 14 files in
+// assets/effects/ - see assets/CREDITS.md) - _burst below already
+// randomizes each instance's own rotation, so the same base file still
+// reads as a fresh shape each time it's reused.
 const ULT_EFFECT_SPRITES = {
-    warrior: [{ sprite: 'assets/effects/scorch_01.png', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }],
-    berserker: [{ sprite: 'assets/effects/flame_04.png', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.png', tint: 0xff8c00 }],
-    rogue: [{ sprite: 'assets/effects/slash_04.png', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.png', tint: 0xe0c3fc }],
-    archer: [{ sprite: 'assets/effects/muzzle_02.png', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }],
-    mage: [{ sprite: 'assets/effects/magic_03.png', tint: 0x3498db }, { sprite: 'assets/effects/star_04.png', tint: 0x00d4ff }],
-    necromancer: [{ sprite: 'assets/effects/symbol_01.png', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.png', tint: 0x2c3e50 }],
-    paladin: [{ sprite: 'assets/effects/light_01.png', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.png', tint: 0xffd700 }],
+    warrior: [{ sprite: 'assets/effects/scorch_01.png', tint: 0xdfe6e9 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_03.png', tint: 0xecf0f1 }],
+    berserker: [{ sprite: 'assets/effects/flame_04.png', tint: 0xff4500 }, { sprite: 'assets/effects/fire_01.png', tint: 0xff8c00 }, { sprite: 'assets/effects/smoke_04.png', tint: 0x8b0000 }],
+    rogue: [{ sprite: 'assets/effects/slash_04.png', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.png', tint: 0xe0c3fc }, { sprite: 'assets/effects/star_04.png', tint: 0xd6a4ff }],
+    archer: [{ sprite: 'assets/effects/muzzle_02.png', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.png', tint: 0xffffff }, { sprite: 'assets/effects/circle_04.png', tint: 0x27ae60 }],
+    mage: [{ sprite: 'assets/effects/magic_03.png', tint: 0x3498db }, { sprite: 'assets/effects/star_04.png', tint: 0x00d4ff }, { sprite: 'assets/effects/spark_06.png', tint: 0x00eaff }],
+    necromancer: [{ sprite: 'assets/effects/symbol_01.png', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.png', tint: 0x2c3e50 }, { sprite: 'assets/effects/circle_03.png', tint: 0x4a148c }],
+    paladin: [{ sprite: 'assets/effects/light_01.png', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.png', tint: 0xffd700 }, { sprite: 'assets/effects/star_04.png', tint: 0xfff9c4 }],
 };
 
 // Every texture is tiny (character portraits are a few KB, effects ~50-100KB)
@@ -162,6 +197,29 @@ function cgPreloadAll() {
     Object.values(ULT_EFFECT_SPRITES).forEach(list => list.forEach(e => cgLoadTexture(e.sprite)));
 }
 
+// Resolves --portrait-w/--portrait-h (style.css, tied to --tile-size) to
+// actual pixel numbers, via a hidden probe element rather than
+// canvasEl.getBoundingClientRect() directly - PvP/co-op stages are first
+// created while their modal is still display:none (see CLAUDE.md's note on
+// pvp-modal/coop-modal sitting hidden earlier in index.html), and a hidden
+// ancestor makes getBoundingClientRect report 0x0. The probe is appended
+// straight to <body> (never inside a modal) and hidden with
+// visibility:hidden rather than display:none, so it always participates in
+// layout and its computed size is real - unlike reading the custom property
+// text itself (getComputedStyle on an untyped custom property returns the
+// clamp()/calc() source string, NOT the resolved number).
+let cgSizeProbe = null;
+function cgPortraitSize(canvasEl) {
+    if (!cgSizeProbe) {
+        cgSizeProbe = document.createElement('div');
+        cgSizeProbe.style.cssText = 'position:absolute; top:0; left:0; visibility:hidden; pointer-events:none; width:var(--portrait-w); height:var(--portrait-h);';
+        document.body.appendChild(cgSizeProbe);
+    }
+    const rect = cgSizeProbe.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return [rect.width, rect.height];
+    return [canvasEl.width || 56, canvasEl.height || 70];
+}
+
 // One CombatStage per portrait slot (solo's player/enemy, PvP's me/opponent,
 // co-op's me/ally/enemy - up to 7 across the whole app). Each owns exactly one
 // PIXI.Application mounted into `canvasEl`.
@@ -175,11 +233,12 @@ class CombatStage {
     }
 
     async _init() {
+        const [w, h] = cgPortraitSize(this.canvasEl);
         const app = new PIXI.Application();
         await app.init({
             canvas: this.canvasEl,
-            width: this.canvasEl.width || 96,
-            height: this.canvasEl.height || 96,
+            width: w,
+            height: h,
             backgroundAlpha: 0,
             antialias: false, // crisp pixel art, not smoothed
             resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -412,4 +471,248 @@ function cgGetStage(canvasId) {
     return stage;
 }
 
+// Faz 2 (graphics roadmap) - a tiny colored burst AT THE MATCHED TILE'S OWN
+// POSITION, tinted per tile type (same palette as HIT_EFFECT_SPRITES above,
+// so the board and the portrait hit effects read as the same visual
+// language). Deliberately plain DOM/CSS, not another PixiJS stage - a match
+// can clear up to 7-8 tiles at once on a 64-tile board, and one PIXI.Application
+// per tile would be a real cost for something this small; a radial-gradient
+// div animated with transform+opacity only is compositor-cheap and matches
+// this project's existing mobile-GPU-perf discipline (see .tile's own
+// comment in style.css on why filter/box-shadow are avoided at board scale).
+const TILE_BURST_COLORS = {
+    sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f'
+};
+function cgTileBurst(tileEl, tileType) {
+    if (!tileEl || !cgEffectsEnabled()) return;
+    const color = TILE_BURST_COLORS[tileType];
+    if (!color) return;
+    const rect = tileEl.getBoundingClientRect();
+    const burst = document.createElement('div');
+    burst.className = 'cg-tile-burst';
+    burst.style.left = (rect.left + rect.width / 2 + window.scrollX) + 'px';
+    burst.style.top = (rect.top + rect.height / 2 + window.scrollY) + 'px';
+    burst.style.width = rect.width + 'px';
+    burst.style.height = rect.height + 'px';
+    burst.style.setProperty('--burst-color', color);
+    document.body.appendChild(burst);
+    // animationend is the normal path; the timeout is only a safety net in
+    // case the element gets display:none'd (e.g. a fast overlay swap) before
+    // the animation ever fires that event.
+    burst.addEventListener('animationend', () => burst.remove());
+    setTimeout(() => burst.remove(), 600);
+}
+
+// Faz 7 (graphics roadmap, 2nd wave) - sets a bar AND its ghost-trail
+// sibling (see .bar-ghost, style.css) to the same target width. Safe to
+// call on any bar id, ghost or not - a bar with no `${barId}-ghost`
+// element in the DOM (armor bars, ult bars, the tiered opponent/ally
+// status bars) just silently skips that half, so this can be dropped in
+// anywhere a bar's width was previously set directly.
+function cgSetBarWithGhost(barId, pct) {
+    const bar = document.getElementById(barId);
+    if (bar) bar.style.width = pct + '%';
+    const ghost = document.getElementById(barId + '-ghost');
+    if (ghost) ghost.style.width = pct + '%';
+}
+
+// Faz 7 - toggles the low-HP pulse (style.css's .low-hp) on a bar's own
+// .bar-container. `containerEl` (not an id) since the three modes don't
+// all reach their HP bar's container the same way - callers already have
+// the element in hand more often than not.
+function cgSetLowHpWarning(containerEl, isLow) {
+    if (!containerEl) return;
+    containerEl.classList.toggle('low-hp', !!isLow);
+}
+
+// Faz 7 - toggles the ULT-ready glow (style.css's .ult-ready).
+function cgSetUltReady(containerEl, isReady) {
+    if (!containerEl) return;
+    containerEl.classList.toggle('ult-ready', !!isReady);
+}
+
+// Faz 8 (graphics roadmap, 2nd wave) - a boss level's entrance (a red
+// full-screen flash + the boss's own portrait bouncing into view) instead
+// of just a log line and a bigger stat block. `portraitId` is the mode's
+// own enemy canvas ('enemy-sprite' solo, 'coop-enemy-sprite' co-op - PvP
+// has no boss concept, it's 1v1 duels). The entrance class is removed
+// after its own animation finishes rather than left on the element - solo's
+// enemy-sprite ALSO carries .enemy-display's permanent float bob, and since
+// two animation-shorthand classes on one element don't combine (the later
+// one wins outright, same lesson as matched/matched-big - see that fix's
+// commit), leaving cg-boss-entrance on permanently would silently kill the
+// float animation for good, not just for its own 0.6s.
+function cgBossIntro(portraitId) {
+    if (!cgEffectsEnabled()) return;
+    const flash = document.createElement('div');
+    flash.className = 'cg-boss-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+
+    const portrait = document.getElementById(portraitId);
+    if (portrait) {
+        portrait.classList.remove('cg-boss-entrance');
+        void portrait.offsetWidth;
+        portrait.classList.add('cg-boss-entrance');
+        setTimeout(() => portrait.classList.remove('cg-boss-entrance'), 650);
+    }
+}
+
+// Faz 8 - a ONE-TIME dramatic beat for the moment a boss enrages, on top of
+// checkBossEnrage's (game.js) existing ONGOING .enraged pulse - that pulse
+// communicates "this is now more dangerous" for the rest of the fight, but
+// never actually announced the TRANSITION itself. Reuses cgBoardImpact's
+// own shake for the "impact" half rather than inventing a third shake
+// variant.
+function cgBossEnrageTransition(gridEl) {
+    if (typeof cgBoardImpact === 'function') cgBoardImpact(gridEl, 3);
+    if (!cgEffectsEnabled()) return;
+    const flash = document.createElement('div');
+    flash.className = 'cg-boss-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+}
+
+// Faz 10 (graphics roadmap, 2nd wave) - a per-class glow ring around the
+// player's OWN portrait, not the shared board (Faz 5 already gave
+// #pvp-grid/#coop-grid their own MODE-identity border tint - stacking a
+// second, class-based tint on the same shared board would fight that
+// signal instead of adding to it; the player's own portrait belongs to
+// them alone in every mode, so it's the right place for CLASS identity).
+const CLASS_GLOW_KEYS = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+function cgSetClassGlow(canvasId, classKey) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    CLASS_GLOW_KEYS.forEach(k => el.classList.remove('class-glow-' + k));
+    if (classKey && CLASS_GLOW_KEYS.includes(classKey)) el.classList.add('class-glow-' + classKey);
+}
+
+// Faz 10 - a persistent aura on the player's own portrait while an
+// orange/red/teal unique item (items.js's RARITY_DEFS - the isUnique tier,
+// this project's actual "legendary" vocabulary; the reward-pool's own
+// common/uncommon/rare/epic/legendary strings from Faz 9 are a DIFFERENT,
+// unrelated system for temporary per-run stat picks) is equipped in any
+// slot. `rarityKey` is null to clear it. Uses the item's own RARITY_DEFS
+// color (single source of truth) rather than a second hardcoded palette.
+function cgSetLegendaryAura(canvasId, rarityKey) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    if (rarityKey && typeof RARITY_DEFS !== 'undefined' && RARITY_DEFS[rarityKey]) {
+        el.style.setProperty('--legendary-aura-color', RARITY_DEFS[rarityKey].color);
+        el.classList.add('cg-legendary-aura');
+    } else {
+        el.classList.remove('cg-legendary-aura');
+        el.style.removeProperty('--legendary-aura-color');
+    }
+}
+
+// Faz 11 (graphics roadmap, 2nd wave) - every modal in this project opened/
+// closed with a hard display:none<->flex snap (no transition possible on
+// `display` itself). This fades+scales it instead, using the same
+// "add .visible a frame after display is set, remove it before the
+// eventual display:none" pattern .cg-defeat-vignette and .achievement-toast
+// already use elsewhere in this file/achievements.js - not a new
+// technique, just applied to modals too. `opening=false`'s setTimeout only
+// commits display:none if nothing re-opened the SAME modal in the
+// meantime (checks .visible is still absent), so a fast close-then-reopen
+// (e.g. a player double-tapping) can't get stuck hidden.
+function cgAnimateModal(modalEl, opening) {
+    if (!modalEl) return;
+    if (opening) {
+        modalEl.style.display = 'flex';
+        void modalEl.offsetWidth;
+        modalEl.classList.add('visible');
+    } else {
+        modalEl.classList.remove('visible');
+        setTimeout(() => {
+            if (!modalEl.classList.contains('visible')) modalEl.style.display = 'none';
+        }, 220);
+    }
+}
+
+// Faz 11 (graphics roadmap, 2nd wave) - a depleting progress underline on
+// the speed-bonus badge (⚡x2.0 etc.), so how much of the window is left
+// reads at a glance instead of only from the multiplier number itself.
+// Simpler than a true circular countdown ring - the badge is a pill, not
+// a circle, and a conic-gradient ring wrapped around non-circular text
+// adds real visual complexity for the same "time's running out" read a
+// linear depletion bar already gives cleanly. `ratio` is 1 (full window
+// left) down to 0 (about to expire).
+function cgSetSpeedBonusProgress(elId, ratio) {
+    const el = document.getElementById(elId);
+    if (el) el.style.setProperty('--speed-progress', (Math.max(0, Math.min(1, ratio)) * 100) + '%');
+}
+
+// Faz 11 - see cgAnimateModal below for the full rationale; this one is a
+// brief full-screen dark curtain for the reward-screen -> next-level
+// transition (the "SONRAKİ SEVİYE" button's onclick, game.js), which
+// previously swapped straight to the new board with no transition at all.
+function cgLevelTransition() {
+    const curtain = document.createElement('div');
+    curtain.className = 'cg-level-curtain';
+    document.body.appendChild(curtain);
+    setTimeout(() => curtain.remove(), 500);
+}
+
+// Faz 3 (graphics roadmap) - a whole-screen moment for the two events that
+// previously got only a sound cue and a log line: winning (an enemy/boss/
+// PvP opponent goes down) and losing (game over, party wipe, PvP loss).
+// `kind` is 'victory' or 'defeat'; `big` (boss kills, not ordinary minion
+// kills) makes the victory confetti burst noticeably larger. Every element
+// this creates is position:fixed + transform/opacity-only and self-removes
+// on a timeout, the same disposable-DOM-node pattern cgTileBurst above
+// uses, so a mode never has to remember to clean this up itself.
+function cgCelebrate(kind, big) {
+    if (kind === 'victory') cgConfettiBurst(big);
+    else if (kind === 'defeat') cgDefeatVignette();
+}
+
+const CG_CONFETTI_COLORS = ['#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#e67e22'];
+function cgConfettiBurst(big) {
+    if (!cgEffectsEnabled()) return;
+    const count = big ? 40 : 22;
+    const layer = document.createElement('div');
+    layer.className = 'cg-confetti-layer';
+    for (let i = 0; i < count; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'cg-confetti-piece';
+        piece.style.left = (Math.random() * 100) + 'vw';
+        piece.style.setProperty('--drift', (Math.random() * 140 - 70) + 'px');
+        piece.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+        piece.style.backgroundColor = CG_CONFETTI_COLORS[i % CG_CONFETTI_COLORS.length];
+        piece.style.animationDelay = (Math.random() * 0.3) + 's';
+        piece.style.animationDuration = (1.4 + Math.random() * 0.8) + 's';
+        layer.appendChild(piece);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 2600);
+}
+
+function cgDefeatVignette() {
+    const el = document.createElement('div');
+    el.className = 'cg-defeat-vignette';
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('visible'));
+    setTimeout(() => el.remove(), 1600);
+}
+
+// Faz 1 (graphics roadmap) - board-wide "that landed" feedback for a big
+// match, on top of the per-portrait hit effects above. Takes the grid
+// element itself (caller's job to getElementById the right one - see
+// CLAUDE.md's hard rule on why this file never guesses a selector) and the
+// STRONGEST getMatchShapeInfo multiplier among the groups resolved this
+// step, so a step with several simultaneous matches shakes at its biggest
+// match's intensity, not its smallest. multiplier thresholds mirror
+// getMatchShapeInfo's own tiers (1=3-match, 2=4, 2.5=cross, 3=5, 3.5=6,
+// 4=7!!) - below 2 (a plain 3-match) gets no shake at all, matching how the
+// board has always felt for the common case.
+function cgBoardImpact(gridEl, maxMultiplier) {
+    if (!gridEl || !maxMultiplier || maxMultiplier < 2 || !cgEffectsEnabled()) return;
+    const cls = maxMultiplier >= 3 ? 'shake-big' : 'shake';
+    gridEl.classList.remove('shake', 'shake-big');
+    void gridEl.offsetWidth; // force reflow so re-adding the class restarts the animation
+    gridEl.classList.add(cls);
+}
+
 document.addEventListener('DOMContentLoaded', cgPreloadAll);
+document.addEventListener('DOMContentLoaded', cgApplyLowGraphicsState);

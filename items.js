@@ -110,6 +110,32 @@ const RARITY_DEFS = {
     teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
 };
 
+// Faz 10 (graphics roadmap, 2nd wave) - re-checks currentOwnedItems
+// (economy.js) for an equipped isUnique item and updates the player's own
+// combat-portrait aura (cgSetLegendaryAura, graphics.js) across all three
+// modes at once, same "one global, synced everywhere" pattern
+// setMyPortraitEverywhere (game.js) already uses for the portrait art
+// itself. Call this any time equip state could have changed: after
+// fetchOwnedItems resolves, after equipItem/unequipItem succeeds
+// (economy.js), and after a class pick / portrait (re)creation
+// (setMyPortraitEverywhere, game.js) so a freshly-made canvas doesn't start
+// without an aura it should already have.
+// Priority when more than one unique is equipped across different slots:
+// red (rarest, dropWeight 0.4) beats teal beats orange - a player wearing
+// their absolute rarest piece sees THAT color, not whichever slot happened
+// to iterate last.
+const LEGENDARY_AURA_PRIORITY = ['red', 'teal', 'orange'];
+function syncLegendaryAura() {
+    if (typeof cgSetLegendaryAura !== 'function') return;
+    let best = null;
+    (typeof currentOwnedItems !== 'undefined' ? currentOwnedItems : []).forEach(it => {
+        if (it.equipped_slot && RARITY_DEFS[it.rarity] && RARITY_DEFS[it.rarity].isUnique) {
+            if (!best || LEGENDARY_AURA_PRIORITY.indexOf(it.rarity) < LEGENDARY_AURA_PRIORITY.indexOf(best)) best = it.rarity;
+        }
+    });
+    ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => cgSetLegendaryAura(id, best));
+}
+
 // Display-only mirrors of supabase/schema.sql's item_scrap_values /
 // item_sell_values / item_upgrade_costs - the actual amounts are enforced
 // server-side (scrap_item/sell_item/upgrade_item), these just label the

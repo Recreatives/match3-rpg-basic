@@ -29,6 +29,21 @@
     --board-size: clamp(270px, 80dvmin, 560px);
     --tile-size: calc(var(--board-size) / 8);
     --panel-width: calc(var(--board-size) + 8px); /* board content + its 2x4px border */
+
+    /* Combat portrait canvas size (graphics.js resolves these to real px via
+       a hidden probe element - see cgPortraitSize - and sizes each
+       PIXI.Application accordingly; see CombatStage._init). Tied to
+       --tile-size, NOT a flat px value, so it inherits the same viewport-safe
+       clamping the rest of the UI already has: on a small phone --tile-size
+       sits near its floor and the multiplier below lands almost exactly on
+       the OLD hardcoded 56x70, so there's no new overflow risk there; on a
+       roomy viewport --tile-size grows toward its ceiling and portraits grow
+       meaningfully with it. The 92px/115px ceiling is deliberately kept under
+       .stat-box's fixed 100px width (see .stat-box below) so the canvas never
+       has to spill out of its box even on desktop. Aspect ratio (0.8) matches
+       the original 56:70 art crop at both ends of the clamp. */
+    --portrait-w: clamp(56px, calc(var(--tile-size) * 1.5), 92px);
+    --portrait-h: clamp(70px, calc(var(--tile-size) * 1.875), 115px);
 }
 /* html/body are a fixed, non-scrolling shell. On iOS Safari, letting body
    itself be the scrolling element means every swipe on the board can be
@@ -95,6 +110,22 @@ body {
     20%, 80% { transform: translate3d(2px, 0, 0); }
     30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
     40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Faz 1 (graphics roadmap) - a stronger board-wide shake for a 5+/cross/6/7!!
+   match (see cgBoardImpact in graphics.js), reusing .shake's own transform-
+   only approach (no filter/box-shadow) so it stays cheap on weak mobile
+   GPUs - see .tile's comment above for why that matters in this project.
+   Also nudges vertically, not just horizontally, so it reads as distinctly
+   bigger than the plain .shake used for a 4-match or a direct-damage hit. */
+.shake-big {
+    animation: shakeBig 0.6s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes shakeBig {
+    10%, 90% { transform: translate3d(-2px, 1px, 0); }
+    20%, 80% { transform: translate3d(4px, -1px, 0); }
+    30%, 50%, 70% { transform: translate3d(-8px, 2px, 0); }
+    40%, 60% { transform: translate3d(8px, -2px, 0); }
 }
 
 .game-overlay {
@@ -203,11 +234,33 @@ body {
 
 .speed-bonus {
     display: none;
+    position: relative; overflow: hidden;
     font-size: 0.75rem; font-weight: bold; color: var(--accent);
     background: rgba(241, 196, 15, 0.12);
     border: 1px solid var(--accent);
     padding: 3px 8px; border-radius: 10px;
     white-space: nowrap;
+}
+/* Faz 11 (graphics roadmap, 2nd wave) - cgSetSpeedBonusProgress's (graphics.js)
+   depleting underline, driven by the --speed-progress custom property. */
+.speed-bonus::after {
+    content: '';
+    position: absolute; left: 0; bottom: 0; height: 3px;
+    width: var(--speed-progress, 100%);
+    background: var(--accent);
+    transition: width 0.1s linear;
+}
+
+/* Faz 11 - cgLevelTransition's own element (graphics.js). */
+.cg-level-curtain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 197;
+    background: #000;
+    animation: cgLevelCurtain 0.5s ease-in-out forwards;
+}
+@keyframes cgLevelCurtain {
+    0% { opacity: 0; }
+    40% { opacity: 0.85; }
+    100% { opacity: 0; }
 }
 
 .hud {
@@ -229,7 +282,12 @@ body {
     width: 100%; height: 6px; background: #333;
     border-radius: 3px; overflow: hidden; margin-top: 2px;
 }
-.bar { height: 100%; transition: width 0.3s; }
+/* Faz 7 (graphics roadmap, 2nd wave) - position:relative + z-index puts
+   .bar in its own stacking context ABOVE .bar-ghost below (a
+   position:absolute sibling would otherwise paint above a plain in-flow
+   .bar by default, the opposite of what's needed here). No-op for a bar
+   with no ghost sibling (armor/ult/etc.) - safe as a shared base rule. */
+.bar { height: 100%; transition: width 0.2s ease; position: relative; z-index: 1; }
 #player-hp-bar { background-color: #2ecc71; width: 100%; }
 #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
 #ult-bar { background-color: #f1c40f; width: 0%; }
@@ -237,6 +295,43 @@ body {
 #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
 .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
 .armor-text { color: var(--armor-color); font-size: 0.75rem; font-weight: bold; }
+
+/* Faz 7 - "ghost trail" damage feedback. cgSetBarWithGhost (graphics.js)
+   sets BOTH bars to the same new width at the same instant - the trick is
+   entirely in the transition timing, no JS "previous value" bookkeeping
+   needed: .bar snaps down fast (0.2s, no delay) while .bar-ghost holds its
+   old rendered width for a beat (0.35s delay) before catching down more
+   slowly (0.6s), so a hit visibly leaves a brief bright afterimage of how
+   much was just lost - the flash IS the ghost's own light color, no
+   separate flash effect needed on top of it. Absolute positioning only
+   inside .bar-container (already position:relative) - transform/opacity
+   are not involved, but width transitions on a small fixed-height bar are
+   a cheap, well-contained repaint, nothing like the 64-tile board case. */
+.bar-ghost {
+    position: absolute; top: 0; left: 0; height: 100%; z-index: 0;
+    background: rgba(255, 255, 255, 0.45);
+    transition: width 0.6s ease 0.35s;
+}
+
+/* Faz 7 - low-HP pulse, reusing enrage-pulse's own scale keyframe (style.css,
+   near .enemy-display.enraged) rather than inventing a new one. */
+.bar-container.low-hp {
+    animation: barLowHpPulse 1s ease-in-out infinite;
+}
+@keyframes barLowHpPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(231, 76, 60, 0); }
+    50% { box-shadow: 0 0 8px 2px rgba(231, 76, 60, 0.75); }
+}
+
+/* Faz 7 - ULT bar's own container gets a "ready, use me" glow at 100%
+   charge (cgSetUltReady, graphics.js) instead of sitting there static. */
+.bar-container.ult-ready {
+    animation: barUltReadyPulse 1.2s ease-in-out infinite;
+}
+@keyframes barUltReadyPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(241, 196, 15, 0); }
+    50% { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.85); }
+}
 
 /* --- STATS BAR (GRID) --- */
 /* Used inside the Stats/Loot modal (#history-modal) rather than the main
@@ -280,7 +375,14 @@ body {
 .grid {
     width: var(--board-size); height: var(--board-size);
     display: flex; flex-wrap: wrap;
-    background-color: var(--board-bg);
+    /* Faz 5 (graphics roadmap) - a subtle radial gradient instead of the old
+       flat --board-bg fill, for a little depth. Still a single static
+       background (no animation, no extra paint per frame), so it costs
+       nothing beyond the very first paint - same perf budget as before.
+       Fixed hex stops (not color-mix()) - this project's mobile testing
+       has included older Android GPUs (see .tile's perf comments below),
+       and color-mix() support there isn't guaranteed. */
+    background: radial-gradient(ellipse at 50% 35%, #3e5568 0%, var(--board-bg) 60%, #29394a 100%);
     border-radius: 8px; border: 4px solid #1a252f;
     box-shadow: inset 0 2px 10px rgba(0,0,0,0.45);
     overflow: hidden; position: relative;
@@ -288,6 +390,13 @@ body {
     transition: opacity 0.5s ease;
     flex-shrink: 0;
 }
+/* Faz 5 - PvP/co-op each get a faint border tint (on top of the shared
+   .grid look above) so the same board reads as a slightly different place
+   depending on mode, without a full separate theme per mode. Border only,
+   not a background-color override, so .mp-grid's own inherited gradient
+   above stays identical across all three modes. */
+#pvp-grid { border-color: #7a3b3b; }
+#coop-grid { border-color: #3b7a6e; }
 /* opacity, not filter:grayscale - a filter on this container forces the
    browser to flatten the whole board (all 64 tiles, mid-animation or not)
    into one offscreen layer and re-filter it every frame for as long as the
@@ -335,6 +444,85 @@ body {
     0% { transform: scale(1); filter: brightness(2); text-shadow: 0 0 6px #fff; background-color: rgba(255,255,255,0.4); }
     40% { transform: scale(1.3); opacity: 1; }
     100% { transform: scale(0); opacity: 0; }
+}
+/* Faz 1 - a 4+/cross match (getMatchShapeInfo's multiplier >= 2) pops
+   noticeably bigger/brighter than a plain 3-match, applied ALONGSIDE
+   .matched (both classes on the same tile - see processMatch/
+   pvpApplyGroupEffect/coopApplyGroupEffect) rather than replacing it, so a
+   big match still gets .matched's own timing/z-index for free. Same
+   transform+filter:brightness-only budget as matchPop, no new expensive
+   properties. */
+.matched-big {
+    animation: matchPopBig 0.45s forwards ease-in-out;
+}
+@keyframes matchPopBig {
+    0% { transform: scale(1); filter: brightness(2.6); text-shadow: 0 0 10px #fff; background-color: rgba(255,255,255,0.55); }
+    40% { transform: scale(1.65); opacity: 1; }
+    100% { transform: scale(0); opacity: 0; }
+}
+
+/* Faz 2 (graphics roadmap) - cgTileBurst's (graphics.js) own element. Fixed
+   position + left/top set inline per-instance in JS (viewport coordinates
+   from getBoundingClientRect, matching .pop-text's own positioning
+   approach). transform+opacity only - see cgTileBurst's comment for why. */
+.cg-tile-burst {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--burst-color) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 15;
+    animation: cgTileBurst 0.45s ease-out forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgTileBurst {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.85; }
+    100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+}
+
+/* Faz 3 (graphics roadmap) - cgCelebrate's victory/defeat overlays
+   (graphics.js). position:fixed (viewport-relative, not page-relative like
+   .pop-text/.cg-tile-burst above) since these are whole-screen moments, not
+   tied to any one board position. transform/opacity only. */
+.cg-confetti-layer {
+    position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden;
+}
+.cg-confetti-piece {
+    position: absolute; top: -12px; width: 8px; height: 14px;
+    animation: cgConfettiFall linear forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgConfettiFall {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: 0.9; }
+}
+
+.cg-defeat-vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 199;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(80,0,0,0.55) 100%);
+    opacity: 0; transition: opacity 0.7s ease;
+}
+.cg-defeat-vignette.visible { opacity: 1; }
+
+/* Faz 8 (graphics roadmap, 2nd wave) - cgBossIntro/cgBossEnrageTransition's
+   own elements (graphics.js). */
+.cg-boss-flash {
+    position: fixed; inset: 0; pointer-events: none; z-index: 198;
+    background: radial-gradient(ellipse at center, rgba(231, 76, 60, 0.55) 0%, rgba(231, 76, 60, 0) 70%);
+    animation: cgBossFlash 0.7s ease-out forwards;
+}
+@keyframes cgBossFlash {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.cg-boss-entrance {
+    animation: cgBossEntrance 0.6s cubic-bezier(.34, 1.56, .64, 1);
+}
+@keyframes cgBossEntrance {
+    0% { transform: scale(0.3) rotate(-8deg); }
+    60% { transform: scale(1.25) rotate(3deg); }
+    100% { transform: scale(1) rotate(0deg); }
 }
 
 /* Overlay Content */
@@ -387,6 +575,37 @@ body {
 .reward-btn:hover, .reward-btn:focus-visible { filter: brightness(1.25); }
 .reward-btn b { font-size: 1.1rem; display: block; margin-bottom: 3px; }
 .reward-btn small { color: #ecf0f1; display: block; line-height: 1.35; opacity: 0.9; overflow-wrap: break-word; }
+
+/* Faz 9 (graphics roadmap, 2nd wave) - staggered reward-card entrance
+   (generateRewards, game.js; coopShowRewardPick, coop.js each set
+   animation-delay per card index). `backwards` fill mode matters here -
+   without it, a card would sit fully visible for its whole delay instead
+   of staying hidden until its own turn to reveal. */
+.reward-btn-reveal {
+    animation: rewardBtnReveal 0.4s ease-out backwards;
+}
+@keyframes rewardBtnReveal {
+    0% { opacity: 0; transform: translateY(14px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* A legendary pick gets one extra light sweep across the card - .reward-btn
+   already has position:relative (below), so this ::after positions off
+   that with no extra wrapper. animation-delay:inherit syncs the sweep to
+   the SAME staggered moment the card itself reveals at, rather than every
+   legendary card's shimmer firing at once regardless of its position. */
+.reward-btn-legendary-reveal { overflow: hidden; }
+.reward-btn-legendary-reveal::after {
+    content: '';
+    position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent);
+    animation: rewardLegendaryShimmer 1.1s ease-out;
+    animation-delay: inherit;
+    pointer-events: none;
+}
+@keyframes rewardLegendaryShimmer {
+    0% { left: -60%; }
+    100% { left: 120%; }
+}
 
 .rarity-common { border-color: var(--common); color: #fff; }
 .rarity-uncommon { border-color: var(--uncommon); background: rgba(46, 204, 113, 0.15); }
@@ -460,6 +679,39 @@ body {
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
 }
+/* Faz 10 (graphics roadmap, 2nd wave) - cgSetClassGlow's per-class rings
+   (graphics.js), applied to the player's OWN combat-portrait canvas. A
+   static box-shadow, not an animation - this sits on a canvas element that
+   may already carry other classes (.enemy-display's float never applies
+   to a player's own portrait, but keeping this animation-free avoids ever
+   risking the same animation-shorthand collision the matched/matched-big
+   and boss-entrance fixes both had to work around elsewhere on this
+   branch). border-radius:50% since these are humanoid portraits, not
+   monster silhouettes - a circular glow reads as "aura around a person"
+   rather than a rectangular highlight. */
+.combat-portrait.class-glow-warrior { box-shadow: 0 0 10px 3px rgba(149, 165, 166, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-berserker { box-shadow: 0 0 10px 3px rgba(231, 76, 60, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-rogue { box-shadow: 0 0 10px 3px rgba(155, 89, 182, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-archer { box-shadow: 0 0 10px 3px rgba(39, 174, 96, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-mage { box-shadow: 0 0 10px 3px rgba(52, 152, 219, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-necromancer { box-shadow: 0 0 10px 3px rgba(142, 68, 173, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-paladin { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.65); border-radius: 50%; }
+
+/* Faz 10 - cgSetLegendaryAura's persistent pulse (graphics.js) for an
+   equipped orange/red/teal unique item - unlike the class glow above,
+   this DOES pulse, since it's meant to keep reading as "you're wearing
+   something rare" for the whole time it's equipped, not just register
+   once. --legendary-aura-color is set inline per-instance by
+   cgSetLegendaryAura (the item's own RARITY_DEFS color); the fallback here
+   only matters if that custom property somehow never got set. */
+.combat-portrait.cg-legendary-aura {
+    animation: cgLegendaryAuraPulse 2.2s ease-in-out infinite;
+}
+@keyframes cgLegendaryAuraPulse {
+    0%, 100% { box-shadow: 0 0 6px 1px var(--legendary-aura-color, #f97316); }
+    50% { box-shadow: 0 0 18px 6px var(--legendary-aura-color, #f97316); }
+}
+
 /* Monster Display - the enemy portrait keeps the same float/enraged animation
    the old emoji-based version had (see game.js's use of enemySprite.classList) -
    these apply to the canvas element's box exactly the same way they did to a
@@ -542,7 +794,20 @@ body {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: var(--modal-bg); z-index: 100; display: none;
     justify-content: center; align-items: center;
+    /* Faz 11 (graphics roadmap, 2nd wave) - cgAnimateModal (graphics.js)
+       toggles .visible a frame after setting display:flex/before the
+       eventual display:none, so this can actually transition instead of
+       hard-snapping. Every modal already shares this one class, so this
+       one rule covers all of them at once. */
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
+.modal-overlay.visible { opacity: 1; }
+.modal-overlay .modal-content {
+    transform: scale(0.94) translateY(8px);
+    transition: transform 0.2s ease;
+}
+.modal-overlay.visible .modal-content { transform: scale(1) translateY(0); }
 .modal-content {
     background: #34495e; width: 90%; max-width: 400px;
     box-sizing: border-box;
@@ -692,4 +957,47 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
 .achievement-toast.visible {
     opacity: 1;
     transform: translate(-50%, 0);
+}
+
+/* Faz 6 (graphics roadmap) - prefers-reduced-motion support, added last so
+   it covers every animation/transition already in this file (the .dying,
+   .shake/.shake-big, .falling, .matched/.matched-big, .pop-text, .float,
+   .enrage-pulse, .cg-tile-burst, .cg-confetti-piece, .cg-defeat-vignette,
+   .achievement-toast rules above included) in one place, rather than
+   editing each rule individually. Collapsing duration to ~0 instead of
+   using `animation: none` keeps each animation's END STATE (the one at
+   100%) actually applied - a tile still visibly clears, a toast still
+   ends up visible - `none` would freeze everything at its START state
+   instead, which reads as broken, not calm.
+   Known limitation: a few flows (triggerDeathSequence's 1.5s pause before
+   winLevel()/gameOver(), the achievement toast's 3.5s visible hold) pace
+   themselves with their own JS setTimeout independent of the CSS duration
+   here - those still wait their original real time even with reduced
+   motion on, so the screen briefly holds still rather than that wait
+   shrinking too. Not visually jarring (nothing is moving during it), just
+   not shortened - fixing that would mean threading a "skip the delay"
+   flag through every such setTimeout across game.js/pvp.js/coop.js, a
+   bigger change than this pass. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Faz 12 (graphics roadmap, 2nd wave) - manual low-graphics mode
+   (cgToggleLowGraphics, graphics.js). Same universal reset as the
+   prefers-reduced-motion block above, but gated on a class instead of an
+   OS media feature - see graphics.js's own comment for why these are two
+   different motivations that deserve two different toggles. The JS-side
+   guards (cgEffectsEnabled) already stop the expensive DOM churn (confetti/
+   tile-burst/board-shake) from being created at all; this CSS half only
+   matters for the handful of effects that don't go through that check
+   (e.g. matched-big's own pop, the class-glow/legendary-aura statics
+   staying instant rather than easing in). */
+html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mode *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
 }
