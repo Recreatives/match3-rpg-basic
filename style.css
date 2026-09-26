@@ -26,7 +26,17 @@
        than the "full" one with no address bar, which is what 100vh/vmin
        assume and why layouts can overflow a real phone screen. */
     --board-size: clamp(270px, 80vmin, 560px);
-    --board-size: clamp(270px, 80dvmin, 560px);
+    /* T5 (roadmap v2) - the board also has to leave room for everything
+       stacked above/below it (top bar, header, HUD, log, ULT button =
+       --chrome-h), otherwise a 360x640 phone had the ULT button and a
+       1280x800 laptop had the board's bottom row pushed off-screen.
+       tests/specs/layout.spec.js checks this at 7 viewport sizes. */
+    --chrome-h: 395px;
+    --board-size: clamp(220px, min(94vw, 100dvh - var(--chrome-h)), 560px);
+    /* UI rows (top bar, HUD, log, ULT) no longer shrink with the board -
+       a narrower top bar just wraps into MORE rows and steals even more
+       height from the board. */
+    --ui-width: max(var(--panel-width), min(100%, 400px));
     --tile-size: calc(var(--board-size) / 8);
     --panel-width: calc(var(--board-size) + 8px); /* board content + its 2x4px border */
 
@@ -87,6 +97,7 @@ body {
 
 @media (min-width: 700px) {
     #app { font-size: 16px; }
+    :root { --chrome-h: 405px; }
 }
 
 /* --- ANIMATIONS & TRANSITIONS --- */
@@ -162,7 +173,7 @@ body {
    width line to itself, the button row gets its own full width to wrap
    and center within, so however many fit per row are evenly spread out. */
 .top-bar {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     display: flex;
     flex-direction: column;
@@ -196,7 +207,7 @@ body {
    (3-4 rows total before you even reached the HUD). Collapsed into one
    compact row so the board gets pushed into view sooner on short screens. */
 .battle-header {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     box-sizing: border-box;
     display: flex;
@@ -264,7 +275,7 @@ body {
 }
 
 .hud {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     display: flex; justify-content: space-between;
     margin-bottom: 5px; background: rgba(0,0,0,0.2);
@@ -772,7 +783,7 @@ body {
    history, but not something that needs to permanently cost ~100px of a
    small screen's height while you're trying to see the board. */
 .log-toggle {
-    width: var(--panel-width); max-width: 100%; box-sizing: border-box;
+    width: var(--ui-width); max-width: 100%; box-sizing: border-box;
     display: flex; align-items: center; gap: 8px;
     background: rgba(0,0,0,0.4); border: 1px solid #555; border-radius: 6px;
     margin-top: 8px; padding: 6px 10px; font-size: 0.8rem;
@@ -785,7 +796,7 @@ body {
 .log-toggle.open .log-chevron { transform: rotate(180deg); }
 
 #log {
-    width: var(--panel-width); max-width: 100%;
+    width: var(--ui-width); max-width: 100%;
     background: rgba(0,0,0,0.4);
     padding: 0 8px; font-size: 0.85rem;
     overflow-y: hidden; border-radius: 0 0 6px 6px; font-family: 'Consolas', monospace;
@@ -811,13 +822,41 @@ body {
 .action-btn {
     margin-top: 8px; padding: 10px 25px; background: var(--accent);
     border: none; cursor: pointer; font-weight: bold; border-radius: 6px;
-    font-size: 1rem; color: #2c3e50; width: var(--panel-width);
+    font-size: 1rem; color: #2c3e50; width: var(--ui-width);
     max-width: 100%;
     box-sizing: border-box;
     flex-shrink: 0;
     margin-bottom: 4px;
 }
 .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+/* T5 (roadmap v2) - landscape phones. Stacking everything vertically put
+   the board almost entirely below a 360-420px-tall screen. Short landscape
+   screens get two columns instead: the UI on the left, the board on the
+   right, sized to the full height. */
+@media (orientation: landscape) and (max-height: 600px) {
+    :root {
+        --board-size: clamp(200px, min(100dvh - 30px, 56vw), 560px);
+        --ui-width: 100%;
+    }
+    #app {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-auto-rows: min-content;
+        column-gap: 10px;
+        align-content: start;
+        align-items: start;
+        justify-items: stretch;
+    }
+    #app > * { grid-column: 1; }
+    #app > #grid { grid-column: 2; grid-row: 1 / span 20; align-self: center; }
+    .version { display: none; }
+    .top-bar { margin-bottom: 2px; }
+    .hud { padding: 4px; margin-bottom: 3px; }
+    .log-toggle, .action-btn { margin-top: 4px; }
+    .log-toggle { padding: 3px 8px; }
+    .action-btn { padding: 6px 12px; margin-bottom: 0; }
+}
 
 /* INFO MODAL */
 .modal-overlay {
@@ -873,6 +912,55 @@ body {
 h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
 ul { padding-left: 20px; margin-top: 5px; }
 li { margin-bottom: 5px; }
+
+/* T5 (roadmap v2) - PvP/co-op battle view. While a match is on, the
+   modal kept its title + long intro paragraph and stacked every stat box
+   on its own full-width row, so the shared board started ~600px down -
+   below the fold on EVERY screen, including a 1280x800 laptop. :has()
+   keys off the same inline style.display='block' pvp.js/coop.js already set
+   when the battle starts (no extra JS state to keep in sync); a browser
+   without :has() just keeps the old scrolling layout. */
+.modal-content:has(#pvp-battle[style*="block"]),
+.modal-content:has(#coop-battle[style*="block"]) {
+    width: 96%; max-height: 96dvh; padding: 8px 10px;
+}
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section > .modal-title,
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section > p:not([id]),
+.modal-content:has(#coop-battle[style*="block"]) .modal-section > .modal-title,
+.modal-content:has(#coop-battle[style*="block"]) .modal-section > p:not([id]) { display: none; }
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section,
+.modal-content:has(#coop-battle[style*="block"]) .modal-section { margin-bottom: 0; padding-bottom: 0; }
+#pvp-battle > .stat-box, #coop-battle > .stat-box {
+    display: inline-block; vertical-align: top; margin-bottom: 4px !important;
+}
+#pvp-battle > .stat-box:has(canvas) { width: calc(50% - 4px) !important; }
+#coop-battle > .stat-box:has(canvas) { width: calc(33.3% - 4px) !important; }
+#pvp-battle > p, #coop-battle > p { margin: 2px 0; }
+/* Board: as wide as the modal allows, but never taller than what's left
+   of the screen under the (now compact) HUD rows. */
+#pvp-grid, #coop-grid { width: min(100%, max(220px, 100dvh - 330px)); }
+#coop-grid { width: min(100%, max(220px, 100dvh - 350px)); }
+#pvp-ult-btn, #coop-ult-btn { margin-bottom: 4px !important; padding: 8px; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+    .modal-content:has(#pvp-battle[style*="block"]),
+    .modal-content:has(#coop-battle[style*="block"]) { max-width: 96vw !important; }
+    #pvp-battle[style*="block"], #coop-battle[style*="block"] {
+        display: grid !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+        grid-auto-rows: min-content;
+        column-gap: 6px;
+        align-items: start;
+    }
+    #pvp-battle > *, #coop-battle > * { grid-column: 1 / 7; }
+    #pvp-battle > .stat-box:has(canvas) { grid-column: span 3; width: auto !important; }
+    #coop-battle > .stat-box:has(canvas) { grid-column: span 2; width: auto !important; }
+    #pvp-battle > p, #coop-battle > p { font-size: 0.75rem; }
+    #pvp-grid, #coop-grid {
+        grid-column: 7; grid-row: 1 / span 20;
+        width: min(100dvh - 40px, 52vw) !important; margin: 0 !important;
+    }
+}
 
 /* --- MANUAL SPECIFIC STYLES --- */
 .manual-grid {
