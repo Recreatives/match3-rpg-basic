@@ -71,7 +71,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         expect(stage.renderCount).toBe(0);
     });
 
-    it('an idle visible portrait repaints only a few times per second', async function (ctx) {
+    it('an idle visible portrait breathes at ~15fps, never full frame rate', async function (ctx) {
         var w = ctx.world;
         onScreen(w);
         await startSolo(w, 'WARRIOR');
@@ -81,7 +81,8 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         var before = stage.renderCount;
         await pumpFrames(w, 1000);
         var perSecond = stage.renderCount - before;
-        expect(perSecond, 'renders in 1s idle').toBeLessThan(12);
+        expect(perSecond, 'renders in 1s idle').toBeLessThan(22);
+        expect(perSecond, 'idle breathing does repaint').toBeGreaterThan(5);
     });
 
     it('an effect makes it repaint every frame, then settle back down', async function (ctx) {

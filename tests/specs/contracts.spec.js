@@ -321,12 +321,12 @@ describe('DOM rules from CLAUDE.md', { world: { pixi: false } }, function () {
     it('every tile type the game can deal has a pixel-art sprite', async function (ctx) {
         var css = await readSource('style.css');
         var types = ctx.world.g('COOP_TILE_TYPES').map(function (t) { return t.type; });
-        // inlined as data: URIs by tools/make_tiles.py (no first-paint flash)
-        types.forEach(function (ty) { expect(css, 'sprite rule for ' + ty).toContain('.tile[data-type="' + ty + '"] { background-image: url(\'data:image/png;base64,'); });
+        // inlined as SVG data: URIs by tools/make_tiles.py (no first-paint flash)
+        types.forEach(function (ty) { expect(css, 'sprite rule for ' + ty).toContain('.tile[data-type="' + ty + '"] { background-image: url("data:image/svg+xml,'); });
     });
 
     it('every asset graphics.js references exists', async function () {
-        var g = src['graphics.js'], refs = g.match(/assets\/[\w\/.-]+\.(png|webp|json)/g) || [];
+        var g = src['graphics.js'], refs = g.match(/assets\/[\w\/.-]+\.(png|webp|json|svg)/g) || [];
         refs = refs.filter(function (r, i) { return refs.indexOf(r) === i; });
         expect(refs.length).toBeGreaterThan(5);
         for (var i = 0; i < refs.length; i++) await readSource(refs[i]);

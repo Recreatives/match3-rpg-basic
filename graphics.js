@@ -10,7 +10,7 @@
 // only repaint while visible and actually changing - a portrait sitting in
 // a closed PvP/co-op modal costs nothing.
 //
-// Character/monster art credit: Batareya (FreePixel.art). Effect art credit:
+// Character/monster portraits and board tiles: original vector art (tools/). Effect art credit:
 // Kenney (kenney.nl). See assets/CREDITS.md.
 
 // Faz 12 (graphics roadmap, 2nd wave) - a manual "low graphics mode",
@@ -100,30 +100,32 @@ async function cgRunAutoQuality() {
     return cgQualityLevel();
 }
 
-// Each file is a 4-frame horizontal idle-animation strip (cropped from the
-// artist's 8-direction spritesheet's front-facing row - see
-// scratchpad-era CREDITS.md notes) rather than one static frame, so the
-// portrait actually breathes/bobs instead of standing frozen.
+// Original vector portraits (tools/make_characters.py): one SVG per hero
+// class and monster type, loaded as a single high-resolution texture. All
+// motion is done in code - idle breathing (cgFrame), class motions, attack
+// lunge, hit knockback, death - so every character animates the same way
+// at any size and pixel ratio.
 const CHARACTER_SPRITES = {
-    warrior: 'assets/characters/warrior_idle.png',
-    berserker: 'assets/characters/berserker_idle.png',
-    rogue: 'assets/characters/rogue_idle.png',
-    archer: 'assets/characters/archer_idle.png',
-    mage: 'assets/characters/mage_idle.png',
-    necromancer: 'assets/characters/necromancer_idle.png',
-    paladin: 'assets/characters/paladin_idle.png',
+    warrior: 'assets/characters/warrior.svg',
+    berserker: 'assets/characters/berserker.svg',
+    rogue: 'assets/characters/rogue.svg',
+    archer: 'assets/characters/archer.svg',
+    mage: 'assets/characters/mage.svg',
+    necromancer: 'assets/characters/necromancer.svg',
+    paladin: 'assets/characters/paladin.svg',
 };
 
 const MONSTER_SPRITES = {
-    normal: 'assets/characters/monster_normal_idle.png',
-    armored: 'assets/characters/monster_armored_idle.png',
-    swift: 'assets/characters/monster_swift_idle.png',
-    drain: 'assets/characters/monster_drain_idle.png',
-    boss: 'assets/characters/monster_boss_idle.png',
+    normal: 'assets/characters/monster_normal.svg',
+    armored: 'assets/characters/monster_armored.svg',
+    swift: 'assets/characters/monster_swift.svg',
+    drain: 'assets/characters/monster_drain.svg',
+    boss: 'assets/characters/monster_boss.svg',
 };
 
-// Every idle strip is 4 equal frames side by side.
-const IDLE_FRAME_COUNT = 4;
+// Idle breathing: a slow squash-and-stretch, repainted at ~15fps (plenty
+// for motion this subtle, and far cheaper than 60 on a phone).
+const CG_BREATH_STEP_MS = 66;
 
 // No attack spritesheet exists in the free art this project uses (see
 // assets/CREDITS.md) - the character/monster packs only ship idle/walk/run.
@@ -365,9 +367,17 @@ function cgFrame(ticker) {
     for (const stage of cgShared.stages) {
         if (stage.paused || !stage.portraitSprite) continue;
         if (!cgIsVisible(stage.canvasEl)) continue;
-        stage.portraitSprite.update(ticker);
-        const frame = stage.portraitSprite.currentFrame;
-        if (frame !== stage.lastFrame) { stage.lastFrame = frame; stage.needsRender = true; }
+        // Idle breathing, only while nothing else is animating the sprite.
+        if (stage.stripH && !stage.dead && stage.activeTweens === 0) {
+            const now = performance.now();
+            const step = Math.floor(now / CG_BREATH_STEP_MS);
+            if (step !== stage.lastFrame) {
+                stage.lastFrame = step;
+                const b = Math.sin(now / 1000 * 2.4 + stage.breathPhase);
+                stage.portraitSprite.scale.set(stage.portraitBaseScale * (1 - 0.012 * b), stage.portraitBaseScale * (1 + 0.022 * b));
+                stage.needsRender = true;
+            }
+        }
         if (!stage.needsRender && stage.activeTweens === 0) continue;
         if (cgShared.lost) continue;
         const [w, h] = stage.size;
@@ -407,13 +417,9 @@ class CombatStage {
         await cgInitShared();
         this.ctx = this.canvasEl.getContext('2d');
         this.root = new PIXI.Container();
-        // An AnimatedSprite (not a plain Sprite) so setPortrait can hand it a
-        // 4-frame idle strip and have it actually play - see IDLE_FRAME_COUNT.
-        // autoUpdate:false - cgFrame advances it from the shared ticker, and
-        // only while the stage is visible.
-        this.portraitSprite = new PIXI.AnimatedSprite([PIXI.Texture.EMPTY]);
-        this.portraitSprite.autoUpdate = false;
+        this.portraitSprite = new PIXI.Sprite(PIXI.Texture.EMPTY);
         this.portraitSprite.anchor.set(0.5, 1);
+        this.breathPhase = Math.random() * Math.PI * 2; // two portraits never breathe in lockstep
         this.portraitBaseScale = 1;
         this.root.addChild(this.portraitSprite);
         this.effectLayer = new PIXI.Container();
@@ -433,7 +439,7 @@ class CombatStage {
         this.canvasEl.height = Math.round(h * res);
         this.canvasEl.style.width = w + 'px';
         this.canvasEl.style.height = h + 'px';
-        if (this.ctx) this.ctx.imageSmoothingEnabled = false;
+        if (this.ctx) { this.ctx.imageSmoothingEnabled = true; this.ctx.imageSmoothingQuality = 'high'; }
         this._fitPortrait();
         this.needsRender = true;
     }
@@ -447,10 +453,8 @@ class CombatStage {
         sprite.y = this.baseY;
         sprite.rotation = 0;
         if (this.stripW) {
-            // Fit within the canvas while preserving aspect ratio - source
-            // art varies a few px in width/height per character (see
-            // assets/CREDITS.md).
-            const scale = Math.min((h * 0.95) / this.stripH, (w * 0.9) / this.stripW, 4);
+            // Fit within the canvas while preserving aspect ratio.
+            const scale = Math.min((h * 0.98) / this.stripH, (w * 0.98) / this.stripW, 4);
             this.portraitBaseScale = scale;
         }
         sprite.scale.set(this.portraitBaseScale);
@@ -458,27 +462,17 @@ class CombatStage {
 
     // Swaps which character/monster art this stage shows. Safe to call before
     // init finishes (awaits internally) or repeatedly (e.g. a fresh monster
-    // every level) - always resets any hit-shake/motion left over from the
-    // last one. `url` points at a 4-frame idle strip (see IDLE_FRAME_COUNT);
-    // slicing it into per-frame textures happens here rather than once at
-    // load time since the same cached strip texture is reused across every
-    // stage showing that character (solo + PvP + co-op can all show a Mage).
+    // every level) - always resets any hit-shake/motion/death left over from
+    // the last one.
     async setPortrait(url) {
         await this.ready;
         this.url = url;
-        const strip = await cgLoadTexture(url);
+        const texture = await cgLoadTexture(url);
         if (this.url !== url) return; // a newer setPortrait won the race
-        strip.source.scaleMode = 'nearest';
-        const frameW = strip.width / IDLE_FRAME_COUNT;
-        const frames = [];
-        for (let i = 0; i < IDLE_FRAME_COUNT; i++) {
-            frames.push(new PIXI.Texture({ source: strip.source, frame: new PIXI.Rectangle(i * frameW, 0, frameW, strip.height) }));
-        }
-        this.portraitSprite.textures = frames;
-        this.portraitSprite.animationSpeed = 0.06; // slow, calm bob - not a run cycle
-        this.portraitSprite.play();
-        this.stripW = frameW;
-        this.stripH = strip.height;
+        texture.source.scaleMode = 'linear';
+        this.portraitSprite.texture = texture;
+        this.stripW = texture.width;
+        this.stripH = texture.height;
         this.portraitSprite.tint = 0xffffff;
         this.portraitSprite.alpha = 1;
         this.dead = false;
@@ -1005,6 +999,30 @@ function cgStageDo(canvasId, method, arg) {
     if (stage && stage[method]) stage[method](arg);
 }
 
+// Browsers decode a background image lazily, per element, the first time
+// it's painted - a freshly built 64-tile board could show blank cells for a
+// frame or two (seen in live testing, even with the art inlined). Decoding
+// each tile image once up front puts them in the decoded-image cache, so
+// the first board paints complete.
+const cgWarmImages = [];
+function cgWarmTileImages() {
+    const probe = document.createElement('div');
+    probe.className = 'tile';
+    probe.style.cssText = 'position:absolute; left:-9999px; top:0;';
+    document.body.appendChild(probe);
+    ['sword', 'heart', 'shield', 'energy', 'skull', 'teamheal'].forEach(type => {
+        probe.dataset.type = type;
+        const m = getComputedStyle(probe).backgroundImage.match(/url\("?(.*?)"?\)$/);
+        if (!m) return;
+        const img = new Image();
+        img.src = m[1];
+        if (img.decode) img.decode().catch(() => {});
+        cgWarmImages.push(img);
+    });
+    probe.remove();
+}
+
+document.addEventListener('DOMContentLoaded', cgWarmTileImages);
 document.addEventListener('DOMContentLoaded', cgPreloadAll);
 document.addEventListener('DOMContentLoaded', cgApplyLowGraphicsState);
 document.addEventListener('DOMContentLoaded', () => setTimeout(() => { cgRunAutoQuality(); }, 1500));

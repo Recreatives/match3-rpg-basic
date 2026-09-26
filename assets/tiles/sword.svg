@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff0b8"/><stop offset=".35" stop-color="#e2b54b"/><stop offset=".7" stop-color="#a8761c"/><stop offset="1" stop-color="#5b3a08"/>
+  </linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe89a"/><stop offset="1" stop-color="#b07a16"/></linearGradient>
+  <radialGradient id="stone" cx="42%" cy="35%" r="75%">
+    <stop offset="0" stop-color="#56616d"/><stop offset=".6" stop-color="#2b333c"/><stop offset="1" stop-color="#151a20"/>
+  </radialGradient>
+  <radialGradient id="halo" cx="50%" cy="52%" r="50%">
+    <stop offset="0" stop-color="#ff6a3d" stop-opacity=".75"/><stop offset=".55" stop-color="#ff6a3d" stop-opacity=".22"/><stop offset="1" stop-color="#ff6a3d" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="em" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#8fa3b8"/></linearGradient>
+  <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs>
+<circle cx="50" cy="52.5" r="46" fill="#000" fill-opacity=".45"/>
+<circle cx="50" cy="50" r="46" fill="url(#rim)" stroke="#3a2504" stroke-width="1.5"/>
+<circle cx="50" cy="50" r="42.6" fill="none" stroke="#fff6d0" stroke-opacity=".35" stroke-width="1"/>
+<circle cx="89.36" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="89.36" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/>
+<circle cx="50" cy="50" r="38.5" fill="url(#stone)" stroke="#120d05" stroke-width="2.2"/>
+<circle cx="50" cy="50" r="38.5" fill="url(#halo)"/>
+<circle cx="50" cy="50" r="33" fill="none" stroke="#ff6a3d" stroke-opacity=".35" stroke-width="1.2" stroke-dasharray="3 4"/>
+<g transform="translate(50 51) scale(.6) translate(-50 -50)">
+      <g transform="rotate(45 50 50)" stroke="#10131a" stroke-width="3" stroke-linejoin="round">
+        <path d="M45 16 L50 5 L55 16 L55 62 L45 62 Z" fill="url(#em)"/>
+        <path d="M50 9 L50 60" stroke="#ffffff" stroke-opacity=".7" stroke-width="2"/>
+        <rect x="31" y="61" width="38" height="8" rx="4" fill="url(#gold)"/>
+        <rect x="46" y="69" width="8" height="16" rx="2" fill="#7a4a24"/>
+        <circle cx="50" cy="89" r="5.5" fill="url(#gold)"/>
+      </g></g>
+<path d="M21 42 A30 30 0 0 1 56 14 A36 30 0 0 0 21 42Z" fill="url(#shine)"/>
+</svg>

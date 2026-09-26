@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>Taş stili önizleme</title>
+<style>
+  body { margin: 0; background: #0e141b; color: #e8eef4; font: 15px/1.4 'Segoe UI', sans-serif; padding: 18px; }
+  h2 { font-size: 17px; margin: 18px 0 8px; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 100%; background: radial-gradient(ellipse at 50% 30%, #2a3a4c, #16202b 75%); border-radius: 14px; padding: 14px;  box-shadow: inset 0 2px 12px rgba(0,0,0,.5); }
+  .row svg { width: 70px; height: 70px; }
+  small { color: #93a4b5; margin-left: 6px; }
+</style></head><body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- emblems (100x100) -->
+    <g id="e-sword"><g transform="rotate(45 50 50)"><path d="M46 14 L50 6 L54 14 L54 60 L46 60 Z"/><rect x="34" y="60" width="32" height="7" rx="3"/><rect x="46.5" y="67" width="7" height="15" rx="2"/><circle cx="50" cy="86" r="5"/></g></g>
+    <path id="e-heart" d="M50 82 C22 63 12 47 18 32 C24 18 42 16 50 30 C58 16 76 18 82 32 C88 47 78 63 50 82Z"/>
+    <path id="e-shield" d="M50 13 L79 23 L79 47 C79 66 66 78 50 87 C34 78 21 66 21 47 L21 23 Z"/>
+    <path id="e-energy" d="M59 9 L27 55 L47 55 L41 91 L74 42 L54 42 Z"/>
+    <g id="e-skull"><path d="M50 14 C30 14 18 28 18 46 C18 58 24 64 31 68 L31 81 L69 81 L69 68 C76 64 82 58 82 46 C82 28 70 14 50 14Z"/></g>
+    <g id="e-skull-holes"><circle cx="38" cy="48" r="8.5"/><circle cx="62" cy="48" r="8.5"/><path d="M50 57 L45 66 L55 66Z"/><rect x="40" y="72" width="3" height="9"/><rect x="48.5" y="72" width="3" height="9"/><rect x="57" y="72" width="3" height="9"/></g>
+    <path id="e-plus" d="M40 16 H60 V40 H84 V60 H60 V84 H40 V60 H16 V40 H40Z"/>
+
+    <!-- style A gradients -->
+    <radialGradient id="gA-red" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9a9a"/><stop offset=".45" stop-color="#e02b3a"/><stop offset="1" stop-color="#6d0714"/></radialGradient>
+    <radialGradient id="gA-pink" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffd0e4"/><stop offset=".45" stop-color="#f0508e"/><stop offset="1" stop-color="#7a1041"/></radialGradient>
+    <radialGradient id="gA-blue" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#bfe2ff"/><stop offset=".45" stop-color="#2f7fe6"/><stop offset="1" stop-color="#0b2a6b"/></radialGradient>
+    <radialGradient id="gA-gold" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#fff6b8"/><stop offset=".45" stop-color="#f5b400"/><stop offset="1" stop-color="#7a4a00"/></radialGradient>
+    <radialGradient id="gA-violet" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#e2c8ff"/><stop offset=".45" stop-color="#7b3fd1"/><stop offset="1" stop-color="#2a0c5c"/></radialGradient>
+    <radialGradient id="gA-green" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c9ffd9"/><stop offset=".45" stop-color="#22b35c"/><stop offset="1" stop-color="#0a4a24"/></radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000" flood-opacity=".55"/></filter>
+
+    <!-- style B -->
+    <radialGradient id="gB-stone" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#5b6570"/><stop offset="1" stop-color="#1c2229"/></radialGradient>
+    <linearGradient id="gB-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e6a6"/><stop offset=".5" stop-color="#b8892c"/><stop offset="1" stop-color="#5e3f0c"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+
+    <!-- style C -->
+    <linearGradient id="gC-steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#b9c6d3"/><stop offset="1" stop-color="#5e6b78"/></linearGradient>
+    <linearGradient id="gC-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8fb3"/><stop offset="1" stop-color="#d81b53"/></linearGradient>
+    <linearGradient id="gC-shield" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fb6ff"/><stop offset="1" stop-color="#1d4fb8"/></linearGradient>
+    <linearGradient id="gC-energy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff27a"/><stop offset="1" stop-color="#f29a00"/></linearGradient>
+    <linearGradient id="gC-skull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4efe4"/><stop offset="1" stop-color="#b7ab93"/></linearGradient>
+    <linearGradient id="gC-plus" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ff0b0"/><stop offset="1" stop-color="#169a4c"/></linearGradient>
+  </defs>
+</svg>
+
+<h2>A · Mücevher <small>her tür farklı şekil + renk taş, içinde kabartma sembol (Bejeweled / Puzzle Quest hissi)</small></h2>
+<div class="row" id="rowA"></div>
+<h2>B · Rün madalyonu <small>altın çerçeveli taş madalyon, parlayan renkli sembol (karanlık fantastik / Gems of War hissi)</small></h2>
+<div class="row" id="rowB"></div>
+<h2>C · Parlak ikon <small>arka plansız, hacimli parlak objeler (mobil casual, en okunaklı)</small></h2>
+<div class="row" id="rowC"></div>
+
+<script>
+const T = ['sword','heart','shield','energy','skull','plus'];
+const A = { sword:['gA-red','M50 6 L90 50 L50 94 L10 50Z'], heart:['gA-pink','M50 90 C14 66 4 44 14 26 C24 8 44 10 50 24 C56 10 76 8 86 26 C96 44 86 66 50 90Z'], shield:['gA-blue','M50 5 L89 27 L89 73 L50 95 L11 73 L11 27Z'], energy:['gA-gold','M50 6 L94 50 L50 94 L6 50Z'], skull:['gA-violet','M30 8 H70 L92 30 V70 L70 92 H30 L8 70 V30Z'], plus:['gA-green','M50 7 A43 43 0 1 1 49.9 7Z'] };
+const col = { sword:'#dfe8f0', heart:'#ff5c8a', shield:'#4aa3ff', energy:'#ffd23a', skull:'#c9b6ff', plus:'#4be08a' };
+function svg(inner){ return `<svg viewBox="0 0 100 100">${inner}</svg>`; }
+function emblem(t, fill, extra='') {
+  const id = t === 'plus' ? 'e-plus' : 'e-' + t;
+  let s = `<use href="#${id}" fill="${fill}" ${extra}/>`;
+  if (t === 'skull') s += `<use href="#e-skull-holes" fill="#1a1020" transform="translate(0 0)"/>`;
+  return s;
+}
+document.getElementById('rowA').innerHTML = T.map(t => { const [g, shape] = A[t];
+  return svg(`<g filter="url(#drop)"><path d="${shape}" fill="url(#${g})" stroke="rgba(0,0,0,.45)" stroke-width="2"/>
+    <path d="${shape}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" transform="translate(50 50) scale(.86) translate(-50 -50)"/>
+    <g transform="translate(50 52) scale(.46) translate(-50 -50)" opacity=".9">${emblem(t, 'rgba(255,255,255,.88)')}</g>
+    <ellipse cx="40" cy="30" rx="22" ry="11" fill="url(#gloss)" transform="rotate(-20 40 30)"/></g>`); }).join('');
+document.getElementById('rowB').innerHTML = T.map(t => svg(`<g filter="url(#drop)">
+    <circle cx="50" cy="50" r="44" fill="url(#gB-rim)"/><circle cx="50" cy="50" r="37" fill="url(#gB-stone)"/>
+    <circle cx="50" cy="50" r="37" fill="none" stroke="rgba(0,0,0,.6)" stroke-width="2"/>
+    <g transform="translate(50 50) scale(.55) translate(-50 -50)" filter="url(#glow)">${emblem(t, col[t])}</g>
+    <path d="M22 38 A30 30 0 0 1 60 16" stroke="rgba(255,255,255,.25)" stroke-width="3" fill="none"/></g>`)).join('');
+const C = { sword:'gC-steel', heart:'gC-heart', shield:'gC-shield', energy:'gC-energy', skull:'gC-skull', plus:'gC-plus' };
+document.getElementById('rowC').innerHTML = T.map(t => svg(`<g filter="url(#drop)" transform="translate(50 50) scale(.9) translate(-50 -50)">
+    ${emblem(t, `url(#${C[t]})`, 'stroke="rgba(10,15,25,.85)" stroke-width="3.5" stroke-linejoin="round"')}
+    ${t==='sword' ? '<g transform="rotate(45 50 50)"><rect x="34" y="60" width="32" height="7" rx="3" fill="#e0a82e" stroke="rgba(10,15,25,.85)" stroke-width="2"/><rect x="46.5" y="67" width="7" height="15" rx="2" fill="#7a4a24"/><circle cx="50" cy="86" r="5" fill="#e0a82e"/></g>' : ''}
+    <ellipse cx="42" cy="34" rx="13" ry="7" fill="url(#gloss)" transform="rotate(-25 42 34)" opacity=".8"/></g>`)).join('');
+</script>
+</body></html>
