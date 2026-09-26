@@ -277,3 +277,65 @@ describe('Combat scene (G3)', { isolate: 'each' }, function () {
         } finally { offScreen(w); }
     });
 });
+
+describe('Automatic quality (G4)', { isolate: 'each', world: { pixi: false } }, function () {
+    // The page counts as visible here (the real check would skip a hidden
+    // tab - which the test runner often is).
+    beforeEach(function (ctx) { ctx.world.win.cgPageVisible = function () { return true; }; });
+    function fakeFps(w, fps) { w.win.cgMeasureFps = function () { return Promise.resolve(fps); }; }
+
+    it('a slow device (25 fps) switches itself to low graphics, remembered as auto', async function (ctx) {
+        var w = ctx.world;
+        fakeFps(w, 25);
+        expect(await w.g('cgRunAutoQuality()')).toBe('low-auto');
+        expect(w.doc.documentElement.classList.contains('low-graphics-mode')).toBe(true);
+        expect(w.$('low-graphics-btn').innerText).toBe('🐢');
+        expect(w.win.localStorage.getItem('pixelDungeonQualitySource')).toBe('auto');
+        expect(w.g('cgEffectsEnabled()')).toBe(false);
+    });
+
+    it('a smooth device (58 fps) stays on high', async function (ctx) {
+        var w = ctx.world;
+        fakeFps(w, 58);
+        expect(await w.g('cgRunAutoQuality()')).toBe('high');
+        expect(w.doc.documentElement.classList.contains('low-graphics-mode')).toBe(false);
+    });
+
+    it('a manual choice is never overridden', async function (ctx) {
+        var w = ctx.world, measured = false;
+        w.g('cgToggleLowGraphics(); cgToggleLowGraphics()'); // player picked HIGH on purpose
+        w.win.cgMeasureFps = function () { measured = true; return Promise.resolve(10); };
+        expect(await w.g('cgRunAutoQuality()')).toBe('high');
+        expect(measured, 'does not even measure').toBe(false);
+    });
+
+    it('the player can turn an auto-lowered device back to high, and it sticks', async function (ctx) {
+        var w = ctx.world;
+        fakeFps(w, 20);
+        await w.g('cgRunAutoQuality()');
+        w.g('cgToggleLowGraphics()');
+        expect(w.g('cgQualityLevel()')).toBe('high');
+        expect(await w.g('cgRunAutoQuality()')).toBe('high');
+    });
+
+    it('a hidden tab is never measured', async function (ctx) {
+        var w = ctx.world, measured = false;
+        w.win.cgPageVisible = function () { return false; };
+        w.win.cgMeasureFps = function () { measured = true; return Promise.resolve(5); };
+        expect(await w.g('cgRunAutoQuality()')).toBe('high');
+        expect(measured).toBe(false);
+    });
+
+    it('an untrustworthy sample (hidden tab / throttled) changes nothing', async function (ctx) {
+        var w = ctx.world;
+        fakeFps(w, null);
+        expect(await w.g('cgRunAutoQuality()')).toBe('high');
+    });
+
+    it('the real sampler refuses a sample shorter than asked (fake clock)', async function (ctx) {
+        var w = ctx.world;
+        var p = w.g('cgMeasureFps(3000)');
+        await w.tick(3100); // fake 3s pass instantly in real time
+        expect(await p).toBeNull();
+    });
+});

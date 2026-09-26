@@ -26,9 +26,21 @@
 // event, which is the real performance line item on a weak GPU, not how
 // long they visually animate for.
 const CG_LOW_GRAPHICS_KEY = 'pixelDungeonLowGraphics';
+// G4 (roadmap v2) - who decided the current mode: 'manual' once the player
+// has pressed the 🎨/🐢 button (that choice is final - auto-detection never
+// touches it again), 'auto' when the FPS check below lowered it, absent
+// otherwise.
+const CG_QUALITY_SOURCE_KEY = 'pixelDungeonQualitySource';
 let cgLowGraphics = localStorage.getItem(CG_LOW_GRAPHICS_KEY) === 'true';
+let cgQualitySource = localStorage.getItem(CG_QUALITY_SOURCE_KEY);
 
 function cgEffectsEnabled() { return !cgLowGraphics; }
+
+// 'high' | 'low-auto' | 'low-manual' - shown in the ?debug=1 overlay.
+function cgQualityLevel() {
+    if (!cgLowGraphics) return 'high';
+    return cgQualitySource === 'auto' ? 'low-auto' : 'low-manual';
+}
 
 function cgApplyLowGraphicsState() {
     document.documentElement.classList.toggle('low-graphics-mode', cgLowGraphics);
@@ -38,8 +50,54 @@ function cgApplyLowGraphicsState() {
 
 function cgToggleLowGraphics() {
     cgLowGraphics = !cgLowGraphics;
+    cgQualitySource = 'manual';
     localStorage.setItem(CG_LOW_GRAPHICS_KEY, String(cgLowGraphics));
+    localStorage.setItem(CG_QUALITY_SOURCE_KEY, 'manual');
     cgApplyLowGraphicsState();
+}
+
+// G4 - automatic quality. A weak phone shouldn't need the player to find
+// the 🐢 button: a few seconds after boot, the real frame rate is sampled
+// (requestAnimationFrame, i.e. what the player actually sees) and, if it's
+// consistently low, the same low-graphics mode is switched on - and
+// remembered as an AUTO decision. A manual choice always wins and is never
+// overridden. A hidden tab (no frames at all) proves nothing and is skipped.
+const CG_AUTO_LOW_FPS = 40;
+const CG_AUTO_SAMPLE_MS = 3000;
+
+function cgMeasureFps(ms) {
+    return new Promise(resolve => {
+        let frames = 0, running = true;
+        const start = performance.now();
+        const loop = () => { if (!running) return; frames++; requestAnimationFrame(loop); };
+        requestAnimationFrame(loop);
+        setTimeout(() => {
+            running = false;
+            const seconds = (performance.now() - start) / 1000;
+            // Only trust a sample that really lasted about as long as asked
+            // and saw a real number of frames - a throttled/background tab
+            // or a test's fake clock gives nonsense otherwise.
+            const trustworthy = frames >= 10 && seconds >= (ms / 1000) * 0.8;
+            resolve(trustworthy ? frames / seconds : null);
+        }, ms);
+    });
+}
+
+function cgPageVisible() { return !document.visibilityState || document.visibilityState === 'visible'; }
+
+async function cgRunAutoQuality() {
+    if (cgQualitySource === 'manual' || cgLowGraphics) return cgQualityLevel();
+    if (!cgPageVisible()) return cgQualityLevel();
+    const fps = await cgMeasureFps(CG_AUTO_SAMPLE_MS);
+    if (fps === null || cgQualitySource === 'manual') return cgQualityLevel();
+    if (fps < CG_AUTO_LOW_FPS) {
+        cgLowGraphics = true;
+        cgQualitySource = 'auto';
+        localStorage.setItem(CG_LOW_GRAPHICS_KEY, 'true');
+        localStorage.setItem(CG_QUALITY_SOURCE_KEY, 'auto');
+        cgApplyLowGraphicsState();
+    }
+    return cgQualityLevel();
 }
 
 // Each file is a 4-frame horizontal idle-animation strip (cropped from the
@@ -949,3 +1007,4 @@ function cgStageDo(canvasId, method, arg) {
 
 document.addEventListener('DOMContentLoaded', cgPreloadAll);
 document.addEventListener('DOMContentLoaded', cgApplyLowGraphicsState);
+document.addEventListener('DOMContentLoaded', () => setTimeout(() => { cgRunAutoQuality(); }, 1500));
