@@ -65,3 +65,21 @@ function scriptRandom(world, values) {
     var i = 0;
     world.win.Math.random = function () { return values[i++ % values.length]; };
 }
+
+// Awaits a promise from inside a world while also advancing that world's
+// fake clock - anything the page awaits that internally waits on
+// setTimeout (PixiJS's renderer init does, sometimes) would otherwise
+// never resolve under fake timers.
+async function awaitInWorld(world, promise, maxMs) {
+    var done = false, value, error;
+    Promise.resolve(promise).then(function (v) { done = true; value = v; }, function (e) { done = true; error = e; });
+    // Real time has to pass too (image fetch/decode), so each step also
+    // yields ~10ms of wall clock.
+    for (var waited = 0; !done && waited < (maxMs || 10000); waited += 50) {
+        await world.tick(50);
+        if (!done) await new Promise(function (r) { setTimeout(r, 10); });
+    }
+    if (error) throw error;
+    if (!done) throw new Error('awaitInWorld: still pending after ' + (maxMs || 10000) + 'ms of fake time');
+    return value;
+}

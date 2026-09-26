@@ -39,6 +39,10 @@
             logClientError('Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason), reason && reason.stack);
         });
     </script>
+    <!-- G2: pixel font for titles/numbers (latin-ext covers Turkish). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap&subset=latin-ext">
     <link rel="stylesheet" href="style.css?v=1.26">
     <!-- Cloudflare Turnstile - explicit render mode (explicit.js), not the
          default auto-scanning api.js: the gate's widget container starts

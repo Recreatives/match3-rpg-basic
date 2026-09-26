@@ -286,6 +286,20 @@ describe('DOM rules from CLAUDE.md', { world: { pixi: false } }, function () {
         scripts.forEach(function (f) { expect(sw, 'sw.js APP_SHELL').toContain("'./" + f + "'"); });
     });
 
+    it('every url() in style.css points at a real file', async function () {
+        var css = await readSource('style.css');
+        var urls = (css.match(/url\(['"]?([^'")]+)['"]?\)/g) || []).map(function (u) { return u.replace(/^url\(['"]?|['"]?\)$/g, ''); })
+            .filter(function (u) { return !/^(data:|https?:|#)/.test(u); });
+        expect(urls.length, 'tile sprites are referenced').toBeGreaterThanOrEqual(6);
+        for (var i = 0; i < urls.length; i++) await readSource(urls[i]);
+    });
+
+    it('every tile type the game can deal has a pixel-art sprite', async function (ctx) {
+        var css = await readSource('style.css');
+        var types = ctx.world.g('COOP_TILE_TYPES').map(function (t) { return t.type; });
+        types.forEach(function (ty) { expect(css, 'sprite rule for ' + ty).toContain('.tile[data-type="' + ty + '"] { background-image'); });
+    });
+
     it('every asset graphics.js references exists', async function () {
         var g = src['graphics.js'], refs = g.match(/assets\/[\w\/.-]+\.(png|webp|json)/g) || [];
         refs = refs.filter(function (r, i) { return refs.indexOf(r) === i; });

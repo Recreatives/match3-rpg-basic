@@ -14,6 +14,23 @@
     --epic: #9b59b6;      /* Purple */
     --legendary: #e67e22; /* Orange */
 
+    /* G2 (roadmap v2) - tile-type palette, the same colors the pixel-art
+       tiles (assets/tiles/, tools/make_tiles.py) and graphics.js's
+       TILE_BURST_COLORS / HIT_EFFECT_SPRITES tints use, in one place. */
+    --c-sword: #dfe6e9;
+    --c-heart: #ff4d6d;
+    --c-shield: #3b82f6;
+    --c-energy: #ffdd33;
+    --c-skull: #e74c3c;
+    --c-teamheal: #2ecc71;
+    --c-hp: #2ecc71;
+    --c-enemy-hp: #e74c3c;
+
+    /* G2 - pixel font for titles/banners only (Google Fonts, latin-ext subset
+       covers ğüşıöçİ). Numbers and body text stay a system font: at HP-text
+       size this face's 5 reads like a $ sign. */
+    --font-pixel: 'Pixelify Sans', 'Segoe UI', Tahoma, sans-serif;
+
     /* --- RESPONSIVE SIZING ---
        Everything below scales off --board-size, which grows with the
        viewport (via vmin, so it works in both portrait and landscape)
@@ -235,6 +252,7 @@ body {
 }
 
 .turn-indicator {
+    font-family: var(--font-pixel);
     font-size: 0.85rem; font-weight: bold; padding: 4px 12px;
     border-radius: 16px; background: #222; color: #777;
     transition: all 0.3s;
@@ -486,6 +504,30 @@ body {
     40% { transform: scale(1.3); opacity: 1; }
     100% { transform: scale(0); opacity: 0; }
 }
+/* G2 (roadmap v2) - pixel-art tiles instead of OS emoji (emoji look
+   different on iOS/Android/Windows and clashed with the pixel-art
+   portraits). Game logic is untouched: dataset.type still drives
+   everything and the emoji stays in the DOM (logs, board-sync broadcasts,
+   screen readers) - it's just rendered at font-size 0 while the sprite is
+   drawn as the tile's background. 16px art, scaled in whole-pixel steps
+   where round() is supported so every art pixel stays the same size. */
+.tile[data-type] {
+    font-size: 0 !important;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 76%;
+    background-size: round(down, calc(var(--tile-size) * 0.82), 16px);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+.mp-grid .tile[data-type] { background-size: 76%; }
+.tile[data-type="sword"] { background-image: url('assets/tiles/sword.png'); }
+.tile[data-type="heart"] { background-image: url('assets/tiles/heart.png'); }
+.tile[data-type="shield"] { background-image: url('assets/tiles/shield.png'); }
+.tile[data-type="energy"] { background-image: url('assets/tiles/energy.png'); }
+.tile[data-type="skull"] { background-image: url('assets/tiles/skull.png'); }
+.tile[data-type="teamheal"] { background-image: url('assets/tiles/teamheal.png'); }
+
 /* Faz 1 - a 4+/cross match (getMatchShapeInfo's multiplier >= 2) pops
    noticeably bigger/brighter than a plain 3-match, applied ALONGSIDE
    .matched (both classes on the same tile - see processMatch/
@@ -567,7 +609,7 @@ body {
 }
 
 /* Overlay Content */
-.overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
+.overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; font-family: var(--font-pixel); letter-spacing: 0.5px; }
 .overlay-btn {
     padding: 15px 30px; font-size: 1.1rem; background: #27ae60;
     color: white; border: 2px solid #2ecc71; border-radius: 8px;
@@ -908,7 +950,7 @@ body {
     cursor: pointer; color: #bdc3c7;
 }
 .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
-.modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; }
+.modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; font-family: var(--font-pixel); }
 h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
 ul { padding-left: 20px; margin-top: 5px; }
 li { margin-bottom: 5px; }

@@ -39,7 +39,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
     it('all 7 portrait slots share ONE WebGL renderer (every portrait canvas is 2D)', async function (ctx) {
         var w = ctx.world;
         var stages = PORTRAIT_IDS.map(function (id) { return w.g('cgGetStage')(id); });
-        await Promise.all(stages.map(function (s) { return s.ready; }));
+        await awaitInWorld(w, Promise.all(stages.map(function (s) { return s.ready; })));
         expect(w.g('cgShared.stages.length')).toBe(7);
         PORTRAIT_IDS.forEach(function (id) {
             expect(w.$(id).getContext('2d'), id + ' is a 2D canvas').toBeTruthy();
@@ -52,8 +52,8 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         onScreen(w);
         await startSolo(w, 'MAGE');
         var stage = w.g("cgGetStage('player-sprite')");
-        await stage.ready;
-        await stage.setPortrait(w.g('CHARACTER_SPRITES.mage'));
+        await awaitInWorld(w, stage.ready);
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.mage')));
         await pumpFrames(w, 300);
         expect(stage.renderCount).toBeGreaterThan(0);
         expect(opaquePixels(w.$('player-sprite'))).toBeGreaterThan(200);
@@ -63,8 +63,8 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         var w = ctx.world;
         onScreen(w);
         var stage = w.g("cgGetStage('pvp-opp-sprite')");
-        await stage.ready;
-        await stage.setPortrait(w.g('CHARACTER_SPRITES.rogue'));
+        await awaitInWorld(w, stage.ready);
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.rogue')));
         stage.playUlt('rogue');
         await pumpFrames(w, 400);
         expect(getComputedStyle(w.$('pvp-modal')).display).toBe('none');
@@ -76,7 +76,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         onScreen(w);
         await startSolo(w, 'WARRIOR');
         var stage = w.g("cgGetStage('player-sprite')");
-        await stage.setPortrait(w.g('CHARACTER_SPRITES.warrior'));
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
         await pumpFrames(w, 300);
         var before = stage.renderCount;
         await pumpFrames(w, 1000);
@@ -89,7 +89,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         onScreen(w);
         await startSolo(w, 'WARRIOR');
         var stage = w.g("cgGetStage('player-sprite')");
-        await stage.setPortrait(w.g('CHARACTER_SPRITES.warrior'));
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
         await pumpFrames(w, 200);
         var before = stage.renderCount;
         stage.playUlt('warrior');
@@ -103,7 +103,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
     it('portraits re-layout when the viewport changes size', async function (ctx) {
         var w = ctx.world;
         var stage = w.g("cgGetStage('player-sprite')");
-        await stage.ready;
+        await awaitInWorld(w, stage.ready);
         var before = w.$('player-sprite').style.width;
         w.frame.style.width = '1100px'; w.frame.style.height = '1000px';
         // Browsers deliver 'resize' as part of a rendering update, which a
@@ -120,7 +120,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         onScreen(w);
         await startSolo(w, 'MAGE');
         var stage = w.g("cgGetStage('player-sprite')");
-        await stage.setPortrait(w.g('CHARACTER_SPRITES.mage'));
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.mage')));
         var canvas = w.g('cgShared.renderer.canvas');
         canvas.dispatchEvent(new w.win.Event('webglcontextlost'));
         expect(w.g('cgShared.lost')).toBe(true);

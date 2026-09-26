@@ -39,7 +39,7 @@ describe('Layout: solo screen fits without scrolling', { world: false }, functio
             try {
                 await startSolo(w, 'WARRIOR');
                 w.g("setMyPortraitEverywhere('warrior')");
-                var st = w.g("cgGetStage('player-sprite')"); if (st) await st.ready;
+                var st = w.g("cgGetStage('player-sprite')"); if (st) await awaitInWorld(w, st.ready);
                 expect(noHorizontalScroll(w), 'horizontal overflow px').toBe(0);
                 expect(offscreen(w, ['grid', 'player-sprite', 'enemy-sprite', 'player-hp-bar-container',
                     'enemy-hp-bar-container', 'turn-banner', 'ult-btn', 'log-toggle'], W, H)).toEqual([]);
@@ -62,7 +62,7 @@ describe('Layout: solo screen fits without scrolling', { world: false }, functio
                 try {
                     w.g('selectedClass = CLASSES.WARRIOR');
                     var stages = ids.filter(function (id) { return /sprite/.test(id); }).map(function (id) { return w.g("cgGetStage('" + id + "')"); });
-                    for (var si = 0; si < stages.length; si++) if (stages[si]) await stages[si].ready;
+                    for (var si = 0; si < stages.length; si++) if (stages[si]) await awaitInWorld(w, stages[si].ready);
                     w.g("toggleModal('" + mode + "-modal')");
                     await w.tick(300);
                     // exactly what pvpStartMatch / coopBeginRun do to the view
