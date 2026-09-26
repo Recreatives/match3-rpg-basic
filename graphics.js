@@ -486,12 +486,16 @@ class CombatStage {
     // happened to me" cue. For sword/skull, which actually damage someone,
     // see playHitReaction instead - a shake reads as far too mild for "I
     // just got hit," which is exactly the gap the user called out.
-    async playHit(tileType) {
+    async playHit(tileType, delayMs) {
         await this.ready;
-        this._shake(this.portraitSprite, 6, 220);
-        this._flash(this.portraitSprite, 120);
+        if (delayMs) await cgWait(delayMs);
+        // Self-buffs: a gentle bob plus a flash in the buff's own color
+        // (green heal, blue armor, gold energy) so it reads as "I got
+        // something", held long enough to actually see.
+        this._shake(this.portraitSprite, 5, 420);
+        this._flash(this.portraitSprite, 700, CG_FLASH_COLORS[tileType] || 0x9fd8ff);
         const effect = HIT_EFFECT_SPRITES[tileType];
-        if (effect) this._burst([effect], 1.1, 380);
+        if (effect) this._burst([effect], 1.3, 800);
     }
 
     // Played on the DEFENDER whenever a sword/skull match actually damages
@@ -499,13 +503,14 @@ class CombatStage {
     // in place) plus a stronger flash, so landing a hit is unmistakable
     // instead of reading as a generic sparkle. skull hits knock back harder
     // than sword, matching its bigger damage number.
-    async playHitReaction(tileType) {
+    async playHitReaction(tileType, delayMs) {
         await this.ready;
+        if (delayMs) await cgWait(delayMs);
         const severity = tileType === 'skull' ? 1.5 : 1;
-        this._knockback(this.portraitSprite, 15 * severity, 280);
-        this._flash(this.portraitSprite, 180);
+        this._knockback(this.portraitSprite, 18 * severity, 520);
+        this._flash(this.portraitSprite, 650, 0xff3b30); // hurt = red
         const effect = HIT_EFFECT_SPRITES[tileType];
-        if (effect) this._burst([effect], 1.2 * severity, 400);
+        if (effect) this._burst([effect], 1.4 * severity, 850);
     }
 
     // The one big moment per class - a three-layer particle burst plus a
@@ -514,10 +519,10 @@ class CombatStage {
     // unrecognized key rather than silently doing nothing.
     async playUlt(classKey) {
         await this.ready;
-        this._shake(this.portraitSprite, 10, 380);
-        this._flash(this.portraitSprite, 220);
+        this._shake(this.portraitSprite, 10, 700);
+        this._flash(this.portraitSprite, 900, 0xfff2a0);
         const effects = ULT_EFFECT_SPRITES[classKey] || [HIT_EFFECT_SPRITES.energy];
-        this._burst(effects, 1.9, 650);
+        this._burst(effects, 2.1, 1200);
     }
 
     // Played on the ATTACKER's own portrait (as opposed to playHit/
@@ -601,11 +606,15 @@ class CombatStage {
         }, () => { target.x = this.baseX; target.rotation = 0; });
     }
 
-    _flash(target, durationMs) {
+    // Tints the portrait toward `color` and back: a quick rise, a hold,
+    // then an ease back to normal, so the hit/heal color is actually seen.
+    _flash(target, durationMs, color) {
+        const c = color === undefined ? 0xff3b30 : color;
+        const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
         this._tween(durationMs, t => {
-            const v = 1 - t;
-            const c = Math.round(255 * v) << 16 | Math.round(255 * v) << 8 | 255;
-            target.tint = t >= 0.98 ? 0xffffff : c;
+            const k = t < 0.15 ? t / 0.15 : t < 0.45 ? 1 : 1 - (t - 0.45) / 0.55;
+            const mix = (v) => Math.round(255 + (v - 255) * k * 0.85);
+            target.tint = t >= 0.99 ? 0xffffff : (mix(r) << 16 | mix(g) << 8 | mix(b));
         }, () => { target.tint = 0xffffff; });
     }
 
@@ -958,6 +967,67 @@ function cgBoardImpact(gridEl, maxMultiplier) {
     gridEl.classList.add(cls);
 }
 
+// Buff flash colors (portrait tint) and the delay between a shot leaving
+// the board and it landing on the target portrait: the target's reaction
+// and the combat number are timed to that landing, so cause and effect
+// read as one motion.
+const CG_FLASH_COLORS = { heart: 0x3dff8a, shield: 0x5aa8ff, energy: 0xffd84a, teamheal: 0x3dff8a };
+const CG_IMPACT_DELAY_MS = 480;
+function cgWait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Big combat numbers over a portrait: "-25" red for damage, "+12" green
+// heal, "+8" blue armor, "+15%" gold ult charge. Pops in larger than life,
+// holds, then floats up and fades (~1.4s) - long enough to read what just
+// happened. Shown in low-graphics mode too (it's information, not flair).
+function cgCombatText(targetEl, text, kind, delayMs) {
+    if (!targetEl) return;
+    const show = () => {
+        const r = targetEl.getBoundingClientRect();
+        if (!r.width) return;
+        const el = document.createElement('div');
+        el.className = 'cg-combat-text cg-ct-' + (kind || 'dmg');
+        el.textContent = text;
+        el.style.left = (r.left + r.width / 2 + (Math.random() * 16 - 8)) + 'px';
+        el.style.top = (r.top + r.height * 0.35) + 'px';
+        document.body.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+        setTimeout(() => el.remove(), 1800);
+    };
+    if (delayMs) setTimeout(show, delayMs); else show();
+}
+
+// Rising green sparkles around a portrait for heals.
+function cgHealSparkles(targetEl, delayMs) {
+    if (!targetEl || !cgEffectsEnabled()) return;
+    setTimeout(() => {
+        const r = targetEl.getBoundingClientRect();
+        if (!r.width) return;
+        const layer = document.createElement('div');
+        layer.className = 'cg-sparkle-layer';
+        for (let i = 0; i < 9; i++) {
+            const p = document.createElement('div');
+            p.className = 'cg-sparkle';
+            p.style.left = (r.left + r.width * (0.15 + Math.random() * 0.7)) + 'px';
+            p.style.top = (r.top + r.height * (0.45 + Math.random() * 0.4)) + 'px';
+            p.style.animationDelay = (i * 0.07) + 's';
+            layer.appendChild(p);
+        }
+        document.body.appendChild(layer);
+        setTimeout(() => layer.remove(), 1700);
+    }, delayMs || 0);
+}
+
+// A bar (HP/armor/ult) container pulses red (hit) or green (heal).
+function cgBarPulse(containerEl, kind, delayMs) {
+    if (!containerEl) return;
+    setTimeout(() => {
+        containerEl.classList.remove('cg-bar-hit', 'cg-bar-heal');
+        void containerEl.offsetWidth;
+        containerEl.classList.add(kind === 'heal' ? 'cg-bar-heal' : 'cg-bar-hit');
+        setTimeout(() => containerEl.classList.remove('cg-bar-hit', 'cg-bar-heal'), 800);
+    }, delayMs || 0);
+}
+
 // G3 (roadmap v2) - a small glowing shot flying from the matched tiles to
 // whoever the match affects (the enemy for sword/skull, your own portrait
 // for heart/shield/energy, your teammate for co-op's teamheal), so cause and
@@ -979,7 +1049,7 @@ function cgProjectile(fromEl, toEl, tileType) {
     el.style.setProperty('--shot-color', color);
     document.body.appendChild(el);
     el.addEventListener('animationend', () => el.remove());
-    setTimeout(() => el.remove(), 700);
+    setTimeout(() => el.remove(), 900);
 }
 
 // G3 - the combat area's backdrop changes every 5 floors (after each boss):
@@ -993,10 +1063,10 @@ function cgSetSceneTier(el, level) {
 
 // Plays a portrait method if that stage exists - keeps the mode files' call
 // sites to one line.
-function cgStageDo(canvasId, method, arg) {
+function cgStageDo(canvasId, method, arg, arg2) {
     if (typeof PIXI === 'undefined') return;
     const stage = cgGetStage(canvasId);
-    if (stage && stage[method]) stage[method](arg);
+    if (stage && stage[method]) stage[method](arg, arg2);
 }
 
 // Browsers decode a background image lazily, per element, the first time

@@ -274,7 +274,10 @@ let selectedClass = null;
 // The single-player implementation of the combat context described above.
 function makeSinglePlayerCombatContext() {
     return {
-        dealDamageToOpponent(amount) { inflictDamage('enemy', amount); },
+        dealDamageToOpponent(amount) {
+            inflictDamage('enemy', amount);
+            if (typeof cgCombatText === 'function') cgCombatText(document.getElementById('enemy-sprite'), '-' + amount, 'crit', 250);
+        },
         dealDirectDamageToOpponent(amount) {
             if (enemyHP > 0) {
                 enemyHP -= amount;
@@ -1049,7 +1052,7 @@ function getMatchShapeInfo(count, isCross) {
 const soloBoard = {
     tiles, width, pool: tileTypes,
     gridEl: () => gridDisplay,
-    clearDelayMs: 400,
+    clearDelayMs: 560,
     initialDelayMs: 400,
     channel: null,
     cascadeDepth: 0,
@@ -1146,7 +1149,19 @@ function setMyPortraitEverywhere(classKey) {
 function soloPlayHit(sideStr, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
-    if (stage) stage.playHit(tileType);
+    // timed to when the shot from the board lands (graphics.js)
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
+}
+
+// Combat number + bar pulse over a solo portrait ('player' | 'enemy'),
+// landing together with the shot (see graphics.js's cgCombatText).
+function soloCombatText(sideStr, text, kind) {
+    if (typeof cgCombatText !== 'function') return;
+    let portrait = document.getElementById(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
+    let bar = document.getElementById(sideStr === 'player' ? 'player-hp-bar-container' : 'enemy-hp-bar-container');
+    cgCombatText(portrait, text, kind, CG_IMPACT_DELAY_MS);
+    if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', CG_IMPACT_DELAY_MS);
+    if (kind === 'heal') { cgBarPulse(bar, 'heal', CG_IMPACT_DELAY_MS); cgHealSparkles(portrait, CG_IMPACT_DELAY_MS); }
 }
 
 // Sword/skull actually damage the receiving side - a real knockback, not
@@ -1156,7 +1171,7 @@ function soloPlayHit(sideStr, tileType) {
 function soloPlayHitReaction(sideStr, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 function applyRPGEffects(type, multiplier) {
@@ -1184,6 +1199,7 @@ function applyRPGEffects(type, multiplier) {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
         soloPlayHitReaction(target, 'sword');
+        soloCombatText(target, '-' + baseVal, 'dmg');
         log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
@@ -1196,6 +1212,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
         soloPlayHit(actor, 'heart');
+        soloCombatText(actor, '+' + baseVal, 'heal');
         log(tf('{user} İyileşme +{val}', { user: t(user), val: baseVal }), 'log-heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
@@ -1205,6 +1222,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
         soloPlayHit(actor, 'shield');
+        soloCombatText(actor, '+' + baseVal, 'armor');
         log(tf('{user} Zırh +{val}', { user: t(user), val: baseVal }), 'log-armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
@@ -1214,11 +1232,13 @@ function applyRPGEffects(type, multiplier) {
         soloPlayHit(actor, 'energy');
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
+            soloCombatText('player', '+' + baseVal + '%', 'energy');
             log(tf('Ult +{val}%', { val: baseVal }), 'log-hit');
             if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: baseVal });
         } else {
             let absorb = Math.floor(baseVal / 2);
             enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
+            soloCombatText('enemy', '+' + absorb, 'heal');
             log(tf('Düşman {val} emdi', { val: absorb }), "log-enemy");
         }
 
@@ -1241,6 +1261,8 @@ function applyRPGEffects(type, multiplier) {
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
         soloPlayHitReaction(target, 'skull');
+        soloCombatText(target, '-' + dmgToOpponent, 'crit');
+        if (recoil > 0) soloCombatText(self, '-' + recoil, 'self');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         // G3 - a monster's own landed hit gets a visible lunge.

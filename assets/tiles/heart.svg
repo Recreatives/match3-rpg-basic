@@ -1,28 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 <defs>
-  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#fff0b8"/><stop offset=".35" stop-color="#e2b54b"/><stop offset=".7" stop-color="#a8761c"/><stop offset="1" stop-color="#5b3a08"/>
-  </linearGradient>
-  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe89a"/><stop offset="1" stop-color="#b07a16"/></linearGradient>
-  <radialGradient id="stone" cx="42%" cy="35%" r="75%">
-    <stop offset="0" stop-color="#56616d"/><stop offset=".6" stop-color="#2b333c"/><stop offset="1" stop-color="#151a20"/>
-  </radialGradient>
-  <radialGradient id="halo" cx="50%" cy="52%" r="50%">
-    <stop offset="0" stop-color="#ff4f8b" stop-opacity=".75"/><stop offset=".55" stop-color="#ff4f8b" stop-opacity=".22"/><stop offset="1" stop-color="#ff4f8b" stop-opacity="0"/>
-  </radialGradient>
-  <linearGradient id="em" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc2d6"/><stop offset="1" stop-color="#e8336f"/></linearGradient>
-  <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="disc" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#6a2440"/><stop offset=".6" stop-color="#3e0f24"/><stop offset="1" stop-color="#1a050e"/></radialGradient>
+  <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffeaa0"/><stop offset=".5" stop-color="#b8892c"/><stop offset="1" stop-color="#4a2f06"/></linearGradient>
+  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ff4f7f" stop-opacity=".45"/><stop offset="1" stop-color="#ff4f7f" stop-opacity="0"/></radialGradient>
 </defs>
-<circle cx="50" cy="52.5" r="46" fill="#000" fill-opacity=".45"/>
-<circle cx="50" cy="50" r="46" fill="url(#rim)" stroke="#3a2504" stroke-width="1.5"/>
-<circle cx="50" cy="50" r="42.6" fill="none" stroke="#fff6d0" stroke-opacity=".35" stroke-width="1"/>
-<circle cx="89.36" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="89.36" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/>
-<circle cx="50" cy="50" r="38.5" fill="url(#stone)" stroke="#120d05" stroke-width="2.2"/>
-<circle cx="50" cy="50" r="38.5" fill="url(#halo)"/>
-<circle cx="50" cy="50" r="33" fill="none" stroke="#ff4f8b" stroke-opacity=".35" stroke-width="1.2" stroke-dasharray="3 4"/>
-<g transform="translate(50 51) scale(.6) translate(-50 -50)">
-      <path d="M50 84 C20 64 10 47 16 31 C22 16 41 14 50 28 C59 14 78 16 84 31 C90 47 80 64 50 84Z"
-            fill="url(#em)" stroke="#10131a" stroke-width="3.5" stroke-linejoin="round"/>
-      <path d="M27 33 C29 25 36 22 42 26" stroke="#ffffff" stroke-opacity=".75" stroke-width="4" fill="none" stroke-linecap="round"/></g>
-<path d="M21 42 A30 30 0 0 1 56 14 A36 30 0 0 0 21 42Z" fill="url(#shine)"/>
+<circle cx="50" cy="52" r="47" fill="#000" fill-opacity=".45"/>
+<circle cx="50" cy="50" r="47" fill="url(#ring)"/>
+<circle cx="50" cy="50" r="44" fill="url(#disc)" stroke="#0a0c10" stroke-width="1.5"/>
+<circle cx="50" cy="50" r="40" fill="url(#halo)"/>
+<g transform="translate(50 50) scale(.84) translate(-50 -50)">
+<defs>
+  <radialGradient id="ruby" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff8aa6"/><stop offset=".45" stop-color="#e3143f"/><stop offset="1" stop-color="#6a0016"/></radialGradient>
+</defs>
+<path d="M50 90 C16 68 5 48 11 30 C17 12 40 10 50 25 C60 10 83 12 89 30 C95 48 84 68 50 90Z" fill="url(#ruby)" stroke="#0d1016" stroke-width="3.5" stroke-linejoin="round"/>
+<g stroke="#5a0012" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round">
+  <path d="M50 25 L36 40 L50 55 L64 40 Z" fill="#ff5c7c" fill-opacity=".55"/>
+  <path d="M36 40 L19 34 L22 52 Z" fill="#ff9fb3" fill-opacity=".5"/>
+  <path d="M64 40 L81 34 L78 52 Z" fill="#b8002a" fill-opacity=".45"/>
+  <path d="M36 40 L22 52 L50 55 Z" fill="#f02a56" fill-opacity=".4"/>
+  <path d="M64 40 L78 52 L50 55 Z" fill="#9a0022" fill-opacity=".45"/>
+  <path d="M22 52 L50 86 L50 55 Z" fill="#c8002e" fill-opacity=".35"/>
+  <path d="M78 52 L50 86 L50 55 Z" fill="#7a0018" fill-opacity=".45"/>
+</g>
+<path d="M20 30 Q24 19 35 18" stroke="#fff" stroke-opacity=".9" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+<path d="M66 20 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2Z" fill="#fff" fill-opacity=".95"/></g>
 </svg>

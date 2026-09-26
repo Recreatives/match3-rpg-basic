@@ -503,7 +503,7 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpMyHP -= remainder;
     }
     pvpIncomingStats.damage += amount;
-    showFloatingText(`-${amount}`, document.getElementById('pvp-my-hp-bar'), '#e74c3c');
+    pvpCombatText('me', '-' + amount, 'dmg', false);
     pvpUpdateUI();
 
     if (pvpMyHP <= 0 && before > 0) {
@@ -519,10 +519,24 @@ function pvpApplyIncomingDamage(amount, direct) {
 // Mirrors game.js's soloPlayHit for the two-canvas PvP layout - 'me' is
 // always pvp-my-sprite, 'opp' is always pvp-opp-sprite, regardless of who
 // actually dealt the hit (each client only ever renders its own two slots).
+// Combat number over a PvP portrait ('me' | 'opp'); `delay` false for
+// things that arrive over the network (no shot to wait for).
+function pvpCombatText(side, text, kind, delay) {
+    if (typeof cgCombatText !== 'function') return;
+    let d = delay === false ? 0 : CG_IMPACT_DELAY_MS;
+    let portrait = document.getElementById(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
+    cgCombatText(portrait, text, kind, d);
+    if (side === 'me') {
+        let bar = document.getElementById('pvp-my-hp-bar-container');
+        if (kind === 'heal') { cgBarPulse(bar, 'heal', d); cgHealSparkles(portrait, d); }
+        else if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', d);
+    }
+}
+
 function pvpPlayHit(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
-    if (stage) stage.playHit(tileType);
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 // Sword/skull actually damage the receiving side - see game.js's
@@ -531,7 +545,7 @@ function pvpPlayHit(side, tileType) {
 function pvpPlayHitReaction(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 function pvpReceiveAttack(payload) {
@@ -857,7 +871,7 @@ function pvpAttemptSwap(tile1, tile2) {
 const pvpBoard = {
     tiles: pvpTiles, width: PVP_WIDTH, pool: tileTypes,
     gridEl: () => document.getElementById('pvp-grid'),
-    clearDelayMs: 350,
+    clearDelayMs: 520,
     initialDelayMs: 0,
     channel: () => pvpChannel,
     cascadeDepth: 0,
@@ -920,12 +934,15 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
             pvpPlayHitReaction('opp', 'skull');
+            pvpCombatText('opp', '-' + amount, 'crit');
+            if (recoil > 0) pvpCombatText('me', '-' + recoil, 'self');
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
         } else {
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
             pvpPlayHitReaction('opp', 'sword');
+            pvpCombatText('opp', '-' + amount, 'dmg');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
@@ -933,18 +950,21 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
         pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
         pvpMyTurnStats.heal += heal;
         pvpPlayHit('me', 'heart');
+        pvpCombatText('me', '+' + heal, 'heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
         pvpMyTurnStats.armor += gain;
         pvpPlayHit('me', 'shield');
+        pvpCombatText('me', '+' + gain, 'armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         pvpUltCharge = Math.min(pvpUltCharge + gain, 100);
         pvpMyTurnStats.ultGain += gain;
         pvpPlayHit('me', 'energy');
+        pvpCombatText('me', '+' + gain + '%', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     }
 

@@ -632,7 +632,7 @@ function coopApplyIncomingDamage(amount, drainUlt) {
     else { coopMyHP -= (amount - coopMyArmor); coopMyArmor = 0; }
 
     coopPlayHitReaction('me', 'sword');
-    showFloatingText(`-${amount}`, document.getElementById('coop-my-hp-bar'), '#e74c3c');
+    coopCombatText('me', '-' + amount, 'dmg', false);
     coopLog(tf('Düşman sana {val} hasar verdi.', { val: amount }));
     coopSyncSelfState();
 }
@@ -1071,11 +1071,24 @@ function coopAttemptSwap(tile1, tile2) {
 // Mirrors game.js's soloPlayHit for co-op's three-canvas layout. 'ally'
 // is used by coopOnAllyHeal below, not by coopApplyGroupEffect - a teamheal
 // match only ever benefits the ally once THEIR client applies the broadcast.
+// Combat number over a co-op portrait ('me' | 'ally' | 'enemy').
+function coopCombatText(side, text, kind, delay) {
+    if (typeof cgCombatText !== 'function') return;
+    let d = delay === false ? 0 : CG_IMPACT_DELAY_MS;
+    let portrait = document.getElementById(side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite');
+    cgCombatText(portrait, text, kind, d);
+    if (side === 'me') {
+        let bar = document.getElementById('coop-my-hp-bar-container');
+        if (kind === 'heal') { cgBarPulse(bar, 'heal', d); cgHealSparkles(portrait, d); }
+        else if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', d);
+    } else if (kind === 'heal') cgHealSparkles(portrait, d);
+}
+
 function coopPlayHit(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
     let stage = cgGetStage(id);
-    if (stage) stage.playHit(tileType);
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 // Sword/skull actually damage the shared enemy - see game.js's
@@ -1085,7 +1098,7 @@ function coopPlayHitReaction(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
     let stage = cgGetStage(id);
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 // --- CO-OP BOARD (sharedboard.js's engine) ---
@@ -1094,7 +1107,7 @@ function coopPlayHitReaction(side, tileType) {
 const coopBoard = {
     tiles: coopTiles, width: COOP_WIDTH, pool: COOP_TILE_TYPES,
     gridEl: () => document.getElementById('coop-grid'),
-    clearDelayMs: 350,
+    clearDelayMs: 520,
     initialDelayMs: 0,
     channel: () => coopChannel,
     cascadeDepth: 0,
@@ -1153,12 +1166,15 @@ function coopApplyGroupEffect(group, shape, isInitial) {
             }
             coopApplyDamageToEnemy(amount);
             coopPlayHitReaction('enemy', 'skull');
+            coopCombatText('enemy', '-' + amount, 'crit');
+            if (recoil > 0) coopCombatText('me', '-' + recoil, 'self');
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
             coopMyTurnStats.selfDamage += recoil;
             coopSyncSelfState();
         } else {
             coopApplyDamageToEnemy(amount);
             coopPlayHitReaction('enemy', 'sword');
+            coopCombatText('enemy', '-' + amount, 'dmg');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
@@ -1166,6 +1182,7 @@ function coopApplyGroupEffect(group, shape, isInitial) {
         coopMyHP = Math.min(coopMyHP + heal, COOP_MAX_HP);
         coopMyTurnStats.heal += heal;
         coopPlayHit('me', 'heart');
+        coopCombatText('me', '+' + heal, 'heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
         coopSyncSelfState();
     } else if (group.type === 'shield') {
@@ -1173,6 +1190,7 @@ function coopApplyGroupEffect(group, shape, isInitial) {
         coopMyArmor += gain;
         coopMyTurnStats.armor += gain;
         coopPlayHit('me', 'shield');
+        coopCombatText('me', '+' + gain, 'armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
         coopSyncSelfState();
     } else if (group.type === 'energy') {
@@ -1180,6 +1198,7 @@ function coopApplyGroupEffect(group, shape, isInitial) {
         coopUltCharge = Math.min(coopUltCharge + gain, 100);
         coopMyTurnStats.ultGain += gain;
         coopPlayHit('me', 'energy');
+        coopCombatText('me', '+' + gain + '%', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     } else if (group.type === 'teamheal') {
         // Heals the ALLY, not me - only ever appears on a co-op board
@@ -1190,6 +1209,7 @@ function coopApplyGroupEffect(group, shape, isInitial) {
         let allyRole = coopRole === 'host' ? 'guest' : 'host';
         coopChannel.send({ type: 'broadcast', event: 'ally-heal', payload: { targetRole: allyRole, amount: heal } });
         coopMyTurnStats.teamHeal += heal;
+        coopCombatText('ally', '+' + heal, 'heal');
         coopLog(tf('Takım arkadaşını {val} can iyileştirdin.', { val: heal }));
     }
 

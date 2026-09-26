@@ -369,7 +369,7 @@ describe('Rewards & gold', { isolate: 'each' }, function () {
 // deliberate, noticed, and the snapshot updated in the same commit. The
 // failure message prints the new fingerprint to paste in.
 describe('Golden master (seeded solo run)', { isolate: 'each', world: { seed: 20260925, pixi: false } }, function () {
-    var EXPECTED = '23/845fe522/7:10:-58:100';
+    var EXPECTED = '11/766a0003/5:-31:128:22';
 
     it('40 scripted player moves produce the recorded fingerprint', async function (ctx) {
         var w = ctx.world, trace = [];

@@ -1,28 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 <defs>
-  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#fff0b8"/><stop offset=".35" stop-color="#e2b54b"/><stop offset=".7" stop-color="#a8761c"/><stop offset="1" stop-color="#5b3a08"/>
-  </linearGradient>
-  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe89a"/><stop offset="1" stop-color="#b07a16"/></linearGradient>
-  <radialGradient id="stone" cx="42%" cy="35%" r="75%">
-    <stop offset="0" stop-color="#56616d"/><stop offset=".6" stop-color="#2b333c"/><stop offset="1" stop-color="#151a20"/>
-  </radialGradient>
-  <radialGradient id="halo" cx="50%" cy="52%" r="50%">
-    <stop offset="0" stop-color="#35e07c" stop-opacity=".75"/><stop offset=".55" stop-color="#35e07c" stop-opacity=".22"/><stop offset="1" stop-color="#35e07c" stop-opacity="0"/>
-  </radialGradient>
-  <linearGradient id="em" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8ffdc"/><stop offset="1" stop-color="#1fae5a"/></linearGradient>
-  <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="disc" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#1f5a36"/><stop offset=".6" stop-color="#0e3320"/><stop offset="1" stop-color="#04140b"/></radialGradient>
+  <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffeaa0"/><stop offset=".5" stop-color="#b8892c"/><stop offset="1" stop-color="#4a2f06"/></linearGradient>
+  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#4ef08c" stop-opacity=".45"/><stop offset="1" stop-color="#4ef08c" stop-opacity="0"/></radialGradient>
 </defs>
-<circle cx="50" cy="52.5" r="46" fill="#000" fill-opacity=".45"/>
-<circle cx="50" cy="50" r="46" fill="url(#rim)" stroke="#3a2504" stroke-width="1.5"/>
-<circle cx="50" cy="50" r="42.6" fill="none" stroke="#fff6d0" stroke-opacity=".35" stroke-width="1"/>
-<circle cx="89.36" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="89.36" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="66.30" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="10.64" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="33.70" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="66.30" cy="10.64" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/><circle cx="89.36" cy="33.70" r="1.9" fill="#fff3c4" stroke="#5a3b08" stroke-width=".8"/>
-<circle cx="50" cy="50" r="38.5" fill="url(#stone)" stroke="#120d05" stroke-width="2.2"/>
-<circle cx="50" cy="50" r="38.5" fill="url(#halo)"/>
-<circle cx="50" cy="50" r="33" fill="none" stroke="#35e07c" stroke-opacity=".35" stroke-width="1.2" stroke-dasharray="3 4"/>
-<g transform="translate(50 51) scale(.6) translate(-50 -50)">
-      <path d="M39 14 H61 V39 H86 V61 H61 V86 H39 V61 H14 V39 H39 Z"
-            fill="url(#em)" stroke="#10131a" stroke-width="3.5" stroke-linejoin="round"/>
-      <path d="M43 19 V41 H19" stroke="#ffffff" stroke-opacity=".7" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
-<path d="M21 42 A30 30 0 0 1 56 14 A36 30 0 0 0 21 42Z" fill="url(#shine)"/>
+<circle cx="50" cy="52" r="47" fill="#000" fill-opacity=".45"/>
+<circle cx="50" cy="50" r="47" fill="url(#ring)"/>
+<circle cx="50" cy="50" r="44" fill="url(#disc)" stroke="#0a0c10" stroke-width="1.5"/>
+<circle cx="50" cy="50" r="40" fill="url(#halo)"/>
+<g transform="translate(50 50) scale(.84) translate(-50 -50)">
+<defs>
+  <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9dffc2"/><stop offset=".5" stop-color="#1fcf64"/><stop offset="1" stop-color="#067a34"/></linearGradient>
+  <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".5"/><stop offset=".4" stop-color="#ffffff" stop-opacity=".08"/><stop offset="1" stop-color="#ffffff" stop-opacity=".25"/></linearGradient>
+  <linearGradient id="cork" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9a36a"/><stop offset="1" stop-color="#7a4a22"/></linearGradient>
+</defs>
+<path d="M40 22 L40 36 Q16 46 16 66 Q16 92 50 92 Q84 92 84 66 Q84 46 60 36 L60 22 Z" fill="#dff7ea" fill-opacity=".25" stroke="#0d1016" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M19 62 Q34 54 50 62 Q66 70 81 62 Q84 90 50 90 Q16 90 19 62Z" fill="url(#liquid)"/>
+<circle cx="38" cy="74" r="3" fill="#dfffe9" fill-opacity=".8"/><circle cx="58" cy="80" r="2" fill="#dfffe9" fill-opacity=".8"/><circle cx="50" cy="68" r="1.6" fill="#dfffe9" fill-opacity=".8"/>
+<path d="M40 22 L40 36 Q16 46 16 66 Q16 92 50 92 Q84 92 84 66 Q84 46 60 36 L60 22 Z" fill="url(#glass)"/>
+<rect x="36" y="10" width="28" height="14" rx="4" fill="url(#cork)" stroke="#0d1016" stroke-width="3"/>
+<path d="M44 58 H56 M50 52 V64" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+<path d="M24 58 Q26 48 36 42" stroke="#fff" stroke-opacity=".85" stroke-width="3" fill="none" stroke-linecap="round"/></g>
 </svg>

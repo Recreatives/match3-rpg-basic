@@ -95,8 +95,8 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         var before = stage.renderCount;
         stage.playUlt('warrior');
         await pumpFrames(w, 500);
-        expect(stage.renderCount - before, 'renders during a 650ms ult').toBeGreaterThan(10);
-        await pumpFrames(w, 600);
+        expect(stage.renderCount - before, 'renders during the ult').toBeGreaterThan(10);
+        await pumpFrames(w, 1400); // ult burst ~1.2s + layer stagger
         expect(stage.activeTweens).toBe(0);
         expect(stage.effectLayer.children.length, 'burst sprites cleaned up').toBe(0);
     });
@@ -338,5 +338,64 @@ describe('Automatic quality (G4)', { isolate: 'each', world: { pixi: false } }, 
         var p = w.g('cgMeasureFps(3000)');
         await w.tick(3100); // fake 3s pass instantly in real time
         expect(await p).toBeNull();
+    });
+});
+
+describe('Combat feedback (numbers, sparkles, bar pulse)', { isolate: 'each', world: { pixi: false } }, function () {
+    function texts(w) { return Array.prototype.map.call(w.doc.querySelectorAll('.cg-combat-text'), function (e) { return e.className.replace('cg-combat-text ', '') + ' ' + e.textContent; }); }
+
+    it('a sword hit shows a red "-N" over the enemy when the shot lands, then cleans up', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        w.g('enemyArmor = 0');
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'sword'; setBoard(w, b);
+        scriptRandom(w, [0.05, 0.45, 0.85]); // calm refill - no chain reactions
+        w.g('currentMoveTimeMultiplier = 1; checkForMatches(false)');
+        expect(texts(w), 'nothing before the shot lands').toEqual([]);
+        await w.tick(500);
+        expect(texts(w)).toEqual(['cg-ct-dmg -6']);
+        var t = w.doc.querySelector('.cg-combat-text').getBoundingClientRect(), e = w.$('enemy-sprite').getBoundingClientRect();
+        expect(Math.abs((t.left + t.width / 2) - (e.left + e.width / 2)), 'centered over the enemy').toBeLessThan(20);
+        await w.settle(10000);
+        expect(texts(w)).toEqual([]);
+    });
+
+    it('a heal shows a green "+N", sparkles and a green bar pulse on the healer', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'heart'; setBoard(w, b);
+        w.g('currentMoveTimeMultiplier = 1; checkForMatches(false)');
+        await w.tick(500);
+        expect(texts(w)).toEqual(['cg-ct-heal +4']);
+        expect(w.doc.querySelectorAll('.cg-sparkle').length).toBeGreaterThan(0);
+        expect(w.$('player-hp-bar-container').classList.contains('cg-bar-heal')).toBe(true);
+        await w.settle(5000);
+        expect(w.doc.querySelectorAll('.cg-sparkle-layer, .cg-combat-text').length).toBe(0);
+    });
+
+    it('a skull shows damage on the target AND the recoil on the matcher', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        w.g('enemyArmor = 0; playerArmor = 0');
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'skull'; setBoard(w, b);
+        w.g('currentMoveTimeMultiplier = 1; checkForMatches(false)');
+        await w.tick(500);
+        expect(texts(w).sort()).toEqual(['cg-ct-crit -25', 'cg-ct-self -12']);
+    });
+
+    it('numbers still show in low-graphics mode (information), sparkles do not', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        w.g('cgToggleLowGraphics()');
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'heart'; setBoard(w, b);
+        w.g('checkForMatches(false)');
+        await w.tick(500);
+        expect(texts(w).length).toBe(1);
+        expect(w.doc.querySelectorAll('.cg-sparkle').length).toBe(0);
+        w.g('cgToggleLowGraphics()');
     });
 });

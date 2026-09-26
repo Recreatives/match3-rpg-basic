@@ -264,7 +264,7 @@ describe('Board feel (G1)', { isolate: 'each', world: { pixi: false } }, functio
         setBoard(w, b);
         scriptRandom(w, [0.05, 0.45, 0.85]);
         w.g('checkForMatches(false)');
-        await w.tick(450); // clear delay -> gravity
+        await w.tick(600); // clear delay (560ms) -> gravity
         var tiles = w.g('tiles');
         [0, 8, 16].forEach(function (i) {
             expect(tiles[i].classList.contains('falling'), 'tile ' + i).toBe(true);
@@ -282,7 +282,7 @@ describe('Board feel (G1)', { isolate: 'each', world: { pixi: false } }, functio
         setBoard(w, b);
         scriptRandom(w, [0.05, 0.45, 0.85]);
         w.g('checkForMatches(false)');
-        await w.tick(450);
+        await w.tick(600);
         var tiles = w.g('tiles');
         // column 1: rows 0,1 shift down one row, row 0 gets a new tile from 1 row up
         expect(tiles[9].style.getPropertyValue('--fall-rows')).toBe('1');
