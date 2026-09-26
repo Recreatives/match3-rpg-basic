@@ -46,8 +46,40 @@ jobs:
       - name: Run tests/index.html headlessly
         run: node tests/run-ci.mjs
 
+  # T6 (roadmap v2) - supabase/schema.sql against a real Postgres. There
+  # is no staging database (see CLAUDE.md), so this is the only place a
+  # schema/RPC/RLS change gets exercised before the user re-runs the file in
+  # the Supabase SQL Editor. Applies a small Supabase shim, then the real
+  # schema TWICE (it must be safely re-runnable), then security assertions.
+  sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Supabase shim
+        run: psql -v ON_ERROR_STOP=1 -q -f tests/sql/00_supabase_shim.sql
+      - name: Apply supabase/schema.sql (1st run)
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: Apply supabase/schema.sql again (must be re-runnable)
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: RLS / RPC assertions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/10_rls_and_rpcs.sql
+
   trigger-pages-rebuild:
-    needs: test
+    needs: [test, sql]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
