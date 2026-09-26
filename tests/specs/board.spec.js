@@ -254,3 +254,95 @@ describe('Level start (regressions)', { isolate: 'each', world: { pixi: false } 
         expect(w.g('ultCharge')).toBeLessThanOrEqual(100);
     });
 });
+
+describe('Board feel (G1)', { isolate: 'each', world: { pixi: false } }, function () {
+    it('refilled tiles fall exactly as many rows as they dropped', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard(); [0, 8, 16].forEach(function (i) { b[i] = 'energy'; }); // column 0, rows 0-2
+        setBoard(w, b);
+        scriptRandom(w, [0.05, 0.45, 0.85]);
+        w.g('checkForMatches(false)');
+        await w.tick(450); // clear delay -> gravity
+        var tiles = w.g('tiles');
+        [0, 8, 16].forEach(function (i) {
+            expect(tiles[i].classList.contains('falling'), 'tile ' + i).toBe(true);
+            expect(tiles[i].style.getPropertyValue('--fall-rows'), 'tile ' + i).toBe('3');
+            expect(tiles[i].style.getPropertyValue('--fall-col')).toBe('0');
+        });
+        expect(tiles[24].classList.contains('falling'), 'untouched tile below').toBe(false);
+    });
+
+    it('a tile above a hole falls by the hole size', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard(); [16, 17, 18].forEach(function (i) { b[i] = 'sword'; }); // row 2
+        setBoard(w, b);
+        scriptRandom(w, [0.05, 0.45, 0.85]);
+        w.g('checkForMatches(false)');
+        await w.tick(450);
+        var tiles = w.g('tiles');
+        // column 1: rows 0,1 shift down one row, row 0 gets a new tile from 1 row up
+        expect(tiles[9].style.getPropertyValue('--fall-rows')).toBe('1');
+        expect(tiles[17].style.getPropertyValue('--fall-rows')).toBe('1');
+        expect(tiles[17].style.getPropertyValue('--fall-col')).toBe('1');
+    });
+
+    it('an idle player gets a hint after 6s, not before, on a real valid move', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g('startPlayerTimer()');
+        await w.tick(5000);
+        expect(w.doc.querySelectorAll('#grid .tile.hint').length).toBe(0);
+        await w.tick(1500);
+        var hinted = w.g('tiles').map(function (t, i) { return t.classList.contains('hint') ? i : -1; }).filter(function (i) { return i >= 0; });
+        expect(hinted).toHaveLength(2);
+        var d = Math.abs(hinted[0] - hinted[1]);
+        expect(d === 1 || d === 8, 'adjacent').toBe(true);
+        var types = boardTypes(w), h = types[hinted[0]]; types[hinted[0]] = types[hinted[1]]; types[hinted[1]] = h;
+        expect(w.g('findMatchGroups')(fakeTiles(types), 8).length).toBeGreaterThan(0);
+    });
+
+    it('any input or the turn ending clears the hint', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g('startPlayerTimer()');
+        await w.tick(6500);
+        expect(w.doc.querySelectorAll('#grid .tile.hint').length).toBe(2);
+        w.g('handleInputStart(tiles[0])');
+        expect(w.doc.querySelectorAll('#grid .tile.hint').length).toBe(0);
+        w.g('handleInputStart(tiles[0])'); // deselect
+        w.g('startPlayerTimer()');
+        await w.tick(6500);
+        w.g('stopPlayerTimer()');
+        expect(w.doc.querySelectorAll('#grid .tile.hint').length).toBe(0);
+    });
+
+    it('an invalid swap slides, shakes and slides back', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard();
+        setBoard(w, b);
+        var tiles = w.g('tiles');
+        w.g('attemptSwap')(tiles[0], tiles[1]);
+        await w.tick(150);
+        expect(tiles[0].classList.contains('invalid-swap')).toBe(true);
+        expect(w.g('isProcessing'), 'input locked during the bounce').toBe(true);
+        await w.settle(2000);
+        expect(tiles[0].classList.contains('invalid-swap')).toBe(false);
+        expect(boardTypes(w)).toEqual(b);
+        expect(w.g('isProcessing')).toBe(false);
+    });
+
+    it('reduced motion / low graphics skip the swap slide entirely', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        w.g('cgToggleLowGraphics()');
+        expect(w.g('sbMotionMs(140)')).toBe(0);
+        w.g('cgToggleLowGraphics()');
+        expect(w.g('sbMotionMs(140)')).toBe(140);
+    });
+});

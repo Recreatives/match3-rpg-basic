@@ -428,10 +428,40 @@ body {
     border: 2px solid var(--accent); border-radius: 4px; transform: scale(1.12);
     box-shadow: 0 0 12px rgba(241, 196, 15, 0.65);
 }
-.falling { animation: dropIn 0.4s cubic-bezier(0.34, 1.2, 0.64, 1); will-change: transform, opacity; }
+/* G1 (graphics roadmap v2) - real gravity. The board engine
+   (sharedboard.js's sbDropAndRefill) sets --fall-rows (how many rows this
+   tile actually fell) and --fall-col (its column) on every falling tile:
+   the start offset and duration grow with the distance, each column starts
+   a few ms after the one to its left, and the tile lands with a small
+   squash. transform/opacity only - same mobile-GPU budget as before. */
+.falling {
+    animation-name: dropIn;
+    animation-duration: calc(220ms + var(--fall-rows, 1) * 45ms);
+    animation-delay: calc(var(--fall-col, 0) * 15ms);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
+    animation-fill-mode: backwards;
+    will-change: transform, opacity;
+}
 @keyframes dropIn {
-    0% { transform: translateY(calc(var(--tile-size) * -1)); opacity: 0; }
-    100% { transform: translateY(0px); opacity: 1; }
+    0% { transform: translateY(calc(var(--tile-size) * -1 * var(--fall-rows, 1))); opacity: 0; }
+    15% { opacity: 1; }
+    80% { transform: translateY(0) scale(1.06, 0.9); animation-timing-function: ease-out; }
+    100% { transform: translateY(0) scale(1, 1); opacity: 1; }
+}
+/* G1 - idle hint (sbMaybeShowHint): a gentle pulse on the two tiles of a
+   valid move. Brightness+scale on just two tiles, never a layout change. */
+.tile.hint { animation: tileHint 1.1s ease-in-out infinite; border-radius: 6px; }
+@keyframes tileHint {
+    0%, 100% { transform: scale(1); filter: brightness(1); background-color: transparent; }
+    50% { transform: scale(1.14); filter: brightness(1.45); background-color: rgba(241, 196, 15, 0.35); }
+}
+/* G1 - a swap that makes no match bounces back with a short shake
+   (sbTrySwap adds this for the return slide). */
+.tile.invalid-swap { animation: tileInvalid 0.28s ease-in-out; }
+@keyframes tileInvalid {
+    0%, 100% { translate: 0 0; }
+    25% { translate: -3px 0; }
+    75% { translate: 3px 0; }
 }
 .matched {
     animation: matchPop 0.4s forwards ease-in-out; z-index: 10;
@@ -981,6 +1011,7 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
@@ -998,6 +1029,7 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
    staying instant rather than easing in). */
 html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mode *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
 }
