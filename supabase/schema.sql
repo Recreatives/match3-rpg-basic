@@ -7,6 +7,15 @@
 -- Run this whole file once in the Supabase SQL Editor (Dashboard -> SQL Editor)
 -- on a fresh project. Safe to re-run: every statement is guarded.
 
+-- Functions are created in file order, but some plpgsql functions declare
+-- variables of a table's row type (e.g. resolve_betrayal's
+-- `v_item public.player_items`) before that table's own section further
+-- down. With body checking on, a FRESH project failed right there (an
+-- existing project never noticed, because the table already existed) -
+-- found by CI's real-Postgres run (.github/workflows/ci.yml, job "sql").
+-- Same setting pg_dump emits; bodies are still fully checked when called.
+set check_function_bodies = off;
+
 -- 1. players ---------------------------------------------------------------
 -- One row per auth identity. id matches auth.users.id exactly (1:1).
 create table if not exists public.players (
