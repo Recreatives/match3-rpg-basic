@@ -33,9 +33,11 @@ DISC = {
     'energy':   ('#ffe24a', '#c79a00', '#4a3500'),
     'teamheal': ('#4fe88a', '#12994a', '#033a18'),
     'shield':   ('#4f9dff', '#1653c4', '#051c4a'),
-    'skull':    ('#b77bff', '#6a2cc4', '#22074a'),
+    # the one DARK tile: charcoal with red-glowing sockets - reads apart from
+    # the blue shield (a purple skull was too close) and says 'danger'
+    'skull':    ('#5a5a66', '#26262e', '#08080b'),
 }
-GLOW = {'sword': '#ffd08a', 'heart': '#ffb3c8', 'shield': '#b8dcff', 'energy': '#fff3a8', 'skull': '#e2c8ff', 'teamheal': '#bfffd6'}
+GLOW = {'sword': '#ffd08a', 'heart': '#ffb3c8', 'shield': '#b8dcff', 'energy': '#fff3a8', 'skull': '#ff5a4a', 'teamheal': '#bfffd6'}
 
 
 def _blade(rot):
@@ -130,7 +132,7 @@ def icon_skull():
     return f'''
 <defs>
   <radialGradient id="bone" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#fffdf5"/><stop offset=".6" stop-color="#e2d6bb"/><stop offset="1" stop-color="#9c8a68"/></radialGradient>
-  <radialGradient id="socket" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#e3c6ff"/><stop offset=".35" stop-color="#9b4dff"/><stop offset="1" stop-color="#140820"/></radialGradient>
+  <radialGradient id="socket" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffe0c8"/><stop offset=".35" stop-color="#ff2a1a"/><stop offset="1" stop-color="#200404"/></radialGradient>
 </defs>
 <path d="M50 8 C26 8 12 25 12 45 C12 59 19 67 28 71 L28 86 Q28 92 34 92 L66 92 Q72 92 72 86 L72 71 C81 67 88 59 88 45 C88 25 74 8 50 8Z" fill="url(#bone)" stroke="{INK}" stroke-width="3.5" stroke-linejoin="round"/>
 <path d="M50 8 C74 8 88 25 88 45 C88 59 81 67 72 71 L72 86 Q72 92 66 92 L60 92 Q72 60 50 8Z" fill="#6a5a3e" fill-opacity=".22"/>

@@ -1212,6 +1212,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
         soloPlayHit(actor, 'heart');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
         soloCombatText(actor, '+' + baseVal, 'heal');
         log(tf('{user} İyileşme +{val}', { user: t(user), val: baseVal }), 'log-heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
@@ -1222,6 +1223,7 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
         soloPlayHit(actor, 'shield');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
         soloCombatText(actor, '+' + baseVal, 'armor');
         log(tf('{user} Zırh +{val}', { user: t(user), val: baseVal }), 'log-armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
@@ -1230,6 +1232,7 @@ function applyRPGEffects(type, multiplier) {
     } else if (type === 'energy') {
         let baseVal = Math.floor(stats.energy * multiplier);
         soloPlayHit(actor, 'energy');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
             soloCombatText('player', '+' + baseVal + '%', 'energy');

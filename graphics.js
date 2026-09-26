@@ -127,76 +127,266 @@ const MONSTER_SPRITES = {
 // for motion this subtle, and far cheaper than 60 on a phone).
 const CG_BREATH_STEP_MS = 66;
 
-// No attack spritesheet exists in the free art this project uses (see
-// assets/CREDITS.md) - the character/monster packs only ship idle/walk/run.
-// Rather than leave every class's every tile type looking identical, each
-// class gets its own motion PER TILE TYPE (35 combinations total), built
-// from a small set of reusable primitives below rather than 35 fully
-// bespoke curves. Every primitive is a function of t in [0,1] returning
-// {dx, dy, rot, scale} offsets from the portrait's resting pose.
-const MOTION = {
-    // forward-and-back lunge (attack)
-    lunge: (amp, rotAmp = 0) => t => ({ dx: Math.sin(t * Math.PI) * amp, dy: 0, rot: Math.sin(t * Math.PI) * rotAmp, scale: 1 + Math.sin(t * Math.PI) * 0.08 }),
-    // two rapid back-to-back lunges (frenzied attack)
-    doubleLunge: (amp, rotAmp = 0) => t => ({ dx: Math.sin(t * Math.PI * 2) * amp, dy: 0, rot: Math.sin(t * Math.PI * 2) * rotAmp, scale: 1 }),
-    // diagonal dart forward-up and back (rogue-style quick strike)
-    dash: (dx, dy) => t => ({ dx: Math.sin(t * Math.PI) * dx, dy: -Math.sin(t * Math.PI) * dy, rot: -Math.sin(t * Math.PI) * 0.2, scale: 1 - Math.sin(t * Math.PI) * 0.08 }),
-    // pull back (anticipation) then snap forward past origin (bow release)
-    pullRelease: (back, forward) => t => ({ dx: t < 0.35 ? -back * (t / 0.35) : forward * Math.sin(((t - 0.35) / 0.65) * Math.PI), dy: 0, rot: 0, scale: 1 }),
-    // rise up with a light rotational wobble and scale pulse (arcane cast)
-    riseAndPulse: (amp, rotAmp = 0.06) => t => ({ dx: 0, dy: -Math.sin(t * Math.PI) * amp, rot: Math.sin(t * Math.PI * 2) * rotAmp, scale: 1 + Math.sin(t * Math.PI) * 0.06 }),
-    // dip down then rise back (channeling/drawing essence inward)
-    dipAndRise: (amp, scaleAmp = 0.07) => t => ({ dx: 0, dy: Math.sin(t * Math.PI) * amp, rot: 0, scale: 1 - Math.sin(t * Math.PI) * scaleAmp }),
-    // wind up (rise) then slam down hard with a squash on landing
-    windUpSlam: (up, down, squash = 0.12) => t => ({ dx: 0, dy: t < 0.45 ? -up * (t / 0.45) : down * ((t - 0.45) / 0.55), rot: 0, scale: t > 0.45 ? 1 + ((t - 0.45) / 0.55) * squash : 1 }),
-    // raise up and hold, bracing (shield block)
-    raiseGuard: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI * 0.9), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.05 }),
-    // duck/crouch low (taking cover instead of blocking)
-    duckLow: amp => t => ({ dx: 0, dy: amp * Math.sin(t * Math.PI), rot: 0, scale: 1 - Math.sin(t * Math.PI) * 0.06 }),
-    // quick lateral dodge and return (evasive block)
-    sidestep: amp => t => ({ dx: Math.sin(t * Math.PI) * amp, dy: 0, rot: Math.sin(t * Math.PI) * 0.1, scale: 1 }),
-    // brief resisting flinch then settle (shrugging off / bracing)
-    shrinkFlinch: amp => t => ({ dx: 0, dy: 0, rot: 0, scale: 1 - Math.sin(t * Math.PI) * amp }),
-    // gentle radiant float (healing glow)
-    glowFloat: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.08 }),
-    // small steady hold, minimal motion (calm/composed)
-    steady: amp => t => ({ dx: 0, dy: -amp * Math.sin(t * Math.PI), rot: 0, scale: 1 + Math.sin(t * Math.PI) * 0.03 }),
+// --- CLASS CHOREOGRAPHY (per-class, per-action animation + vector CG_VFX) ------
+// Every hero class has its OWN move for every action - sword, skull, heart,
+// shield, energy and its ultimate - and every monster type its own attack
+// and buff. A move = a pose curve for the portrait sprite (anticipation ->
+// action -> recovery) plus vector effects drawn with PIXI.Graphics inside
+// the portrait's own stage: sword arcs, a shield dome, a spinning rune
+// circle, a pillar of light, an arrow, shadow afterimages, auras, particles.
+// Heroes face right (+x toward the enemy), monsters face left.
+//
+// Pose helpers return {dx, dy, rot, sx, sy, alpha} for t in [0,1]; every
+// value is an offset/multiplier from the resting pose.
+const CG_EASE = {
+    out: t => 1 - Math.pow(1 - t, 3),
+    inOut: t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+    bump: t => Math.sin(Math.PI * Math.min(1, Math.max(0, t))),
+    seg: (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a))),
+};
+const CG_POSE = {
+    // wind back, strike forward, settle
+    strike: (back, fwd, rot = 0.25) => t => {
+        const w = CG_EASE.seg(t, 0, 0.3), s = CG_EASE.seg(t, 0.3, 0.55), r = CG_EASE.seg(t, 0.55, 1);
+        const dx = -back * CG_EASE.out(w) + (back + fwd) * CG_EASE.out(s) - fwd * CG_EASE.inOut(r);
+        const rt = -rot * 0.6 * CG_EASE.out(w) + rot * 1.6 * CG_EASE.out(s) - rot * CG_EASE.inOut(r);
+        return { dx, dy: 0, rot: rt, sx: 1 + 0.06 * CG_EASE.bump(s), sy: 1 };
+    },
+    // rise, then slam down with a squash
+    slam: (up, rot = 0) => t => {
+        const u = CG_EASE.seg(t, 0, 0.4), d = CG_EASE.seg(t, 0.4, 0.55), r = CG_EASE.seg(t, 0.55, 1);
+        return { dx: 4 * CG_EASE.bump(t), dy: -up * CG_EASE.out(u) + up * CG_EASE.out(d) + 3 * CG_EASE.bump(r), rot: rot * CG_EASE.bump(u),
+                 sx: 1 + 0.12 * CG_EASE.bump(r), sy: 1 - 0.12 * CG_EASE.bump(r) };
+    },
+    // turns in place (a horizontal flip-through, like spinning on the spot)
+    // rather than rotating around the feet, which would fling the character
+    // out of its own portrait canvas
+    spin: (turns = 1) => t => ({ dx: 6 * CG_EASE.bump(t), dy: -5 * CG_EASE.bump(t), rot: 0.08 * Math.sin(t * Math.PI * 4),
+                                  sx: Math.cos(Math.PI * 2 * turns * CG_EASE.inOut(t)), sy: 1 + 0.05 * CG_EASE.bump(t) }),
+    brace: (amt = 0.1) => t => ({ dx: -3 * CG_EASE.bump(t), dy: 3 * CG_EASE.bump(t), rot: -0.05 * CG_EASE.bump(t), sx: 1 + amt * CG_EASE.bump(t), sy: 1 - amt * 0.8 * CG_EASE.bump(t) }),
+    float: (up) => t => ({ dx: 0, dy: -up * CG_EASE.bump(t), rot: 0.05 * Math.sin(t * Math.PI * 4), sx: 1, sy: 1 + 0.04 * CG_EASE.bump(t) }),
+    kneel: (down) => t => ({ dx: 0, dy: down * CG_EASE.bump(t), rot: 0, sx: 1 + 0.05 * CG_EASE.bump(t), sy: 1 - 0.08 * CG_EASE.bump(t) }),
+    roar: () => t => ({ dx: Math.sin(t * 60) * 2 * CG_EASE.bump(t), dy: 0, rot: 0, sx: 1 + 0.1 * CG_EASE.bump(t), sy: 1 + 0.1 * CG_EASE.bump(t) }),
+    blink: (dist) => t => {
+        const out = CG_EASE.seg(t, 0.1, 0.25), back = CG_EASE.seg(t, 0.65, 0.85);
+        return { dx: dist * (t < 0.65 ? CG_EASE.out(CG_EASE.seg(t, 0.15, 0.3)) : 1 - CG_EASE.out(back)), dy: -4 * CG_EASE.bump(t), rot: 0.1 * CG_EASE.bump(t),
+                 sx: 1, sy: 1, alpha: t < 0.25 ? 1 - out * 0.85 : t > 0.8 ? 1 : 0.15 + 0.85 * CG_EASE.seg(t, 0.3, 0.45) };
+    },
+    draw: () => t => {
+        const d = CG_EASE.seg(t, 0, 0.45), f = CG_EASE.seg(t, 0.45, 0.6), r = CG_EASE.seg(t, 0.6, 1);
+        return { dx: -7 * CG_EASE.out(d) + 12 * CG_EASE.out(f) - 5 * CG_EASE.inOut(r), dy: 0, rot: -0.08 * CG_EASE.out(d) + 0.08 * CG_EASE.out(f), sx: 1, sy: 1 };
+    },
+    dodge: (dist) => t => ({ dx: -dist * CG_EASE.bump(t), dy: -3 * CG_EASE.bump(t), rot: -0.2 * CG_EASE.bump(t), sx: 1, sy: 1 }),
+    charge: (dist) => t => {
+        const c = CG_EASE.seg(t, 0.15, 0.4), r = CG_EASE.seg(t, 0.55, 1);
+        return { dx: -5 * CG_EASE.bump(CG_EASE.seg(t, 0, 0.15)) + dist * CG_EASE.out(c) - dist * CG_EASE.inOut(r), dy: 0, rot: 0.18 * CG_EASE.bump(c), sx: 1 + 0.08 * CG_EASE.bump(c), sy: 1 };
+    },
 };
 
-// Chosen to echo each class's own combat identity, AND to make the same
-// tile type read differently class to class (the user specifically asked
-// for Archer's and Warrior's own shield/armor reaction to look different
-// from each other, not just attacks) - e.g. shield: Warrior/Paladin raise
-// an actual guard, Rogue dodges instead of blocking (matches its own dodge-
-// chance passive), Archer ducks for cover, Mage/Necromancer conjure a ward.
-const CLASS_MOTIONS = {
+// Vector effects. Coordinates are in the portrait's own pixel space
+// (w x h, feet at the bottom center). `f` = facing (+1 hero, -1 monster).
+const CG_VFX = {
+    // a crescent sword arc in front of the character
+    slash(st, color, { a0 = -2.1, a1 = 0.5, r = 0.42, width = 5, at = 0.3, ms = 520, cx = 0.62, cy = 0.5, spin = 0.9 } = {}) {
+        const [w, h] = st.size, f = st.facing;
+        const g = new PIXI.Graphics();
+        g.arc(0, 0, h * r, a0, a1).stroke({ width: width * 2.6, color, alpha: 0.35, cap: 'round' });
+        g.arc(0, 0, h * r, a0, a1).stroke({ width, color, alpha: 1, cap: 'round' });
+        g.arc(0, 0, h * r * 0.9, a0 + 0.3, a1 - 0.1).stroke({ width: width * 0.45, color: 0xffffff, alpha: 1, cap: 'round' });
+        g.x = w * (f > 0 ? cx : 1 - cx); g.y = h * cy; g.scale.x = f;
+        st._vfx(g, ms, t => { g.alpha = t < at ? 0 : 1 - Math.pow(CG_EASE.seg(t, at, 1), 2); g.rotation = f * spin * CG_EASE.out(CG_EASE.seg(t, at, 1)); g.scale.set(f * (0.8 + 0.3 * CG_EASE.seg(t, at, 1)), 0.8 + 0.3 * CG_EASE.seg(t, at, 1)); });
+    },
+    ring(st, color, { x = 0.5, y = 0.92, r0 = 0.1, r1 = 0.55, width = 4, flat = 0.35, ms = 700, at = 0 } = {}) {
+        const [w, h] = st.size;
+        const g = new PIXI.Graphics();
+        g.circle(0, 0, h * 0.5).stroke({ width: width / 0.5, color, alpha: 1 });
+        g.x = w * x; g.y = h * y;
+        st._vfx(g, ms, t => { const k = CG_EASE.seg(t, at, 1); const s = r0 + (r1 - r0) * CG_EASE.out(k); g.scale.set(s, s * flat); g.alpha = t < at ? 0 : 1 - k; });
+    },
+    dome(st, color, { ms = 950 } = {}) {
+        const [w, h] = st.size;
+        const g = new PIXI.Graphics();
+        g.ellipse(0, 0, w * 0.46, h * 0.5).fill({ color, alpha: 0.2 }).stroke({ width: 3, color, alpha: 0.95 });
+        g.ellipse(-w * 0.14, -h * 0.22, w * 0.12, h * 0.08).fill({ color: 0xffffff, alpha: 0.45 });
+        g.x = w / 2; g.y = h * 0.52;
+        st._vfx(g, ms, t => { const p = CG_EASE.seg(t, 0, 0.2); g.scale.set(0.6 + 0.45 * CG_EASE.out(p) - 0.05 * CG_EASE.seg(t, 0.2, 0.35)); g.alpha = t < 0.75 ? 1 : 1 - CG_EASE.seg(t, 0.75, 1); });
+    },
+    pillar(st, color, { ms = 1000 } = {}) {
+        const [w, h] = st.size;
+        const g = new PIXI.Graphics();
+        for (let i = 0; i < 4; i++) g.rect(-w * (0.34 - i * 0.07), -h, w * (0.68 - i * 0.14), h * 1.02).fill({ color: i === 3 ? 0xffffff : color, alpha: 0.18 + i * 0.12 });
+        g.x = w / 2; g.y = h;
+        st._vfx(g, ms, t => { g.scale.x = 0.3 + 0.7 * CG_EASE.out(CG_EASE.seg(t, 0, 0.25)); g.alpha = t < 0.7 ? CG_EASE.seg(t, 0, 0.15) : 1 - CG_EASE.seg(t, 0.7, 1); }, true);
+    },
+    rune(st, color, { ms = 1000, size = 0.5, y = 0.96 } = {}) {
+        const [w, h] = st.size;
+        const c = new PIXI.Container();
+        const g = new PIXI.Graphics();
+        const R = w * size;
+        g.circle(0, 0, R).stroke({ width: 3, color, alpha: 1 }).circle(0, 0, R * 0.78).stroke({ width: 1.5, color, alpha: 0.8 });
+        const pts = [];
+        for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 - Math.PI / 2; pts.push(Math.cos(a) * R * 0.78, Math.sin(a) * R * 0.78); }
+        g.poly([pts[0], pts[1], pts[4], pts[5], pts[8], pts[9]]).stroke({ width: 1.8, color });
+        g.poly([pts[2], pts[3], pts[6], pts[7], pts[10], pts[11]]).stroke({ width: 1.8, color });
+        c.addChild(g); c.x = w / 2; c.y = h * y; c.scale.y = 0.32;
+        st._vfx(c, ms, t => { g.rotation = t * 3; c.scale.x = CG_EASE.out(CG_EASE.seg(t, 0, 0.2)); c.alpha = t < 0.75 ? 1 : 1 - CG_EASE.seg(t, 0.75, 1); }, true);
+    },
+    aura(st, color, { ms = 900, pulses = 2 } = {}) {
+        const [w, h] = st.size;
+        const g = new PIXI.Graphics();
+        for (let i = 3; i >= 1; i--) g.ellipse(0, 0, w * 0.2 * i, h * 0.18 * i).fill({ color, alpha: 0.12 });
+        g.x = w / 2; g.y = h * 0.55;
+        st._vfx(g, ms, t => { g.scale.set(0.85 + 0.2 * Math.abs(Math.sin(t * Math.PI * pulses))); g.alpha = CG_EASE.bump(t); }, true);
+    },
+    particles(st, color, { n = 10, x = 0.5, y = 0.8, spread = 0.4, rise = 0.5, vx = 0, ms = 900, size = 2.4, at = 0 } = {}) {
+        const [w, h] = st.size, f = st.facing;
+        for (let i = 0; i < n; i++) {
+            const g = new PIXI.Graphics();
+            g.circle(0, 0, size * (0.6 + Math.random() * 0.8)).fill({ color }).circle(0, 0, size * 2).fill({ color, alpha: 0.25 });
+            const x0 = w * (x + (Math.random() - 0.5) * spread), y0 = h * (y + (Math.random() - 0.5) * spread * 0.4);
+            const dx = f * vx * w * (0.6 + Math.random() * 0.8), dy = -rise * h * (0.6 + Math.random() * 0.8);
+            const delay = at + Math.random() * 0.25;
+            g.x = x0; g.y = y0; g.alpha = 0;
+            st._vfx(g, ms, t => { const k = CG_EASE.seg(t, delay, 1); g.x = x0 + dx * CG_EASE.out(k); g.y = y0 + dy * CG_EASE.out(k); g.alpha = k <= 0 ? 0 : 1 - k; });
+        }
+    },
+    orbit(st, color, { n = 5, ms = 1000, r = 0.34, inward = false } = {}) {
+        const [w, h] = st.size;
+        for (let i = 0; i < n; i++) {
+            const g = new PIXI.Graphics();
+            g.circle(0, 0, 3).fill({ color: 0xffffff }).circle(0, 0, 6).fill({ color, alpha: 0.6 }).circle(0, 0, 10).fill({ color, alpha: 0.2 });
+            const a0 = i * Math.PI * 2 / n;
+            st._vfx(g, ms, t => { const a = a0 + t * Math.PI * 3; const rr = (inward ? 1 - 0.8 * t : 0.3 + 0.7 * CG_EASE.out(t)) * r; g.x = w / 2 + Math.cos(a) * w * rr * 1.4; g.y = h * 0.55 + Math.sin(a) * h * rr * 0.6; g.alpha = CG_EASE.bump(t); });
+        }
+    },
+    afterimages(st, color, { n = 3, gap = 0.08, ms = 700 } = {}) {
+        const sprite = st.portraitSprite;
+        if (!sprite.texture || sprite.texture === PIXI.Texture.EMPTY) return;
+        for (let i = 1; i <= n; i++) {
+            const ghost = new PIXI.Sprite(sprite.texture);
+            ghost.anchor.set(0.5, 1); ghost.tint = color; ghost.alpha = 0;
+            st._vfx(ghost, ms, t => {
+                // follows the real sprite with a lag, fading out
+                const lagT = Math.max(0, t - i * gap);
+                ghost.x = st.baseX + (st.lastPose.dx) * (1 - i * 0.25);
+                ghost.y = st.baseY + st.lastPose.dy;
+                ghost.rotation = sprite.rotation;
+                ghost.scale.set(sprite.scale.x, sprite.scale.y);
+                ghost.alpha = lagT > 0 ? 0.45 * (1 - t) / i : 0;
+            }, true);
+        }
+    },
+    arrow(st, color, { ms = 600, at = 0.45, big = false } = {}) {
+        const [w, h] = st.size, f = st.facing;
+        const g = new PIXI.Graphics();
+        const L = w * (big ? 0.55 : 0.4), T = big ? 4 : 2.5;
+        g.moveTo(-L, 0).lineTo(0, 0).stroke({ width: T, color: 0xe8d8b0 });
+        g.poly([0, -T * 2.2, T * 4, 0, 0, T * 2.2]).fill({ color: 0xdfe6ee }).stroke({ width: 1, color: 0x222222 });
+        g.moveTo(-L, 0).lineTo(-L - 8, -5).moveTo(-L, 0).lineTo(-L - 8, 5).stroke({ width: 2, color });
+        g.moveTo(-L * 1.8, 0).lineTo(-L * 0.2, 0).stroke({ width: T * 3, color, alpha: 0.35 });
+        g.scale.x = f; g.y = h * 0.52;
+        st._vfx(g, ms, t => { const k = CG_EASE.seg(t, at, 1); g.x = w / 2 + f * (w * 0.1 + w * 0.9 * CG_EASE.out(k)); g.alpha = t < at ? 0 : 1 - CG_EASE.seg(k, 0.6, 1); });
+    },
+    beam(st, color, { ms = 800, at = 0.35 } = {}) {
+        const [w, h] = st.size, f = st.facing;
+        const g = new PIXI.Graphics();
+        g.rect(0, -h * 0.07, w, h * 0.14).fill({ color, alpha: 0.5 }).rect(0, -h * 0.03, w, h * 0.06).fill({ color: 0xffffff, alpha: 0.9 });
+        g.x = w / 2; g.y = h * 0.5; g.scale.x = f;
+        st._vfx(g, ms, t => { const k = CG_EASE.seg(t, at, 1); g.scale.x = f * CG_EASE.out(CG_EASE.seg(k, 0, 0.25)); g.scale.y = 1 - 0.8 * CG_EASE.seg(k, 0.5, 1); g.alpha = t < at ? 0 : 1 - CG_EASE.seg(k, 0.6, 1); });
+    },
+    flash(st, color, { ms = 400 } = {}) {
+        const [w, h] = st.size;
+        const g = new PIXI.Graphics();
+        g.rect(0, 0, w, h).fill({ color, alpha: 0.55 });
+        st._vfx(g, ms, t => { g.alpha = 1 - t; });
+    },
+};
+
+const CG_COL = { white: 0xffffff, steel: 0xdfe8f2, blue: 0x4f9dff, cyan: 0x62e6ff, gold: 0xffd24a, red: 0xff3b30, orange: 0xff8a2a,
+              purple: 0xb05cff, green: 0x3dff8a, leaf: 0x7ed957, holy: 0xfff2a8, bone: 0xeae0c8, shadow: 0x6a3aa8 };
+
+// ms: total length. pose: sprite curve. fx(stage): effects to spawn.
+const CG_CLASS_ACTIONS = {
     warrior: {
-        sword: MOTION.lunge(12), skull: MOTION.lunge(17, 0.05),
-        shield: MOTION.raiseGuard(9), heart: MOTION.dipAndRise(5, 0.05), energy: MOTION.riseAndPulse(3, 0.03),
+        sword: { ms: 720, pose: CG_POSE.strike(6, 18), fx: s => CG_VFX.slash(s, CG_COL.steel, { width: 6 }) },
+        skull: { ms: 900, pose: CG_POSE.slam(14, -0.3), fx: s => { CG_VFX.slash(s, CG_COL.red, { a0: -2.6, a1: 0.2, width: 7, at: 0.4 }); CG_VFX.ring(s, CG_COL.orange, { at: 0.45 }); } },
+        shield: { ms: 1000, pose: CG_POSE.brace(0.1), fx: s => CG_VFX.dome(s, CG_COL.blue) },
+        heart: { ms: 1000, pose: CG_POSE.kneel(5), fx: s => { CG_VFX.aura(s, CG_COL.green); CG_VFX.particles(s, CG_COL.green, { n: 9 }); } },
+        energy: { ms: 900, pose: CG_POSE.roar(), fx: s => { CG_VFX.ring(s, CG_COL.orange, { y: 0.45, flat: 1, r1: 0.7 }); CG_VFX.ring(s, CG_COL.gold, { y: 0.45, flat: 1, r1: 0.9, at: 0.25 }); } },
+        ult: { ms: 1300, pose: CG_POSE.charge(26), fx: s => { CG_VFX.afterimages(s, CG_COL.steel); CG_VFX.slash(s, CG_COL.white, { r: 0.55, width: 9, at: 0.35 }); CG_VFX.ring(s, CG_COL.blue, { at: 0.4, r1: 0.9 }); CG_VFX.dome(s, CG_COL.blue, { ms: 800 }); } },
     },
     berserker: {
-        sword: MOTION.doubleLunge(10), skull: MOTION.doubleLunge(15, 0.12),
-        shield: MOTION.shrinkFlinch(0.1), heart: MOTION.doubleLunge(5), energy: MOTION.doubleLunge(6, 0.08),
+        sword: { ms: 800, pose: CG_POSE.spin(1), fx: s => { CG_VFX.slash(s, CG_COL.red, { a0: -Math.PI, a1: Math.PI, r: 0.4, cx: 0.5, at: 0.2, spin: 2 }); } },
+        skull: { ms: 1000, pose: CG_POSE.strike(8, 20, 0.45), fx: s => { CG_VFX.aura(s, CG_COL.red, { pulses: 4 }); CG_VFX.slash(s, CG_COL.red, { at: 0.3 }); CG_VFX.slash(s, CG_COL.orange, { a0: -1.2, a1: 1.6, at: 0.5 }); } },
+        shield: { ms: 900, pose: CG_POSE.roar(), fx: s => { CG_VFX.ring(s, CG_COL.orange, { y: 0.5, flat: 1, r1: 0.6 }); CG_VFX.particles(s, CG_COL.orange, { n: 8, y: 0.95, rise: 0.2, spread: 0.8 }); } },
+        heart: { ms: 900, pose: CG_POSE.roar(), fx: s => { CG_VFX.aura(s, CG_COL.orange, { pulses: 3 }); CG_VFX.particles(s, CG_COL.red, { n: 8 }); } },
+        energy: { ms: 900, pose: CG_POSE.slam(8), fx: s => { CG_VFX.ring(s, CG_COL.gold, { at: 0.45 }); CG_VFX.particles(s, 0x9a7a55, { n: 10, y: 0.97, rise: 0.15, spread: 1, at: 0.45 }); } },
+        ult: { ms: 1400, pose: CG_POSE.spin(2), fx: s => { CG_VFX.aura(s, CG_COL.red, { ms: 1400, pulses: 5 }); CG_VFX.particles(s, CG_COL.orange, { n: 16, ms: 1400, rise: 0.8 }); CG_VFX.slash(s, CG_COL.red, { a0: -Math.PI, a1: Math.PI, r: 0.45, cx: 0.5, at: 0.2, spin: 3, ms: 1300 }); } },
     },
     rogue: {
-        sword: MOTION.dash(16, 7), skull: MOTION.dash(20, 9),
-        shield: MOTION.sidestep(14), heart: MOTION.dipAndRise(4, 0.04), energy: MOTION.sidestep(6),
+        sword: { ms: 800, pose: CG_POSE.blink(22), fx: s => { CG_VFX.afterimages(s, CG_COL.shadow); CG_VFX.slash(s, CG_COL.purple, { width: 3, at: 0.45, a0: -1.8, a1: 0.2 }); } },
+        skull: { ms: 900, pose: CG_POSE.blink(26), fx: s => { CG_VFX.afterimages(s, CG_COL.shadow); CG_VFX.slash(s, CG_COL.purple, { a0: -2.3, a1: -0.3, at: 0.4 }); CG_VFX.slash(s, CG_COL.purple, { a0: 0.3, a1: 2.3, at: 0.5, spin: -0.9 }); } },
+        shield: { ms: 800, pose: CG_POSE.dodge(18), fx: s => { CG_VFX.afterimages(s, CG_COL.shadow); CG_VFX.particles(s, 0x8a8a9a, { n: 10, y: 0.85, rise: 0.25, spread: 0.7 }); } },
+        heart: { ms: 900, pose: CG_POSE.kneel(4), fx: s => { CG_VFX.particles(s, 0x8a8a9a, { n: 8, rise: 0.3 }); CG_VFX.particles(s, CG_COL.green, { n: 6 }); } },
+        energy: { ms: 700, pose: CG_POSE.spin(1), fx: s => { CG_VFX.orbit(s, CG_COL.purple, { n: 4 }); } },
+        ult: { ms: 1300, pose: CG_POSE.blink(28), fx: s => { CG_VFX.afterimages(s, CG_COL.shadow, { n: 4 }); [0.35, 0.5, 0.65].forEach((at, i) => CG_VFX.slash(s, i % 2 ? CG_COL.white : CG_COL.purple, { at, a0: i % 2 ? 0.3 : -2.3, a1: i % 2 ? 2.3 : -0.3, spin: i % 2 ? -1 : 1, ms: 1300 })); } },
     },
     archer: {
-        sword: MOTION.pullRelease(7, 11), skull: MOTION.pullRelease(9, 15),
-        shield: MOTION.duckLow(8), heart: MOTION.steady(4), energy: MOTION.pullRelease(3, 4),
+        sword: { ms: 800, pose: CG_POSE.draw(), fx: s => CG_VFX.arrow(s, CG_COL.leaf) },
+        skull: { ms: 1000, pose: CG_POSE.draw(), fx: s => { CG_VFX.rune(s, CG_COL.leaf, { ms: 1000 }); CG_VFX.arrow(s, CG_COL.red, { big: true, at: 0.5 }); } },
+        shield: { ms: 900, pose: CG_POSE.kneel(7), fx: s => { CG_VFX.orbit(s, CG_COL.leaf, { n: 6 }); } },
+        heart: { ms: 1000, pose: CG_POSE.float(4), fx: s => { CG_VFX.aura(s, CG_COL.leaf); CG_VFX.particles(s, CG_COL.leaf, { n: 10 }); } },
+        energy: { ms: 900, pose: CG_POSE.draw(), fx: s => { CG_VFX.ring(s, CG_COL.leaf, { y: 0.5, flat: 1, r0: 0.9, r1: 0.1 }); } },
+        ult: { ms: 1300, pose: CG_POSE.draw(), fx: s => { CG_VFX.rune(s, CG_COL.gold, { ms: 1300 }); CG_VFX.arrow(s, CG_COL.gold, { big: true, at: 0.5, ms: 1300 }); CG_VFX.beam(s, CG_COL.leaf, { at: 0.55, ms: 1300 }); } },
     },
     mage: {
-        sword: MOTION.riseAndPulse(9), skull: MOTION.riseAndPulse(12, 0.1),
-        shield: MOTION.glowFloat(6), heart: MOTION.glowFloat(9), energy: MOTION.riseAndPulse(5, 0.12),
+        sword: { ms: 900, pose: CG_POSE.float(8), fx: s => { CG_VFX.rune(s, CG_COL.blue); CG_VFX.particles(s, CG_COL.cyan, { n: 6, y: 0.4, vx: 0.8, rise: 0.05, at: 0.35 }); } },
+        skull: { ms: 1000, pose: CG_POSE.float(10), fx: s => { CG_VFX.rune(s, CG_COL.purple); CG_VFX.beam(s, CG_COL.cyan); } },
+        shield: { ms: 1000, pose: CG_POSE.float(5), fx: s => { CG_VFX.dome(s, CG_COL.cyan); CG_VFX.rune(s, CG_COL.cyan, { ms: 900 }); } },
+        heart: { ms: 1000, pose: CG_POSE.float(6), fx: s => { CG_VFX.particles(s, CG_COL.cyan, { n: 10 }); CG_VFX.aura(s, CG_COL.blue); } },
+        energy: { ms: 900, pose: CG_POSE.float(6), fx: s => { CG_VFX.rune(s, CG_COL.gold); CG_VFX.orbit(s, CG_COL.cyan, { n: 5 }); } },
+        ult: { ms: 1400, pose: CG_POSE.float(12), fx: s => { CG_VFX.rune(s, CG_COL.cyan, { ms: 1400, size: 0.7 }); CG_VFX.orbit(s, CG_COL.blue, { n: 6, ms: 1400, inward: true }); CG_VFX.beam(s, CG_COL.cyan, { at: 0.5, ms: 1400 }); CG_VFX.flash(s, CG_COL.cyan, { ms: 500 }); } },
     },
     necromancer: {
-        sword: MOTION.dipAndRise(7), skull: MOTION.dipAndRise(10, 0.1),
-        shield: MOTION.shrinkFlinch(0.06), heart: MOTION.dipAndRise(8, 0.05), energy: MOTION.dipAndRise(4, 0.06),
+        sword: { ms: 900, pose: CG_POSE.float(4), fx: s => { CG_VFX.orbit(s, CG_COL.purple, { n: 4 }); CG_VFX.particles(s, CG_COL.purple, { n: 6, y: 0.5, vx: 0.8, rise: 0.05, at: 0.4 }); } },
+        skull: { ms: 1000, pose: CG_POSE.kneel(4), fx: s => { CG_VFX.aura(s, CG_COL.shadow, { pulses: 3 }); CG_VFX.ring(s, CG_COL.purple, { at: 0.3 }); CG_VFX.particles(s, CG_COL.bone, { n: 6, y: 0.9, rise: 0.4, at: 0.3 }); } },
+        shield: { ms: 1000, pose: CG_POSE.brace(0.06), fx: s => { CG_VFX.dome(s, CG_COL.shadow); CG_VFX.orbit(s, CG_COL.bone, { n: 5 }); } },
+        heart: { ms: 1000, pose: CG_POSE.float(5), fx: s => { CG_VFX.orbit(s, CG_COL.green, { n: 5, inward: true }); } },
+        energy: { ms: 900, pose: CG_POSE.float(5), fx: s => { CG_VFX.aura(s, CG_COL.purple, { pulses: 3 }); } },
+        ult: { ms: 1400, pose: CG_POSE.float(10), fx: s => { CG_VFX.aura(s, CG_COL.shadow, { ms: 1400, pulses: 5 }); CG_VFX.orbit(s, CG_COL.purple, { n: 7, ms: 1400, inward: true }); CG_VFX.rune(s, CG_COL.purple, { ms: 1400, size: 0.65 }); } },
     },
     paladin: {
-        sword: MOTION.windUpSlam(9, 13), skull: MOTION.windUpSlam(11, 17, 0.16),
-        shield: MOTION.raiseGuard(13), heart: MOTION.riseAndPulse(10, 0.04), energy: MOTION.raiseGuard(5),
+        sword: { ms: 900, pose: CG_POSE.slam(12), fx: s => { CG_VFX.ring(s, CG_COL.gold, { at: 0.45 }); CG_VFX.particles(s, CG_COL.holy, { n: 8, y: 0.95, rise: 0.3, at: 0.45 }); } },
+        skull: { ms: 1100, pose: CG_POSE.slam(16), fx: s => { CG_VFX.pillar(s, CG_COL.gold); CG_VFX.ring(s, CG_COL.holy, { at: 0.45, r1: 0.8 }); } },
+        shield: { ms: 1000, pose: CG_POSE.brace(0.08), fx: s => CG_VFX.dome(s, CG_COL.gold) },
+        heart: { ms: 1100, pose: CG_POSE.float(5), fx: s => { CG_VFX.pillar(s, CG_COL.holy); CG_VFX.particles(s, CG_COL.holy, { n: 10 }); } },
+        energy: { ms: 900, pose: CG_POSE.float(4), fx: s => { CG_VFX.ring(s, CG_COL.gold, { y: 0.12, flat: 0.3, r0: 0.2, r1: 0.6 }); CG_VFX.aura(s, CG_COL.gold); } },
+        ult: { ms: 1500, pose: CG_POSE.slam(16), fx: s => { CG_VFX.pillar(s, CG_COL.gold, { ms: 1500 }); CG_VFX.ring(s, CG_COL.holy, { at: 0.45, r1: 1 }); CG_VFX.ring(s, CG_COL.gold, { at: 0.55, r1: 1.2 }); CG_VFX.flash(s, CG_COL.holy, { ms: 600 }); } },
+    },
+};
+
+// Monsters (facing left). `attack` when their own sword/skull lands,
+// `buff` when they match heart/shield/energy.
+const CG_MONSTER_ACTIONS = {
+    monster_normal: {
+        attack: { ms: 800, pose: CG_POSE.strike(7, 18, 0.35), fx: s => CG_VFX.slash(s, 0xc9955a, { width: 6 }) },
+        buff: { ms: 800, pose: CG_POSE.roar(), fx: s => CG_VFX.aura(s, CG_COL.leaf) },
+    },
+    monster_armored: {
+        attack: { ms: 1000, pose: CG_POSE.slam(10), fx: s => { CG_VFX.ring(s, 0xaab4c0, { at: 0.45, r1: 0.9, width: 6 }); CG_VFX.particles(s, 0x8a8f96, { n: 12, y: 0.97, rise: 0.2, spread: 1.1, at: 0.45 }); } },
+        buff: { ms: 900, pose: CG_POSE.brace(0.06), fx: s => CG_VFX.dome(s, CG_COL.cyan) },
+    },
+    monster_swift: {
+        attack: { ms: 800, pose: CG_POSE.blink(22), fx: s => { CG_VFX.afterimages(s, CG_COL.red); CG_VFX.slash(s, CG_COL.orange, { width: 3, at: 0.45 }); } },
+        buff: { ms: 700, pose: CG_POSE.spin(1), fx: s => CG_VFX.particles(s, CG_COL.orange, { n: 8 }) },
+    },
+    monster_drain: {
+        attack: { ms: 1000, pose: CG_POSE.blink(18), fx: s => { CG_VFX.orbit(s, CG_COL.purple, { n: 5 }); CG_VFX.particles(s, CG_COL.purple, { n: 8, y: 0.5, vx: 0.9, rise: 0.05, at: 0.4 }); } },
+        buff: { ms: 900, pose: CG_POSE.float(6), fx: s => CG_VFX.aura(s, CG_COL.purple, { pulses: 3 }) },
+    },
+    monster_boss: {
+        attack: { ms: 1000, pose: CG_POSE.charge(24), fx: s => { CG_VFX.afterimages(s, CG_COL.red); CG_VFX.slash(s, CG_COL.red, { r: 0.55, width: 8, at: 0.35 }); CG_VFX.ring(s, CG_COL.orange, { at: 0.4, r1: 0.9 }); } },
+        buff: { ms: 1000, pose: CG_POSE.roar(), fx: s => { CG_VFX.aura(s, CG_COL.red, { pulses: 4 }); CG_VFX.particles(s, CG_COL.orange, { n: 10 }); } },
     },
 };
 
@@ -417,6 +607,12 @@ class CombatStage {
         await cgInitShared();
         this.ctx = this.canvasEl.getContext('2d');
         this.root = new PIXI.Container();
+        // back layer (auras, pillars, runes, afterimages) sits behind the
+        // character; effectLayer (slashes, bursts, particles) in front.
+        this.backLayer = new PIXI.Container();
+        this.root.addChild(this.backLayer);
+        this.facing = 1;
+        this.lastPose = { dx: 0, dy: 0 };
         this.portraitSprite = new PIXI.Sprite(PIXI.Texture.EMPTY);
         this.portraitSprite.anchor.set(0.5, 1);
         this.breathPhase = Math.random() * Math.PI * 2; // two portraits never breathe in lockstep
@@ -453,8 +649,9 @@ class CombatStage {
         sprite.y = this.baseY;
         sprite.rotation = 0;
         if (this.stripW) {
-            // Fit within the canvas while preserving aspect ratio.
-            const scale = Math.min((h * 0.98) / this.stripH, (w * 0.98) / this.stripW, 4);
+            // Fit within the canvas while preserving aspect ratio, leaving
+            // side room for the class actions to lunge/dash into.
+            const scale = Math.min((h * 0.9) / this.stripH, (w * 0.8) / this.stripW, 4);
             this.portraitBaseScale = scale;
         }
         sprite.scale.set(this.portraitBaseScale);
@@ -467,6 +664,8 @@ class CombatStage {
     async setPortrait(url) {
         await this.ready;
         this.url = url;
+        this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
+        this.facing = this.charKey.indexOf('monster_') === 0 ? -1 : 1;
         const texture = await cgLoadTexture(url);
         if (this.url !== url) return; // a newer setPortrait won the race
         texture.source.scaleMode = 'linear';
@@ -519,7 +718,9 @@ class CombatStage {
     // unrecognized key rather than silently doing nothing.
     async playUlt(classKey) {
         await this.ready;
-        this._shake(this.portraitSprite, 10, 700);
+        // the class's own ultimate choreography, plus the sprite bursts
+        const set = CG_CLASS_ACTIONS[classKey];
+        this._perform(set && set.ult);
         this._flash(this.portraitSprite, 900, 0xfff2a0);
         const effects = ULT_EFFECT_SPRITES[classKey] || [HIT_EFFECT_SPRITES.energy];
         this._burst(effects, 2.1, 1200);
@@ -528,7 +729,7 @@ class CombatStage {
     // Played on the ATTACKER's own portrait (as opposed to playHit/
     // playHitReaction, which play on whoever's getting hit) whenever that
     // class's own tile match lands - `tileType` picks which of that class's
-    // 5 motions plays (see CLASS_MOTIONS), so the SAME class visibly does a
+    // 6 actions plays (see CG_CLASS_ACTIONS), so the SAME class visibly does a
     // different thing for a sword match than a shield match, and two
     // different classes doing the same tile type still look distinct from
     // each other. Silently does nothing for an unrecognized class (a
@@ -536,21 +737,43 @@ class CombatStage {
     // fallback motion that wouldn't mean anything for it.
     async playClassMotion(classKey, tileType) {
         await this.ready;
-        const fn = CLASS_MOTIONS[classKey] && CLASS_MOTIONS[classKey][tileType];
-        if (!fn) return;
-        const sprite = this.portraitSprite;
-        this._tween(420, t => {
-            const m = fn(t);
-            sprite.x = this.baseX + m.dx;
-            sprite.y = this.baseY + m.dy;
-            sprite.rotation = m.rot;
-            sprite.scale.set(this.portraitBaseScale * m.scale);
+        const set = CG_CLASS_ACTIONS[classKey];
+        this._perform(set && set[tileType === 'teamheal' ? 'heart' : tileType]);
+    }
+
+    // Runs one choreographed action: the pose curve on the sprite plus its
+    // vector effects (skipped in low-graphics mode - the pose still plays).
+    _perform(action) {
+        if (!action || this.dead) return;
+        this.lastAction = action;
+        if (action.fx && cgEffectsEnabled()) action.fx(this);
+        const sprite = this.portraitSprite, f = this.facing;
+        // Pose offsets are authored for a ~90px-wide portrait; scale them to
+        // this canvas and keep the character (mostly) inside it.
+        const [w] = this.size, k = w / 90;
+        const room = Math.max(4, (w - this.stripW * this.portraitBaseScale) / 2 + w * 0.08);
+        this._tween(action.ms, t => {
+            const p = action.pose(t);
+            const dx = Math.max(-room, Math.min(room, p.dx * k));
+            this.lastPose = { dx: f * dx, dy: p.dy * k };
+            sprite.x = this.baseX + f * dx;
+            sprite.y = this.baseY + p.dy * k;
+            sprite.rotation = f * p.rot;
+            sprite.scale.set(this.portraitBaseScale * (p.sx || 1), this.portraitBaseScale * (p.sy || 1));
+            sprite.alpha = p.alpha === undefined ? 1 : p.alpha;
         }, () => {
-            sprite.x = this.baseX;
-            sprite.y = this.baseY;
-            sprite.rotation = 0;
+            this.lastPose = { dx: 0, dy: 0 };
+            sprite.x = this.baseX; sprite.y = this.baseY; sprite.rotation = 0; sprite.alpha = 1;
             sprite.scale.set(this.portraitBaseScale);
         });
+    }
+
+    // Adds a vector effect that lives for `ms`, updated by onT(t), then is
+    // removed and destroyed.
+    _vfx(obj, ms, onT, back) {
+        (back ? this.backLayer : this.effectLayer).addChild(obj);
+        onT(0);
+        this._tween(ms, onT, () => { if (obj.parent) obj.parent.removeChild(obj); obj.destroy({ children: true }); });
     }
 
     // `effects` is a list of {sprite, tint} - see HIT_EFFECT_SPRITES/
@@ -643,15 +866,17 @@ class CombatStage {
     // G3 (roadmap v2) - a monster has no class motion set, so its own
     // landed hit used to read as nothing at all. A short wind-up, a lunge
     // toward its target (`direction` -1 = left, +1 = right) and back.
-    async playAttack(direction) {
+    async playAttack() {
         await this.ready;
-        const dir = direction || -1;
-        const sprite = this.portraitSprite;
-        this._tween(380, t => {
-            const lunge = t < 0.3 ? -4 * (t / 0.3) : 16 * Math.sin(((t - 0.3) / 0.7) * Math.PI);
-            sprite.x = this.baseX + dir * lunge;
-            sprite.scale.set(this.portraitBaseScale * (1 + 0.08 * Math.max(0, lunge) / 16));
-        }, () => { sprite.x = this.baseX; sprite.scale.set(this.portraitBaseScale); });
+        const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
+        this._perform(set.attack);
+    }
+
+    // A monster matched heart/shield/energy for itself.
+    async playBuff() {
+        await this.ready;
+        const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
+        this._perform(set.buff);
     }
 
     // G3 - topples and fades out; stays down until setPortrait()/revive().
@@ -735,7 +960,7 @@ if (/[?&]debug=1\b/.test(location.search)) document.addEventListener('DOMContent
 // comment in style.css on why filter/box-shadow are avoided at board scale).
 const TILE_BURST_COLORS = {
     // same hues as the board tiles (tools/make_tiles.py DISC)
-    sword: '#ff9a3c', skull: '#b77bff', shield: '#4f9dff', heart: '#ff5c8a', energy: '#ffe24a', teamheal: '#4fe88a'
+    sword: '#ff9a3c', skull: '#ff4a3a', shield: '#4f9dff', heart: '#ff5c8a', energy: '#ffe24a', teamheal: '#4fe88a'
 };
 function cgTileBurst(tileEl, tileType) {
     if (!tileEl || !cgEffectsEnabled()) return;

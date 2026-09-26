@@ -399,3 +399,76 @@ describe('Combat feedback (numbers, sparkles, bar pulse)', { isolate: 'each', wo
         w.g('cgToggleLowGraphics()');
     });
 });
+
+describe('Class choreography (per-class actions + VFX)', { isolate: 'each' }, function () {
+    var SLOTS = ['player-sprite', 'enemy-sprite', 'pvp-my-sprite', 'pvp-opp-sprite', 'coop-my-sprite', 'coop-ally-sprite', 'coop-enemy-sprite'];
+    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+    var ACTIONS = ['sword', 'skull', 'heart', 'shield', 'energy', 'ult'];
+
+    it('every class has its own move for all 6 actions, every monster an attack and a buff', function (ctx) {
+        var A = ctx.world.g('CG_CLASS_ACTIONS'), M = ctx.world.g('CG_MONSTER_ACTIONS');
+        CLASSES.forEach(function (c) {
+            ACTIONS.forEach(function (a) {
+                expect(!!(A[c] && A[c][a] && A[c][a].pose && A[c][a].fx), c + '.' + a).toBe(true);
+                expect(A[c][a].ms, c + '.' + a + ' lasts long enough to read').toBeGreaterThanOrEqual(700);
+            });
+        });
+        ['monster_normal', 'monster_armored', 'monster_swift', 'monster_drain', 'monster_boss'].forEach(function (m) {
+            expect(!!(M[m] && M[m].attack && M[m].buff), m).toBe(true);
+        });
+        // no two classes share the same sword move
+        var fxSrc = CLASSES.map(function (c) { return String(A[c].sword.fx) + String(A[c].sword.pose); });
+        expect(fxSrc.filter(function (s, i) { return fxSrc.indexOf(s) !== i; })).toEqual([]);
+    });
+
+    it('all 42 class actions run, draw effects, then clean up and return to rest', async function (ctx) {
+        var w = ctx.world;
+        var stages = SLOTS.map(function (id) { return w.g("cgGetStage('" + id + "')"); });
+        for (var i = 0; i < 7; i++) {
+            await awaitInWorld(w, stages[i].ready);
+            await awaitInWorld(w, stages[i].setPortrait(w.g('CHARACTER_SPRITES.' + CLASSES[i])));
+        }
+        var drew = [];
+        stages.forEach(function (st, i) {
+            ACTIONS.forEach(function (a) { if (a === 'ult') st.playUlt(CLASSES[i]); else st.playClassMotion(CLASSES[i], a); });
+        });
+        await pumpFrames(w, 120);
+        stages.forEach(function (st, i) { drew.push(st.effectLayer.children.length + st.backLayer.children.length); });
+        drew.forEach(function (n, i) { expect(n, CLASSES[i] + ' spawned effects').toBeGreaterThan(3); });
+        await pumpFrames(w, 1800);
+        stages.forEach(function (st, i) {
+            expect(st.activeTweens, CLASSES[i] + ' tweens').toBe(0);
+            expect(st.effectLayer.children.length + st.backLayer.children.length, CLASSES[i] + ' vfx cleaned').toBe(0);
+            expect(st.portraitSprite.x, CLASSES[i] + ' back at rest').toBe(st.baseX);
+            expect(st.portraitSprite.alpha, CLASSES[i] + ' visible').toBe(1);
+        });
+    }, { timeout: 30000 });
+
+    it('every monster attacks and buffs with its own move, facing left', async function (ctx) {
+        var w = ctx.world, types = ['normal', 'armored', 'swift', 'drain', 'boss'];
+        var stages = SLOTS.slice(0, 5).map(function (id) { return w.g("cgGetStage('" + id + "')"); });
+        for (var i = 0; i < 5; i++) { await awaitInWorld(w, stages[i].ready); await awaitInWorld(w, stages[i].setPortrait(w.g('MONSTER_SPRITES.' + types[i]))); }
+        stages.forEach(function (st) { expect(st.facing).toBe(-1); st.playAttack(); });
+        await pumpFrames(w, 300);
+        stages.forEach(function (st, i) {
+            var moved = st.portraitSprite.x !== st.baseX || st.portraitSprite.y !== st.baseY || st.portraitSprite.alpha !== 1;
+            expect(moved, types[i] + ' attack moves').toBe(true);
+        });
+        await pumpFrames(w, 1000);
+        stages.forEach(function (st) { st.playBuff(); });
+        await pumpFrames(w, 1200);
+        stages.forEach(function (st, i) { expect(st.effectLayer.children.length + st.backLayer.children.length, types[i]).toBe(0); });
+    }, { timeout: 20000 });
+
+    it('low-graphics mode keeps the move but skips the effects', async function (ctx) {
+        var w = ctx.world;
+        var st = w.g("cgGetStage('player-sprite')");
+        await awaitInWorld(w, st.ready); await awaitInWorld(w, st.setPortrait(w.g('CHARACTER_SPRITES.mage')));
+        w.g('cgToggleLowGraphics()');
+        st.playClassMotion('mage', 'skull');
+        await pumpFrames(w, 200);
+        expect(st.effectLayer.children.length + st.backLayer.children.length).toBe(0);
+        expect(st.activeTweens).toBeGreaterThan(0);
+        w.g('cgToggleLowGraphics()');
+    });
+});
