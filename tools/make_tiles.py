@@ -7,7 +7,14 @@ on their own (blade / heart / shield / bolt / skull / plus), so the board
 still reads without color (colorblind players).
 
 Run: python3 tools/make_tiles.py
+
+Besides the PNG files, it inlines each sprite into style.css as a data: URI
+(the `.tile[data-type="..."] { background-image: ... }` rules). They're
+~200 bytes each, and inlining means a freshly built board never paints
+blank cells while 64 new tile elements wait on image requests/decodes - a
+flash seen in live testing on every level start.
 """
+import base64, io, re
 from PIL import Image
 import os
 
@@ -159,4 +166,12 @@ if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for name, rows in TILES.items():
         build(rows).save(os.path.join(OUT, name + '.png'), optimize=True)
-    print('wrote', len(TILES), 'tiles to', os.path.abspath(OUT))
+    css_path = os.path.join(os.path.dirname(__file__), '..', 'style.css')
+    css = open(css_path).read()
+    for name, rows in TILES.items():
+        buf = io.BytesIO(); build(rows).save(buf, 'PNG', optimize=True)
+        uri = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+        css, n = re.subn(r'(\.tile\[data-type="%s"\] \{ background-image: url\()[^)]*(\); \})' % name, lambda m: m.group(1) + "'" + uri + "'" + m.group(2), css)
+        assert n == 1, name
+    open(css_path, 'w').write(css)
+    print('wrote', len(TILES), 'tiles to', os.path.abspath(OUT), '+ inlined into style.css')

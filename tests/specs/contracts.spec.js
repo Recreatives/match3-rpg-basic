@@ -200,6 +200,31 @@ describe('i18n completeness', { world: { pixi: false } }, function () {
         expect(Object.keys(dict).filter(function (k) { return !String(dict[k]).trim(); })).toEqual([]);
     });
 
+    // Found in live testing: the reward title was written in English as the
+    // SOURCE string, so Turkish mode showed "VICTORY! PICK 2".
+    it('Turkish mode shows Turkish (reward title, ULT button), English mode English', async function (ctx) {
+        var w = ctx.world;
+        w.g("setLanguage('tr')");
+        await startSolo(w, 'WARRIOR', { level: 2 });
+        w.g("CLASSES.WARRIOR && document.getElementById('class-selection') && renderClassButtons(); document.getElementById('class-selection').children[0].click()");
+        expect(w.$('ult-btn').textContent).toMatch(/KULLAN/);
+        w.g('maxPlayerHP = 100; playerHP = 50; winLevel()');
+        expect(w.$('overlay-title').textContent).toMatch(/ZAFER/);
+        w.g("setLanguage('en'); updateRewardTitle()");
+        expect(w.$('overlay-title').textContent).toMatch(/VICTORY/);
+        w.g("setLanguage('tr')");
+    });
+
+    it('no English UI text is hard-coded outside the translation system', async function () {
+        var bad = [];
+        for (var i = 0; i < FILES.length; i++) {
+            var src = await readSource(FILES[i]);
+            var re = /(?:innerText|textContent)\s*=\s*[`'"]([^`'"]*)[`'"]/g, m;
+            while ((m = re.exec(src))) if (/\b(USE|VICTORY|PICK|READY|WAITING|NEXT LEVEL|GAME OVER|YOU WIN|YOU LOSE)\b/.test(m[1])) bad.push(FILES[i] + ': ' + m[1]);
+        }
+        expect(bad).toEqual([]);
+    });
+
     it('switching to English and back re-renders static UI without errors', function (ctx) {
         var w = ctx.world;
         w.g("setLanguage('en')");
@@ -290,14 +315,14 @@ describe('DOM rules from CLAUDE.md', { world: { pixi: false } }, function () {
         var css = await readSource('style.css');
         var urls = (css.match(/url\(['"]?([^'")]+)['"]?\)/g) || []).map(function (u) { return u.replace(/^url\(['"]?|['"]?\)$/g, ''); })
             .filter(function (u) { return !/^(data:|https?:|#)/.test(u); });
-        expect(urls.length, 'tile sprites are referenced').toBeGreaterThanOrEqual(6);
         for (var i = 0; i < urls.length; i++) await readSource(urls[i]);
     });
 
     it('every tile type the game can deal has a pixel-art sprite', async function (ctx) {
         var css = await readSource('style.css');
         var types = ctx.world.g('COOP_TILE_TYPES').map(function (t) { return t.type; });
-        types.forEach(function (ty) { expect(css, 'sprite rule for ' + ty).toContain('.tile[data-type="' + ty + '"] { background-image'); });
+        // inlined as data: URIs by tools/make_tiles.py (no first-paint flash)
+        types.forEach(function (ty) { expect(css, 'sprite rule for ' + ty).toContain('.tile[data-type="' + ty + '"] { background-image: url(\'data:image/png;base64,'); });
     });
 
     it('every asset graphics.js references exists', async function () {

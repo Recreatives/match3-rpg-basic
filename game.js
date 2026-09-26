@@ -352,7 +352,7 @@ function renderClassButtons() {
             // (they never call resetGame() - that's solo's own start path),
             // so this needs the exact same clean-slate rebuild.
             rebuildTileStats();
-            document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
+            document.getElementById('ult-btn').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
             updateUI();
             container.style.display = 'none';
             renderModeButtons();
@@ -572,7 +572,7 @@ function winLevel() {
 
 function updateRewardTitle() {
     if (rewardPicksLeft > 0) {
-        overlayTitle.innerText = tf('VICTORY! PICK {n}', { n: rewardPicksLeft });
+        overlayTitle.innerText = tf('ZAFER! {n} ÖDÜL SEÇ', { n: rewardPicksLeft });
         return;
     }
     rewardArea.style.display = 'none';
