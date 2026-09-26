@@ -1,8 +1,8 @@
 """Generates the board tiles as detailed SVG icons on colored medallions.
 
-Each tile = a dark, type-tinted medallion (thin gold rim, soft inner glow)
-carrying a semi-realistic painted-style icon: a beveled steel sword with a
-jeweled hilt, a faceted ruby heart, a riveted steel-and-blue heater shield
+Each tile = a saturated medallion in the type's own hue (thin gold rim,
+soft inner glow) carrying a semi-realistic painted-style icon: crossed
+ornate steel swords with jeweled hilts, a faceted ruby heart, a riveted steel-and-blue heater shield
 with a gold cross, a crackling lightning bolt, a shaded skull with glowing
 sockets, and a green healing potion (co-op's teamheal). Colors AND shapes
 differ per type, so the board reads at a glance and for colorblind players.
@@ -23,40 +23,56 @@ ROOT = os.path.join(os.path.dirname(__file__), '..')
 OUT = os.path.join(ROOT, 'assets', 'tiles')
 INK = '#0d1016'
 
-# medallion tint per type: (light, mid, dark)
+# medallion tint per type: (light, mid, dark). Hues are spread around the
+# color wheel (pink-red, orange, yellow, green, blue, purple) and kept
+# saturated, so every type reads by color alone at a glance - its icon
+# shape is the second, colorblind-safe cue.
 DISC = {
-    'sword':    ('#6a3a2c', '#3a1a14', '#170806'),
-    'heart':    ('#6a2440', '#3e0f24', '#1a050e'),
-    'shield':   ('#2c4a78', '#15284a', '#070f1f'),
-    'energy':   ('#6a5418', '#3a2c08', '#171002'),
-    'skull':    ('#4a2e6e', '#261540', '#0e0718'),
-    'teamheal': ('#1f5a36', '#0e3320', '#04140b'),
+    'heart':    ('#ff5c8a', '#c4144a', '#4a0418'),
+    'sword':    ('#ff9a3c', '#c2520a', '#4a1a02'),
+    'energy':   ('#ffe24a', '#c79a00', '#4a3500'),
+    'teamheal': ('#4fe88a', '#12994a', '#033a18'),
+    'shield':   ('#4f9dff', '#1653c4', '#051c4a'),
+    'skull':    ('#b77bff', '#6a2cc4', '#22074a'),
 }
-GLOW = {'sword': '#ff8a5a', 'heart': '#ff4f7f', 'shield': '#5aa8ff', 'energy': '#ffd84a', 'skull': '#b27bff', 'teamheal': '#4ef08c'}
+GLOW = {'sword': '#ffd08a', 'heart': '#ffb3c8', 'shield': '#b8dcff', 'energy': '#fff3a8', 'skull': '#e2c8ff', 'teamheal': '#bfffd6'}
+
+
+def _blade(rot):
+    """One ornate sword, pointing up-left/up-right after `rot` degrees."""
+    return f'''
+<g transform="rotate({rot} 50 50)">
+  <path d="M50 0 L60 13 L60 60 L40 60 L40 13 Z" fill="{INK}"/>
+  <path d="M50 3 L50 58 L42.5 58 L42.5 14 Z" fill="url(#bladeL)"/>
+  <path d="M50 3 L57.5 14 L57.5 58 L50 58 Z" fill="url(#bladeR)"/>
+  <path d="M50 12 L50 55" stroke="#2f3944" stroke-width="2.4"/>
+  <path d="M50 12 L50 55" stroke="#aebbc8" stroke-width=".9"/>
+  <path d="M45 15 L45 54" stroke="#ffffff" stroke-opacity=".95" stroke-width="1.4"/>
+  <path d="M21 60 Q24 52 32 55 L44 57 Q50 53 56 57 L68 55 Q76 52 79 60 Q76 68 68 65 L56 63 Q50 67 44 63 L32 65 Q24 68 21 60 Z" fill="url(#gold)" stroke="{INK}" stroke-width="2.4" stroke-linejoin="round"/>
+  <circle cx="22.5" cy="60" r="3" fill="url(#gem)" stroke="{INK}" stroke-width="1.2"/>
+  <circle cx="77.5" cy="60" r="3" fill="url(#gem)" stroke="{INK}" stroke-width="1.2"/>
+  <path d="M44 55 L50 49 L56 55 L50 61 Z" fill="url(#gem)" stroke="{INK}" stroke-width="1.6"/>
+  <rect x="45" y="65" width="10" height="19" rx="2.5" fill="url(#grip)" stroke="{INK}" stroke-width="2.4"/>
+  <path d="M45 69 L55 72 M45 74 L55 77 M45 79 L55 82" stroke="#2a1206" stroke-width="1.5"/>
+  <path d="M43 86 Q50 82 57 86 L55 94 Q50 97 45 94 Z" fill="url(#gold)" stroke="{INK}" stroke-width="2.4" stroke-linejoin="round"/>
+</g>'''
 
 
 def icon_sword():
+    # crossed pair of ornate swords + a glint where they cross
     return f'''
 <defs>
-  <linearGradient id="bladeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4f8fc"/><stop offset="1" stop-color="#c9d4de"/></linearGradient>
-  <linearGradient id="bladeR" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8e9cab"/><stop offset="1" stop-color="#5a6674"/></linearGradient>
-  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0a8"/><stop offset=".45" stop-color="#e2b23e"/><stop offset="1" stop-color="#8a5a0e"/></linearGradient>
-  <linearGradient id="grip" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a4f2a"/><stop offset="1" stop-color="#4a2410"/></linearGradient>
-  <radialGradient id="gem" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#ffb3b3"/><stop offset=".5" stop-color="#e0182a"/><stop offset="1" stop-color="#5a0008"/></radialGradient>
+  <linearGradient id="bladeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd9e3"/></linearGradient>
+  <linearGradient id="bladeR" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#95a3b2"/><stop offset="1" stop-color="#5a6674"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b8"/><stop offset=".45" stop-color="#e8b43a"/><stop offset="1" stop-color="#8a5208"/></linearGradient>
+  <linearGradient id="grip" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9a5a2e"/><stop offset="1" stop-color="#4a2410"/></linearGradient>
+  <radialGradient id="gem" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#bfe3ff"/><stop offset=".5" stop-color="#1f7ae0"/><stop offset="1" stop-color="#062a5a"/></radialGradient>
 </defs>
-<g transform="rotate(45 50 50)">
-  <path d="M50 2 L58 14 L58 63 L42 63 L42 14 Z" fill="{INK}"/>
-  <path d="M50 5 L50 61 L44 61 L44 15 Z" fill="url(#bladeL)"/>
-  <path d="M50 5 L56 15 L56 61 L50 61 Z" fill="url(#bladeR)"/>
-  <path d="M50 14 L50 58" stroke="#3e4955" stroke-width="1.6"/>
-  <path d="M46 16 L46 56" stroke="#ffffff" stroke-opacity=".9" stroke-width="1.2"/>
-  <path d="M27 63 Q30 58 36 60 L64 60 Q70 58 73 63 Q70 69 64 67 L36 67 Q30 69 27 63 Z" fill="url(#gold)" stroke="{INK}" stroke-width="2.4" stroke-linejoin="round"/>
-  <circle cx="50" cy="63.5" r="4.2" fill="url(#gem)" stroke="{INK}" stroke-width="1.6"/>
-  <rect x="45" y="67" width="10" height="18" rx="2" fill="url(#grip)" stroke="{INK}" stroke-width="2.4"/>
-  <path d="M45 71 L55 74 M45 76 L55 79 M45 81 L55 84" stroke="#2a1206" stroke-width="1.4"/>
-  <circle cx="50" cy="90" r="6" fill="url(#gold)" stroke="{INK}" stroke-width="2.4"/>
-  <circle cx="48.5" cy="88.5" r="1.8" fill="#fff" fill-opacity=".8"/>
-</g>'''
+<g transform="translate(50 50) scale(.92) translate(-50 -50)">
+{_blade(-38)}
+{_blade(38)}
+</g>
+<path d="M50 20 l2.6 7 7 2.6 -7 2.6 -2.6 7 -2.6 -7 -7 -2.6 7 -2.6Z" fill="#ffffff"/>'''
 
 
 def icon_heart():

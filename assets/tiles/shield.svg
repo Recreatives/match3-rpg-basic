@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 <defs>
-  <radialGradient id="disc" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#2c4a78"/><stop offset=".6" stop-color="#15284a"/><stop offset="1" stop-color="#070f1f"/></radialGradient>
+  <radialGradient id="disc" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#4f9dff"/><stop offset=".6" stop-color="#1653c4"/><stop offset="1" stop-color="#051c4a"/></radialGradient>
   <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffeaa0"/><stop offset=".5" stop-color="#b8892c"/><stop offset="1" stop-color="#4a2f06"/></linearGradient>
-  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#5aa8ff" stop-opacity=".45"/><stop offset="1" stop-color="#5aa8ff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#b8dcff" stop-opacity=".45"/><stop offset="1" stop-color="#b8dcff" stop-opacity="0"/></radialGradient>
 </defs>
 <circle cx="50" cy="52" r="47" fill="#000" fill-opacity=".45"/>
 <circle cx="50" cy="50" r="47" fill="url(#ring)"/>

@@ -734,7 +734,8 @@ if (/[?&]debug=1\b/.test(location.search)) document.addEventListener('DOMContent
 // this project's existing mobile-GPU-perf discipline (see .tile's own
 // comment in style.css on why filter/box-shadow are avoided at board scale).
 const TILE_BURST_COLORS = {
-    sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f', teamheal: '#2ecc71'
+    // same hues as the board tiles (tools/make_tiles.py DISC)
+    sword: '#ff9a3c', skull: '#b77bff', shield: '#4f9dff', heart: '#ff5c8a', energy: '#ffe24a', teamheal: '#4fe88a'
 };
 function cgTileBurst(tileEl, tileType) {
     if (!tileEl || !cgEffectsEnabled()) return;
