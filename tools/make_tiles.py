@@ -29,7 +29,9 @@ INK = '#0d1016'
 # shape is the second, colorblind-safe cue.
 DISC = {
     'heart':    ('#ff5c8a', '#c4144a', '#4a0418'),
-    'sword':    ('#ff9a3c', '#c2520a', '#4a1a02'),
+    # the one LIGHT tile: polished silver - separates from the red heart by
+    # brightness, not just hue (orange read too close to it)
+    'sword':    ('#ffffff', '#c9d2dc', '#6b7784'),
     'energy':   ('#ffe24a', '#c79a00', '#4a3500'),
     'teamheal': ('#4fe88a', '#12994a', '#033a18'),
     'shield':   ('#4f9dff', '#1653c4', '#051c4a'),
@@ -37,7 +39,7 @@ DISC = {
     # the blue shield (a purple skull was too close) and says 'danger'
     'skull':    ('#5a5a66', '#26262e', '#08080b'),
 }
-GLOW = {'sword': '#ffd08a', 'heart': '#ffb3c8', 'shield': '#b8dcff', 'energy': '#fff3a8', 'skull': '#ff5a4a', 'teamheal': '#bfffd6'}
+GLOW = {'sword': '#ffffff', 'heart': '#ffb3c8', 'shield': '#b8dcff', 'energy': '#fff3a8', 'skull': '#ff5a4a', 'teamheal': '#bfffd6'}
 
 
 def _blade(rot):
@@ -64,8 +66,8 @@ def icon_sword():
     # crossed pair of ornate swords + a glint where they cross
     return f'''
 <defs>
-  <linearGradient id="bladeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd9e3"/></linearGradient>
-  <linearGradient id="bladeR" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#95a3b2"/><stop offset="1" stop-color="#5a6674"/></linearGradient>
+  <linearGradient id="bladeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8eef5"/><stop offset="1" stop-color="#98a8ba"/></linearGradient>
+  <linearGradient id="bladeR" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5f6f82"/><stop offset="1" stop-color="#2e3a48"/></linearGradient>
   <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b8"/><stop offset=".45" stop-color="#e8b43a"/><stop offset="1" stop-color="#8a5208"/></linearGradient>
   <linearGradient id="grip" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9a5a2e"/><stop offset="1" stop-color="#4a2410"/></linearGradient>
   <radialGradient id="gem" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#bfe3ff"/><stop offset=".5" stop-color="#1f7ae0"/><stop offset="1" stop-color="#062a5a"/></radialGradient>

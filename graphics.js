@@ -960,7 +960,7 @@ if (/[?&]debug=1\b/.test(location.search)) document.addEventListener('DOMContent
 // comment in style.css on why filter/box-shadow are avoided at board scale).
 const TILE_BURST_COLORS = {
     // same hues as the board tiles (tools/make_tiles.py DISC)
-    sword: '#ff9a3c', skull: '#ff4a3a', shield: '#4f9dff', heart: '#ff5c8a', energy: '#ffe24a', teamheal: '#4fe88a'
+    sword: '#e6edf5', skull: '#ff4a3a', shield: '#4f9dff', heart: '#ff5c8a', energy: '#ffe24a', teamheal: '#4fe88a'
 };
 function cgTileBurst(tileEl, tileType) {
     if (!tileEl || !cgEffectsEnabled()) return;
