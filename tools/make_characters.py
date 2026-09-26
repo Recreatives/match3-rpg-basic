@@ -45,9 +45,13 @@ def shine(d, op=.35):
     return f'<path d="{d}" fill="#ffffff" fill-opacity="{op}"/>'
 
 # ----------------------------------------------------------- body template ---
+def leg(side, pants, boots):
+    if side == 'L':
+        return P('M78 186 L76 226 L96 226 L98 186 Z', pants) + P('M70 222 Q70 236 86 236 L99 236 L99 222 Z', boots)
+    return P('M102 186 L104 226 L124 226 L122 186 Z', pants) + P('M101 222 L101 236 L114 236 Q130 236 130 222 Z', boots)
+
 def legs(pants, boots):
-    return (P('M78 188 L76 226 L96 226 L98 188 Z', pants) + P('M102 188 L104 226 L124 226 L122 188 Z', pants)
-            + P('M70 222 Q70 236 86 236 L99 236 L99 222 Z', boots) + P('M101 222 L101 236 L114 236 Q130 236 130 222 Z', boots))
+    return leg('L', pants, boots) + leg('R', pants, boots)
 
 def torso(fill, belt=None):
     s = P('M66 132 Q64 120 80 116 L120 116 Q136 120 134 132 L128 194 Q100 202 72 194 Z', fill)
@@ -160,180 +164,209 @@ def sun_shield(x=52, y=162):
     return s
 
 # ------------------------------------------------------------- characters ---
+# Every character is a RIG: separate parts, each drawn in place in the same
+# 200x250 box, rotated at runtime around its joint (graphics.js). Parts:
+#   back  - behind everything (cape, wings, tail, quiver); fixed to the body
+#   legL, legR - pivot at the hip
+#   torso - pivot at the waist; carries head and both arms with it
+#   head  - pivot at the neck
+#   armL  - viewer's-left arm + off-hand (shield / bow / dagger); shoulder pivot
+#   armR  - viewer's-right arm + weapon; shoulder pivot
+# Heroes and monsters are all drawn facing right; graphics.js mirrors
+# monsters at runtime so their joints animate the same way.
 DEFS_COMMON = (grad('steel', '#ffffff', '#8b9aa9', '1', '1') + grad('gold', '#ffe89a', '#b07a16')
                + rgrad('orb', '#e8fbff', '#2aa8ff') + grad('shieldblue', '#4f8fe8', '#1f3f8a'))
+PART_ORDER = ['back', 'legL', 'legR', 'torso', 'head', 'armL', 'armR']
+PIVOTS = {'legL': (88, 190), 'legR': (112, 190), 'torso': (100, 196), 'head': (100, 124),
+          'armL': (72, 134), 'armR': (128, 134)}
 
-def svg_doc(defs, body, mirror=False, skin=('#ffd9b8', '#e9a877')):
-    inner = f'<g transform="translate(200 0) scale(-1 1)">{body}</g>' if mirror else body
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 250" width="400" height="500">'
+def svg_wrap(defs, body, skin, size=(200, 250), mirror=False, with_shadow=False, scale=None):
+    inner = body
+    if scale:
+        inner = f'<g transform="translate(100 250) scale({scale}) translate(-100 -250)">{inner}</g>'
+    if mirror:
+        inner = f'<g transform="translate(200 0) scale(-1 1)">{inner}</g>'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 250" width="{size[0]}" height="{size[1]}">'
             f'<defs>{DEFS_COMMON}{rgrad("skin", skin[0], skin[1], "40%", "30%", "75%")}{defs}</defs>'
-            f'{shadow()}{inner}</svg>')
-
-def hero_base(skin_tone, outfit, pants, boots, sleeve=None, belt='#5b3a22', glove=None):
-    return legs(pants, boots) + torso(outfit, belt) + arm('L', sleeve or outfit, skin_tone, glove) + arm('R', sleeve or outfit, skin_tone, glove)
+            f'{shadow() if with_shadow else ""}{inner}</svg>')
 
 SKIN_LIGHT = ('#ffe0c4', '#e8a878')
 SKIN_TAN = ('#f2c08f', '#c98450')
 SKIN_PALE = ('#e9e6f2', '#a8a3c0')
+SKIN_GOBLIN = ('#a6e06a', '#4f8a2a')
+
+def rig(defs, skin, parts, monster=False, scale=None, pivots=None):
+    return {'defs': defs, 'skin': skin, 'parts': parts, 'monster': monster, 'scale': scale,
+            'pivots': dict(PIVOTS, **(pivots or {}))}
 
 def warrior():
     d = grad('armor', '#e9eef3', '#7d8b99') + grad('cape', '#e0433b', '#7d1510')
-    b = P('M62 128 Q40 180 54 232 L146 232 Q160 180 138 128 Z', 'url(#cape)')
-    b += hero_base('url(#skin)', 'url(#armor)', '#4a5563', '#3a3f4a', 'url(#armor)', '#7a4a24', 'url(#armor)')
-    b += P('M84 122 L116 122 L112 150 L88 150 Z', '#c0312a', 3)
-    b += head('')
-    b += eyes('#2a4d7a') + mouth('grim')
-    b += P('M52 84 Q52 30 100 30 Q148 30 148 84 L136 84 Q134 58 100 56 Q66 58 64 84 Z', 'url(#armor)')
-    b += P('M96 56 L104 56 L104 96 L96 96 Z', 'url(#armor)', 3)
-    b += P('M100 30 Q104 8 128 4 Q116 16 118 28 Q110 22 100 30 Z', '#e0433b', 3)
-    b += round_shield(50, 166) + sword(152, 172)
-    return svg_doc(d, b, skin=SKIN_LIGHT)
+    torso_ = torso('url(#armor)', '#7a4a24') + P('M84 122 L116 122 L112 150 L88 150 Z', '#c0312a', 3)
+    head_ = (head('') + eyes('#2a4d7a') + mouth('grim')
+             + P('M52 84 Q52 30 100 30 Q148 30 148 84 L136 84 Q134 58 100 56 Q66 58 64 84 Z', 'url(#armor)')
+             + P('M96 56 L104 56 L104 96 L96 96 Z', 'url(#armor)', 3)
+             + P('M100 30 Q104 8 128 4 Q116 16 118 28 Q110 22 100 30 Z', '#e0433b', 3))
+    return rig(d, SKIN_LIGHT, {
+        'back': P('M62 128 Q40 180 54 232 L146 232 Q160 180 138 128 Z', 'url(#cape)'),
+        'legL': leg('L', '#4a5563', '#3a3f4a'), 'legR': leg('R', '#4a5563', '#3a3f4a'),
+        'torso': torso_, 'head': head_,
+        'armL': arm('L', 'url(#armor)', 'url(#skin)', 'url(#armor)') + round_shield(50, 166),
+        'armR': sword(152, 172) + arm('R', 'url(#armor)', 'url(#skin)', 'url(#armor)'),
+    })
 
 def berserker():
     d = grad('fur', '#b98a5a', '#6b4526') + grad('horn', '#fffbea', '#c9b98f')
-    b = legs('#5a3a26', '#3a2718') + P('M66 132 Q64 120 80 116 L120 116 Q136 120 134 132 L128 194 Q100 202 72 194 Z', 'url(#skin)')
-    b += P('M84 150 Q100 158 116 150', 'none', 2.5) + P('M100 132 L100 150', 'none', 2.5)
-    b += P('M70 176 Q100 184 130 176 L129 190 Q100 198 71 190 Z', '#3f2a1a', 3)
-    b += arm('L', 'url(#skin)', 'url(#skin)') + arm('R', 'url(#skin)', 'url(#skin)')
-    b += P('M60 120 Q66 104 84 110 L88 128 Q70 134 60 120 Z', 'url(#fur)', 3) + P('M140 120 Q134 104 116 110 L112 128 Q130 134 140 120 Z', 'url(#fur)', 3)
-    b += head('')
-    b += P('M58 92 Q60 140 100 140 Q140 140 142 92 Q128 116 100 116 Q72 116 58 92 Z', '#b5431d')
-    b += eyes('#3b2a1a', angry=True) + mouth('shout', 112)
-    b += P('M72 96 L80 102 M120 102 L128 96', 'none', 3.5, 'stroke="#2f7ae0"')
-    b += P('M54 76 Q54 36 100 36 Q146 36 146 76 L138 70 Q100 56 62 70 Z', '#6d7784')
-    b += P('M56 62 Q28 50 26 18 Q44 36 64 44 Z', 'url(#horn)', 3.5) + P('M144 62 Q172 50 174 18 Q156 36 136 44 Z', 'url(#horn)', 3.5)
-    b += axe(156, 176, double=False)
-    return svg_doc(d, b, skin=SKIN_TAN)
+    torso_ = (P('M66 132 Q64 120 80 116 L120 116 Q136 120 134 132 L128 194 Q100 202 72 194 Z', 'url(#skin)')
+              + P('M84 150 Q100 158 116 150', 'none', 2.5) + P('M100 132 L100 150', 'none', 2.5)
+              + P('M70 176 Q100 184 130 176 L129 190 Q100 198 71 190 Z', '#3f2a1a', 3))
+    head_ = (head('') + P('M58 92 Q60 140 100 140 Q140 140 142 92 Q128 116 100 116 Q72 116 58 92 Z', '#b5431d')
+             + eyes('#3b2a1a', angry=True) + mouth('shout', 112)
+             + P('M72 96 L80 102 M120 102 L128 96', 'none', 3.5, 'stroke="#2f7ae0"')
+             + P('M54 76 Q54 36 100 36 Q146 36 146 76 L138 70 Q100 56 62 70 Z', '#6d7784')
+             + P('M56 62 Q28 50 26 18 Q44 36 64 44 Z', 'url(#horn)', 3.5) + P('M144 62 Q172 50 174 18 Q156 36 136 44 Z', 'url(#horn)', 3.5))
+    return rig(d, SKIN_TAN, {
+        'legL': leg('L', '#5a3a26', '#3a2718'), 'legR': leg('R', '#5a3a26', '#3a2718'),
+        'torso': torso_, 'head': head_,
+        'armL': arm('L', 'url(#skin)', 'url(#skin)') + P('M60 120 Q66 104 84 110 L88 128 Q70 134 60 120 Z', 'url(#fur)', 3),
+        'armR': axe(156, 176, double=False) + arm('R', 'url(#skin)', 'url(#skin)') + P('M140 120 Q134 104 116 110 L112 128 Q130 134 140 120 Z', 'url(#fur)', 3),
+    })
 
 def rogue():
     d = grad('hood', '#6b4fa0', '#2a1c4a') + grad('leather', '#4b3a5e', '#221832')
-    b = hero_base('url(#skin)', 'url(#leather)', '#2b2238', '#18121f', 'url(#leather)', '#5a3a22', '#2b2238')
-    b += P('M72 140 L128 176 M128 140 L72 176', 'none', 3, 'stroke="#8e6fc0"')
-    b += head('')
-    b += P('M58 96 Q60 132 100 134 Q140 132 142 96 Z', '#2a1c4a')
-    b += eyes('#6a2b9a', angry=True, y=86)
-    b += P('M46 98 Q40 26 100 22 Q160 26 154 98 Q146 64 100 60 Q54 64 46 98 Z', 'url(#hood)')
-    b += P('M46 98 Q52 122 64 130 L70 118 Q58 110 56 96 Z', 'url(#hood)', 3) + P('M154 98 Q148 122 136 130 L130 118 Q142 110 144 96 Z', 'url(#hood)', 3)
-    b += dagger(146, 172) + dagger(54, 172, flip=True)
-    return svg_doc(d, b, skin=SKIN_LIGHT)
+    head_ = (head('') + P('M58 96 Q60 132 100 134 Q140 132 142 96 Z', '#2a1c4a') + eyes('#6a2b9a', angry=True, y=86)
+             + P('M46 98 Q40 26 100 22 Q160 26 154 98 Q146 64 100 60 Q54 64 46 98 Z', 'url(#hood)')
+             + P('M46 98 Q52 122 64 130 L70 118 Q58 110 56 96 Z', 'url(#hood)', 3) + P('M154 98 Q148 122 136 130 L130 118 Q142 110 144 96 Z', 'url(#hood)', 3))
+    return rig(d, SKIN_LIGHT, {
+        'legL': leg('L', '#2b2238', '#18121f'), 'legR': leg('R', '#2b2238', '#18121f'),
+        'torso': torso('url(#leather)', '#5a3a22') + P('M72 140 L128 176 M128 140 L72 176', 'none', 3, 'stroke="#8e6fc0"'),
+        'head': head_,
+        'armL': arm('L', 'url(#leather)', 'url(#skin)', '#2b2238') + dagger(54, 172, flip=True),
+        'armR': arm('R', 'url(#leather)', 'url(#skin)', '#2b2238') + dagger(146, 172),
+    })
 
 def archer():
     d = grad('green', '#6fbf5a', '#2c6a2a') + grad('leather', '#a0703f', '#5a3a1c')
-    b = R(126, 96, 22, 66, 6, '#7a4a24', 3.5, 'transform="rotate(18 137 129)"')
-    b += ''.join(P(f'M{130+i*5} 98 L{128+i*5} 80 L{134+i*5} 86 Z', '#e8e0cc', 2) for i in range(3))
-    b += hero_base('url(#skin)', 'url(#leather)', '#3f5a2a', '#4a2f18', 'url(#green)', '#3a2616')
-    b += head('')
-    b += P('M68 60 Q100 44 132 60 L128 70 Q100 60 72 70 Z', '#c98a3a', 3)
-    b += eyes('#2d6b2a') + mouth('smile') + blush()
-    b += P('M50 90 Q44 24 100 22 Q156 24 150 90 Q144 56 100 52 Q56 56 50 90 Z', 'url(#green)')
-    b += P('M150 70 Q176 76 184 60 Q170 90 148 92 Z', 'url(#green)', 3)
-    b += bow(40, 152)
-    return svg_doc(d, b, skin=SKIN_LIGHT)
+    back = (R(126, 96, 22, 66, 6, '#7a4a24', 3.5, 'transform="rotate(18 137 129)"')
+            + ''.join(P(f'M{130+i*5} 98 L{128+i*5} 80 L{134+i*5} 86 Z', '#e8e0cc', 2) for i in range(3)))
+    head_ = (head('') + P('M68 60 Q100 44 132 60 L128 70 Q100 60 72 70 Z', '#c98a3a', 3) + eyes('#2d6b2a') + mouth('smile') + blush()
+             + P('M50 90 Q44 24 100 22 Q156 24 150 90 Q144 56 100 52 Q56 56 50 90 Z', 'url(#green)')
+             + P('M150 70 Q176 76 184 60 Q170 90 148 92 Z', 'url(#green)', 3))
+    return rig(d, SKIN_LIGHT, {
+        'back': back,
+        'legL': leg('L', '#3f5a2a', '#4a2f18'), 'legR': leg('R', '#3f5a2a', '#4a2f18'),
+        'torso': torso('url(#leather)', '#3a2616'), 'head': head_,
+        'armL': bow(40, 152) + arm('L', 'url(#green)', 'url(#skin)'),
+        'armR': arm('R', 'url(#green)', 'url(#skin)'),
+    })
+
+def robe_torso(fill, trim):
+    return (P('M64 132 Q62 120 80 116 L120 116 Q138 120 136 132 L150 232 L50 232 Z', fill)
+            + P('M96 118 L104 118 L108 232 L92 232 Z', trim, 3))
 
 def mage():
     d = grad('robe', '#4f7fe0', '#1d2f7a') + grad('hat', '#5a86ea', '#1a2a6e')
-    b = P('M64 132 Q62 120 80 116 L120 116 Q138 120 136 132 L150 232 L50 232 Z', 'url(#robe)')
-    b += P('M96 118 L104 118 L108 232 L92 232 Z', '#e8c35a', 3)
-    b += arm('L', 'url(#robe)', 'url(#skin)') + arm('R', 'url(#robe)', 'url(#skin)')
-    b += head('')
-    b += eyes('#2b6ad6') + mouth('smile') + blush()
-    b += P('M64 104 Q100 150 136 104 Q124 124 100 126 Q76 124 64 104 Z', '#f2f0ea', 3)
-    b += P('M40 66 Q100 50 160 66 Q152 78 100 72 Q48 78 40 66 Z', 'url(#hat)')
-    b += P('M62 66 Q84 34 96 -8 Q116 20 132 22 Q124 40 138 66 Z', 'url(#hat)')
-    b += '<path d="M104 30 l3 6 6 1 -5 4 1 6 -5 -3 -5 3 1 -6 -5 -4 6 -1Z" fill="#ffe46a"/>'
-    b += '<path d="M82 52 l2 4 4 .5 -3 3 .7 4 -3.7 -2 -3.7 2 .7 -4 -3 -3 4 -.5Z" fill="#ffe46a"/>'
-    b += staff(152, 172, 'orb', '#5bc8ff')
-    return svg_doc(d, b, skin=SKIN_LIGHT)
+    head_ = (head('') + eyes('#2b6ad6') + mouth('smile') + blush()
+             + P('M64 104 Q100 150 136 104 Q124 124 100 126 Q76 124 64 104 Z', '#f2f0ea', 3)
+             + P('M40 66 Q100 50 160 66 Q152 78 100 72 Q48 78 40 66 Z', 'url(#hat)')
+             + P('M62 66 Q84 34 96 -8 Q116 20 132 22 Q124 40 138 66 Z', 'url(#hat)')
+             + '<path d="M104 30 l3 6 6 1 -5 4 1 6 -5 -3 -5 3 1 -6 -5 -4 6 -1Z" fill="#ffe46a"/>'
+             + '<path d="M82 52 l2 4 4 .5 -3 3 .7 4 -3.7 -2 -3.7 2 .7 -4 -3 -3 4 -.5Z" fill="#ffe46a"/>')
+    return rig(d, SKIN_LIGHT, {
+        'torso': robe_torso('url(#robe)', '#e8c35a'), 'head': head_,
+        'armL': arm('L', 'url(#robe)', 'url(#skin)'),
+        'armR': staff(152, 172, 'orb', '#5bc8ff') + arm('R', 'url(#robe)', 'url(#skin)'),
+    })
 
 def necromancer():
     d = grad('robe', '#3a2f4a', '#120d1a') + grad('trim', '#b57bff', '#5a2aa0')
-    b = P('M64 132 Q62 120 80 116 L120 116 Q138 120 136 132 L150 232 L50 232 Z', 'url(#robe)')
-    b += P('M96 118 L104 118 L108 232 L92 232 Z', 'url(#trim)', 3)
-    b += arm('L', 'url(#robe)', 'url(#skin)') + arm('R', 'url(#robe)', 'url(#skin)')
-    b += head('')
-    b += P('M74 106 Q100 118 126 106', 'none', 2.5, 'stroke="#7a6f96"')
-    b += eyes(glow='#c58bff', y=88) + mouth('grim', 112)
-    b += P('M44 104 Q36 22 100 18 Q164 22 156 104 Q146 60 100 56 Q54 60 44 104 Z', 'url(#robe)')
-    b += P('M44 104 Q36 22 100 18 Q164 22 156 104', 'none', 3, 'stroke="#b57bff"')
-    b += staff(152, 172, 'skull', '#b57bff')
-    b += '<circle cx="46" cy="170" r="16" fill="#b57bff" fill-opacity=".35"/>' + C(46, 170, 7, '#d9b8ff', 2)
-    return svg_doc(d, b, skin=SKIN_PALE)
+    head_ = (head('') + P('M74 106 Q100 118 126 106', 'none', 2.5, 'stroke="#7a6f96"') + eyes(glow='#c58bff', y=88) + mouth('grim', 112)
+             + P('M44 104 Q36 22 100 18 Q164 22 156 104 Q146 60 100 56 Q54 60 44 104 Z', 'url(#robe)')
+             + P('M44 104 Q36 22 100 18 Q164 22 156 104', 'none', 3, 'stroke="#b57bff"'))
+    return rig(d, SKIN_PALE, {
+        'torso': robe_torso('url(#robe)', 'url(#trim)'), 'head': head_,
+        'armL': arm('L', 'url(#robe)', 'url(#skin)') + '<circle cx="46" cy="170" r="16" fill="#b57bff" fill-opacity=".35"/>' + C(46, 170, 7, '#d9b8ff', 2),
+        'armR': staff(152, 172, 'skull', '#b57bff') + arm('R', 'url(#robe)', 'url(#skin)'),
+    })
 
 def paladin():
     d = grad('armor', '#fff6d6', '#c9a13f') + grad('tabard', '#ffffff', '#cfd6e2')
-    b = '<ellipse cx="100" cy="30" rx="36" ry="9" fill="none" stroke="#ffe46a" stroke-width="5" stroke-opacity=".9"/>'
-    b += hero_base('url(#skin)', 'url(#armor)', '#8a6a2a', '#5a4418', 'url(#armor)', '#7a4a24', 'url(#armor)')
-    b += P('M84 122 L116 122 L114 190 L86 190 Z', 'url(#tabard)', 3) + P('M96 136 H104 V148 H114 V156 H104 V176 H96 V156 H86 V148 H96 Z', '#e8c35a', 2)
-    b += head('')
-    b += P('M56 84 Q52 36 100 34 Q148 36 144 84 Q132 60 100 58 Q68 60 56 84 Z', '#f2c94c')
-    b += eyes('#2a6fd0') + mouth('smile') + blush()
-    b += P('M58 76 Q66 62 80 60', 'none', 3) + P('M142 76 Q134 62 120 60', 'none', 3)
-    b += sun_shield(50, 166) + hammer(152, 176)
-    return svg_doc(d, b, skin=SKIN_LIGHT)
-
-# monsters (drawn facing right like heroes, then mirrored to face left)
-SKIN_GOBLIN = ('#a6e06a', '#4f8a2a')
+    head_ = ('<ellipse cx="100" cy="30" rx="36" ry="9" fill="none" stroke="#ffe46a" stroke-width="5" stroke-opacity=".9"/>'
+             + head('') + P('M56 84 Q52 36 100 34 Q148 36 144 84 Q132 60 100 58 Q68 60 56 84 Z', '#f2c94c')
+             + eyes('#2a6fd0') + mouth('smile') + blush()
+             + P('M58 76 Q66 62 80 60', 'none', 3) + P('M142 76 Q134 62 120 60', 'none', 3))
+    return rig(d, SKIN_LIGHT, {
+        'legL': leg('L', '#8a6a2a', '#5a4418'), 'legR': leg('R', '#8a6a2a', '#5a4418'),
+        'torso': torso('url(#armor)', '#7a4a24') + P('M84 122 L116 122 L114 190 L86 190 Z', 'url(#tabard)', 3)
+                 + P('M96 136 H104 V148 H114 V156 H104 V176 H96 V156 H86 V148 H96 Z', '#e8c35a', 2),
+        'head': head_,
+        'armL': arm('L', 'url(#armor)', 'url(#skin)', 'url(#armor)') + sun_shield(50, 166),
+        'armR': hammer(152, 176) + arm('R', 'url(#armor)', 'url(#skin)', 'url(#armor)'),
+    })
 
 def goblin():
     d = grad('rag', '#9a6b3f', '#5a3a1c')
-    b = legs('url(#skin)', '#5a3a1c') + torso('url(#rag)', '#3f2a1a')
-    b += arm('L', 'url(#skin)', 'url(#skin)') + arm('R', 'url(#skin)', 'url(#skin)')
-    b += ears('', pointy=True, big=True) + head('', cy=86, r=44)
-    b += eyes('#c83a1a', angry=True, y=90) + mouth('fangs', 110)
-    b += P('M96 98 Q100 106 104 98', 'none', 3)
-    b += R(146, 90, 16, 84, 7, '#8a5a2a', 3.5, 'transform="rotate(12 154 132)"') + C(160, 92, 16, '#8a5a2a', 3.5)
-    return svg_doc(d, b, mirror=True, skin=SKIN_GOBLIN)
+    return rig(d, SKIN_GOBLIN, {
+        'legL': leg('L', 'url(#skin)', '#5a3a1c'), 'legR': leg('R', 'url(#skin)', '#5a3a1c'),
+        'torso': torso('url(#rag)', '#3f2a1a'),
+        'head': ears('', pointy=True, big=True) + head('', cy=86, r=44) + eyes('#c83a1a', angry=True, y=90) + mouth('fangs', 110) + P('M96 98 Q100 106 104 98', 'none', 3),
+        'armL': arm('L', 'url(#skin)', 'url(#skin)'),
+        'armR': R(146, 90, 16, 84, 7, '#8a5a2a', 3.5, 'transform="rotate(12 154 132)"') + C(160, 92, 16, '#8a5a2a', 3.5) + arm('R', 'url(#skin)', 'url(#skin)'),
+    }, monster=True)
 
 def golem():
     d = grad('rock', '#a9b2bc', '#4b535c') + grad('moss', '#7fc46a', '#2f6a2a')
-    b = P('M70 196 L66 232 L98 232 L98 196 Z', 'url(#rock)') + P('M102 196 L102 232 L134 232 L130 196 Z', 'url(#rock)')
-    b += P('M52 128 L66 108 L134 108 L148 128 L140 200 L60 200 Z', 'url(#rock)')
-    b += P('M80 130 L96 150 L88 176 M122 124 L112 146 L124 168', 'none', 3)
-    b += P('M52 128 Q70 116 84 124 L80 136 Q64 132 52 128 Z', 'url(#moss)', 3)
-    b += P('M40 132 L60 124 L64 176 L36 180 Z', 'url(#rock)') + P('M160 132 L140 124 L136 176 L164 180 Z', 'url(#rock)')
-    b += R(30, 172, 34, 26, 8, 'url(#rock)', 4) + R(136, 172, 34, 26, 8, 'url(#rock)', 4)
-    b += P('M58 60 L78 30 L122 30 L142 60 L136 106 L64 106 Z', 'url(#rock)')
-    b += P('M70 34 Q90 22 104 30 L98 42 Q84 36 72 44 Z', 'url(#moss)', 3)
-    b += eyes(glow='#62f5ff', y=74) + P('M84 94 L116 94', 'none', 4)
-    return svg_doc(d, b, mirror=True, skin=('#a9b2bc', '#4b535c'))
+    return rig(d, ('#a9b2bc', '#4b535c'), {
+        'legL': P('M70 194 L66 232 L98 232 L98 194 Z', 'url(#rock)'),
+        'legR': P('M102 194 L102 232 L134 232 L130 194 Z', 'url(#rock)'),
+        'torso': (P('M52 128 L66 108 L134 108 L148 128 L140 200 L60 200 Z', 'url(#rock)')
+                  + P('M80 130 L96 150 L88 176 M122 124 L112 146 L124 168', 'none', 3)
+                  + P('M52 128 Q70 116 84 124 L80 136 Q64 132 52 128 Z', 'url(#moss)', 3)),
+        'head': (P('M58 60 L78 30 L122 30 L142 60 L136 106 L64 106 Z', 'url(#rock)')
+                 + P('M70 34 Q90 22 104 30 L98 42 Q84 36 72 44 Z', 'url(#moss)', 3)
+                 + eyes(glow='#62f5ff', y=74) + P('M84 94 L116 94', 'none', 4)),
+        'armL': P('M40 132 L60 124 L64 176 L36 180 Z', 'url(#rock)') + R(30, 172, 34, 26, 8, 'url(#rock)', 4),
+        'armR': P('M160 132 L140 124 L136 176 L164 180 Z', 'url(#rock)') + R(136, 172, 34, 26, 8, 'url(#rock)', 4),
+    }, monster=True, pivots={'armL': (56, 128), 'armR': (144, 128), 'head': (100, 108), 'legL': (84, 196), 'legR': (116, 196)})
 
 def imp():
     d = grad('wing', '#5a1b2a', '#240810')
-    b = P('M70 128 Q20 96 12 50 Q40 70 52 60 Q50 90 76 116 Z', 'url(#wing)') + P('M130 128 Q180 96 188 50 Q160 70 148 60 Q150 90 124 116 Z', 'url(#wing)')
-    b += P('M120 196 Q170 214 176 176 Q182 170 186 180 Q180 226 118 210 Z', 'url(#skin)', 3.5)
-    b += legs('url(#skin)', '#3a0e14') + torso('url(#skin)')
-    b += arm('L', 'url(#skin)', 'url(#skin)') + arm('R', 'url(#skin)', 'url(#skin)')
-    b += P('M134 172 L162 150 M138 178 L168 162 M140 184 L170 176', 'none', 3.5, 'stroke="#f2e6c8"')
-    b += ears('', pointy=True) + head('', cy=86, r=42)
-    b += P('M70 52 Q58 26 66 6 Q76 30 88 44 Z', '#2a0a0e', 3.5) + P('M130 52 Q142 26 134 6 Q124 30 112 44 Z', '#2a0a0e', 3.5)
-    b += eyes('#ffcf33', angry=True, y=90) + mouth('fangs', 108)
-    return svg_doc(d, b, mirror=True, skin=('#ff6a4a', '#9a1f1a'))
+    return rig(d, ('#ff6a4a', '#9a1f1a'), {
+        'back': (P('M70 128 Q20 96 12 50 Q40 70 52 60 Q50 90 76 116 Z', 'url(#wing)') + P('M130 128 Q180 96 188 50 Q160 70 148 60 Q150 90 124 116 Z', 'url(#wing)')
+                 + P('M120 196 Q170 214 176 176 Q182 170 186 180 Q180 226 118 210 Z', 'url(#skin)', 3.5)),
+        'legL': leg('L', 'url(#skin)', '#3a0e14'), 'legR': leg('R', 'url(#skin)', '#3a0e14'),
+        'torso': torso('url(#skin)'),
+        'head': (ears('', pointy=True) + head('', cy=86, r=42)
+                 + P('M70 52 Q58 26 66 6 Q76 30 88 44 Z', '#2a0a0e', 3.5) + P('M130 52 Q142 26 134 6 Q124 30 112 44 Z', '#2a0a0e', 3.5)
+                 + eyes('#ffcf33', angry=True, y=90) + mouth('fangs', 108)),
+        'armL': arm('L', 'url(#skin)', 'url(#skin)'),
+        'armR': arm('R', 'url(#skin)', 'url(#skin)') + P('M134 172 L162 150 M138 178 L168 162 M140 184 L170 176', 'none', 3.5, 'stroke="#f2e6c8"'),
+    }, monster=True)
 
 def wraith():
     d = rgrad('ghost', '#d9c2ff', '#4b2a86', '50%', '35%', '80%') + grad('hood', '#3a2466', '#120a24')
-    b = '<ellipse cx="100" cy="130" rx="86" ry="100" fill="#8a5cff" fill-opacity=".14"/>'
-    b += P('M56 110 Q52 160 60 200 Q70 224 80 206 Q90 232 100 210 Q110 232 120 206 Q130 224 140 200 Q148 160 144 110 Z', 'url(#ghost)', 4, 'fill-opacity=".92"')
-    b += P('M56 128 Q30 150 34 186 Q46 170 60 172 Z', 'url(#ghost)', 3.5) + P('M144 128 Q170 150 166 186 Q154 170 140 172 Z', 'url(#ghost)', 3.5)
-    b += P('M60 150 Q100 166 140 150', 'none', 4, 'stroke="#9aa1b3" stroke-dasharray="8 5"')
-    b += P('M44 104 Q36 22 100 18 Q164 22 156 104 Q146 132 100 132 Q54 132 44 104 Z', 'url(#hood)')
-    b += E(100, 90, 38, 34, '#070410', 0)
-    b += eyes(glow='#c58bff', y=88)
-    return svg_doc(d, b, mirror=True, skin=('#d9c2ff', '#4b2a86'))
+    return rig(d, ('#d9c2ff', '#4b2a86'), {
+        'back': '<ellipse cx="100" cy="130" rx="86" ry="100" fill="#8a5cff" fill-opacity=".14"/>',
+        'torso': (P('M56 110 Q52 160 60 200 Q70 224 80 206 Q90 232 100 210 Q110 232 120 206 Q130 224 140 200 Q148 160 144 110 Z', 'url(#ghost)', 4, 'fill-opacity=".92"')
+                  + P('M60 150 Q100 166 140 150', 'none', 4, 'stroke="#9aa1b3" stroke-dasharray="8 5"')),
+        'head': (P('M44 104 Q36 22 100 18 Q164 22 156 104 Q146 132 100 132 Q54 132 44 104 Z', 'url(#hood)')
+                 + E(100, 90, 38, 34, '#070410', 0) + eyes(glow='#c58bff', y=88)),
+        'armL': P('M56 128 Q30 150 34 186 Q46 170 60 172 Z', 'url(#ghost)', 3.5),
+        'armR': P('M144 128 Q170 150 166 186 Q154 170 140 172 Z', 'url(#ghost)', 3.5),
+    }, monster=True, pivots={'armL': (58, 132), 'armR': (142, 132), 'head': (100, 126)})
 
 def minotaur():
     d = grad('fur', '#8a3a2a', '#3a120c') + grad('horn', '#fffbea', '#b3a27a') + grad('plate', '#5f6772', '#23282f')
-    b = '<g transform="translate(100 250) scale(1.08) translate(-100 -250)">'
-    b += legs('url(#fur)', '#1c0a06') + P('M58 132 Q56 114 78 110 L122 110 Q144 114 142 132 L134 196 Q100 206 66 196 Z', 'url(#skin)')
-    b += P('M66 132 L134 132 L130 160 L70 160 Z', 'url(#plate)', 3.5) + P('M70 176 Q100 186 130 176 L129 190 Q100 200 71 190 Z', '#2a120c', 3)
-    b += arm('L', 'url(#skin)', 'url(#skin)') + arm('R', 'url(#skin)', 'url(#skin)')
-    b += P('M58 60 Q16 52 8 14 Q34 34 60 36 Z', 'url(#horn)', 4) + P('M142 60 Q184 52 192 14 Q166 34 140 36 Z', 'url(#horn)', 4)
-    b += ears('', pointy=True) + head('', cy=82, r=46)
-    b += E(100, 108, 24, 16, '#c88a6a', 3.5) + C(92, 108, 3, O, 0) + C(108, 108, 3, O, 0)
-    b += C(100, 124, 6, 'none', 3, 'stroke="#e8c35a"')
-    b += eyes(glow='#ff5a2a', y=80)
-    b += P('M68 66 L92 74 M132 66 L108 74', 'none', 5)
-    b += axe(156, 176, double=False) + '</g>'
-    return svg_doc(d, b, mirror=True, skin=('#b5523a', '#5a1a10'))
+    return rig(d, ('#b5523a', '#5a1a10'), {
+        'legL': leg('L', 'url(#fur)', '#1c0a06'), 'legR': leg('R', 'url(#fur)', '#1c0a06'),
+        'torso': (P('M58 132 Q56 114 78 110 L122 110 Q144 114 142 132 L134 196 Q100 206 66 196 Z', 'url(#skin)')
+                  + P('M66 132 L134 132 L130 160 L70 160 Z', 'url(#plate)', 3.5) + P('M70 176 Q100 186 130 176 L129 190 Q100 200 71 190 Z', '#2a120c', 3)),
+        'head': (P('M58 60 Q16 52 8 14 Q34 34 60 36 Z', 'url(#horn)', 4) + P('M142 60 Q184 52 192 14 Q166 34 140 36 Z', 'url(#horn)', 4)
+                 + ears('', pointy=True) + head('', cy=82, r=46)
+                 + E(100, 108, 24, 16, '#c88a6a', 3.5) + C(92, 108, 3, O, 0) + C(108, 108, 3, O, 0)
+                 + C(100, 124, 6, 'none', 3, 'stroke="#e8c35a"') + eyes(glow='#ff5a2a', y=80) + P('M68 66 L92 74 M132 66 L108 74', 'none', 5)),
+        'armL': arm('L', 'url(#skin)', 'url(#skin)'),
+        'armR': axe(156, 176, double=False) + arm('R', 'url(#skin)', 'url(#skin)'),
+    }, monster=True, scale=1.08, pivots={'head': (100, 120)})
 
 CHARACTERS = {
     'warrior': warrior, 'berserker': berserker, 'rogue': rogue, 'archer': archer,
@@ -343,7 +376,22 @@ CHARACTERS = {
 }
 
 if __name__ == '__main__':
+    import json
     os.makedirs(OUT, exist_ok=True)
+    rigs = {}
     for key, fn in CHARACTERS.items():
-        open(os.path.join(OUT, key + '.svg'), 'w').write(fn())
-    print('wrote', len(CHARACTERS), 'characters to', os.path.abspath(OUT))
+        r = fn()
+        present = [p for p in PART_ORDER if r['parts'].get(p)]
+        body = ''.join(r['parts'][p] for p in present)
+        # combined portrait (previews, menus), monsters mirrored to face left
+        open(os.path.join(OUT, key + '.svg'), 'w').write(
+            svg_wrap(r['defs'], body, r['skin'], (400, 500), mirror=r['monster'], with_shadow=True, scale=r['scale']))
+        os.makedirs(os.path.join(OUT, key), exist_ok=True)
+        for p in present:
+            open(os.path.join(OUT, key, p + '.svg'), 'w').write(
+                svg_wrap(r['defs'], r['parts'][p], r['skin'], (200, 250), scale=r['scale']))
+        sc = r['scale'] or 1
+        piv = {k: [round(100 + (x - 100) * sc, 1), round(250 + (y - 250) * sc, 1)] for k, (x, y) in r['pivots'].items()}
+        rigs[key] = {'parts': present, 'pivots': piv, 'monster': r['monster']}
+    open(os.path.join(OUT, 'rigs.json'), 'w').write(json.dumps(rigs, indent=1))
+    print('wrote', len(CHARACTERS), 'rigged characters to', os.path.abspath(OUT))

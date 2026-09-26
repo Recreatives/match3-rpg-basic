@@ -1,0 +1,444 @@
+{
+ "warrior": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "berserker": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "rogue": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "archer": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "mage": {
+  "parts": [
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "necromancer": {
+  "parts": [
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "paladin": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
+ "monster_normal": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": true
+ },
+ "monster_armored": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    84,
+    196
+   ],
+   "legR": [
+    116,
+    196
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    108
+   ],
+   "armL": [
+    56,
+    128
+   ],
+   "armR": [
+    144,
+    128
+   ]
+  },
+  "monster": true
+ },
+ "monster_swift": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": true
+ },
+ "monster_drain": {
+  "parts": [
+   "back",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    126
+   ],
+   "armL": [
+    58,
+    132
+   ],
+   "armR": [
+    142,
+    132
+   ]
+  },
+  "monster": true
+ },
+ "monster_boss": {
+  "parts": [
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    87.0,
+    185.2
+   ],
+   "legR": [
+    113.0,
+    185.2
+   ],
+   "torso": [
+    100.0,
+    191.7
+   ],
+   "head": [
+    100.0,
+    109.6
+   ],
+   "armL": [
+    69.8,
+    124.7
+   ],
+   "armR": [
+    130.2,
+    124.7
+   ]
+  },
+  "monster": true
+ }
+}

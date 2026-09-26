@@ -460,6 +460,34 @@ describe('Class choreography (per-class actions + VFX)', { isolate: 'each' }, fu
         stages.forEach(function (st, i) { expect(st.effectLayer.children.length + st.backLayer.children.length, types[i]).toBe(0); });
     }, { timeout: 20000 });
 
+    it('characters are jointed rigs: limbs swing during every action and settle back', async function (ctx) {
+        var w = ctx.world, JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
+        var R = w.g('CG_CLASS_RIGS'), RIGS = w.g('CG_RIGS'), MR = w.g('CG_MONSTER_RIGS');
+        CLASSES.forEach(function (c) { ACTIONS.forEach(function (a) { expect(!!RIGS[R[c][a]], c + '.' + a + ' rig').toBe(true); }); });
+        Object.keys(MR).forEach(function (m) { expect(!!(RIGS[MR[m].attack] && RIGS[MR[m].buff]), m + ' rigs').toBe(true); });
+        var stages = SLOTS.map(function (id) { return w.g("cgGetStage('" + id + "')"); });
+        for (var i = 0; i < 7; i++) {
+            await awaitInWorld(w, stages[i].ready);
+            await awaitInWorld(w, stages[i].setPortrait(w.g('CHARACTER_SPRITES.' + CLASSES[i])));
+            JOINTS.forEach(function (j) { expect(!!stages[i].joints[j], CLASSES[i] + ' has ' + j).toBe(true); });
+        }
+        for (var a = 0; a < ACTIONS.length; a++) {
+            var act = ACTIONS[a];
+            stages.forEach(function (st, i) { if (act === 'ult') st.playUlt(CLASSES[i]); else st.playClassMotion(CLASSES[i], act); });
+            var peak = stages.map(function () { return 0; });
+            for (var f = 0; f < 12; f++) {
+                await pumpFrames(w, 100);
+                stages.forEach(function (st, i) { JOINTS.forEach(function (j) { peak[i] = Math.max(peak[i], Math.abs(st.joints[j].rotation)); }); });
+            }
+            peak.forEach(function (p, i) { expect(p, CLASSES[i] + '.' + act + ' moves a limb clearly').toBeGreaterThan(0.3); });
+            await pumpFrames(w, 1200);
+            stages.forEach(function (st, i) {
+                expect(st.activeTweens, CLASSES[i] + '.' + act + ' done').toBe(0);
+                JOINTS.forEach(function (j) { expect(Math.abs(st.joints[j].rotation), CLASSES[i] + '.' + act + ' ' + j + ' back to idle').toBeLessThan(0.1); });
+            });
+        }
+    }, { timeout: 60000 });
+
     it('low-graphics mode keeps the move but skips the effects', async function (ctx) {
         var w = ctx.world;
         var st = w.g("cgGetStage('player-sprite')");

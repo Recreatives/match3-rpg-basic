@@ -260,19 +260,20 @@ const CG_VFX = {
         }
     },
     afterimages(st, color, { n = 3, gap = 0.08, ms = 700 } = {}) {
+        if (!st.rigParts) return;
         const sprite = st.portraitSprite;
-        if (!sprite.texture || sprite.texture === PIXI.Texture.EMPTY) return;
         for (let i = 1; i <= n; i++) {
-            const ghost = new PIXI.Sprite(sprite.texture);
-            ghost.anchor.set(0.5, 1); ghost.tint = color; ghost.alpha = 0;
-            st._vfx(ghost, ms, t => {
-                // follows the real sprite with a lag, fading out
+            const ghost = st._buildRig(st.rigParts, st.rigPivots, st.facing < 0);
+            ghost.root.tint = color; ghost.root.alpha = 0;
+            CG_JOINTS.forEach(j => { if (ghost.joints[j] && st.joints[j]) ghost.joints[j].rotation = st.joints[j].rotation; });
+            st._vfx(ghost.root, ms, t => {
+                // trails the real body with a lag, fading out
                 const lagT = Math.max(0, t - i * gap);
-                ghost.x = st.baseX + (st.lastPose.dx) * (1 - i * 0.25);
-                ghost.y = st.baseY + st.lastPose.dy;
-                ghost.rotation = sprite.rotation;
-                ghost.scale.set(sprite.scale.x, sprite.scale.y);
-                ghost.alpha = lagT > 0 ? 0.45 * (1 - t) / i : 0;
+                ghost.root.x = st.baseX + st.lastPose.dx * (1 - i * 0.25);
+                ghost.root.y = st.baseY + st.lastPose.dy;
+                ghost.root.rotation = sprite.rotation;
+                ghost.root.scale.set(sprite.scale.x, sprite.scale.y);
+                ghost.root.alpha = lagT > 0 ? 0.45 * (1 - t) / i : 0;
             }, true);
         }
     },
@@ -300,6 +301,92 @@ const CG_VFX = {
         g.rect(0, 0, w, h).fill({ color, alpha: 0.55 });
         st._vfx(g, ms, t => { g.alpha = 1 - t; });
     },
+};
+
+
+// --- CHARACTER RIG (jointed limbs) ----------------------------------------
+// Characters are rigs (tools/make_characters.py -> assets/characters/<key>/
+// <part>.svg + rigs.json): back, legL, legR, torso, head, armL (off-hand),
+// armR (weapon). Each joint rotates around its pivot; the torso carries the
+// head and both arms. Actions animate the joints with keyframes (angles in
+// radians, +clockwise); heroes face right, monsters are mirrored.
+let cgRigsPromise = null;
+function cgLoadRigs() {
+    if (!cgRigsPromise) cgRigsPromise = fetch('assets/characters/rigs.json').then(r => r.json()).catch(() => ({}));
+    return cgRigsPromise;
+}
+
+// keyframes [[t, value], ...] -> smooth (ease-in-out between keys) function
+function cgKeys(frames) {
+    return t => {
+        if (t <= frames[0][0]) return frames[0][1];
+        for (let i = 1; i < frames.length; i++) {
+            const [t1, v1] = frames[i], [t0, v0] = frames[i - 1];
+            if (t <= t1) { const k = (t - t0) / (t1 - t0 || 1); const e = k * k * (3 - 2 * k); return v0 + (v1 - v0) * e; }
+        }
+        return frames[frames.length - 1][1];
+    };
+}
+const CG_JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
+function cgRig(def) { const out = {}; CG_JOINTS.forEach(j => { if (def[j]) out[j] = cgKeys(def[j]); }); return out; }
+const Z = [0, 0], ONE = [1, 0];
+// arm angles: negative swings the arm forward/up toward the enemy (right),
+// about -1.5 is straight forward, about -2.9 straight up over the head.
+const CG_RIGS = {
+    overhead: cgRig({ armR: [Z, [.3, -2.9], [.5, -0.5], [.72, -0.7], ONE], armL: [Z, [.3, 0.35], [.5, -0.45], ONE],
+        torso: [Z, [.3, -0.12], [.5, 0.2], [.75, 0.12], ONE], head: [Z, [.3, -0.08], [.5, 0.1], ONE],
+        legR: [Z, [.45, -0.35], [.75, -0.3], ONE], legL: [Z, [.45, 0.22], [.75, 0.18], ONE] }),
+    heavy: cgRig({ armR: [Z, [.35, -3.0], [.52, -0.4], [.75, -0.6], ONE], armL: [Z, [.35, -2.7], [.54, -0.6], ONE],
+        torso: [Z, [.35, -0.18], [.52, 0.3], [.75, 0.2], ONE], head: [Z, [.35, -0.12], [.52, 0.14], ONE],
+        legR: [Z, [.5, -0.45], [.8, -0.4], ONE], legL: [Z, [.5, 0.3], [.8, 0.25], ONE] }),
+    spin: cgRig({ armR: [Z, [.15, -1.6], [.85, -1.7], ONE], armL: [Z, [.15, 1.1], [.85, 1.1], ONE],
+        legL: [Z, [.5, 0.25], ONE], legR: [Z, [.5, -0.25], ONE], head: [Z, [.5, 0.1], ONE] }),
+    stab: cgRig({ armR: [Z, [.3, 0.6], [.45, -1.55], [.7, -1.45], ONE], armL: [Z, [.35, 0.5], [.55, -1.35], [.75, -1.25], ONE],
+        torso: [Z, [.3, -0.1], [.45, 0.28], [.7, 0.22], ONE], legR: [Z, [.45, -0.5], [.7, -0.45], ONE], legL: [Z, [.45, 0.35], [.7, 0.3], ONE] }),
+    xslash: cgRig({ armR: [Z, [.3, -2.5], [.5, -0.2], [.75, -0.3], ONE], armL: [Z, [.35, -2.3], [.55, 0.3], [.75, 0.25], ONE],
+        torso: [Z, [.3, -0.1], [.5, 0.22], ONE], legR: [Z, [.45, -0.45], ONE], legL: [Z, [.45, 0.3], ONE] }),
+    bow: cgRig({ armL: [Z, [.25, -0.75], [.8, -0.75], ONE], armR: [Z, [.25, -1.25], [.45, -0.55], [.52, -1.55], [.8, -1.3], ONE],
+        torso: [Z, [.25, -0.06], [.5, 0.06], ONE], head: [Z, [.25, 0.08], [.8, 0.08], ONE],
+        legL: [Z, [.25, 0.15], [.8, 0.15], ONE], legR: [Z, [.25, -0.15], [.8, -0.15], ONE] }),
+    cast: cgRig({ armR: [Z, [.3, -2.7], [.55, -1.4], [.8, -1.5], ONE], armL: [Z, [.3, 2.3], [.55, -1.3], [.8, -1.2], ONE],
+        head: [Z, [.3, -0.14], [.55, 0.08], ONE], torso: [Z, [.3, -0.08], [.55, 0.12], ONE] }),
+    block: cgRig({ armL: [Z, [.22, -1.35], [.8, -1.35], ONE], armR: [Z, [.22, 0.4], [.8, 0.4], ONE],
+        torso: [Z, [.22, -0.1], [.8, -0.1], ONE], head: [Z, [.22, 0.08], [.8, 0.08], ONE],
+        legL: [Z, [.22, 0.2], [.8, 0.2], ONE], legR: [Z, [.22, -0.2], [.8, -0.2], ONE] }),
+    heal: cgRig({ armL: [Z, [.3, 1.0], [.75, 1.0], ONE], armR: [Z, [.3, -1.0], [.75, -1.0], ONE],
+        head: [Z, [.3, -0.18], [.75, -0.18], ONE], torso: [Z, [.3, -0.06], [.75, -0.06], ONE] }),
+    kneel: cgRig({ legL: [Z, [.3, 0.5], [.75, 0.5], ONE], legR: [Z, [.3, -0.55], [.75, -0.55], ONE], torso: [Z, [.3, 0.12], [.75, 0.12], ONE],
+        armL: [Z, [.3, -0.6], [.75, -0.6], ONE], armR: [Z, [.3, -0.9], [.75, -0.9], ONE], head: [Z, [.3, 0.18], [.75, 0.18], ONE] }),
+    power: cgRig({ armL: [Z, [.2, 0.5], [.45, 2.5], [.8, 2.4], ONE], armR: [Z, [.2, -0.5], [.45, -2.5], [.8, -2.4], ONE],
+        head: [Z, [.45, -0.2], [.8, -0.2], ONE], legL: [Z, [.2, 0.2], [.45, 0.05], ONE], legR: [Z, [.2, -0.2], [.45, -0.05], ONE] }),
+    roar: cgRig({ armL: [Z, [.25, 1.3], [.75, 1.3], ONE], armR: [Z, [.25, -1.3], [.75, -1.3], ONE],
+        head: [Z, [.25, -0.28], [.75, -0.25], ONE], torso: [Z, [.25, -0.12], [.75, -0.1], ONE] }),
+    charge: cgRig({ armR: [Z, [.15, 0.8], [.4, -1.6], [.65, -1.4], ONE], armL: [Z, [.15, 0.6], [.4, -1.2], ONE],
+        torso: [Z, [.15, -0.1], [.4, 0.3], [.65, 0.25], ONE],
+        legR: [Z, [.2, -0.5], [.3, 0.3], [.4, -0.5], [.55, 0.2], ONE], legL: [Z, [.2, 0.4], [.3, -0.3], [.4, 0.4], [.55, -0.2], ONE] }),
+    slam: cgRig({ armR: [Z, [.35, -3.0], [.5, -0.6], [.75, -0.7], ONE], armL: [Z, [.35, -2.8], [.5, -0.7], ONE],
+        torso: [Z, [.35, -0.15], [.5, 0.25], ONE], legR: [Z, [.5, -0.3], ONE], legL: [Z, [.5, 0.2], ONE] }),
+    dodge: cgRig({ torso: [Z, [.3, -0.28], ONE], head: [Z, [.3, -0.15], ONE], armL: [Z, [.3, 0.7], ONE], armR: [Z, [.3, -0.5], ONE],
+        legL: [Z, [.3, 0.35], ONE], legR: [Z, [.3, -0.1], ONE] }),
+    flinch: cgRig({ torso: [Z, [.15, -0.3], [.5, -0.1], ONE], head: [Z, [.15, -0.35], [.5, -0.1], ONE],
+        armL: [Z, [.15, 0.8], [.6, 0.2], ONE], armR: [Z, [.15, -0.8], [.6, -0.2], ONE], legL: [Z, [.15, 0.12], ONE], legR: [Z, [.15, -0.12], ONE] }),
+    death: cgRig({ torso: [Z, [1, -0.35]], head: [Z, [1, -0.4]], armL: [Z, [1, 0.9]], armR: [Z, [1, -0.9]], legL: [Z, [1, 0.2]], legR: [Z, [1, -0.3]] }),
+};
+// which rig animation each class uses for each action (VFX + body motion
+// live in CG_CLASS_ACTIONS below)
+const CG_CLASS_RIGS = {
+    warrior: { sword: 'overhead', skull: 'heavy', shield: 'block', heart: 'kneel', energy: 'roar', ult: 'charge' },
+    berserker: { sword: 'spin', skull: 'heavy', shield: 'roar', heart: 'roar', energy: 'power', ult: 'spin' },
+    rogue: { sword: 'stab', skull: 'xslash', shield: 'dodge', heart: 'kneel', energy: 'spin', ult: 'xslash' },
+    archer: { sword: 'bow', skull: 'bow', shield: 'kneel', heart: 'heal', energy: 'power', ult: 'bow' },
+    mage: { sword: 'cast', skull: 'cast', shield: 'block', heart: 'heal', energy: 'power', ult: 'cast' },
+    necromancer: { sword: 'cast', skull: 'cast', shield: 'block', heart: 'heal', energy: 'power', ult: 'cast' },
+    paladin: { sword: 'slam', skull: 'slam', shield: 'block', heart: 'heal', energy: 'power', ult: 'slam' },
+};
+const CG_MONSTER_RIGS = {
+    monster_normal: { attack: 'overhead', buff: 'roar' }, monster_armored: { attack: 'slam', buff: 'block' },
+    monster_swift: { attack: 'stab', buff: 'power' }, monster_drain: { attack: 'cast', buff: 'heal' },
+    monster_boss: { attack: 'charge', buff: 'roar' },
 };
 
 const CG_COL = { white: 0xffffff, steel: 0xdfe8f2, blue: 0x4f9dff, cyan: 0x62e6ff, gold: 0xffd24a, red: 0xff3b30, orange: 0xff8a2a,
@@ -563,8 +650,14 @@ function cgFrame(ticker) {
             const step = Math.floor(now / CG_BREATH_STEP_MS);
             if (step !== stage.lastFrame) {
                 stage.lastFrame = step;
-                const b = Math.sin(now / 1000 * 2.4 + stage.breathPhase);
+                const sec = now / 1000, b = Math.sin(sec * 2.4 + stage.breathPhase);
                 stage.portraitSprite.scale.set(stage.portraitBaseScale * (1 - 0.012 * b), stage.portraitBaseScale * (1 + 0.022 * b));
+                // idle life: arms sway out of phase, head bobs, weight shifts
+                const j = stage.joints;
+                if (j.armL) j.armL.rotation = 0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 0.6);
+                if (j.armR) j.armR.rotation = -0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 1.2);
+                if (j.head) j.head.rotation = 0.04 * Math.sin(sec * 1.2 + stage.breathPhase);
+                if (j.torso) j.torso.rotation = 0.015 * Math.sin(sec * 1.2 + stage.breathPhase + 2);
                 stage.needsRender = true;
             }
         }
@@ -613,8 +706,11 @@ class CombatStage {
         this.root.addChild(this.backLayer);
         this.facing = 1;
         this.lastPose = { dx: 0, dy: 0 };
-        this.portraitSprite = new PIXI.Sprite(PIXI.Texture.EMPTY);
-        this.portraitSprite.anchor.set(0.5, 1);
+        // `portraitSprite` is the rig's ROOT container (kept under this name:
+        // every body-level effect - lunge, knockback, flash, death - moves or
+        // tints it as a whole); the jointed parts live inside (see _buildRig).
+        this.portraitSprite = new PIXI.Container();
+        this.joints = {};
         this.breathPhase = Math.random() * Math.PI * 2; // two portraits never breathe in lockstep
         this.portraitBaseScale = 1;
         this.root.addChild(this.portraitSprite);
@@ -648,6 +744,7 @@ class CombatStage {
         sprite.x = this.baseX;
         sprite.y = this.baseY;
         sprite.rotation = 0;
+        sprite.pivot.set(100, 250); // rig space: feet at the bottom center of the 200x250 box
         if (this.stripW) {
             // Fit within the canvas while preserving aspect ratio, leaving
             // side room for the class actions to lunge/dash into.
@@ -666,17 +763,74 @@ class CombatStage {
         this.url = url;
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
         this.facing = this.charKey.indexOf('monster_') === 0 ? -1 : 1;
-        const texture = await cgLoadTexture(url);
+        const rigs = await cgLoadRigs();
+        const rig = rigs[this.charKey];
+        if (!rig) return;
+        const base = url.replace(/\.[a-z]+$/, '') + '/';
+        const textures = await Promise.all(rig.parts.map(p => cgLoadTexture(base + p + '.svg')));
         if (this.url !== url) return; // a newer setPortrait won the race
-        texture.source.scaleMode = 'linear';
-        this.portraitSprite.texture = texture;
-        this.stripW = texture.width;
-        this.stripH = texture.height;
+        const parts = {};
+        rig.parts.forEach((p, i) => { textures[i].source.scaleMode = 'linear'; parts[p] = textures[i]; });
+        this.rigParts = parts;
+        this.rigPivots = rig.pivots;
+        this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
+        const built = this._buildRig(parts, rig.pivots, rig.monster);
+        this.portraitSprite.addChild(built.inner);
+        this.joints = built.joints;
+        this.stripW = 200;
+        this.stripH = 250;
         this.portraitSprite.tint = 0xffffff;
         this.portraitSprite.alpha = 1;
         this.dead = false;
         this._fitPortrait();
         this.needsRender = true;
+    }
+
+    // Builds the joint hierarchy for a set of part textures: back and legs on
+    // the body, the torso joint carrying head and both arms. Returns the
+    // (optionally mirrored) inner container, its joints, and a standalone
+    // root for clones (afterimages).
+    _buildRig(parts, pivots, mirror) {
+        const joints = {};
+        const inner = new PIXI.Container();
+        if (mirror) { inner.position.set(200, 0); inner.scale.x = -1; }
+        const sprite = (tex) => { const sp = new PIXI.Sprite(tex); sp.width = 200; sp.height = 250; return sp; };
+        const joint = (name) => {
+            const c = new PIXI.Container();
+            const [px, py] = pivots[name] || [100, 125];
+            c.pivot.set(px, py); c.position.set(px, py);
+            if (parts[name]) c.addChild(sprite(parts[name]));
+            joints[name] = c;
+            return c;
+        };
+        if (parts.back) inner.addChild(sprite(parts.back));
+        inner.addChild(joint('legL'));
+        inner.addChild(joint('legR'));
+        const torso = joint('torso');
+        torso.addChild(joint('head'));
+        torso.addChild(joint('armL'));
+        torso.addChild(joint('armR'));
+        inner.addChild(torso);
+        const root = new PIXI.Container();
+        root.pivot.set(100, 250);
+        root.addChild(inner);
+        return { inner, joints, root };
+    }
+
+    // Sets joint angles from a rig animation at t (or idle when none).
+    _applyRig(rigAnim, t) {
+        CG_JOINTS.forEach(j => {
+            const c = this.joints[j];
+            if (!c) return;
+            c.rotation = rigAnim && rigAnim[j] ? rigAnim[j](t) : 0;
+        });
+    }
+
+    // One-off joint animation (hit flinch, death) layered on the body.
+    _rigTween(name, ms, hold) {
+        const anim = CG_RIGS[name];
+        if (!anim) return;
+        this._tween(ms, t => this._applyRig(anim, t), () => { if (!hold) this._applyRig(null, 0); });
     }
 
     // A quick shake + white hit-flash on the portrait itself, plus a small
@@ -707,6 +861,7 @@ class CombatStage {
         if (delayMs) await cgWait(delayMs);
         const severity = tileType === 'skull' ? 1.5 : 1;
         this._knockback(this.portraitSprite, 18 * severity, 520);
+        if (this.activeTweens <= 1) this._rigTween('flinch', 560);
         this._flash(this.portraitSprite, 650, 0xff3b30); // hurt = red
         const effect = HIT_EFFECT_SPRITES[tileType];
         if (effect) this._burst([effect], 1.4 * severity, 850);
@@ -720,7 +875,7 @@ class CombatStage {
         await this.ready;
         // the class's own ultimate choreography, plus the sprite bursts
         const set = CG_CLASS_ACTIONS[classKey];
-        this._perform(set && set.ult);
+        this._perform(set && set.ult, CG_CLASS_RIGS[classKey] && CG_CLASS_RIGS[classKey].ult);
         this._flash(this.portraitSprite, 900, 0xfff2a0);
         const effects = ULT_EFFECT_SPRITES[classKey] || [HIT_EFFECT_SPRITES.energy];
         this._burst(effects, 2.1, 1200);
@@ -738,16 +893,19 @@ class CombatStage {
     async playClassMotion(classKey, tileType) {
         await this.ready;
         const set = CG_CLASS_ACTIONS[classKey];
-        this._perform(set && set[tileType === 'teamheal' ? 'heart' : tileType]);
+        const act = tileType === 'teamheal' ? 'heart' : tileType;
+        this._perform(set && set[act], CG_CLASS_RIGS[classKey] && CG_CLASS_RIGS[classKey][act]);
     }
 
     // Runs one choreographed action: the pose curve on the sprite plus its
     // vector effects (skipped in low-graphics mode - the pose still plays).
-    _perform(action) {
+    _perform(action, rigName) {
         if (!action || this.dead) return;
+        if (rigName) action = Object.assign({}, action, { rig: rigName });
         this.lastAction = action;
         if (action.fx && cgEffectsEnabled()) action.fx(this);
         const sprite = this.portraitSprite, f = this.facing;
+        const rigAnim = CG_RIGS[action.rig];
         // Pose offsets are authored for a ~90px-wide portrait; scale them to
         // this canvas and keep the character (mostly) inside it.
         const [w] = this.size, k = w / 90;
@@ -761,7 +919,9 @@ class CombatStage {
             sprite.rotation = f * p.rot;
             sprite.scale.set(this.portraitBaseScale * (p.sx || 1), this.portraitBaseScale * (p.sy || 1));
             sprite.alpha = p.alpha === undefined ? 1 : p.alpha;
+            this._applyRig(rigAnim, t);
         }, () => {
+            this._applyRig(null, 0);
             this.lastPose = { dx: 0, dy: 0 };
             sprite.x = this.baseX; sprite.y = this.baseY; sprite.rotation = 0; sprite.alpha = 1;
             sprite.scale.set(this.portraitBaseScale);
@@ -869,14 +1029,14 @@ class CombatStage {
     async playAttack() {
         await this.ready;
         const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
-        this._perform(set.attack);
+        this._perform(set.attack, (CG_MONSTER_RIGS[this.charKey] || CG_MONSTER_RIGS.monster_normal).attack);
     }
 
     // A monster matched heart/shield/energy for itself.
     async playBuff() {
         await this.ready;
         const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
-        this._perform(set.buff);
+        this._perform(set.buff, (CG_MONSTER_RIGS[this.charKey] || CG_MONSTER_RIGS.monster_normal).buff);
     }
 
     // G3 - topples and fades out; stays down until setPortrait()/revive().
@@ -884,6 +1044,7 @@ class CombatStage {
         await this.ready;
         const sprite = this.portraitSprite;
         this.dead = true;
+        this._rigTween('death', 650, true);
         this._tween(650, t => {
             sprite.rotation = 0.5 * t;
             sprite.y = this.baseY + this.size[1] * 0.12 * t;
@@ -898,6 +1059,7 @@ class CombatStage {
         this.dead = false;
         this.portraitSprite.alpha = 1;
         this.portraitSprite.tint = 0xffffff;
+        this._applyRig(null, 0);
         this._fitPortrait();
         this.needsRender = true;
     }
