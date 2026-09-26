@@ -400,6 +400,7 @@ function coopOnLevelStart(payload) {
     else coopApplyLevelClearHeal();
 
     coopLevel = payload.level;
+    if (typeof cgSetSceneTier === 'function') cgSetSceneTier(document.getElementById('coop-battle'), payload.level);
     coopBoard.cascadeDepth = 0; // see startLevel's cascadeDepth reset (game.js)
     coopIsBossLevel = payload.isBoss;
     coopEnemyHP = payload.enemyHP;
@@ -536,6 +537,7 @@ function coopApplySessionResume(state) {
 }
 
 function coopOnEnemyDefeated(payload) {
+    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playDeath');
     coopLog(payload.isBoss ? tf('Boss (Lvl {level}) yenildi!', { level: payload.level }) : tf('Minion (Lvl {level}) yenildi!', { level: payload.level }));
     if (typeof playSound === 'function') playSound('victory');
     if (typeof cgCelebrate === 'function') cgCelebrate('victory', payload.isBoss);
@@ -637,6 +639,7 @@ function coopApplyIncomingDamage(amount, drainUlt) {
 
 function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
+    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playAttack', -1);
     if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0, payload.drainUlt || 0);
     else coopLog(tf('Düşman takım arkadaşına {val} hasar verdi.', { val: payload.amount }));
 }
@@ -1113,6 +1116,12 @@ function coopApplyGroupEffect(group, shape, isInitial) {
     let { extraTurn, ultBonus } = shape;
     let multiplier = shape.multiplier * coopMoveTimeMultiplier;
     if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+    // G3 - shot from the matched tiles to the enemy (attack), my teammate
+    // (teamheal) or me (everything else).
+    if (typeof cgProjectile === 'function') {
+        let targetId = (group.type === 'sword' || group.type === 'skull') ? 'coop-enemy-sprite' : group.type === 'teamheal' ? 'coop-ally-sprite' : 'coop-my-sprite';
+        cgProjectile(coopTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
+    }
 
     if (extraTurn) coopExtraTurnTriggered = true;
     if (ultBonus > 0) {

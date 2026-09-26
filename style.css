@@ -24,6 +24,9 @@
     --c-skull: #e74c3c;
     --c-teamheal: #2ecc71;
     --c-hp: #2ecc71;
+    /* G3 - combat backdrop default (crypt); [data-floor] overrides these on
+       the HUD / co-op battle view (cgSetSceneTier). */
+    --scene-a: #2e3d4d; --scene-b: #1f2a36; --scene-glow: rgba(52, 152, 219, 0.22);
     --c-enemy-hp: #e74c3c;
 
     /* G2 - pixel font for titles/banners only (Google Fonts, latin-ext subset
@@ -527,6 +530,39 @@ body {
 .tile[data-type="energy"] { background-image: url('assets/tiles/energy.png'); }
 .tile[data-type="skull"] { background-image: url('assets/tiles/skull.png'); }
 .tile[data-type="teamheal"] { background-image: url('assets/tiles/teamheal.png'); }
+
+/* G3 (roadmap v2) - cgProjectile's shot (graphics.js). Starts on the
+   matched tiles, flies to the affected portrait along --dx/--dy. */
+.cg-projectile {
+    position: fixed;
+    width: 12px; height: 12px; margin: -6px 0 0 -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, var(--shot-color) 45%, transparent 72%);
+    pointer-events: none;
+    z-index: 16;
+    animation: cgShot 0.38s cubic-bezier(0.55, 0, 0.85, 0.35) forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgShot {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0.2; }
+    15% { opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(1.5); opacity: 0.9; }
+}
+
+/* G3 - the combat backdrop behind the portraits: a static stone-wall
+   pattern plus a floor glow, re-tinted every 5 floors (cgSetSceneTier sets
+   data-floor). Static gradients only - painted once, no per-frame cost. */
+.hud, #pvp-battle > .stat-box:has(canvas), #coop-battle > .stat-box:has(canvas) {
+    background:
+        radial-gradient(ellipse at 50% 115%, var(--scene-glow), transparent 62%),
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.24) 0 2px, transparent 2px 16px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 32px),
+        linear-gradient(var(--scene-a), var(--scene-b));
+    border-radius: 8px;
+}
+[data-floor="moss"] { --scene-a: #2c4235; --scene-b: #1b2a21; --scene-glow: rgba(46, 204, 113, 0.22); }
+[data-floor="ember"] { --scene-a: #4a2d26; --scene-b: #2a1714; --scene-glow: rgba(230, 126, 34, 0.28); }
+[data-floor="abyss"] { --scene-a: #33264a; --scene-b: #1b1428; --scene-glow: rgba(155, 89, 182, 0.28); }
 
 /* Faz 1 - a 4+/cross match (getMatchShapeInfo's multiplier >= 2) pops
    noticeably bigger/brighter than a plain 3-match, applied ALONGSIDE

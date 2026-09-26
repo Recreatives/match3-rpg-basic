@@ -422,6 +422,8 @@ class CombatStage {
         this.stripW = frameW;
         this.stripH = strip.height;
         this.portraitSprite.tint = 0xffffff;
+        this.portraitSprite.alpha = 1;
+        this.dead = false;
         this._fitPortrait();
         this.needsRender = true;
     }
@@ -577,6 +579,43 @@ class CombatStage {
         ticker.add(step);
     }
 
+    // G3 (roadmap v2) - a monster has no class motion set, so its own
+    // landed hit used to read as nothing at all. A short wind-up, a lunge
+    // toward its target (`direction` -1 = left, +1 = right) and back.
+    async playAttack(direction) {
+        await this.ready;
+        const dir = direction || -1;
+        const sprite = this.portraitSprite;
+        this._tween(380, t => {
+            const lunge = t < 0.3 ? -4 * (t / 0.3) : 16 * Math.sin(((t - 0.3) / 0.7) * Math.PI);
+            sprite.x = this.baseX + dir * lunge;
+            sprite.scale.set(this.portraitBaseScale * (1 + 0.08 * Math.max(0, lunge) / 16));
+        }, () => { sprite.x = this.baseX; sprite.scale.set(this.portraitBaseScale); });
+    }
+
+    // G3 - topples and fades out; stays down until setPortrait()/revive().
+    async playDeath() {
+        await this.ready;
+        const sprite = this.portraitSprite;
+        this.dead = true;
+        this._tween(650, t => {
+            sprite.rotation = 0.5 * t;
+            sprite.y = this.baseY + this.size[1] * 0.12 * t;
+            sprite.alpha = 1 - t;
+            const c = Math.round(255 - 90 * t);
+            sprite.tint = (255 << 16) | (c << 8) | c;
+        }, () => { sprite.alpha = 0; });
+    }
+
+    async revive() {
+        await this.ready;
+        this.dead = false;
+        this.portraitSprite.alpha = 1;
+        this.portraitSprite.tint = 0xffffff;
+        this._fitPortrait();
+        this.needsRender = true;
+    }
+
     pause() { this.paused = true; }
     resume() { this.paused = false; this.needsRender = true; }
 }
@@ -634,7 +673,7 @@ if (/[?&]debug=1\b/.test(location.search)) document.addEventListener('DOMContent
 // this project's existing mobile-GPU-perf discipline (see .tile's own
 // comment in style.css on why filter/box-shadow are avoided at board scale).
 const TILE_BURST_COLORS = {
-    sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f'
+    sword: '#ffffff', skull: '#e74c3c', shield: '#3b82f6', heart: '#ff6b9d', energy: '#f1c40f', teamheal: '#2ecc71'
 };
 function cgTileBurst(tileEl, tileType) {
     if (!tileEl || !cgEffectsEnabled()) return;
@@ -865,6 +904,47 @@ function cgBoardImpact(gridEl, maxMultiplier) {
     gridEl.classList.remove('shake', 'shake-big');
     void gridEl.offsetWidth; // force reflow so re-adding the class restarts the animation
     gridEl.classList.add(cls);
+}
+
+// G3 (roadmap v2) - a small glowing shot flying from the matched tiles to
+// whoever the match affects (the enemy for sword/skull, your own portrait
+// for heart/shield/energy, your teammate for co-op's teamheal), so cause and
+// effect read as one motion instead of "tiles vanish, a number changes
+// somewhere else". position:fixed + transform/opacity only, self-removing.
+function cgProjectile(fromEl, toEl, tileType) {
+    if (!fromEl || !toEl || !cgEffectsEnabled()) return;
+    const color = TILE_BURST_COLORS[tileType] || '#ffffff';
+    const a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    if (!a.width || !b.width) return; // hidden screen - nothing to fly between
+    const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
+    const x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
+    const el = document.createElement('div');
+    el.className = 'cg-projectile';
+    el.style.left = x0 + 'px';
+    el.style.top = y0 + 'px';
+    el.style.setProperty('--dx', (x1 - x0) + 'px');
+    el.style.setProperty('--dy', (y1 - y0) + 'px');
+    el.style.setProperty('--shot-color', color);
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+    setTimeout(() => el.remove(), 700);
+}
+
+// G3 - the combat area's backdrop changes every 5 floors (after each boss):
+// crypt -> moss -> ember -> abyss, then around again. Pure CSS (style.css,
+// [data-floor]); this only sets the attribute.
+const CG_FLOOR_THEMES = ['crypt', 'moss', 'ember', 'abyss'];
+function cgSetSceneTier(el, level) {
+    if (!el) return;
+    el.dataset.floor = CG_FLOOR_THEMES[Math.floor(Math.max(0, level - 1) / 5) % CG_FLOOR_THEMES.length];
+}
+
+// Plays a portrait method if that stage exists - keeps the mode files' call
+// sites to one line.
+function cgStageDo(canvasId, method, arg) {
+    if (typeof PIXI === 'undefined') return;
+    const stage = cgGetStage(canvasId);
+    if (stage && stage[method]) stage[method](arg);
 }
 
 document.addEventListener('DOMContentLoaded', cgPreloadAll);

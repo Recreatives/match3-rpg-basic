@@ -459,6 +459,10 @@ function startLevel() {
         if (stage) stage.setPortrait(MONSTER_SPRITES[currentMinionType] || MONSTER_SPRITES.normal);
     }
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
+    // G3 - backdrop changes every 5 floors; the player's portrait stands
+    // back up if the last fight ended with it toppled.
+    if (typeof cgSetSceneTier === 'function') cgSetSceneTier(document.getElementById('solo-hud'), level);
+    if (typeof cgStageDo === 'function') cgStageDo('player-sprite', 'revive');
 
     if (isBoss) {
         log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
@@ -490,6 +494,7 @@ function checkWinCondition() {
 
 function triggerDeathSequence(who) {
     currentState = STATE.GAMEOVER;
+    if (typeof cgStageDo === 'function') cgStageDo(who === 'enemy' ? 'enemy-sprite' : 'player-sprite', 'playDeath');
     isProcessing = true;
     stopPlayerTimer();
     if (who === 'enemy') {
@@ -1089,6 +1094,14 @@ function soloApplyGroup(group, shape, isInitial, validTiles) {
         showFloatingText(`${shapeLabel}x${displayMult}`, centerTile, color);
     }
 
+    // G3 - a shot flies from the matched tiles to whoever this match
+    // affects: the opponent for sword/skull, the matcher for everything else.
+    if (validTiles > 0 && typeof cgProjectile === 'function') {
+        let hostile = group.type === 'sword' || group.type === 'skull';
+        let targetId = (hostile === isPlayerTurn) ? 'enemy-sprite' : 'player-sprite';
+        cgProjectile(tiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
+    }
+
     if (validTiles > 0) applyRPGEffects(group.type, finalMultiplier);
 }
 
@@ -1174,6 +1187,8 @@ function applyRPGEffects(type, multiplier) {
         log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        // G3 - a monster's own landed hit gets a visible lunge.
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', -1);
         if (typeof playSound === 'function') playSound('hit');
 
     } else if (type === 'heart') {
@@ -1228,6 +1243,8 @@ function applyRPGEffects(type, multiplier) {
         soloPlayHitReaction(target, 'skull');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        // G3 - a monster's own landed hit gets a visible lunge.
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', -1);
         if (typeof playSound === 'function') playSound('crit');
     }
 

@@ -198,3 +198,82 @@ describe('DOM effects', { isolate: 'each', world: { pixi: false } }, function ()
         expect(grid.classList.contains('shake-big')).toBe(true);
     });
 });
+
+describe('Combat scene (G3)', { isolate: 'each' }, function () {
+    it('a real sword match fires a shot from the board to the enemy portrait', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'sword';
+        setBoard(w, b);
+        w.g('checkForMatches(false)');
+        var shots = w.doc.querySelectorAll('.cg-projectile');
+        expect(shots.length).toBe(1);
+        var enemy = w.$('enemy-sprite').getBoundingClientRect(), tile = w.g('tiles')[1].getBoundingClientRect();
+        var dx = parseFloat(shots[0].style.getPropertyValue('--dx'));
+        expect(dx, 'flies right, toward the enemy').toBeCloseTo((enemy.left + enemy.width / 2) - (tile.left + tile.width / 2), 1);
+        await w.settle(5000);
+        expect(w.doc.querySelectorAll('.cg-projectile').length, 'cleaned up').toBe(0);
+    });
+
+    it('heal/shield shots go to your own portrait; low-graphics fires none', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        freezeEnemyTurn(w);
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'heart';
+        setBoard(w, b);
+        w.g('checkForMatches(false)');
+        var shot = w.doc.querySelector('.cg-projectile');
+        expect(parseFloat(shot.style.getPropertyValue('--dx')), 'flies left, to the player').toBeLessThan(0);
+        await w.settle(5000);
+        w.g('cgToggleLowGraphics()');
+        setBoard(w, b);
+        w.g('checkForMatches(false)');
+        expect(w.doc.querySelectorAll('.cg-projectile').length).toBe(0);
+        w.g('cgToggleLowGraphics()');
+    });
+
+    it('the backdrop changes theme every 5 floors', async function (ctx) {
+        var w = ctx.world, seen = {};
+        [[1, 'crypt'], [5, 'crypt'], [6, 'moss'], [11, 'ember'], [16, 'abyss'], [21, 'crypt']].forEach(function (c) {
+            w.g('level = ' + c[0] + '; currentState = STATE.PLAYING; startLevel()');
+            seen[c[0]] = w.$('solo-hud').dataset.floor;
+            expect(seen[c[0]], 'level ' + c[0]).toBe(c[1]);
+        });
+        var bg = w.win.getComputedStyle(w.$('solo-hud')).getPropertyValue('--scene-a').trim();
+        expect(bg.length, 'theme vars resolve on the HUD').toBeGreaterThan(0);
+    });
+
+    it('the enemy lunges when its own sword/skull hit lands, not on the player\'s', async function (ctx) {
+        var w = ctx.world, calls = [];
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        var orig = w.win.cgStageDo;
+        w.win.cgStageDo = function (id, m, arg) { calls.push(id + '.' + m); return orig(id, m, arg); };
+        w.g("isPlayerTurn = true; applyRPGEffects('sword', 1)");
+        expect(calls.indexOf('enemy-sprite.playAttack')).toBe(-1);
+        w.g("isPlayerTurn = false; applyRPGEffects('skull', 1)");
+        expect(calls).toContain('enemy-sprite.playAttack');
+    });
+
+    it('a kill topples the portrait; the next portrait/level stands it back up', async function (ctx) {
+        var w = ctx.world;
+        onScreen(w);
+        try {
+            await startSolo(w, 'WARRIOR');
+            var stage = w.g("cgGetStage('enemy-sprite')");
+            await awaitInWorld(w, stage.setPortrait(w.g('MONSTER_SPRITES.normal')));
+            w.g("enemyHP = 0; checkWinCondition()");
+            await pumpFrames(w, 800);
+            expect(stage.dead).toBe(true);
+            expect(stage.portraitSprite.alpha).toBe(0);
+            await awaitInWorld(w, stage.setPortrait(w.g('MONSTER_SPRITES.armored')));
+            expect(stage.dead).toBe(false);
+            expect(stage.portraitSprite.alpha).toBe(1);
+            var player = w.g("cgGetStage('player-sprite')");
+            await awaitInWorld(w, player.ready);
+            player.playDeath(); await pumpFrames(w, 800);
+            await awaitInWorld(w, player.revive());
+            expect(player.portraitSprite.alpha).toBe(1);
+        } finally { offScreen(w); }
+    });
+});

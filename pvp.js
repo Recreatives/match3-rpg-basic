@@ -437,6 +437,7 @@ function pvpStartMatch() {
     sbCreateBoardDOM('pvp-grid', 'pvp-tile-', pvpTiles, pvpHandleTap);
     pvpSelectedTile = null;
     pvpBoard.cascadeDepth = 0;
+    if (typeof cgStageDo === 'function') { cgStageDo('pvp-my-sprite', 'revive'); cgStageDo('pvp-opp-sprite', 'revive'); }
     if (pvpMyTurn) sbDealBoard(pvpBoard);
     pvpUpdateUI();
     pvpLog(pvpBetrayalMode ? t('⚔️ İhanet düellosu başladı.') : t('🟢 Rakip bağlı - eşleşme başladı.'));
@@ -570,6 +571,7 @@ function pvpReceiveTurnEnd() {
 function pvpOnOpponentDefeated() {
     if (pvpMatchOver) return;
     pvpMatchOver = true;
+    if (typeof cgStageDo === 'function') cgStageDo('pvp-opp-sprite', 'playDeath');
     pvpStopThinkingAnimation();
     pvpSetStatus(t('KAZANDIN!'));
     pvpLog(t('Rakip yenildi - kazandın!'));
@@ -649,6 +651,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 // run's achievement buffs are gone (see achievements.js's "ACTIVE" vs
 // "lifetime" split).
 function pvpOnDefeat() {
+    if (typeof cgStageDo === 'function') cgStageDo('pvp-my-sprite', 'playDeath');
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
     if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
@@ -876,6 +879,11 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
     let { extraTurn, ultBonus } = shape;
     let multiplier = shape.multiplier * pvpMoveTimeMultiplier;
     if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+    // G3 - shot from the matched tiles to the opponent (attack) or to me.
+    if (typeof cgProjectile === 'function') {
+        let targetId = (group.type === 'sword' || group.type === 'skull') ? 'pvp-opp-sprite' : 'pvp-my-sprite';
+        cgProjectile(pvpTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
+    }
 
     if (extraTurn) pvpExtraTurnTriggered = true;
     if (ultBonus > 0) {
