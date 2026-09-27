@@ -1321,7 +1321,7 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
     display: flex; flex-direction: column; align-items: center;
     background: radial-gradient(ellipse at 50% 40%, #3d4760, #161a24 75%); border-radius: 8px; padding: 6px;
 }
-.char-preview-img { width: min(46vw, 170px); height: auto; animation: char-breathe 3.2s ease-in-out infinite; transform-origin: 50% 90%; }
+.char-preview-img { width: min(56vw, 230px); height: auto; animation: char-breathe 3.2s ease-in-out infinite; transform-origin: 50% 90%; }
 @keyframes char-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.012) translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) { .char-preview-img { animation: none; } }
 .char-blurb { margin: 4px 0 0; font-size: 0.75rem; color: #d0d6dc; text-align: center; }

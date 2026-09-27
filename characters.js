@@ -153,7 +153,9 @@ function charPortraitImg(cls, look, items, cssClass) {
     img.alt = '';
     if (typeof avPaint === 'function' && typeof heroSpecFor === 'function') {
         try {
-            const svg = avPaint(heroSpecFor(cls, look, items || [])).portrait;
+            let svg = avPaint(heroSpecFor(cls, look, items || [])).portrait;
+            // list cards show head and shoulders (the body box is 0 0 200 250)
+            if (cssClass !== 'char-preview-img') svg = svg.replace(/viewBox="[^"]*" width="[^"]*" height="[^"]*"/, 'viewBox="5 -5 190 190" width="190" height="190"');
             img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         } catch (e) { console.warn('portrait:', e); }
     }
@@ -300,7 +302,7 @@ function renderCharacterCreator() {
     const def = classDefFor(d.cls);
     const blurb = document.createElement('p');
     blurb.className = 'char-blurb';
-    blurb.textContent = def ? `${def.emoji} ${def.name} - ${t(def.desc)}` : '';
+    blurb.textContent = def ? `${def.emoji} ${def.name} - ${t(def.desc).replace(/<[^>]*>/g, '')}` : '';
     preview.appendChild(blurb);
     box.appendChild(preview);
 

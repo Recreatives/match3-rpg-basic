@@ -145,6 +145,7 @@
             fakeTimers: opts.fakeTimers,
             realtimeBus: opts.realtimeBus,
             noSession: opts.noSession,
+            noCharacter: opts.noCharacter,
             epoch: opts.epoch || Date.UTC(2026, 0, 1, 12, 0, 0)
         };
         var html = rewriteIndexHtml(await readSource('index.html'), id, opts);
