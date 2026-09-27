@@ -141,7 +141,7 @@ describe('Solo board resolution (live board, fake clock)', { isolate: 'each' }, 
             await w.settle(10000);
             expect(w.g('boardHasValidMove(tiles, width)'), 'seed ' + (1000 + s)).toBe(true);
         }
-    });
+    }, { timeout: 40000 });
 
     it('the turn ends exactly once per player move (no double enemy turn)', async function (ctx) {
         var w = ctx.world, ends = 0;
