@@ -180,7 +180,8 @@ class CombatArena {
         if (arm && arm.parent) {
             try {
                 // bottom of the arm part ~ the hand; rig space -> arena space
-                const p = arm.toGlobal(new PIXI.Point(arm.pivot.x + 6, arm.pivot.y + 58));
+                const hand = stage.rigHand || [6, 58];
+                const p = arm.toGlobal(new PIXI.Point(arm.pivot.x + hand[0], arm.pivot.y + hand[1]));
                 const origin = this.root.toGlobal(new PIXI.Point(0, 0));
                 const k = this.root.scale.x || 1;
                 return { x: (p.x - origin.x) / k, y: (p.y - origin.y) / k };

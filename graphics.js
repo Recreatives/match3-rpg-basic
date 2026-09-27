@@ -323,10 +323,12 @@ const CG_VFX = {
 // armR (weapon). Each joint rotates around its pivot; the torso carries the
 // head and both arms. Actions animate the joints with keyframes (angles in
 // radians, +clockwise); heroes face right, monsters are mirrored.
-let cgRigsPromise = null;
-function cgLoadRigs() {
-    if (!cgRigsPromise) cgRigsPromise = fetch('assets/characters/rigs.json').then(r => r.json()).catch(() => ({}));
-    return cgRigsPromise;
+// rigs.json sits next to the portraits it describes (one per art set)
+let cgRigsPromises = {};
+function cgLoadRigs(dir) {
+    const d = dir || 'assets/characters/';
+    if (!cgRigsPromises[d]) cgRigsPromises[d] = fetch(d + 'rigs.json').then(r => r.json()).catch(() => ({}));
+    return cgRigsPromises[d];
 }
 
 // keyframes [[t, value], ...] -> smooth (ease-in-out between keys) function
@@ -842,7 +844,7 @@ class CombatStage {
         this.url = url;
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
         this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : (this.charKey.indexOf('monster_') === 0 ? -1 : 1);
-        const rigs = await cgLoadRigs();
+        const rigs = await cgLoadRigs(url.replace(/[^/]*$/, ''));
         const rig = rigs[this.charKey];
         if (!rig) return;
         const base = url.replace(/\.[a-z]+$/, '') + '/';
@@ -852,6 +854,7 @@ class CombatStage {
         rig.parts.forEach((p, i) => { textures[i].source.scaleMode = 'linear'; parts[p] = textures[i]; });
         this.rigParts = parts;
         this.rigPivots = rig.pivots;
+        this.rigHand = rig.hand || [6, 58]; // weapon hand, relative to the arm pivot
         this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
         const built = this._buildRig(parts, rig.pivots, this.facing < 0);
         this.portraitSprite.addChild(built.inner);
