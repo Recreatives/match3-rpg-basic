@@ -89,6 +89,13 @@ jobs:
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -f tests/sql/06_legacy_check.sql
+      - name: Supabase SQL Editor's "Run and enable RLS" (appends enable RLS for every create table it sees)
+        run: |
+          grep -ioE '^create table (if not exists )?public\.[a-z_]+' supabase/schema.sql | grep -oE 'public\.[a-z_]+' | sort -u \
+            | sed 's/.*/alter table & enable row level security;/' > /tmp/studio_rls.sql
+          cat /tmp/studio_rls.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f /tmp/studio_rls.sql
+          psql -v ON_ERROR_STOP=1 -q -f /tmp/studio_rls.sql
 
   trigger-pages-rebuild:
     needs: [test, sql]

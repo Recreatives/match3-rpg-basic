@@ -27,12 +27,23 @@ create table if not exists public.players (
 -- 2. wallets -----------------------------------------------------------------
 -- Currency that survives between runs. Separate from in-run TILE_STATS, which
 -- stay client-side and reset every run (see game.js resetGame()).
-create table if not exists public.wallets (
-    player_id  uuid primary key references public.players(id) on delete cascade,
-    gold       integer not null default 0 check (gold >= 0),
-    materials  integer not null default 0 check (materials >= 0),
-    updated_at timestamptz not null default now()
-);
+-- (Created through `execute` on purpose: since v1.37 `wallets` ends this
+-- file as a VIEW of the active character's purse (section 30), and the
+-- Supabase SQL Editor's "Run and enable RLS" button appends
+-- `alter table <t> enable row level security` for every `create table` it
+-- spots in the text - which fails on a view. Only a brand new database
+-- ever runs this; everywhere else `wallets` already exists.)
+do $$
+begin
+    if to_regclass('public.wallets') is null and to_regclass('public.wallets_legacy') is null then
+        execute 'create table public.wallets (
+            player_id  uuid primary key references public.players(id) on delete cascade,
+            gold       integer not null default 0 check (gold >= 0),
+            materials  integer not null default 0 check (materials >= 0),
+            updated_at timestamptz not null default now()
+        )';
+    end if;
+end $$;
 
 -- 3. auto-provision on first sign-in -----------------------------------------
 -- A brand new anonymous session should never need a separate "create my
