@@ -236,6 +236,9 @@ describe('Combat scene (G3)', { isolate: 'each' }, function () {
         var me = w.$('player-sprite').getBoundingClientRect(), tile = w.g('tiles')[1].getBoundingClientRect();
         expect(parseFloat(shot.style.getPropertyValue('--dx')), 'flies to the player').toBeCloseTo((me.left + me.width / 2) - (tile.left + tile.width / 2), 1);
         await w.settle(5000);
+        // (a shot's clean-up rides a real-time animation end - on a slow CI
+        // runner the first one can still be in the DOM here)
+        w.doc.querySelectorAll('.cg-projectile').forEach(function (e) { e.remove(); });
         w.g('cgToggleLowGraphics()');
         setBoard(w, b);
         w.g('checkForMatches(false)');

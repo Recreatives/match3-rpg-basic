@@ -98,7 +98,7 @@ describe('Characters: growth', function () {
     it('a character grows along its class lines, and solo HP with its level', async function (ctx) {
         var w = ctx.world;
         expect(w.g("applyCharacterLevelBonuses({ shield: 0, sword: 0, heart: 0 }, 'warrior', 50)")).toEqual({ shield: 5, sword: 3, heart: 1 });
-        expect(w.g("applyCharacterLevelBonuses({ shield: 0 }, 'warrior', 1)")).toEqual({ shield: 0 });
+        expect(w.g("applyCharacterLevelBonuses({ shield: 0, sword: 0, heart: 0 }, 'warrior', 1)")).toEqual({ shield: 0, sword: 0, heart: 0 });
         w.g('activeCharacter.level = 11; activeCharacter.mastery = 0');
         await startSolo(w, 'WARRIOR');
         expect(w.g('maxPlayerHP')).toBe(120);
