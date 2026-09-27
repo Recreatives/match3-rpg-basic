@@ -553,12 +553,17 @@ describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 
             for (var i = 0; i < group.length; i++) { await awaitInWorld(w, stages[i].ready); await awaitInWorld(w, stages[i].setPortrait(w.g('MONSTER_SPRITES.' + group[i]))); }
             await pumpFrames(w, 1300);
             stages.forEach(function (st) { expect(st.facing).toBe(-1); st.playAttack(1); });
-            await pumpFrames(w, 300);
-            stages.forEach(function (st, i) {
-                var moved = st.portraitSprite.x !== st.baseX || st.portraitSprite.y !== st.baseY || st.portraitSprite.alpha !== 1 || JOINTS.some(function (j) { return Math.abs(st.joints[j].rotation) > 0.2; });
-                expect(moved, group[i] + ' attack moves').toBe(true);
-            });
-            await pumpFrames(w, 1300);
+            // whichever move it picked (melee or ranged), it visibly moves at
+            // some point during the attack - sample the whole move
+            var moved = stages.map(function () { return false; });
+            for (var f = 0; f < 16; f++) {
+                await pumpFrames(w, 50);
+                stages.forEach(function (st, i) {
+                    if (st.portraitSprite.x !== st.baseX || st.portraitSprite.y !== st.baseY || st.portraitSprite.alpha !== 1 || JOINTS.some(function (j) { return Math.abs(st.joints[j].rotation) > 0.2; })) moved[i] = true;
+                });
+            }
+            moved.forEach(function (m, i) { expect(m, group[i] + ' attack moves').toBe(true); });
+            await pumpFrames(w, 700);
             stages.forEach(function (st) { st.playBuff(); });
             await pumpFrames(w, 1400);
             stages.forEach(function (st, i) { expect(st.effectLayer.children.length + st.backLayer.children.length, group[i]).toBe(0); });
