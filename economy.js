@@ -610,6 +610,12 @@ async function equipItem(itemRowId) {
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
     if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+    // the equip flourish: on the inventory figure and on my fighter
+    const rc = RARITY_DEFS[item.rarity] ? RARITY_DEFS[item.rarity].color : '#ffffff';
+    const fig = document.getElementById('inv-figure');
+    if (fig) { fig.classList.remove('flourish'); void fig.offsetWidth; fig.style.setProperty('--fc', rc); fig.classList.add('flourish'); }
+    if (typeof cgStageDo === 'function') ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => cgStageDo(id, 'playFlourish', parseInt(rc.replace('#', ''), 16)));
+    if (typeof playSound === 'function') playSound('gold');
     return true;
 }
 
@@ -726,6 +732,7 @@ async function awardLootDrop(dropLevel) {
     currentOwnedItems.push(data);
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof showLootToast === 'function') showLootToast(item);
+    if (typeof cgLootBeam === 'function') cgLootBeam(item.rarity);
     return data;
 }
 

@@ -989,6 +989,10 @@ class CombatStage {
         this._installRig(parts, painted.pivots, painted.hand, painted.box);
         this.rigHandL = painted.handL || null;
         this.gearFx = cgGearFxFrom(spec);
+        const wpn = spec.gear && spec.gear.weapon;
+        this.weaponStyle = wpn ? wpn.style : null;
+        // a trail follows magic-and-better weapons through their swings
+        this.weaponTrail = wpn && wpn.tier >= 2 && wpn.glow ? parseInt(String(wpn.glow).replace('#', ''), 16) : null;
         this.needsRender = true;
     }
 
@@ -1009,6 +1013,65 @@ class CombatStage {
             const j = sp[0], g = j.toGlobal(new PIXI.Point(j.pivot.x + sp[1][0], j.pivot.y + sp[1][1]));
             return this.root.toLocal(g);
         } catch (e) { return null; }
+    }
+
+    // A ribbon of the weapon's rarity color that follows the hand through
+    // a swing (the last ~10 hand positions, fading toward the tail).
+    _weaponTrail(color, ms) {
+        const g = new PIXI.Graphics(), pts = [];
+        this._vfx(g, ms, t => {
+            g.clear();
+            if (t > 0.2 && t < 0.72) { const p = this._gearPoint('hand'); if (p) pts.push(p.x, p.y); }
+            if (pts.length > 20) pts.splice(0, 2);
+            const n = pts.length / 2;
+            for (let i = 1; i < n; i++) {
+                const a = i / n;
+                g.moveTo(pts[i * 2 - 2], pts[i * 2 - 1]).lineTo(pts[i * 2], pts[i * 2 + 1]).stroke({ color, width: 1 + 5 * a, alpha: 0.75 * a * (t > 0.72 ? 1 - CG_EASE.seg(t, 0.72, 0.95) : 1), cap: 'round' });
+            }
+        });
+    }
+
+    // A unique item's passive just fired: a burst where it's worn (its
+    // idle-effect color) and its name floating up.
+    playProc(at, color, label) {
+        if (this.dead || !cgEffectsEnabled() || !this.root || !this.size) return;
+        const p = this._gearPoint(at) || { x: this.size[0] / 2, y: this.size[1] * 0.5 };
+        const g = new PIXI.Graphics();
+        this._vfx(g, 900, t => {
+            g.clear();
+            const e = CG_EASE.out(Math.min(1, t * 1.6));
+            g.circle(p.x, p.y, 6 + 26 * e).stroke({ color, width: 3 * (1 - t) + 0.5, alpha: 1 - t });
+            for (let i = 0; i < 10; i++) {
+                const a = i * Math.PI / 5 + 0.3, r = 8 + 30 * e;
+                g.circle(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r * 0.8 - 10 * t, 2.2 * (1 - t) + 0.4).fill({ color: i % 2 ? 0xffffff : color, alpha: 1 - t });
+            }
+            g.circle(p.x, p.y, 12 * (1 - t)).fill({ color, alpha: 0.35 * (1 - t) });
+        });
+        if (label) {
+            const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Georgia, serif', fontSize: 13, fontWeight: 'bold', fill: color, stroke: { color: 0x000000, width: 3 } } });
+            txt.anchor.set(0.5);
+            this._vfx(txt, 1300, t => { txt.x = p.x; txt.y = p.y - 16 - 26 * CG_EASE.out(t); txt.alpha = t < 0.7 ? 1 : 1 - CG_EASE.seg(t, 0.7, 1); });
+        }
+        this.needsRender = true;
+    }
+
+    // Just equipped something: a ring at the feet and a sparkle rising
+    // up the body in the item's rarity color.
+    playFlourish(color) {
+        if (this.dead || !cgEffectsEnabled() || !this.root || !this.size) return;
+        CG_VFX.ring(this, color, { y: 0.97, flat: 1, r1: 0.7, ms: 700 });
+        CG_VFX.particles(this, color, { n: 12, y: 0.95, rise: 0.8, spread: 0.5, ms: 900 });
+        CG_VFX.aura(this, color, { ms: 700 });
+    }
+
+    // A loot beam: a pillar of the dropped item's rarity color where the
+    // defeated foe stood (Diablo-style), taller for rarer items.
+    playLootBeam(color, big) {
+        if (!cgEffectsEnabled() || !this.root || !this.size) return;
+        CG_VFX.pillar(this, color, { ms: big ? 2600 : 1600 });
+        CG_VFX.particles(this, color, { n: big ? 18 : 8, y: 0.95, rise: big ? 1 : 0.6, spread: 0.4, ms: big ? 2400 : 1400 });
+        if (big) CG_VFX.ring(this, color, { y: 0.97, flat: 1, r1: 1, ms: 1200 });
+        this.needsRender = true;
     }
 
     // The worn uniques' idle effects and the full-set aura (see
@@ -1321,7 +1384,9 @@ class CombatStage {
     async playClassMotion(classKey, tileType, power, combo) {
         await this.ready;
         const act = tileType === 'teamheal' ? 'heart' : tileType;
-        const list = typeof cgMovesFor === 'function' ? cgMovesFor(classKey, act) : null;
+        let list = typeof cgMovesFor === 'function' ? cgMovesFor(classKey, act) : null;
+        // what's in the hand changes how it swings (moves.js CG_WEAPON_MOVES)
+        if (list && this.weaponStyle && typeof cgWeaponMoves === 'function') list = list.concat(cgWeaponMoves(this.weaponStyle, act));
         this._perform(this._pickMove(classKey + '.' + act, list, cgTierFor(power, combo)));
     }
 
@@ -1358,6 +1423,7 @@ class CombatStage {
         this.lastAction = move;
         const ctx = { stage: this, foe, arena, reach, impactMs, ms, f, tier };
         if (move.fx && cgEffectsEnabled()) move.fx(this, ctx);
+        if (kind === 'melee' && this.weaponTrail !== null && this.weaponTrail !== undefined && cgEffectsEnabled()) this._weaponTrail(this.weaponTrail, ms);
         if (kind === 'ranged' && move.shot && foe) {
             const launch = move.launchMs || 230;
             this._after(launch, () => {
@@ -1831,6 +1897,29 @@ function cgGearFxFrom(spec) {
     return out.slice(0, 5);
 }
 
+// A unique's passive fired (items.js triggerPassiveHook): play it on my
+// fighter in whichever mode is on screen.
+function cgGearProc(item, label) {
+    const vis = typeof heroItemVisual === 'function' ? heroItemVisual(item) : null;
+    if (!vis) return;
+    const color = parseInt(String(vis.glow || '#ffd24a').replace('#', ''), 16);
+    const at = CG_GEAR_FX_AT[vis.slot] || 'chest';
+    ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.offsetParent !== null) cgStageDo(id, 'playProc', at, color, label);
+    });
+}
+// A loot drop: a beam where the foe fell, in the visible mode's arena.
+function cgLootBeam(rarityKey) {
+    const def = typeof RARITY_DEFS !== 'undefined' ? RARITY_DEFS[rarityKey] : null;
+    if (!def || rarityKey === 'grey' || rarityKey === 'white') return;
+    const color = parseInt(String(def.color).replace('#', ''), 16);
+    const big = ['green', 'orange', 'red', 'teal'].indexOf(rarityKey) !== -1;
+    const id = ['enemy-sprite', 'coop-enemy-sprite', 'pvp-opp-sprite'].find(i => { const el = document.getElementById(i); return el && el.offsetParent !== null; });
+    if (id) cgStageDo(id, 'playLootBeam', color, big);
+    if (typeof playSound === 'function' && big) playSound('victory');
+}
+
 // Faz 10 - a persistent aura on the player's own portrait while an
 // orange/red/teal unique item (items.js's RARITY_DEFS - the isUnique tier,
 // this project's actual "legendary" vocabulary; the reward-pool's own
@@ -2059,10 +2148,10 @@ function cgSetSceneTier(el, level) {
 
 // Plays a portrait method if that stage exists - keeps the mode files' call
 // sites to one line.
-function cgStageDo(canvasId, method, arg, arg2) {
+function cgStageDo(canvasId, method, ...args) {
     if (typeof PIXI === 'undefined') return;
     const stage = cgGetStage(canvasId);
-    if (stage && stage[method]) stage[method](arg, arg2);
+    if (stage && stage[method]) stage[method](...args);
 }
 
 // Browsers decode a background image lazily, per element, the first time

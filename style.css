@@ -1441,3 +1441,12 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 #shop-modal .stats-bar { padding: 6px; }
 #shop-modal .stats-bar .stat-item { flex-direction: row; gap: 6px; }
 #shop-modal .stats-bar .stat-item span:first-child { margin: 0; font-size: 1rem; }
+/* equip flourish (economy.js equipItem): a light sweep over the figure */
+.inv-figure { position: relative; --fc: #ffd24a; }
+.inv-figure.flourish::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--fc) 55%, transparent), transparent 65%);
+    animation: inv-flourish 0.8s ease-out forwards;
+}
+@keyframes inv-flourish { 0% { opacity: 0; transform: scale(0.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .inv-figure.flourish::after { animation: none; opacity: 0; } }

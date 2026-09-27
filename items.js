@@ -453,13 +453,16 @@ const UNIQUE_PASSIVES = {
 // effect returns. A player with no legendary equipped (or one whose
 // passive is for a different hook) costs one array scan and nothing else.
 function triggerPassiveHook(hookName, ctx, payload) {
-    (typeof currentOwnedItems !== 'undefined' ? currentOwnedItems : [])
-        .filter(it => it.equipped_slot)
+    activeEquippedItems()
         .forEach(it => {
             let passive = UNIQUE_PASSIVES[it.base_id];
             if (!passive || passive.hook !== hookName) return;
             let msg = passive.effect(ctx, payload || {});
-            if (msg) ctx.log(msg, 'log-armor');
+            if (msg) {
+                ctx.log(msg, 'log-armor');
+                // and show it on the hero, where the item is worn
+                if (typeof cgGearProc === 'function') cgGearProc(it, String(msg).replace(/^✨\s*/, '').split(':')[0]);
+            }
         });
 }
 

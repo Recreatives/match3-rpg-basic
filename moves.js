@@ -382,6 +382,39 @@ const CG_MONSTER_MOVES = {
     },
 };
 
+// --- WEAPON-TYPE MOVES ------------------------------------------------------------
+// Extra attacks for what's actually in the hand (hero avatars only - see
+// playClassMotion): an axe cleaves wide, a mace or hammer smashes the
+// ground, a spear lunges from far, daggers flurry, a scythe reaps. They
+// join the class's own list, so a warrior with a spear still fights like a
+// warrior - just with some spear work mixed in.
+const CG_WEAPON_MOVES = {
+    axe: {
+        sword: [cgMelee('wx.cleave', 'spin', 'charge', CGC.steel, cgSlashAt(CGC.steel, { a0: -2.6, a1: 2.6, spin: 1.4, r: 0.55, width: 8 })),
+            cgMelee('wx.chop', 'overhead', 'leap', CGC.orange, cgAll(cgSlashAt(CGC.white, { a0: -1.9, a1: 0.2, width: 9 }), cgRingAt(CGC.orange, { r1: 0.7 })), { tier: 2, onImpact: cgGroundHit(CGC.orange, 8) })],
+    },
+    mace: {
+        sword: [cgMelee('wm.smash', 'heavy', 'dash', CGC.steel, cgRingAt(CGC.white, { r1: 0.6 }), { onImpact: cgGroundHit(0xaab4c0, 8) }),
+            cgMelee('wm.crush', 'slam', 'leap', CGC.gold, cgAll(cgRingAt(CGC.gold, { y: 0.5, flat: 1, r1: 0.9 }), cgSlashAt(CGC.gold, { a0: -1.6, a1: 0.4, width: 7 })), { tier: 2, onImpact: cgGroundHit(CGC.gold, 12) })],
+    },
+    spear: {
+        sword: [cgMelee('ws.lunge', 'thrust', 'slide', CGC.white, cgSlashAt(CGC.white, { a0: -0.2, a1: 0.2, r: 0.7, width: 3 })),
+            cgMelee('ws.vault', 'thrust', 'leap', CGC.blue, cgAll(cgSlashAt(CGC.white, { a0: -0.5, a1: 0.5, r: 0.6, width: 4 }), cgRingAt(CGC.blue, { r1: 0.5 })), { tier: 2 })],
+    },
+    dagger: {
+        sword: [cgMelee('wd.flurry', 'stab', 'blink', CGC.purple, cgAll(cgSlashAt(CGC.white, { a0: -0.8, a1: 0.6, r: 0.4, width: 3 }), cgSlashAt(CGC.purple, { a0: 0.6, a1: -0.8, r: 0.42, width: 3, at: 0.55 })))],
+    },
+    scythe: {
+        sword: [cgMelee('wy.reap', 'spin', 'slide', CGC.purple, cgSlashAt(CGC.purple, { a0: -2.8, a1: 1.2, spin: 1.1, r: 0.6, width: 7 }))],
+        skull: [cgMelee('wy.harvest', 'backhand', 'blink', CGC.bone, cgAll(cgSlashAt(CGC.bone, { a0: 1.2, a1: -2.2, r: 0.6, width: 8 }), cgRingAt(CGC.purple, { r1: 0.6 })), { tier: 2 })],
+    },
+};
+CG_WEAPON_MOVES.hammer = CG_WEAPON_MOVES.mace;
+function cgWeaponMoves(style, action) {
+    const set = CG_WEAPON_MOVES[style];
+    return (set && set[action]) || [];
+}
+
 // Every move gets a readable default length: melee/ranged ~1s (impact at
 // the midpoint), self moves 1s.
 function cgMovesFor(classKey, action) {

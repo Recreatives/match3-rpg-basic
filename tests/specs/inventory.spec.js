@@ -127,3 +127,32 @@ describe('Gear effects', function () {
         expect(remote.gear.helmet.fx).toBe(undefined);
     });
 });
+
+describe('Item animation', function () {
+    it('the weapon in hand adds its own moves to the attack pool', function (ctx) {
+        var w = ctx.world;
+        expect(w.g("cgWeaponMoves('spear', 'sword').map(function(m){ return m.id; })")).toContain('ws.lunge');
+        expect(w.g("cgWeaponMoves('hammer', 'sword').length")).toBeGreaterThan(0);
+        expect(w.g("cgWeaponMoves('bow', 'sword').length")).toBe(0);
+    });
+
+    it("a unique's passive firing shows a proc on the hero", async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g("window.__procs = []; var orig = cgGearProc; cgGearProc = function (it, label) { __procs.push(it.base_id + '|' + label); };");
+        w.g("currentOwnedItems = [{ id: 'p1', base_id: 'uniq_titans_hide', slot: 'chest', rarity: 'red', rolled_stats: {}, equipped_slot: 'chest', character_id: 'char-1' }]");
+        w.g("triggerPassiveHook('sword', makeSinglePlayerCombatContext(), { amount: 40 })");
+        expect(w.g('__procs')).toEqual(['uniq_titans_hide|Titan Zırhı']);
+        // another character's worn item never fires
+        w.g("__procs = []; currentOwnedItems[0].character_id = 'someone-else'; triggerPassiveHook('sword', makeSinglePlayerCombatContext(), { amount: 40 })");
+        expect(w.g('__procs')).toEqual([]);
+    });
+
+    it('a rare drop plays a loot beam; common drops do not', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g("window.__beams = []; var st = cgGetStage('enemy-sprite'); var o = st.playLootBeam.bind(st); st.playLootBeam = function (c, big) { __beams.push(big); o(c, big); };");
+        w.g("cgLootBeam('white'); cgLootBeam('blue'); cgLootBeam('red')");
+        expect(w.g('__beams')).toEqual([false, true]);
+    });
+});
