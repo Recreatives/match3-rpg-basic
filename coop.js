@@ -266,6 +266,7 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
     coopChannel.on('broadcast', { event: 'ally-heal' }, ({ payload }) => coopOnAllyHeal(payload));
+    coopChannel.on('broadcast', { event: 'ally-move' }, ({ payload }) => coopOnAllyMove(payload));
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
     coopChannel.on('broadcast', { event: 'vote-open' }, ({ payload }) => coopOpenVote(payload.kind, payload.context));
     coopChannel.on('broadcast', { event: 'vote-choice' }, ({ payload }) => coopOnAllyVote(payload));
@@ -639,9 +640,20 @@ function coopApplyIncomingDamage(amount, drainUlt) {
 
 function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
-    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playAttack', -1);
+    // the enemy runs at whichever hero it actually hit
+    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playAttack', 1, payload.role === coopRole ? 'coop-my-sprite' : 'coop-ally-sprite');
     if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0, payload.drainUlt || 0);
     else coopLog(tf('Düşman takım arkadaşına {val} hasar verdi.', { val: payload.amount }));
+}
+
+// My teammate matched something: their fighter performs the move in the
+// arena, and the enemy flinches if it was an attack. Purely visual - the
+// real damage arrives through enemy-damage / enemy-hp-sync.
+function coopOnAllyMove(payload) {
+    if (coopMatchOver || typeof cgGetStage !== 'function' || !payload) return;
+    let ally = cgGetStage('coop-ally-sprite');
+    if (ally && payload.cls) ally.playClassMotion(payload.cls, payload.type, payload.power || 1);
+    if (payload.type === 'sword' || payload.type === 'skull') coopPlayHitReaction('enemy', payload.type);
 }
 
 function coopOnAllyHpSync(payload) {
@@ -1132,7 +1144,7 @@ function coopApplyGroupEffect(group, shape, isInitial) {
     // G3 - shot from the matched tiles to the enemy (attack), my teammate
     // (teamheal) or me (everything else).
     if (typeof cgProjectile === 'function') {
-        let targetId = (group.type === 'sword' || group.type === 'skull') ? 'coop-enemy-sprite' : group.type === 'teamheal' ? 'coop-ally-sprite' : 'coop-my-sprite';
+        let targetId = group.type === 'teamheal' ? 'coop-ally-sprite' : 'coop-my-sprite';
         cgProjectile(coopTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
     }
 
@@ -1149,7 +1161,9 @@ function coopApplyGroupEffect(group, shape, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('coop-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type, shape.multiplier, coopBoard.cascadeDepth);
+        // cosmetic only: lets my teammate see my move on their screen too
+        if (coopChannel) coopChannel.send({ type: 'broadcast', event: 'ally-move', payload: { cls: selectedClass.name.toLowerCase(), type: group.type, power: shape.multiplier } });
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -1304,7 +1318,8 @@ function coopUpdateUI() {
     let ultBtn = document.getElementById('coop-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = coopUltCharge < 100 || !coopMyTurn || coopMatchOver || coopProcessing || !selectedClass || coopMyDown;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(coopUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
+        document.getElementById('coop-ult-btn-label').innerText = selectedClass ? selectedClass.ultName : t('ULT (sınıf seçilmedi)');
+        if (typeof cgStageDo === 'function') cgStageDo('coop-my-sprite', 'setUltReady', coopUltCharge >= 100);
     }
 
     let grid = document.getElementById('coop-grid');

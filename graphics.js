@@ -123,6 +123,18 @@ const MONSTER_SPRITES = {
     boss: 'assets/characters/monster_boss.svg',
 };
 
+// Presentation randomness (which move variant, spark angles...) uses its
+// own generator so animations never consume the game's Math.random - the
+// board/AI sequence (and tests' seeded worlds) stay independent of how many
+// frames happened to render.
+let cgRandState = (Date.now() ^ 0x9e3779b9) >>> 0;
+function cgRand() {
+    cgRandState ^= cgRandState << 13; cgRandState >>>= 0;
+    cgRandState ^= cgRandState >>> 17;
+    cgRandState ^= cgRandState << 5; cgRandState >>>= 0;
+    return cgRandState / 4294967296;
+}
+
 // Idle breathing: a slow squash-and-stretch, repainted at ~15fps (plenty
 // for motion this subtle, and far cheaper than 60 on a phone).
 const CG_BREATH_STEP_MS = 66;
@@ -269,8 +281,9 @@ const CG_VFX = {
             st._vfx(ghost.root, ms, t => {
                 // trails the real body with a lag, fading out
                 const lagT = Math.max(0, t - i * gap);
-                ghost.root.x = st.baseX + st.lastPose.dx * (1 - i * 0.25);
-                ghost.root.y = st.baseY + st.lastPose.dy;
+                // the back layer already follows the body; trail behind it
+                ghost.root.x = st.baseX - st.facing * i * 12 * Math.min(1, Math.abs(st.lastPose.dx) / 20);
+                ghost.root.y = st.baseY + Math.min(0, st.lastPose.dy) * 0.2;
                 ghost.root.rotation = sprite.rotation;
                 ghost.root.scale.set(sprite.scale.x, sprite.scale.y);
                 ghost.root.alpha = lagT > 0 ? 0.45 * (1 - t) / i : 0;
@@ -371,7 +384,44 @@ const CG_RIGS = {
     flinch: cgRig({ torso: [Z, [.15, -0.3], [.5, -0.1], ONE], head: [Z, [.15, -0.35], [.5, -0.1], ONE],
         armL: [Z, [.15, 0.8], [.6, 0.2], ONE], armR: [Z, [.15, -0.8], [.6, -0.2], ONE], legL: [Z, [.15, 0.12], ONE], legR: [Z, [.15, -0.12], ONE] }),
     death: cgRig({ torso: [Z, [1, -0.35]], head: [Z, [1, -0.4]], armL: [Z, [1, 0.9]], armR: [Z, [1, -0.9]], legL: [Z, [1, 0.2]], legR: [Z, [1, -0.3]] }),
+    // --- arena move set ---
+    thrust: cgRig({ armR: [Z, [.3, 0.5], [.45, -1.5], [.7, -1.4], ONE], armL: [Z, [.3, 0.4], [.45, 0.7], ONE],
+        torso: [Z, [.3, -0.08], [.45, 0.25], [.7, 0.2], ONE], legR: [Z, [.45, -0.55], [.7, -0.5], ONE], legL: [Z, [.45, 0.35], ONE] }),
+    uppercut: cgRig({ armR: [Z, [.3, 0.9], [.5, -2.6], [.72, -2.3], ONE], armL: [Z, [.3, -0.5], [.5, 0.5], ONE],
+        torso: [Z, [.3, 0.18], [.5, -0.2], ONE], head: [Z, [.3, 0.1], [.5, -0.15], ONE], legR: [Z, [.3, -0.35], [.5, -0.1], ONE], legL: [Z, [.3, 0.25], ONE] }),
+    backhand: cgRig({ armR: [Z, [.3, -2.0], [.5, 0.9], [.72, 0.7], ONE], armL: [Z, [.3, 0.4], [.5, -0.3], ONE],
+        torso: [Z, [.3, -0.15], [.5, 0.18], ONE], legR: [Z, [.5, -0.35], ONE], legL: [Z, [.5, 0.25], ONE] }),
+    kick: cgRig({ legR: [Z, [.3, 0.4], [.5, -1.3], [.68, -1.1], ONE], legL: [Z, [.5, 0.15], ONE],
+        torso: [Z, [.3, 0.05], [.5, -0.25], ONE], armL: [Z, [.5, 0.6], ONE], armR: [Z, [.5, -0.8], ONE] }),
+    bash: cgRig({ armL: [Z, [.3, 0.5], [.5, -1.45], [.7, -1.35], ONE], armR: [Z, [.3, 0.3], [.5, 0.5], ONE],
+        torso: [Z, [.3, -0.1], [.5, 0.3], ONE], legR: [Z, [.5, -0.5], ONE], legL: [Z, [.5, 0.3], ONE] }),
+    throw: cgRig({ armR: [Z, [.3, -3.0], [.47, -1.2], [.65, -0.9], ONE], armL: [Z, [.3, -1.2], [.47, 0.4], ONE],
+        torso: [Z, [.3, -0.15], [.47, 0.2], ONE], legR: [Z, [.47, -0.35], ONE], legL: [Z, [.47, 0.2], ONE] }),
+    push: cgRig({ armR: [Z, [.3, 0.6], [.5, -1.55], [.8, -1.5], ONE], armL: [Z, [.3, 0.6], [.5, -1.5], [.8, -1.45], ONE],
+        torso: [Z, [.3, -0.12], [.5, 0.15], ONE], head: [Z, [.5, 0.08], ONE], legR: [Z, [.5, -0.25], ONE] }),
+    summon: cgRig({ armR: [Z, [.35, -2.8], [.55, -0.3], ONE], armL: [Z, [.35, 2.6], [.55, 0.4], ONE],
+        torso: [Z, [.35, -0.15], [.55, 0.2], ONE], legL: [Z, [.55, 0.25], ONE], legR: [Z, [.55, -0.25], ONE], head: [Z, [.35, -0.2], [.55, 0.2], ONE] }),
+    pray: cgRig({ armR: [Z, [.3, -2.4], [.75, -2.4], ONE], armL: [Z, [.3, 2.4], [.75, 2.4], ONE], head: [Z, [.3, -0.22], [.75, -0.22], ONE] }),
+    drink: cgRig({ armR: [Z, [.3, -2.3], [.7, -2.4], ONE], head: [Z, [.35, -0.3], [.7, -0.3], ONE], torso: [Z, [.35, -0.08], ONE] }),
+    victory: cgRig({ armR: [Z, [.3, -2.9], [.8, -2.85], ONE], armL: [Z, [.3, 0.4], ONE], head: [Z, [.3, -0.15], ONE], torso: [Z, [.3, -0.05], ONE] }),
+    guard: cgRig({ armL: [Z, [.2, -2.2], [.8, -2.2], ONE], armR: [Z, [.2, -0.4], [.8, -0.4], ONE], head: [Z, [.2, 0.12], ONE],
+        legL: [Z, [.2, 0.3], [.8, 0.3], ONE], legR: [Z, [.2, -0.3], [.8, -0.3], ONE], torso: [Z, [.2, 0.08], ONE] }),
+    stagger: cgRig({ torso: [Z, [.2, -0.4], [.6, -0.15], ONE], head: [Z, [.2, -0.45], [.6, -0.1], ONE], armL: [Z, [.2, 1.2], [.6, 0.3], ONE],
+        armR: [Z, [.2, -1.2], [.6, -0.3], ONE], legL: [Z, [.2, 0.35], [.6, 0.1], ONE], legR: [Z, [.2, -0.45], [.6, -0.1], ONE] }),
+    recoil: cgRig({ torso: [Z, [.15, 0.35], [.55, 0.1], ONE], head: [Z, [.15, 0.3], [.55, 0.05], ONE], armL: [Z, [.15, -0.5], ONE],
+        armR: [Z, [.15, 0.5], ONE], legL: [Z, [.15, 0.2], ONE], legR: [Z, [.15, -0.2], ONE] }),
+    knockdown: cgRig({ torso: [Z, [.25, -0.6], [.6, -0.6], ONE], head: [Z, [.25, -0.4], [.6, -0.3], ONE], armL: [Z, [.25, 1.5], [.6, 1.2], ONE],
+        armR: [Z, [.25, -1.5], [.6, -1.2], ONE], legL: [Z, [.25, -0.4], [.6, -0.3], ONE], legR: [Z, [.25, -0.9], [.6, -0.8], ONE] }),
 };
+// when each rig's decisive beat happens (the blow / the release), so a
+// move can time-warp its rig to land that beat exactly on the impact
+const CG_RIG_KEYS = { overhead: 0.5, heavy: 0.52, spin: 0.5, stab: 0.45, xslash: 0.5, bow: 0.47, cast: 0.55, slam: 0.5, charge: 0.4,
+    thrust: 0.45, uppercut: 0.5, backhand: 0.5, kick: 0.5, bash: 0.5, throw: 0.47, push: 0.5, summon: 0.55 };
+function cgRigWarp(rig, target) {
+    const a = CG_RIG_KEYS[rig];
+    if (target === null || target === undefined || a === undefined || target <= 0 || target >= 1) return t => t;
+    return t => t <= target ? a * t / target : a + (1 - a) * (t - target) / (1 - target);
+}
 // which rig animation each class uses for each action (VFX + body motion
 // live in CG_CLASS_ACTIONS below)
 const CG_CLASS_RIGS = {
@@ -626,6 +676,7 @@ function cgInitShared() {
 
 function cgHandleResize() {
     if (!cgShared.renderer) return;
+    if (typeof cgRelayoutArenas === 'function') cgRelayoutArenas();
     const size = cgPortraitSize();
     if (size[0] === cgShared.size[0] && size[1] === cgShared.size[1]) return;
     cgShared.size = size;
@@ -643,7 +694,7 @@ function cgFrame(ticker) {
     const renderer = cgShared.renderer;
     for (const stage of cgShared.stages) {
         if (stage.paused || !stage.portraitSprite) continue;
-        if (!cgIsVisible(stage.canvasEl)) continue;
+        if (!cgIsVisible(stage.arena ? stage.arena.canvasEl : stage.canvasEl)) continue;
         // Idle breathing, only while nothing else is animating the sprite.
         if (stage.stripH && !stage.dead && stage.activeTweens === 0) {
             const now = performance.now();
@@ -661,6 +712,12 @@ function cgFrame(ticker) {
                 stage.needsRender = true;
             }
         }
+        if (stage._updateAuras(performance.now())) stage.needsRender = true;
+        // arena fighters: the arena paints them all at once (cgRenderArenas)
+        if (stage.arena) {
+            if (stage.needsRender || stage.activeTweens > 0) { stage.arena.dirty = true; stage.needsRender = false; }
+            continue;
+        }
         if (!stage.needsRender && stage.activeTweens === 0) continue;
         if (cgShared.lost) continue;
         const [w, h] = stage.size;
@@ -673,6 +730,7 @@ function cgFrame(ticker) {
         stage.renderCount++;
         cgShared.stats.renders++;
     }
+    if (typeof cgRenderArenas === 'function') cgRenderArenas();
 }
 
 // One CombatStage per portrait slot (solo's player/enemy, PvP's me/opponent,
@@ -693,18 +751,29 @@ class CombatStage {
         this.activeTweens = 0;
         this.lastFrame = -1;
         this.renderCount = 0;
+        this.lastMoves = {};
+        this.performToken = 0;
+        this.auras = { ult: null, legendary: null, enraged: false };
+        this.groundGlow = null;
+        this.incomingTier = 0;
+        // An .arena-slot <div> (not a <canvas>) = this fighter lives in its
+        // mode's shared arena scene (arena.js) instead of its own canvas.
+        this.side = canvasEl.dataset && canvasEl.dataset.side === 'right' ? 'right' : 'left';
+        this.embedded = canvasEl.tagName !== 'CANVAS';
         this.ready = this._init();
     }
 
     async _init() {
         await cgInitShared();
-        this.ctx = this.canvasEl.getContext('2d');
+        if (!this.embedded) this.ctx = this.canvasEl.getContext('2d');
         this.root = new PIXI.Container();
         // back layer (auras, pillars, runes, afterimages) sits behind the
         // character; effectLayer (slashes, bursts, particles) in front.
         this.backLayer = new PIXI.Container();
         this.root.addChild(this.backLayer);
-        this.facing = 1;
+        // arena fighters face their side's opponent; a lone portrait faces
+        // right (heroes) or left (monsters, set in setPortrait)
+        this.facing = this.embedded && this.side === 'right' ? -1 : 1;
         this.lastPose = { dx: 0, dy: 0 };
         // `portraitSprite` is the rig's ROOT container (kept under this name:
         // every body-level effect - lunge, knockback, flash, death - moves or
@@ -716,7 +785,15 @@ class CombatStage {
         this.root.addChild(this.portraitSprite);
         this.effectLayer = new PIXI.Container();
         this.root.addChild(this.effectLayer);
+        // persistent auras (ULT ready, legendary item, enrage) - their own
+        // layer, deepest of all, so effect layers only ever hold effects
+        this.auraG = new PIXI.Graphics();
+        this.root.addChildAt(this.auraG, 0);
         cgShared.stages.push(this);
+        if (this.embedded && typeof cgGetArena === 'function') {
+            this.arena = cgGetArena(this.canvasEl.dataset.arena);
+            if (this.arena) this.arena.addFighter(this);
+        }
         this._layout();
         return this;
     }
@@ -724,6 +801,8 @@ class CombatStage {
     // (Re)sizes the 2D canvas to the current shared portrait size and
     // re-fits the portrait - on creation and on every viewport resize.
     _layout() {
+        if (this.arena) { this.arena.layoutFighter(this); return; }
+        if (this.embedded) return;
         this.size = cgShared.size;
         const [w, h] = this.size;
         const res = cgShared.resolution;
@@ -762,7 +841,7 @@ class CombatStage {
         await this.ready;
         this.url = url;
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
-        this.facing = this.charKey.indexOf('monster_') === 0 ? -1 : 1;
+        this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : (this.charKey.indexOf('monster_') === 0 ? -1 : 1);
         const rigs = await cgLoadRigs();
         const rig = rigs[this.charKey];
         if (!rig) return;
@@ -774,7 +853,7 @@ class CombatStage {
         this.rigParts = parts;
         this.rigPivots = rig.pivots;
         this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
-        const built = this._buildRig(parts, rig.pivots, rig.monster);
+        const built = this._buildRig(parts, rig.pivots, this.facing < 0);
         this.portraitSprite.addChild(built.inner);
         this.joints = built.joints;
         this.stripW = 200;
@@ -784,6 +863,8 @@ class CombatStage {
         this.dead = false;
         this._fitPortrait();
         this.needsRender = true;
+        // a fresh monster in the arena walks in from its side
+        if (this.arena && this.side === 'right' && this.charKey.indexOf('monster_') === 0) this.playEntrance();
     }
 
     // Builds the joint hierarchy for a set of part textures: back and legs on
@@ -851,81 +932,253 @@ class CombatStage {
         if (effect) this._burst([effect], 1.3, 800);
     }
 
-    // Played on the DEFENDER whenever a sword/skull match actually damages
-    // them - a real knockback (pushed back and staggered, not just jittered
-    // in place) plus a stronger flash, so landing a hit is unmistakable
-    // instead of reading as a generic sparkle. skull hits knock back harder
-    // than sword, matching its bigger damage number.
-    async playHitReaction(tileType, delayMs) {
+    // Played on the DEFENDER when a blow lands. How hard it reads depends on
+    // what hit it: the attacker's move marks its target with its tier when
+    // it starts (incomingTier) - a light hit flinches, a heavy one staggers
+    // the fighter back a few steps, a finisher knocks them off their feet.
+    // Two flinch variants alternate so a run of small hits doesn't repeat.
+    async playHitReaction(tileType, delayMs, tierArg) {
         await this.ready;
         if (delayMs) await cgWait(delayMs);
-        const severity = tileType === 'skull' ? 1.5 : 1;
-        this._knockback(this.portraitSprite, 18 * severity, 520);
-        if (this.activeTweens <= 1) this._rigTween('flinch', 560);
+        if (this.dead) return;
+        const tier = tierArg || this.incomingTier || (tileType === 'skull' ? 2 : 1);
+        this.incomingTier = 0;
         this._flash(this.portraitSprite, 650, 0xff3b30); // hurt = red
         const effect = HIT_EFFECT_SPRITES[tileType];
-        if (effect) this._burst([effect], 1.4 * severity, 850);
+        if (effect) this._burst([effect], 1.1 + 0.3 * tier, 850);
+        if (this.activeMove) return; // mid-move: the flash + burst say it, don't yank the body
+        const back = -this.facing; // pushed away from whoever it faces
+        const sprite = this.portraitSprite, k = this.size[0] / 90;
+        let rig, ms, push;
+        if (tier >= 3) { rig = 'knockdown'; ms = 1300; push = 26; }
+        else if (tier === 2) { rig = cgRand() < 0.5 ? 'stagger' : 'recoil'; ms = 760; push = 20; }
+        else { rig = cgRand() < 0.5 ? 'flinch' : 'recoil'; ms = 520; push = 12; }
+        const anim = CG_RIGS[rig];
+        const token = ++this.performToken;
+        this.activeMove = { reaction: true };
+        this._tween(ms, t => {
+            if (token !== this.performToken) return;
+            let dx, rot = 0, dy = 0;
+            if (tier >= 3) {
+                // thrown back, down on the ground, then back up
+                const fly = CG_EASE.out(CG_EASE.seg(t, 0, 0.25)), up = CG_EASE.inOut(CG_EASE.seg(t, 0.6, 0.95));
+                dx = push * k * fly * (1 - up * 0.6);
+                rot = back * 1.25 * fly * (1 - up);
+                dy = -18 * k * CG_EASE.bump(CG_EASE.seg(t, 0, 0.25)) / 3;
+            } else {
+                dx = push * k * Math.sin(Math.min(1, t * 1.4) * Math.PI) * (1 - t * 0.3);
+                rot = back * 0.16 * Math.sin(t * Math.PI);
+            }
+            sprite.x = this.baseX + back * dx;
+            sprite.y = this.baseY + dy;
+            sprite.rotation = rot;
+            this._applyRig(anim, t);
+        }, () => {
+            if (token !== this.performToken) return;
+            this.activeMove = null;
+            sprite.x = this.baseX; sprite.y = this.baseY; sprite.rotation = 0;
+            this._applyRig(null, 0);
+        });
+        if (this.arena && tier >= 3) this._after(ms * 0.25, () => { const p = this.arena.bodyPoint(this, 0); this.arena.dust(p.x, p.y, 8, back); this.arena.shake(4, 220); });
     }
 
-    // The one big moment per class - a three-layer particle burst plus a
-    // stronger shake/flash. `classKey` picks the effect combo (see
-    // ULT_EFFECT_SPRITES); falls back to a generic spark burst for an
-    // unrecognized key rather than silently doing nothing.
+    // The one big moment per class: the arena dims, the camera pushes in on
+    // the caster, the ult's name sweeps across, then the class's own ult
+    // move lands (at the usual impact time) with a hit-stop and a heavy
+    // reaction on the target.
     async playUlt(classKey) {
         await this.ready;
-        // the class's own ultimate choreography, plus the sprite bursts
-        const set = CG_CLASS_ACTIONS[classKey];
-        this._perform(set && set.ult, CG_CLASS_RIGS[classKey] && CG_CLASS_RIGS[classKey].ult);
+        const move = typeof cgUltMove === 'function' ? cgUltMove(classKey) : null;
+        const arena = this.arena;
+        const color = (move && move.color) || 0xfff2a0;
+        if (arena && cgEffectsEnabled()) {
+            arena.dim(0.55, 1600);
+            const bp = arena.bodyPoint(this, 0.55);
+            arena.zoomTo(bp.x, bp.y, 1.14, 900, 250);
+            arena.banner(cgUltName(classKey), color, 1500);
+        }
         this._flash(this.portraitSprite, 900, 0xfff2a0);
         const effects = ULT_EFFECT_SPRITES[classKey] || [HIT_EFFECT_SPRITES.energy];
         this._burst(effects, 2.1, 1200);
+        if (move) this._perform(move);
+        const foe = arena ? arena.opponentOf(this) : null;
+        if (foe) this._after(cgImpactMs(), () => { cgHitStop(120); foe.playHitReaction('skull', 0, 3); });
     }
 
-    // Played on the ATTACKER's own portrait (as opposed to playHit/
-    // playHitReaction, which play on whoever's getting hit) whenever that
-    // class's own tile match lands - `tileType` picks which of that class's
-    // 6 actions plays (see CG_CLASS_ACTIONS), so the SAME class visibly does a
-    // different thing for a sword match than a shield match, and two
-    // different classes doing the same tile type still look distinct from
-    // each other. Silently does nothing for an unrecognized class (a
-    // monster has no class) or tile type rather than guessing at a
-    // fallback motion that wouldn't mean anything for it.
-    async playClassMotion(classKey, tileType) {
+    // The fighter's own move for a tile match. Every class has several
+    // moves per action (moves.js); a bigger match (4/5, L/T) or a combo
+    // escalates to heavier moves and finishers, and the same move never
+    // plays twice in a row.
+    async playClassMotion(classKey, tileType, power, combo) {
         await this.ready;
-        const set = CG_CLASS_ACTIONS[classKey];
         const act = tileType === 'teamheal' ? 'heart' : tileType;
-        this._perform(set && set[act], CG_CLASS_RIGS[classKey] && CG_CLASS_RIGS[classKey][act]);
+        const list = typeof cgMovesFor === 'function' ? cgMovesFor(classKey, act) : null;
+        this._perform(this._pickMove(classKey + '.' + act, list, cgTierFor(power, combo)));
     }
 
-    // Runs one choreographed action: the pose curve on the sprite plus its
-    // vector effects (skipped in low-graphics mode - the pose still plays).
-    _perform(action, rigName) {
-        if (!action || this.dead) return;
-        if (rigName) action = Object.assign({}, action, { rig: rigName });
-        this.lastAction = action;
-        if (action.fx && cgEffectsEnabled()) action.fx(this);
-        const sprite = this.portraitSprite, f = this.facing;
-        const rigAnim = CG_RIGS[action.rig];
-        // Pose offsets are authored for a ~90px-wide portrait; scale them to
-        // this canvas and keep the character (mostly) inside it.
-        const [w] = this.size, k = w / 90;
-        const room = Math.max(4, (w - this.stripW * this.portraitBaseScale) / 2 + w * 0.08);
-        this._tween(action.ms, t => {
-            const p = action.pose(t);
-            const dx = Math.max(-room, Math.min(room, p.dx * k));
-            this.lastPose = { dx: f * dx, dy: p.dy * k };
-            sprite.x = this.baseX + f * dx;
-            sprite.y = this.baseY + p.dy * k;
-            sprite.rotation = f * p.rot;
+    _pickMove(key, list, tier) {
+        if (!list || !list.length) return null;
+        let pool = list.filter(m => (m.tier || 1) === tier);
+        for (let t = tier - 1; !pool.length && t >= 1; t--) pool = list.filter(m => (m.tier || 1) === t);
+        if (!pool.length) pool = list;
+        const last = this.lastMoves[key];
+        if (pool.length > 1) pool = pool.filter(m => m.id !== last);
+        const move = pool[Math.floor(cgRand() * pool.length)];
+        this.lastMoves[key] = move.id;
+        return move;
+    }
+
+    // Runs fn after `ms` of animation time.
+    _after(ms, fn) { this._tween(Math.max(1, ms), () => {}, fn); }
+
+    // Runs one move: body motion (a dash/leap/blink across the arena for
+    // melee, a pose for the rest), the jointed rig, its vector effects, a
+    // projectile timed to arrive on the impact, and the impact's own
+    // hit-stop/shake/burst. Effects spawned in the fighter's own layers
+    // travel with the body.
+    _perform(move, opts) {
+        if (!move || this.dead) return;
+        opts = opts || {};
+        const ms = move.ms || 1000, impactMs = cgImpactMs();
+        const kind = move.kind || 'self', f = this.facing;
+        const arena = this.arena;
+        const foe = arena && kind !== 'self' ? arena.opponentOf(this, opts.targetId) : null;
+        const reach = kind === 'melee' && foe ? arena.reachTo(this, foe) : 0;
+        const tier = move.tier || 1;
+        if (foe) foe.incomingTier = Math.max(foe.incomingTier || 0, tier);
+        this.lastAction = move;
+        const ctx = { stage: this, foe, arena, reach, impactMs, ms, f, tier };
+        if (move.fx && cgEffectsEnabled()) move.fx(this, ctx);
+        if (kind === 'ranged' && move.shot && foe) {
+            const launch = move.launchMs || 230;
+            this._after(launch, () => {
+                if (foe.dead && !foe.portraitSprite) return;
+                arena.shoot(move.shot, arena.handPoint(this), arena.bodyPoint(foe, move.aimY || 0.5), Math.max(60, impactMs - launch), move.color || 0xffffff);
+            });
+        }
+        this._after(impactMs, () => {
+            if (move.onImpact && cgEffectsEnabled()) move.onImpact(this, ctx);
+            if (!foe) return;
+            if (tier >= 2) cgHitStop(tier >= 3 ? 110 : 60);
+            arena.shake(tier >= 3 ? 7 : tier === 2 ? 4 : 2, 260);
+            if (kind === 'melee') {
+                const p = arena.bodyPoint(foe, 0.55);
+                arena.impact(p.x - f * 8, p.y, move.color || 0xffffff, 0.5 + 0.3 * tier);
+            }
+        });
+        const sprite = this.portraitSprite;
+        const rigAnim = CG_RIGS[move.rig];
+        const keyT = kind === 'ranged' ? (move.launchMs || 230) / ms : kind === 'melee' ? impactMs / ms : null;
+        const warp = cgRigWarp(move.rig, keyT);
+        const body = typeof cgBodyMotion === 'function' ? cgBodyMotion(move, reach, impactMs / ms) : (t => ({}));
+        const k = this.size[0] / 90;
+        const room = arena ? Infinity : Math.max(4, (this.size[0] - (this.stripW || 200) * this.portraitBaseScale) / 2 + this.size[0] * 0.08);
+        // start from wherever the body is now (an interrupted move) instead of snapping
+        const from = { x: sprite.x - this.baseX, y: sprite.y - this.baseY, r: sprite.rotation };
+        const token = ++this.performToken;
+        this.activeMove = move;
+        let stepSide = 0;
+        this._tween(ms, t => {
+            if (token !== this.performToken) return;
+            const p = body(t);
+            const blend = 1 - Math.min(1, t / 0.12);
+            const local = Math.max(-room, Math.min(room, (p.dx || 0) * k));
+            const dx = f * (local + (p.travel || 0));
+            const dy = (p.dy || 0) * k + (p.lift || 0);
+            this.lastPose = { dx, dy };
+            sprite.x = this.baseX + dx * (1 - blend) + from.x * blend;
+            sprite.y = this.baseY + dy * (1 - blend) + from.y * blend;
+            sprite.rotation = f * (p.rot || 0) * (1 - blend) + from.r * blend;
             sprite.scale.set(this.portraitBaseScale * (p.sx || 1), this.portraitBaseScale * (p.sy || 1));
             sprite.alpha = p.alpha === undefined ? 1 : p.alpha;
-            this._applyRig(rigAnim, t);
+            this._applyRig(rigAnim, warp(t));
+            if (p.run) {
+                // running legs/arms layered over the move's own pose
+                const ph = t * ms / 1000 * 15, j = this.joints;
+                if (j.legL) j.legL.rotation += 0.75 * p.run * Math.sin(ph);
+                if (j.legR) j.legR.rotation -= 0.75 * p.run * Math.sin(ph);
+                if (j.torso) j.torso.rotation += 0.12 * p.run;
+                const side = Math.sin(ph) > 0 ? 1 : -1;
+                if (arena && side !== stepSide && Math.abs(p.run) > 0.3) { stepSide = side; const q = arena.bodyPoint(this, 0); arena.dust(q.x, q.y, 2, -f); }
+            }
+            this.effectLayer.x = this.backLayer.x = sprite.x - this.baseX;
+            this.effectLayer.y = this.backLayer.y = Math.min(0, sprite.y - this.baseY);
         }, () => {
+            if (token !== this.performToken) return;
+            this.activeMove = null;
             this._applyRig(null, 0);
             this.lastPose = { dx: 0, dy: 0 };
             sprite.x = this.baseX; sprite.y = this.baseY; sprite.rotation = 0; sprite.alpha = 1;
             sprite.scale.set(this.portraitBaseScale);
+            this.effectLayer.x = this.backLayer.x = 0;
+            this.effectLayer.y = this.backLayer.y = 0;
         });
+    }
+
+    // A monster walks (or, for a boss, stomps) in from its side of the arena.
+    playEntrance() {
+        if (!this.arena || this.dead) return;
+        const sprite = this.portraitSprite, from = this.arena.size[0] - (this.root.x + this.baseX) + 60;
+        const boss = this.charKey === 'monster_boss';
+        const token = ++this.performToken;
+        this.activeMove = { entrance: true };
+        this._tween(boss ? 1100 : 900, t => {
+            if (token !== this.performToken) return;
+            const e = CG_EASE.out(t);
+            sprite.x = this.baseX + (1 - e) * from;
+            sprite.y = this.baseY - (boss ? 40 * CG_EASE.bump(CG_EASE.seg(t, 0, 0.8)) : 0);
+            const ph = t * 14, j = this.joints;
+            if (!boss) { if (j.legL) j.legL.rotation = 0.6 * Math.sin(ph) * (1 - t); if (j.legR) j.legR.rotation = -0.6 * Math.sin(ph) * (1 - t); }
+            if (j.armL) j.armL.rotation = -0.3 * Math.sin(ph) * (1 - t);
+            if (j.armR) j.armR.rotation = 0.3 * Math.sin(ph) * (1 - t);
+        }, () => {
+            if (token !== this.performToken) return;
+            this.activeMove = null;
+            sprite.x = this.baseX; sprite.y = this.baseY;
+            this._applyRig(null, 0);
+            if (boss && this.arena) { const p = this.arena.bodyPoint(this, 0); this.arena.dust(p.x, p.y, 12); this.arena.shake(8, 400); }
+        });
+    }
+
+    // Arms up after the opponent falls.
+    playVictory() {
+        if (this.dead) return;
+        this._perform({ id: 'victory', kind: 'self', ms: 1200, rig: 'victory', pose: CG_POSE.float(6) });
+    }
+
+    // Persistent looks, drawn behind the fighter every frame they're on:
+    // ULT ready (gold), an equipped unique item (its rarity color), an
+    // enraged boss (red).
+    setUltReady(on) { this.auras.ult = on ? 0xffd24a : null; this.needsRender = true; }
+    setLegendary(color) { this.auras.legendary = color || null; this.needsRender = true; }
+    setEnraged(on) { this.auras.enraged = !!on; this.needsRender = true; }
+    setGroundGlow(color) { this.groundGlow = color; if (this.arena && this.shadow) this.arena._drawShadow(this); this.needsRender = true; }
+
+    _updateAuras(now) {
+        const a = this.auras, g = this.auraG;
+        if (!g) return false;
+        const any = a.ult !== null || a.legendary !== null || a.enraged;
+        if (!any) { if (g.visible) { g.clear(); g.visible = false; return true; } return false; }
+        const step = Math.floor(now / CG_BREATH_STEP_MS);
+        if (step === this.auraStep && !this.activeTweens) return false;
+        this.auraStep = step;
+        g.visible = !this.dead;
+        g.clear();
+        const sp = this.portraitSprite, bodyH = (this.stripH || 250) * this.portraitBaseScale;
+        const cx = sp.x, cy = sp.y - bodyH * 0.45;
+        const pulse = 0.5 + 0.5 * Math.sin(now / 1000 * 3.2);
+        const ring = (color, r, alpha) => { for (let i = 3; i >= 1; i--) g.ellipse(cx, cy, r * 0.42 * i / 3 + 4, r * 0.55 * i / 3 + 4).fill({ color, alpha: alpha / i }); };
+        if (a.enraged) ring(0xff2a1a, bodyH * 1.05, 0.22 + 0.18 * pulse);
+        if (a.legendary !== null) ring(a.legendary, bodyH * 0.95, 0.14 + 0.1 * pulse);
+        if (a.ult !== null) {
+            ring(a.ult, bodyH * 0.9, 0.16 + 0.16 * pulse);
+            // rising motes
+            for (let i = 0; i < 5; i++) {
+                const ph = (now / 1400 + i / 5) % 1;
+                g.circle(cx + Math.sin(i * 2.4 + now / 700) * bodyH * 0.22, cy + bodyH * 0.45 - ph * bodyH, 1.6 + pulse).fill({ color: a.ult, alpha: 0.9 * (1 - ph) });
+            }
+        }
+        return true;
     }
 
     // Adds a vector effect that lives for `ms`, updated by onT(t), then is
@@ -984,7 +1237,7 @@ class CombatStage {
     _knockback(target, magnitude, durationMs) {
         this._tween(durationMs, t => {
             const push = magnitude * Math.sin(t * Math.PI) * (1 - t * 0.3);
-            target.x = this.baseX + push;
+            target.x = this.baseX - this.facing * push;
             target.rotation = Math.sin(t * Math.PI) * 0.18;
         }, () => { target.x = this.baseX; target.rotation = 0; });
     }
@@ -1007,11 +1260,12 @@ class CombatStage {
     // in activeTweens so cgFrame knows this stage needs repainting while it
     // runs (and can go back to near-idle the moment it's done).
     _tween(durationMs, onFrame, onDone) {
-        const start = performance.now();
+        const clock = typeof cgNow === 'function' ? cgNow : () => performance.now();
+        const start = clock();
         const ticker = cgShared.ticker;
         this.activeTweens++;
         const step = () => {
-            const t = Math.min(1, (performance.now() - start) / durationMs);
+            const t = Math.min(1, (clock() - start) / durationMs);
             onFrame(t);
             if (t >= 1) {
                 ticker.remove(step);
@@ -1023,28 +1277,31 @@ class CombatStage {
         ticker.add(step);
     }
 
-    // G3 (roadmap v2) - a monster has no class motion set, so its own
-    // landed hit used to read as nothing at all. A short wind-up, a lunge
-    // toward its target (`direction` -1 = left, +1 = right) and back.
-    async playAttack() {
+    // A monster's own hit / self-buff (moves.js has several per monster).
+    // `power` = the match multiplier; `targetId` picks which hero it goes
+    // for when there are two (co-op).
+    async playAttack(power, targetId) {
         await this.ready;
-        const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
-        this._perform(set.attack, (CG_MONSTER_RIGS[this.charKey] || CG_MONSTER_RIGS.monster_normal).attack);
+        const list = typeof cgMonsterMoves === 'function' ? cgMonsterMoves(this.charKey, 'attack', this.auras.enraged) : null;
+        this._perform(this._pickMove(this.charKey + '.attack', list, cgTierFor(power > 0 ? power : 1, 0)), { targetId });
     }
 
-    // A monster matched heart/shield/energy for itself.
     async playBuff() {
         await this.ready;
-        const set = CG_MONSTER_ACTIONS[this.charKey] || CG_MONSTER_ACTIONS.monster_normal;
-        this._perform(set.buff, (CG_MONSTER_RIGS[this.charKey] || CG_MONSTER_RIGS.monster_normal).buff);
+        const list = typeof cgMonsterMoves === 'function' ? cgMonsterMoves(this.charKey, 'buff') : null;
+        this._perform(this._pickMove(this.charKey + '.buff', list, 1));
     }
 
     // G3 - topples and fades out; stays down until setPortrait()/revive().
     async playDeath() {
         await this.ready;
         const sprite = this.portraitSprite;
+        this.performToken++; // stop whatever move was running
+        this.activeMove = null;
         this.dead = true;
         this._rigTween('death', 650, true);
+        const foe = this.arena ? this.arena.opponentOf(this) : null;
+        if (foe && !foe.dead) this._after(450, () => foe.playVictory());
         this._tween(650, t => {
             sprite.rotation = 0.5 * t;
             sprite.y = this.baseY + this.size[1] * 0.12 * t;
@@ -1057,6 +1314,8 @@ class CombatStage {
     async revive() {
         await this.ready;
         this.dead = false;
+        this.performToken++;
+        this.activeMove = null;
         this.portraitSprite.alpha = 1;
         this.portraitSprite.tint = 0xffffff;
         this._applyRig(null, 0);
@@ -1191,6 +1450,12 @@ function cgBossIntro(portraitId) {
     setTimeout(() => flash.remove(), 700);
 
     const portrait = document.getElementById(portraitId);
+    if (portrait && portrait.tagName !== 'CANVAS') {
+        // arena: the boss stomps in (its entrance) and roars once it lands
+        const st = cgStages[portraitId];
+        if (st) st.ready.then(() => st._after(1200, () => st.playBuff()));
+        return;
+    }
     if (portrait) {
         portrait.classList.remove('cg-boss-entrance');
         void portrait.offsetWidth;
@@ -1221,9 +1486,12 @@ function cgBossEnrageTransition(gridEl) {
 // signal instead of adding to it; the player's own portrait belongs to
 // them alone in every mode, so it's the right place for CLASS identity).
 const CLASS_GLOW_KEYS = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+const CLASS_GLOW_COLORS = { warrior: 0x95a5a6, berserker: 0xe74c3c, rogue: 0x9b59b6, archer: 0x27ae60, mage: 0x3498db, necromancer: 0x8e44ad, paladin: 0xf1c40f };
 function cgSetClassGlow(canvasId, classKey) {
     const el = document.getElementById(canvasId);
     if (!el) return;
+    // an arena fighter gets a colored ring on the floor instead of a CSS glow
+    if (el.tagName !== 'CANVAS') { cgStageDo(canvasId, 'setGroundGlow', CLASS_GLOW_COLORS[classKey] === undefined ? null : CLASS_GLOW_COLORS[classKey]); return; }
     CLASS_GLOW_KEYS.forEach(k => el.classList.remove('class-glow-' + k));
     if (classKey && CLASS_GLOW_KEYS.includes(classKey)) el.classList.add('class-glow-' + classKey);
 }
@@ -1238,6 +1506,11 @@ function cgSetClassGlow(canvasId, classKey) {
 function cgSetLegendaryAura(canvasId, rarityKey) {
     const el = document.getElementById(canvasId);
     if (!el) return;
+    if (el.tagName !== 'CANVAS') {
+        const def = rarityKey && typeof RARITY_DEFS !== 'undefined' ? RARITY_DEFS[rarityKey] : null;
+        cgStageDo(canvasId, 'setLegendary', def ? parseInt(String(def.color).replace('#', ''), 16) : null);
+        return;
+    }
     if (rarityKey && typeof RARITY_DEFS !== 'undefined' && RARITY_DEFS[rarityKey]) {
         el.style.setProperty('--legendary-aura-color', RARITY_DEFS[rarityKey].color);
         el.classList.add('cg-legendary-aura');

@@ -276,7 +276,7 @@ function makeSinglePlayerCombatContext() {
     return {
         dealDamageToOpponent(amount) {
             inflictDamage('enemy', amount);
-            if (typeof cgCombatText === 'function') cgCombatText(document.getElementById('enemy-sprite'), '-' + amount, 'crit', 250);
+            if (typeof cgCombatText === 'function') cgCombatText(document.getElementById('enemy-sprite'), '-' + amount, 'crit', CG_IMPACT_DELAY_MS);
         },
         dealDirectDamageToOpponent(amount) {
             if (enemyHP > 0) {
@@ -355,7 +355,7 @@ function renderClassButtons() {
             // (they never call resetGame() - that's solo's own start path),
             // so this needs the exact same clean-slate rebuild.
             rebuildTileStats();
-            document.getElementById('ult-btn').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
+            document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
             updateUI();
             container.style.display = 'none';
             renderModeButtons();
@@ -453,6 +453,7 @@ function startLevel() {
     swiftBonusUsed = false;
     bossEnraged = false;
     enemySprite.classList.remove('enraged');
+    if (typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'setEnraged', false);
     enemyArmor = currentMinionType === 'armored' ? Math.round(maxEnemyHP * MINION_ARMORED_PCT) : 0;
 
     let name = isBoss ? tf('BOSS Sv. {level}', { level }) : tf('Canavar Sv. {level}', { level });
@@ -1100,8 +1101,9 @@ function soloApplyGroup(group, shape, isInitial, validTiles) {
     // G3 - a shot flies from the matched tiles to whoever this match
     // affects: the opponent for sword/skull, the matcher for everything else.
     if (validTiles > 0 && typeof cgProjectile === 'function') {
-        let hostile = group.type === 'sword' || group.type === 'skull';
-        let targetId = (hostile === isPlayerTurn) ? 'enemy-sprite' : 'player-sprite';
+        // The tiles' energy flies to whoever matched them; an attack then
+        // travels on through the arena (the class/monster move itself).
+        let targetId = isPlayerTurn ? 'player-sprite' : 'enemy-sprite';
         cgProjectile(tiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
     }
 
@@ -1192,7 +1194,7 @@ function applyRPGEffects(type, multiplier) {
     // has no class, so the enemy's own turn never triggers this.
     if (isPlayerTurn && selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('player-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type, multiplier, soloBoard.cascadeDepth);
     }
 
     if (type === 'sword') {
@@ -1204,7 +1206,7 @@ function applyRPGEffects(type, multiplier) {
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         // G3 - a monster's own landed hit gets a visible lunge.
-        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', -1);
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', multiplier);
         if (typeof playSound === 'function') playSound('hit');
 
     } else if (type === 'heart') {
@@ -1269,7 +1271,7 @@ function applyRPGEffects(type, multiplier) {
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
         // G3 - a monster's own landed hit gets a visible lunge.
-        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', -1);
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', multiplier);
         if (typeof playSound === 'function') playSound('crit');
     }
 
@@ -1304,6 +1306,7 @@ function checkBossEnrage() {
         ENEMY_TILE_STATS.sword = Math.round(ENEMY_TILE_STATS.sword * BOSS_ENRAGE_STAT_MULT);
         ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
         enemySprite.classList.add('enraged');
+        if (typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'setEnraged', true);
         log(t('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!'), 'log-crit');
         // Faz 8 (graphics roadmap, 2nd wave) - a one-time flash+shake for the
         // TRANSITION itself, on top of the ongoing .enraged pulse this
@@ -1616,7 +1619,8 @@ function updateUI() {
     ultBtn.disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
     // Re-derived every refresh: the static data-i18n-en text would otherwise
     // replace the class's ult name on a language switch.
-    if (selectedClass) ultBtn.innerText = tf('{name} KULLAN (%100)', { name: selectedClass.ultName });
+    if (selectedClass) document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: selectedClass.ultName });
+    if (typeof cgStageDo === 'function') cgStageDo('player-sprite', 'setUltReady', ultCharge >= 100);
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
     // Stat readout (own + enemy) lives in the hover tooltip now (see
     // renderStatsTooltip) - rendered on demand, not every UI tick.

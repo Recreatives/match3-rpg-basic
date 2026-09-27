@@ -322,7 +322,6 @@ body {
 .bar { height: 100%; transition: width 0.2s ease; position: relative; z-index: 1; }
 #player-hp-bar { background-color: #2ecc71; width: 100%; }
 #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
-#ult-bar { background-color: #f1c40f; width: 0%; }
 #player-armor-bar { background-color: var(--armor-color); width: 0%; }
 #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
 .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
@@ -364,6 +363,55 @@ body {
     0%, 100% { box-shadow: 0 0 0 rgba(241, 196, 15, 0); }
     50% { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.85); }
 }
+
+/* --- COMBAT ARENA (arena.js) ---
+   One canvas both fighters share, with each fighter's name/HP bars
+   floating over their side. Sized off --portrait-h so the arena takes
+   the same height budget (--chrome-h) the old portrait row did: the
+   board never loses room on a small phone. */
+:root {
+    --arena-hud-h: 42px;
+    --arena-h: calc(var(--portrait-h) * 1.3 + var(--arena-hud-h));
+}
+.hud.arena {
+    position: relative; display: block;
+    height: var(--arena-h); padding: 0; overflow: hidden;
+}
+.arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.fighter-hud {
+    position: absolute; top: 4px; width: 42%; z-index: 1;
+    text-align: center; font-size: 0.8rem; line-height: 1.1;
+    text-shadow: 0 1px 2px #000;
+}
+.fighter-hud .bar-container { margin-top: 2px; height: 8px; }
+.fighter-hud .armor-container { height: 4px; margin-top: 1px; }
+.fighter-hud .hp-text { margin-top: 1px; font-size: 0.72rem; }
+.fighter-name { font-weight: bold; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fighter-left { left: 3%; }
+.fighter-right { right: 3%; }
+/* where each fighter stands - empty, the canvas draws them */
+.arena-slot { position: absolute; top: var(--arena-hud-h); bottom: 0; width: 40%; pointer-events: none; }
+.slot-left { left: 5%; }
+.slot-right { right: 5%; }
+/* co-op: teammate, you, enemy from left to right */
+.coop-arena .fighter-hud { width: 31%; }
+.coop-arena .fighter-ally { left: 1.5%; }
+.coop-arena .fighter-left { left: 34.5%; }
+.coop-arena .fighter-right { right: 1.5%; }
+.coop-arena .slot-ally { left: 1%; width: 30%; }
+.coop-arena .slot-left { left: 24%; width: 32%; }
+.coop-arena .slot-right { right: 2%; width: 38%; }
+.mp-arena { width: 100%; margin-bottom: 4px; }
+
+/* ULT button = its own charge meter (no separate ULT box any more) */
+.ult-meter-btn { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ult-meter { position: absolute; inset: 0; pointer-events: none; }
+.ult-fill { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, rgba(241, 196, 15, 0.25), rgba(241, 196, 15, 0.55)); transition: width 0.3s ease; }
+.ult-label, .ult-pct { position: relative; z-index: 1; }
+.ult-pct { font-size: 0.8em; opacity: 0.85; }
+.ult-meter-btn:disabled .ult-fill { background: linear-gradient(90deg, rgba(241, 196, 15, 0.12), rgba(241, 196, 15, 0.35)); }
+.ult-meter.ult-ready .ult-fill { background: linear-gradient(90deg, #f39c12, #f1c40f); }
+.ult-meter-btn:has(.ult-ready):not(:disabled) { animation: barUltReadyPulse 1.2s ease-in-out infinite; }
 
 /* --- STATS BAR (GRID) --- */
 /* Used inside the Stats/Loot modal (#history-modal) rather than the main
@@ -596,7 +644,7 @@ body {
    warm torch glows, a floor glow tinted by the floor theme, a faint block
    texture and an inner vignette. Static gradients only (painted once).
    Re-themed every 5 floors via data-floor (cgSetSceneTier). */
-.hud, #pvp-battle > .stat-box:has(canvas), #coop-battle > .stat-box:has(canvas) {
+.hud {
     background:
         radial-gradient(circle at 8% 22%, rgba(255, 176, 72, 0.30), transparent 26%),
         radial-gradient(circle at 92% 22%, rgba(255, 176, 72, 0.30), transparent 26%),
@@ -1055,8 +1103,6 @@ li { margin-bottom: 5px; }
 #pvp-battle > .stat-box, #coop-battle > .stat-box {
     display: inline-block; vertical-align: top; margin-bottom: 4px !important;
 }
-#pvp-battle > .stat-box:has(canvas) { width: calc(50% - 4px) !important; }
-#coop-battle > .stat-box:has(canvas) { width: calc(33.3% - 4px) !important; }
 #pvp-battle > p, #coop-battle > p { margin: 2px 0; }
 /* Board: as wide as the modal allows, but never taller than what's left
    of the screen under the (now compact) HUD rows. */
@@ -1075,8 +1121,6 @@ li { margin-bottom: 5px; }
         align-items: start;
     }
     #pvp-battle > *, #coop-battle > * { grid-column: 1 / 7; }
-    #pvp-battle > .stat-box:has(canvas) { grid-column: span 3; width: auto !important; }
-    #coop-battle > .stat-box:has(canvas) { grid-column: span 2; width: auto !important; }
     #pvp-battle > p, #coop-battle > p { font-size: 0.75rem; }
     #pvp-grid, #coop-grid {
         grid-column: 7; grid-row: 1 / span 20;

@@ -36,14 +36,18 @@ function offScreen(world) { world.frame.parentNode.style.left = '-10000px'; }
 describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
     afterEach(function (ctx) { offScreen(ctx.world); });
 
-    it('all 7 portrait slots share ONE WebGL renderer (every portrait canvas is 2D)', async function (ctx) {
+    it('all 7 fighters share ONE WebGL renderer, drawn into one 2D canvas per mode arena', async function (ctx) {
         var w = ctx.world;
         var stages = PORTRAIT_IDS.map(function (id) { return w.g('cgGetStage')(id); });
         await awaitInWorld(w, Promise.all(stages.map(function (s) { return s.ready; })));
         expect(w.g('cgShared.stages.length')).toBe(7);
-        PORTRAIT_IDS.forEach(function (id) {
-            expect(w.$(id).getContext('2d'), id + ' is a 2D canvas').toBeTruthy();
+        ['solo', 'pvp', 'coop'].forEach(function (k) {
+            expect(w.$(k + '-arena-canvas').getContext('2d'), k + ' arena is a 2D canvas').toBeTruthy();
         });
+        expect(w.g('cgArenas.solo.fighters.length')).toBe(2);
+        expect(w.g('cgArenas.pvp.fighters.length')).toBe(2);
+        expect(w.g('cgArenas.coop.fighters.length')).toBe(3);
+        stages.forEach(function (st, i) { expect(st.embedded && !!st.arena, PORTRAIT_IDS[i] + ' lives in its arena').toBe(true); });
         expect(!!w.g('cgShared.renderer')).toBe(true);
     });
 
@@ -56,7 +60,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.mage')));
         await pumpFrames(w, 300);
         expect(stage.renderCount).toBeGreaterThan(0);
-        expect(opaquePixels(w.$('player-sprite'))).toBeGreaterThan(200);
+        expect(opaquePixels(w.$('solo-arena-canvas'))).toBeGreaterThan(200);
     });
 
     it('a portrait inside a closed modal never renders', async function (ctx) {
@@ -77,7 +81,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         await startSolo(w, 'WARRIOR');
         var stage = w.g("cgGetStage('player-sprite')");
         await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
-        await pumpFrames(w, 300);
+        await pumpFrames(w, 1300); // the monster's walk-in finishes first
         var before = stage.renderCount;
         await pumpFrames(w, 1000);
         var perSecond = stage.renderCount - before;
@@ -105,13 +109,14 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         var w = ctx.world;
         var stage = w.g("cgGetStage('player-sprite')");
         await awaitInWorld(w, stage.ready);
-        var before = w.$('player-sprite').style.width;
+        await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
+        var before = w.$('solo-arena-canvas').width + 'x' + stage.size.join('x');
         w.frame.style.width = '1100px'; w.frame.style.height = '1000px';
         // Browsers deliver 'resize' as part of a rendering update, which a
         // hidden tab never runs - dispatch it explicitly.
         w.win.dispatchEvent(new w.win.Event('resize'));
         await w.tick(200); // the resize handler is debounced on the (fake) setTimeout
-        var after = w.$('player-sprite').style.width;
+        var after = w.$('solo-arena-canvas').width + 'x' + stage.size.join('x');
         expect(after, 'from ' + before).not.toBe(before);
         w.frame.style.width = '420px'; w.frame.style.height = '820px';
     });
@@ -171,16 +176,6 @@ describe('DOM effects', { isolate: 'each', world: { pixi: false } }, function ()
         expect(w.$('player-hp-bar-ghost').style.width).toBe('42%');
     });
 
-    it('class glow and legendary aura land on the right portrait', function (ctx) {
-        var w = ctx.world;
-        w.g("cgSetClassGlow('player-sprite', 'mage'); cgSetLegendaryAura('player-sprite', 'red')");
-        expect(w.$('player-sprite').classList.contains('class-glow-mage')).toBe(true);
-        expect(w.$('player-sprite').classList.contains('cg-legendary-aura')).toBe(true);
-        expect(w.$('enemy-sprite').classList.contains('class-glow-mage')).toBe(false);
-        w.g("cgSetLegendaryAura('player-sprite', null)");
-        expect(w.$('player-sprite').classList.contains('cg-legendary-aura')).toBe(false);
-    });
-
     it('modals fade in/out and end fully hidden', async function (ctx) {
         var w = ctx.world, m = w.$('info-modal');
         w.g("cgAnimateModal(document.getElementById('info-modal'), true)");
@@ -201,7 +196,20 @@ describe('DOM effects', { isolate: 'each', world: { pixi: false } }, function ()
 });
 
 describe('Combat scene (G3)', { isolate: 'each' }, function () {
-    it('a real sword match fires a shot from the board to the enemy portrait', async function (ctx) {
+    it('class glow and legendary aura land on the right portrait', async function (ctx) {
+        var w = ctx.world;
+        // arena fighters: a colored floor ring + a pulsing aura, not CSS
+        w.g("cgSetClassGlow('player-sprite', 'mage'); cgSetLegendaryAura('player-sprite', 'red')");
+        var me = w.g("cgGetStage('player-sprite')"), foe = w.g("cgGetStage('enemy-sprite')");
+        await awaitInWorld(w, me.ready); await awaitInWorld(w, foe.ready);
+        expect(me.groundGlow).toBe(w.g('CLASS_GLOW_COLORS.mage'));
+        expect(me.auras.legendary).toBe(parseInt(w.g('RARITY_DEFS.red.color').slice(1), 16));
+        expect(foe.groundGlow).toBe(null);
+        w.g("cgSetLegendaryAura('player-sprite', null)");
+        expect(me.auras.legendary).toBe(null);
+    });
+
+    it('a real sword match sends the tiles\' energy from the board to the fighter who matched', async function (ctx) {
         var w = ctx.world;
         await startSolo(w, 'WARRIOR', { immortal: true });
         freezeEnemyTurn(w);
@@ -210,9 +218,9 @@ describe('Combat scene (G3)', { isolate: 'each' }, function () {
         w.g('checkForMatches(false)');
         var shots = w.doc.querySelectorAll('.cg-projectile');
         expect(shots.length).toBe(1);
-        var enemy = w.$('enemy-sprite').getBoundingClientRect(), tile = w.g('tiles')[1].getBoundingClientRect();
+        var me = w.$('player-sprite').getBoundingClientRect(), tile = w.g('tiles')[1].getBoundingClientRect();
         var dx = parseFloat(shots[0].style.getPropertyValue('--dx'));
-        expect(dx, 'flies right, toward the enemy').toBeCloseTo((enemy.left + enemy.width / 2) - (tile.left + tile.width / 2), 1);
+        expect(dx, 'flies to the player (their attack then crosses the arena)').toBeCloseTo((me.left + me.width / 2) - (tile.left + tile.width / 2), 1);
         await w.settle(5000);
         expect(w.doc.querySelectorAll('.cg-projectile').length, 'cleaned up').toBe(0);
     });
@@ -225,7 +233,8 @@ describe('Combat scene (G3)', { isolate: 'each' }, function () {
         setBoard(w, b);
         w.g('checkForMatches(false)');
         var shot = w.doc.querySelector('.cg-projectile');
-        expect(parseFloat(shot.style.getPropertyValue('--dx')), 'flies left, to the player').toBeLessThan(0);
+        var me = w.$('player-sprite').getBoundingClientRect(), tile = w.g('tiles')[1].getBoundingClientRect();
+        expect(parseFloat(shot.style.getPropertyValue('--dx')), 'flies to the player').toBeCloseTo((me.left + me.width / 2) - (tile.left + tile.width / 2), 1);
         await w.settle(5000);
         w.g('cgToggleLowGraphics()');
         setBoard(w, b);
@@ -400,93 +409,180 @@ describe('Combat feedback (numbers, sparkles, bar pulse)', { isolate: 'each', wo
     });
 });
 
-describe('Class choreography (per-class actions + VFX)', { isolate: 'each' }, function () {
+describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 'each' }, function () {
     var SLOTS = ['player-sprite', 'enemy-sprite', 'pvp-my-sprite', 'pvp-opp-sprite', 'coop-my-sprite', 'coop-ally-sprite', 'coop-enemy-sprite'];
     var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
-    var ACTIONS = ['sword', 'skull', 'heart', 'shield', 'energy', 'ult'];
+    var ACTIONS = ['sword', 'skull', 'heart', 'shield', 'energy'];
+    var JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
 
-    it('every class has its own move for all 6 actions, every monster an attack and a buff', function (ctx) {
-        var A = ctx.world.g('CG_CLASS_ACTIONS'), M = ctx.world.g('CG_MONSTER_ACTIONS');
+    it('the move library is complete and well-formed', function (ctx) {
+        var w = ctx.world, M = w.g('CG_MOVES'), U = w.g('CG_ULTS'), MM = w.g('CG_MONSTER_MOVES');
+        var RIGS = w.g('CG_RIGS'), SHOTS = w.g('CG_SHOTS'), ids = {}, total = 0;
+        function check(m, where) {
+            expect(!!m.id, where + ' id').toBe(true);
+            expect(ids[m.id], 'unique id ' + m.id).toBe(undefined);
+            ids[m.id] = true; total++;
+            expect(['melee', 'ranged', 'self'].indexOf(m.kind) >= 0, m.id + ' kind').toBe(true);
+            expect(!!RIGS[m.rig], m.id + ' rig ' + m.rig).toBe(true);
+            if (m.kind === 'ranged') expect(typeof SHOTS[m.shot], m.id + ' shot ' + m.shot).toBe('function');
+            if (m.kind === 'melee') expect(['dash', 'leap', 'blink', 'charge', 'slide'].indexOf(m.approach) >= 0, m.id + ' approach').toBe(true);
+            expect(m.ms, m.id + ' readable length').toBeGreaterThanOrEqual(900);
+        }
         CLASSES.forEach(function (c) {
             ACTIONS.forEach(function (a) {
-                expect(!!(A[c] && A[c][a] && A[c][a].pose && A[c][a].fx), c + '.' + a).toBe(true);
-                expect(A[c][a].ms, c + '.' + a + ' lasts long enough to read').toBeGreaterThanOrEqual(700);
+                var list = M[c][a];
+                expect(list.length, c + '.' + a + ' has variety').toBeGreaterThanOrEqual(2);
+                list.forEach(function (m) { check(m, c + '.' + a); });
+                expect(list.filter(function (m) { return (m.tier || 1) === 1; }).length, c + '.' + a + ' light moves').toBeGreaterThanOrEqual(2);
             });
+            ['sword', 'skull'].forEach(function (a) {
+                var tiers = M[c][a].map(function (m) { return m.tier || 1; });
+                expect(tiers.indexOf(2) >= 0 && tiers.indexOf(3) >= 0, c + '.' + a + ' has a heavy move and a finisher').toBe(true);
+            });
+            check(U[c], c + '.ult');
+            expect(U[c].tier).toBe(3);
         });
-        ['monster_normal', 'monster_armored', 'monster_swift', 'monster_drain', 'monster_boss'].forEach(function (m) {
-            expect(!!(M[m] && M[m].attack && M[m].buff), m).toBe(true);
+        Object.keys(MM).forEach(function (k) {
+            expect(MM[k].attack.length, k + ' attacks').toBeGreaterThanOrEqual(3);
+            expect(MM[k].buff.length, k + ' buffs').toBeGreaterThanOrEqual(2);
+            MM[k].attack.concat(MM[k].buff, MM[k].enraged || []).forEach(function (m) { check(m, k); });
         });
-        // no two classes share the same sword move
-        var fxSrc = CLASSES.map(function (c) { return String(A[c].sword.fx) + String(A[c].sword.pose); });
-        expect(fxSrc.filter(function (s, i) { return fxSrc.indexOf(s) !== i; })).toEqual([]);
+        expect(total, 'moves in total').toBeGreaterThanOrEqual(120);
     });
 
-    it('all 42 class actions run, draw effects, then clean up and return to rest', async function (ctx) {
+    it('match power picks the tier: 3-match light, 4-match heavy, 5+ or a big combo a finisher', function (ctx) {
+        var w = ctx.world, tier = w.g('cgTierFor');
+        expect(tier(1, 0)).toBe(1); expect(tier(2, 0)).toBe(2); expect(tier(2.5, 1)).toBe(2);
+        expect(tier(3, 0)).toBe(3); expect(tier(4, 0)).toBe(3); expect(tier(1, 2)).toBe(2); expect(tier(2, 3)).toBe(3);
+    });
+
+    it('the same move never plays twice in a row, and every light move shows up', async function (ctx) {
+        var w = ctx.world, st = w.g("cgGetStage('player-sprite')");
+        await awaitInWorld(w, st.ready);
+        CLASSES.forEach(function (c) {
+            ['sword', 'skull', 'shield'].forEach(function (a) {
+                var list = w.g('cgMovesFor')(c, a), seen = {}, prev = null;
+                for (var i = 0; i < 40; i++) {
+                    var m = st._pickMove(c + '.' + a, list, 1);
+                    expect(m.id === prev, c + '.' + a + ' repeated ' + m.id).toBe(false);
+                    expect(m.tier || 1, c + '.' + a + ' light').toBe(1);
+                    seen[m.id] = true; prev = m.id;
+                }
+                var light = list.filter(function (m) { return (m.tier || 1) === 1; }).length;
+                expect(Object.keys(seen).length, c + '.' + a + ' variety').toBe(light);
+                expect(st._pickMove(c + '.' + a, list, 3).tier || 1, c + '.' + a + ' finisher tier').toBe(a === 'shield' ? 1 : 3);
+            });
+        });
+    });
+
+    it('a melee move crosses the arena to the target and is back home afterwards', async function (ctx) {
+        var w = ctx.world;
+        onScreen(w);
+        await startSolo(w, 'WARRIOR', { immortal: true });
+        var me = w.g("cgGetStage('player-sprite')"), foe = w.g("cgGetStage('enemy-sprite')");
+        await awaitInWorld(w, me.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
+        await pumpFrames(w, 1200);
+        var arena = me.arena, reach = arena.reachTo(me, foe);
+        expect(reach, 'real distance between them').toBeGreaterThan(40);
+        me._perform(w.g('CG_MOVES.warrior.sword[0]'));
+        var peak = 0;
+        for (var i = 0; i < 40; i++) { await pumpFrames(w, 16); peak = Math.max(peak, me.portraitSprite.x - me.baseX); }
+        expect(peak, 'ran most of the way').toBeGreaterThan(reach * 0.8);
+        await pumpFrames(w, 900);
+        expect(me.portraitSprite.x).toBe(me.baseX);
+        offScreen(w);
+    }, { timeout: 15000 });
+
+    it('a ranged move fires a projectile that flies across the arena', async function (ctx) {
+        var w = ctx.world;
+        onScreen(w);
+        await startSolo(w, 'ARCHER', { immortal: true });
+        var me = w.g("cgGetStage('player-sprite')");
+        await awaitInWorld(w, me.setPortrait(w.g('CHARACTER_SPRITES.archer')));
+        await pumpFrames(w, 1200);
+        var fx = me.arena.fxLayer, xs = [];
+        me._perform(w.g('CG_MOVES.archer.sword[0]'));
+        for (var i = 0; i < 30; i++) { await pumpFrames(w, 16); fx.children.forEach(function (c) { xs.push(c.x); }); }
+        expect(xs.length, 'something flew').toBeGreaterThan(5);
+        expect(Math.max.apply(null, xs) - Math.min.apply(null, xs), 'across the arena').toBeGreaterThan(60);
+        await pumpFrames(w, 1200);
+        expect(fx.children.length, 'projectiles cleaned up').toBe(0);
+        offScreen(w);
+    }, { timeout: 15000 });
+
+    it('every class action (and ult) runs in every mode, draws effects, then everything returns to rest', async function (ctx) {
         var w = ctx.world;
         var stages = SLOTS.map(function (id) { return w.g("cgGetStage('" + id + "')"); });
         for (var i = 0; i < 7; i++) {
             await awaitInWorld(w, stages[i].ready);
             await awaitInWorld(w, stages[i].setPortrait(w.g('CHARACTER_SPRITES.' + CLASSES[i])));
         }
-        var drew = [];
-        stages.forEach(function (st, i) {
-            ACTIONS.forEach(function (a) { if (a === 'ult') st.playUlt(CLASSES[i]); else st.playClassMotion(CLASSES[i], a); });
-        });
-        await pumpFrames(w, 120);
-        stages.forEach(function (st, i) { drew.push(st.effectLayer.children.length + st.backLayer.children.length); });
-        drew.forEach(function (n, i) { expect(n, CLASSES[i] + ' spawned effects').toBeGreaterThan(3); });
-        await pumpFrames(w, 1800);
-        stages.forEach(function (st, i) {
-            expect(st.activeTweens, CLASSES[i] + ' tweens').toBe(0);
-            expect(st.effectLayer.children.length + st.backLayer.children.length, CLASSES[i] + ' vfx cleaned').toBe(0);
-            expect(st.portraitSprite.x, CLASSES[i] + ' back at rest').toBe(st.baseX);
-            expect(st.portraitSprite.alpha, CLASSES[i] + ' visible').toBe(1);
-        });
-    }, { timeout: 30000 });
-
-    it('every monster attacks and buffs with its own move, facing left', async function (ctx) {
-        var w = ctx.world, types = ['normal', 'armored', 'swift', 'drain', 'boss'];
-        var stages = SLOTS.slice(0, 5).map(function (id) { return w.g("cgGetStage('" + id + "')"); });
-        for (var i = 0; i < 5; i++) { await awaitInWorld(w, stages[i].ready); await awaitInWorld(w, stages[i].setPortrait(w.g('MONSTER_SPRITES.' + types[i]))); }
-        stages.forEach(function (st) { expect(st.facing).toBe(-1); st.playAttack(); });
-        await pumpFrames(w, 300);
-        stages.forEach(function (st, i) {
-            var moved = st.portraitSprite.x !== st.baseX || st.portraitSprite.y !== st.baseY || st.portraitSprite.alpha !== 1;
-            expect(moved, types[i] + ' attack moves').toBe(true);
-        });
-        await pumpFrames(w, 1000);
-        stages.forEach(function (st) { st.playBuff(); });
         await pumpFrames(w, 1200);
-        stages.forEach(function (st, i) { expect(st.effectLayer.children.length + st.backLayer.children.length, types[i]).toBe(0); });
-    }, { timeout: 20000 });
-
-    it('characters are jointed rigs: limbs swing during every action and settle back', async function (ctx) {
-        var w = ctx.world, JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
-        var R = w.g('CG_CLASS_RIGS'), RIGS = w.g('CG_RIGS'), MR = w.g('CG_MONSTER_RIGS');
-        CLASSES.forEach(function (c) { ACTIONS.forEach(function (a) { expect(!!RIGS[R[c][a]], c + '.' + a + ' rig').toBe(true); }); });
-        Object.keys(MR).forEach(function (m) { expect(!!(RIGS[MR[m].attack] && RIGS[MR[m].buff]), m + ' rigs').toBe(true); });
-        var stages = SLOTS.map(function (id) { return w.g("cgGetStage('" + id + "')"); });
-        for (var i = 0; i < 7; i++) {
-            await awaitInWorld(w, stages[i].ready);
-            await awaitInWorld(w, stages[i].setPortrait(w.g('CHARACTER_SPRITES.' + CLASSES[i])));
-            JOINTS.forEach(function (j) { expect(!!stages[i].joints[j], CLASSES[i] + ' has ' + j).toBe(true); });
-        }
-        for (var a = 0; a < ACTIONS.length; a++) {
-            var act = ACTIONS[a];
-            stages.forEach(function (st, i) { if (act === 'ult') st.playUlt(CLASSES[i]); else st.playClassMotion(CLASSES[i], act); });
-            var peak = stages.map(function () { return 0; });
+        for (var a = 0; a < ACTIONS.length + 1; a++) {
+            var act = ACTIONS[a] || 'ult', drew = [], peak = stages.map(function () { return 0; });
+            stages.forEach(function (st, i) { if (act === 'ult') st.playUlt(CLASSES[i]); else st.playClassMotion(CLASSES[i], act, 1 + (a % 3)); });
             for (var f = 0; f < 12; f++) {
-                await pumpFrames(w, 100);
+                await pumpFrames(w, 60);
                 stages.forEach(function (st, i) { JOINTS.forEach(function (j) { peak[i] = Math.max(peak[i], Math.abs(st.joints[j].rotation)); }); });
+                if (f === 3) stages.forEach(function (st) { drew.push(st.effectLayer.children.length + st.backLayer.children.length); });
             }
-            peak.forEach(function (p, i) { expect(p, CLASSES[i] + '.' + act + ' moves a limb clearly').toBeGreaterThan(0.3); });
-            await pumpFrames(w, 1200);
+            peak.forEach(function (p, i) { expect(p, CLASSES[i] + '.' + act + ' moves a limb').toBeGreaterThan(0.3); });
+            if (act !== 'shield') drew.forEach(function (n, i) { expect(n, CLASSES[i] + '.' + act + ' spawned effects').toBeGreaterThan(0); });
+            await pumpFrames(w, 2200);
             stages.forEach(function (st, i) {
-                expect(st.activeTweens, CLASSES[i] + '.' + act + ' done').toBe(0);
-                JOINTS.forEach(function (j) { expect(Math.abs(st.joints[j].rotation), CLASSES[i] + '.' + act + ' ' + j + ' back to idle').toBeLessThan(0.1); });
+                var id = CLASSES[i] + '.' + act;
+                expect(st.activeTweens, id + ' tweens').toBe(0);
+                expect(st.effectLayer.children.length + st.backLayer.children.length, id + ' vfx cleaned').toBe(0);
+                expect(st.portraitSprite.x, id + ' back at rest').toBe(st.baseX);
+                expect(st.portraitSprite.alpha, id + ' visible').toBe(1);
+                JOINTS.forEach(function (j) { expect(Math.abs(st.joints[j].rotation), id + ' ' + j + ' idle').toBeLessThan(0.1); });
             });
         }
-    }, { timeout: 60000 });
+        ['solo', 'pvp', 'coop'].forEach(function (k) {
+            expect(w.g('cgArenas.' + k + '.fxLayer.children.length'), k + ' arena effects cleaned').toBe(0);
+            expect(w.g('cgArenas.' + k + '.overlayLayer.children.length'), k + ' cinematic cleaned').toBe(0);
+        });
+    }, { timeout: 90000 });
+
+    it('monsters face left from the right side, attack and buff with their own moves', async function (ctx) {
+        var w = ctx.world, types = ['normal', 'armored', 'swift', 'drain', 'boss'];
+        var right = ['enemy-sprite', 'pvp-opp-sprite', 'coop-enemy-sprite'];
+        for (var batch = 0; batch < 2; batch++) {
+            var group = types.slice(batch * 3, batch * 3 + 3);
+            var stages = group.map(function (t, i) { return w.g("cgGetStage('" + right[i] + "')"); });
+            for (var i = 0; i < group.length; i++) { await awaitInWorld(w, stages[i].ready); await awaitInWorld(w, stages[i].setPortrait(w.g('MONSTER_SPRITES.' + group[i]))); }
+            await pumpFrames(w, 1300);
+            stages.forEach(function (st) { expect(st.facing).toBe(-1); st.playAttack(1); });
+            await pumpFrames(w, 300);
+            stages.forEach(function (st, i) {
+                var moved = st.portraitSprite.x !== st.baseX || st.portraitSprite.y !== st.baseY || st.portraitSprite.alpha !== 1 || JOINTS.some(function (j) { return Math.abs(st.joints[j].rotation) > 0.2; });
+                expect(moved, group[i] + ' attack moves').toBe(true);
+            });
+            await pumpFrames(w, 1300);
+            stages.forEach(function (st) { st.playBuff(); });
+            await pumpFrames(w, 1400);
+            stages.forEach(function (st, i) { expect(st.effectLayer.children.length + st.backLayer.children.length, group[i]).toBe(0); });
+        }
+    }, { timeout: 30000 });
+
+    it('a heavy blow knocks the target down, a light one only flinches it', async function (ctx) {
+        var w = ctx.world;
+        var foe = w.g("cgGetStage('enemy-sprite')");
+        await awaitInWorld(w, foe.ready); await awaitInWorld(w, foe.setPortrait(w.g('MONSTER_SPRITES.normal')));
+        await pumpFrames(w, 1300);
+        foe.playHitReaction('sword', 0, 1);
+        var maxRot = 0;
+        for (var i = 0; i < 20; i++) { await pumpFrames(w, 16); maxRot = Math.max(maxRot, Math.abs(foe.portraitSprite.rotation)); }
+        expect(maxRot, 'flinch stays upright').toBeLessThan(0.3);
+        await pumpFrames(w, 800);
+        foe.playHitReaction('skull', 0, 3);
+        maxRot = 0;
+        for (var j = 0; j < 30; j++) { await pumpFrames(w, 16); maxRot = Math.max(maxRot, Math.abs(foe.portraitSprite.rotation)); }
+        expect(maxRot, 'knocked off its feet').toBeGreaterThan(0.8);
+        await pumpFrames(w, 1500);
+        expect(foe.portraitSprite.rotation).toBe(0);
+        expect(foe.portraitSprite.x).toBe(foe.baseX);
+    }, { timeout: 15000 });
 
     it('low-graphics mode keeps the move but skips the effects', async function (ctx) {
         var w = ctx.world;
@@ -496,6 +592,7 @@ describe('Class choreography (per-class actions + VFX)', { isolate: 'each' }, fu
         st.playClassMotion('mage', 'skull');
         await pumpFrames(w, 200);
         expect(st.effectLayer.children.length + st.backLayer.children.length).toBe(0);
+        expect(st.arena.fxLayer.children.length, 'no projectiles').toBe(0);
         expect(st.activeTweens).toBeGreaterThan(0);
         w.g('cgToggleLowGraphics()');
     });

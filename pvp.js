@@ -551,15 +551,16 @@ function pvpPlayHitReaction(side, tileType) {
 function pvpReceiveAttack(payload) {
     if (pvpMatchOver) return;
     if (payload.type === 'ult') {
-        let stage = typeof cgGetStage === 'function' ? cgGetStage('pvp-my-sprite') : null;
-        if (stage) stage.playUlt(pvpOpponentClassName || 'warrior');
+        // the opponent casts it (on their side of the arena); it lands on me
+        let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
+        if (oppStage) oppStage.playUlt(pvpOpponentClassName || 'warrior'); // its impact makes me react
     } else {
         pvpPlayHitReaction('me', payload.type || 'sword');
         // The opponent's own class motion, played on THEIR portrait (as I see
         // it) - the only signal I get of their own matches at all is this
         // attack broadcast, so this is the one place it can fire.
         let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
-        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName, payload.type || 'sword');
+        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName, payload.type || 'sword', payload.power || 1);
     }
     pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
@@ -895,7 +896,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
     if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
     // G3 - shot from the matched tiles to the opponent (attack) or to me.
     if (typeof cgProjectile === 'function') {
-        let targetId = (group.type === 'sword' || group.type === 'skull') ? 'pvp-opp-sprite' : 'pvp-my-sprite';
+        let targetId = 'pvp-my-sprite'; // charges me; my attack then crosses the arena
         cgProjectile(pvpTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
     }
 
@@ -913,7 +914,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('pvp-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type, shape.multiplier, pvpBoard.cascadeDepth);
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -932,7 +933,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
                 recoil = payload.recoil;
             }
             pvpMyTurnStats.damage += amount;
-            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'skull');
             pvpCombatText('opp', '-' + amount, 'crit');
             if (recoil > 0) pvpCombatText('me', '-' + recoil, 'self');
@@ -940,7 +941,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
             pvpMyTurnStats.selfDamage += recoil;
         } else {
             pvpMyTurnStats.damage += amount;
-            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'sword');
             pvpCombatText('opp', '-' + amount, 'dmg');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
@@ -1060,7 +1061,8 @@ function pvpUpdateUI() {
     let ultBtn = document.getElementById('pvp-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = pvpUltCharge < 100 || !pvpMyTurn || pvpMatchOver || pvpProcessing || !selectedClass;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(pvpUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
+        document.getElementById('pvp-ult-btn-label').innerText = selectedClass ? selectedClass.ultName : t('ULT (sınıf seçilmedi)');
+        if (typeof cgStageDo === 'function') cgStageDo('pvp-my-sprite', 'setUltReady', pvpUltCharge >= 100);
     }
 
     let grid = document.getElementById('pvp-grid');
