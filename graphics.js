@@ -278,6 +278,7 @@ const CG_VFX = {
             const ghost = st._buildRig(st.rigParts, st.rigPivots, st.facing < 0);
             ghost.root.tint = color; ghost.root.alpha = 0;
             CG_JOINTS.forEach(j => { if (ghost.joints[j] && st.joints[j]) ghost.joints[j].rotation = st.joints[j].rotation; });
+            if (ghost.joints.armLf && st.joints.armL) ghost.joints.armLf.rotation = st.joints.armL.rotation;
             st._vfx(ghost.root, ms, t => {
                 // trails the real body with a lag, fading out
                 const lagT = Math.max(0, t - i * gap);
@@ -744,6 +745,7 @@ function cgFrame(ticker) {
         if (!stage.needsRender && stage.activeTweens === 0) continue;
         if (cgShared.lost) continue;
         const [w, h] = stage.size;
+        stage._syncLinked();
         if (renderer.width !== w || renderer.height !== h) renderer.resize(w, h);
         renderer.render({ container: stage.root, clear: true });
         const ctx = stage.ctx;
@@ -949,14 +951,29 @@ class CombatStage {
         inner.addChild(joint('legL'));
         inner.addChild(joint('legR'));
         const torso = joint('torso');
-        torso.addChild(joint('head'));
-        torso.addChild(joint('armL'));
+        if (parts.armLf) {
+            // 3/4 view (avatar.js): the far arm is behind the body, but what
+            // it holds (a shield, an orb, a bow) is in front - a second
+            // joint on the same pivot, turned with the arm (_syncLinked)
+            torso.addChildAt(joint('armL'), 0);
+            torso.addChild(joint('head'));
+            torso.addChild(joint('armLf'));
+        } else {
+            torso.addChild(joint('head'));
+            torso.addChild(joint('armL'));
+        }
         torso.addChild(joint('armR'));
         inner.addChild(torso);
         const root = new PIXI.Container();
         root.pivot.set(100, 250);
         root.addChild(inner);
         return { inner, joints, root };
+    }
+
+    // Joints that mirror another one (the far hand's held item).
+    _syncLinked() {
+        const j = this.joints;
+        if (j && j.armLf && j.armL) j.armLf.rotation = j.armL.rotation;
     }
 
     // Sets joint angles from a rig animation at t (or idle when none).

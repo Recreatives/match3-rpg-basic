@@ -339,7 +339,7 @@ class CombatArena {
         const renderer = cgShared.renderer;
         const [w, h] = this.size;
         if (!w || !h || !renderer || cgShared.lost) return;
-        this.fighters.forEach(f => this._placeShadow(f));
+        this.fighters.forEach(f => { this._placeShadow(f); f._syncLinked(); });
         if (renderer.width !== w || renderer.height !== h) renderer.resize(w, h);
         renderer.render({ container: this.scene, clear: true });
         const ctx = this.ctx;
