@@ -82,20 +82,25 @@ function avSession(P) {
 // the hips; head: forward/down offset; R/L: arm (upper, forearm) angles;
 // wAng / offAng: how the weapon / off-hand item is held.
 const AV_STANCES = {
-    // balanced, shield up, sword upright
-    warrior: { front: 26, back: -36, crouch: 2, lean: 3, head: [0, 0], R: [10, 150], L: [58, 116], wAng: 18 },
-    // upright and stately: hammer on the shoulder, shield planted in front
-    paladin: { front: 16, back: -20, crouch: 0, lean: 1, head: [0, -1], R: [28, 196], L: [14, 58], wAng: -72, offBig: true },
-    // very wide and low, lunging forward, axe raised overhead, free hand clawing
-    berserker: { front: 34, back: -44, crouch: 10, lean: 9, head: [3, 3], R: [140, 195], L: [48, 72], wAng: -55 },
-    // a deep crouch: one dagger in reverse grip low, the other up by the face
-    rogue: { front: 24, back: -32, crouch: 14, lean: 8, head: [2, 3], R: [28, 66], L: [34, 150], wAng: 160, offAng: 35 },
-    // side-on, the bow arm straight out
-    archer: { front: 20, back: -30, crouch: 4, lean: 3, head: [1, 0], R: 'nock', L: 'bowhold', wAng: 6 },
-    // upright and calm, feet close: staff planted, the other hand raised with its magic
-    mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: [6, 16], L: [70, 118], wAng: 0 },
-    // hunched, head low and forward: scythe held across, lantern hanging low
-    necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: [28, 100], L: [24, 18], wAng: -32 },
+    // Arms are given as where the HAND rests, relative to its shoulder (the
+    // elbow is solved): R = the near/rear arm (from the back shoulder, the
+    // main weapon), L = the far/lead arm (from the front shoulder, reaching
+    // toward the enemy: shield, bow, orb, lead hand). The two hands are kept
+    // well apart so arms and weapons read clearly - like a boxer's guard.
+    // balanced: shield out front, sword ready at the chest
+    warrior: { front: 26, back: -36, crouch: 2, lean: 3, head: [0, 0], R: { to: [20, 30] }, L: { to: [44, 16] }, wAng: 24 },
+    // upright and stately: hammer resting on the rear shoulder, shield planted low in front
+    paladin: { front: 16, back: -20, crouch: 0, lean: 1, head: [0, -1], R: { to: [12, 34] }, L: { to: [34, 44] }, wAng: -58 },
+    // very wide and low, lunging: axe raised overhead behind, lead hand clawing forward
+    berserker: { front: 34, back: -44, crouch: 10, lean: 9, head: [3, 3], R: { to: [6, -50], bend: 'back' }, L: { to: [46, 34] }, wAng: -40 },
+    // a deep crouch: rear dagger in reverse grip at the chest, lead dagger out front
+    rogue: { front: 24, back: -32, crouch: 14, lean: 8, head: [2, 3], R: { to: [24, 24] }, L: { to: [46, 8] }, wAng: 150, offAng: 55 },
+    // full draw: the bow arm straight out at shoulder height, the string hand at the cheek
+    archer: { front: 20, back: -30, crouch: 4, lean: 3, head: [1, 0], R: { to: [34, -4] }, L: { to: [58, -2] }, wAng: 6 },
+    // upright and calm, feet close: staff planted at the side, the lead hand raised with its magic
+    mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: { to: [-6, 44] }, L: { to: [36, -8] }, wAng: -8 },
+    // hunched, head low: scythe held diagonally, lantern hanging out front
+    necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: { to: [18, 36] }, L: { to: [34, 44] }, wAng: -30 },
 };
 
 // How each class breathes and fidgets while waiting (graphics.js cgFrame):
@@ -126,8 +131,10 @@ function avGeom(bodyKey, cls) {
     const lean = st.lean * k;
     P.lean = lean;
     P.front = 100 + P.sw * 0.25 + lean;                  // sternum / front line
-    P.shR = [100 + P.sw * 0.74 + lean, P.sy + 1];         // near shoulder joint
-    P.shL = [100 - P.sw * 0.46 + lean, P.sy - 1];         // far shoulder joint
+    // turned toward +x, the camera-side (near) shoulder sits at the BACK of
+    // the body and the far one at the front edge, half behind the chest
+    P.shR = [100 - P.sw * 0.5 + lean, P.sy + 1];          // near (rear) shoulder joint
+    P.shL = [100 + P.sw * 0.66 + lean, P.sy - 1];         // far (lead) shoulder joint
     P.hipR = [100 + P.hipw * 0.38, P.hipy + 2];
     P.hipL = [100 - P.hipw * 0.46, P.hipy + 1];
     P.headX = 100 + lean + 2 + st.head[0];
@@ -199,7 +206,15 @@ function avArm(P, side) {
     const pose = (P.armPose && P.armPose[side]) || 'hang';
     const len = (P.hand - P.sy) / 2;
     let ex, ey, hx, hy;
-    if (pose === 'nock') {
+    if (pose && pose.to) {
+        // hand placed where the stance says, elbow solved (down, or back
+        // for a raised arm)
+        const target = [ax + pose.to[0] * P.k, ay + pose.to[1] * P.k];
+        const d = Math.hypot(target[0] - ax, target[1] - ay);
+        if (d > 2 * len - 0.05) { const sc = (2 * len - 0.05) / d; target[0] = ax + (target[0] - ax) * sc; target[1] = ay + (target[1] - ay) * sc; }
+        [ex, ey] = pose.bend === 'back' ? avIK([ax, ay], target, len, -1, 'x') : avIK([ax, ay], target, len, 1, 'y');
+        [hx, hy] = target;
+    } else if (pose === 'nock') {
         // the drawing hand rests on the string at the bow's grip, elbow down
         const B = avArm(Object.assign({}, P, { armPose: { L: 'bowhold' } }), 'L');
         const target = [B.hx - 3, B.hy + 2];
@@ -556,7 +571,11 @@ const AV_PAINT = {
             const arrow = S.line(`M${avN(R.hx - 4)} ${avN(R.hy)} L${avN(tipX)} ${avN(tipY)}`, '#8a5a2b', 1.6 * k)
                 + S.path(`M${avN(tipX)} ${avN(tipY - 2.6 * k)} L${avN(tipX + 6 * k)} ${avN(tipY)} L${avN(tipX)} ${avN(tipY + 2.6 * k)} Z`, S.metal('#c9d2dc'), P.ol * 0.4)
                 + S.path(`M${avN(R.hx - 4)} ${avN(R.hy)} l${avN(-6 * k)} ${avN(-3 * k)} l${avN(3 * k)} ${avN(3 * k)} l${avN(-3 * k)} ${avN(3 * k)} Z`, it.trim || '#c0392b', P.ol * 0.35);
-            return { held: S.rot(painter(S, it, A.hx, A.hy), 6, A.hx, A.hy), weaponR: arrow };
+            // the string pulled back to the drawing hand (in the bow's frame, rotated 6deg)
+            const h = 52 * k, rad = 6 * Math.PI / 180, rotP = (x, y) => [A.hx + (x - A.hx) * Math.cos(rad) - (y - A.hy) * Math.sin(rad), A.hy + (x - A.hx) * Math.sin(rad) + (y - A.hy) * Math.cos(rad)];
+            const top = rotP(A.hx + 1, A.hy - h + 1), bot = rotP(A.hx + 1, A.hy + h - 1);
+            const string = S.line(`M${avN(top[0])} ${avN(top[1])} L${avN(R.hx - 3)} ${avN(R.hy)} L${avN(bot[0])} ${avN(bot[1])}`, '#e8e0cc', 0.9);
+            return { held: S.rot(painter(S, Object.assign({}, it, { drawnTo: true }), A.hx, A.hy), 6, A.hx, A.hy), weaponR: string + arrow };
         }
         const A = avArm(P, 'R');
         const ANG = { sword: 18, axe: 6, mace: 12, hammer: 8, spear: 30, dagger: 55, staff: 2, scythe: -6, wand: 40 };
@@ -672,7 +691,7 @@ const AV_WEAPONS = {
     bow(S, it, hx, hy) {
         const k = S.P.k, h = 52 * k, c = it.color || '#7a5230';
         let s = S.path(`M${avN(hx + 2)} ${avN(hy - h)} Q${avN(hx + 22 * k)} ${avN(hy)} ${avN(hx + 2)} ${avN(hy + h)} L${avN(hx - 2)} ${avN(hy + h - 3)} Q${avN(hx + 16 * k)} ${avN(hy)} ${avN(hx - 2)} ${avN(hy - h + 3)} Z`, S.lin(avLight(c, 0.2), avDark(c, 0.45)));
-        s += S.line(`M${avN(hx + 1)} ${avN(hy - h + 1)} L${avN(hx + 1)} ${avN(hy + h - 1)}`, '#e8e0cc', 0.9);
+        if (!it.drawnTo) s += S.line(`M${avN(hx + 1)} ${avN(hy - h + 1)} L${avN(hx + 1)} ${avN(hy + h - 1)}`, '#e8e0cc', 0.9);
         s += avTrimLine(S, `M${avN(hx + 8 * k)} ${avN(hy - h * 0.5)} Q${avN(hx + 13 * k)} ${avN(hy)} ${avN(hx + 8 * k)} ${avN(hy + h * 0.5)}`, it, 1.5 * k);
         if (it.glow) s = S.glow(hx + 10 * k, hy, 14 * k, it.glow, 0.35) + s;
         return s + avGem(S, hx + 12 * k, hy, 2.2 * k, it);
@@ -712,7 +731,7 @@ function avPaint(spec) {
     // arm poses follow what the hands hold
     // arms follow the class stance (a bow always takes the archer's grip)
     const ST = P.stance;
-    P.armPose = W === 'bow' ? { R: 'nock', L: 'bowhold' } : { R: ST.R === 'nock' ? 'ready' : ST.R, L: ST.L === 'bowhold' ? 'fist' : ST.L };
+    P.armPose = W === 'bow' ? { R: AV_STANCES.archer.R, L: AV_STANCES.archer.L } : { R: ST.R, L: ST.L };
     const L = {};
     const add = o => { Object.keys(o || {}).forEach(key => { if (typeof o[key] === 'string') L[key] = (L[key] || '') + o[key]; else L[key] = o[key]; }); };
     Object.keys(gear).forEach(slot => { const it = gear[slot]; if (it && AV_PAINT[slot]) add(AV_PAINT[slot](S, it)); });
