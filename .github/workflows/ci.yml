@@ -81,6 +81,9 @@ jobs:
         run: |
           createdb legacy
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/00_supabase_shim.sql
+          # v1.36 only ever applied cleanly on top of itself (production was
+          # built up run by run), so: a tolerant first pass, then a strict one
+          PGDATABASE=legacy psql -q -f tests/sql/legacy/schema-v1.36.sql > /dev/null 2>&1 || true
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/legacy/schema-v1.36.sql
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/05_legacy_seed.sql
           PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
