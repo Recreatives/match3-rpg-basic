@@ -26,8 +26,11 @@
     function clone(v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); }
 
     var db = {
+        // the wallet row stands for the active character's purse (a view on
+        // the real server - schema.sql section 30)
         wallets: [{ player_id: userId, gold: 100, materials: 0 }],
-        players: [{ id: userId, display_name: 'Tester', prestige_level: 0 }],
+        players: [{ id: userId, display_name: 'Tester', prestige_level: 0, active_character_id: cfg.noCharacter ? null : 'char-1' }],
+        characters: cfg.noCharacter ? [] : [{ id: 'char-1', player_id: userId, name: 'Tester', class_key: 'warrior', gender: 'm', appearance: {}, level: 1, xp: 0, mastery: 0, gold: 100, materials: 0, needs_setup: false, last_played_at: '2026-01-01T00:00:00Z' }],
         player_items: [],
         player_achievements: [],
         daily_login: [],
@@ -130,6 +133,69 @@
         get_available_titles: function () { return { data: [], error: null }; },
         get_my_trade_offers: function () { return { data: [], error: null }; },
         get_guild_list: function () { return { data: [], error: null }; },
+        // characters (schema.sql section 30) - same shapes, no rules beyond
+        // what the client relies on
+        create_character: function (a) {
+            var row = { id: 'char-' + (nextRowId++), player_id: userId, name: a.p_name, class_key: a.p_class, gender: a.p_gender, appearance: a.p_appearance || {}, level: 1, xp: 0, mastery: 0, gold: 0, materials: 0, needs_setup: false, last_played_at: new Date().toISOString() };
+            table('characters').push(row);
+            table('players')[0].active_character_id = row.id;
+            return { data: clone(row), error: null };
+        },
+        setup_character: function (a) {
+            var c = table('characters').find(function (r) { return r.id === a.p_id; });
+            if (!c) return { data: null, error: { message: 'character not found or already set up' } };
+            Object.assign(c, { name: a.p_name, class_key: a.p_class, gender: a.p_gender, appearance: a.p_appearance || {}, needs_setup: false });
+            return { data: clone(c), error: null };
+        },
+        select_character: function (a) {
+            var c = table('characters').find(function (r) { return r.id === a.p_id; });
+            if (!c) return { data: null, error: { message: 'character not found' } };
+            table('players')[0].active_character_id = c.id;
+            return { data: clone(c), error: null };
+        },
+        delete_character: function (a) {
+            var c = table('characters').find(function (r) { return r.id === a.p_id; });
+            if (!c || String(a.p_confirm_name || '').trim().toLowerCase() !== c.name.toLowerCase()) return { data: null, error: { message: 'character not found or name does not match' } };
+            db.characters = table('characters').filter(function (r) { return r.id !== a.p_id; });
+            db.player_items = table('player_items').filter(function (r) { return r.character_id !== a.p_id; });
+            return { data: null, error: null };
+        },
+        award_run_xp: function (a) {
+            var p = table('players')[0], c = table('characters').find(function (r) { return r.id === p.active_character_id; });
+            if (!c) return { data: null, error: { message: 'no active character' } };
+            c.xp += Math.min(40 + a.p_floor * 12 + Math.min(a.p_kills, 10) * 4, 800);
+            var total = function (L) { var s = 0; for (var i = 1; i < L; i++) s += Math.round(60 * Math.pow(i, 1.5)); return s; };
+            while (c.level < 50 && c.xp >= total(c.level + 1)) c.level++;
+            return { data: [{ level: c.level, xp: c.xp, mastery: c.mastery, leveled_up: false }], error: null };
+        },
+        equip_item: function (a) {
+            var items = table('player_items'), it = items.find(function (r) { return r.id === a.p_item_id; });
+            if (!it) return { data: null, error: { message: 'equip_item: item not found or not yours' } };
+            var charId = table('players')[0].active_character_id;
+            var slot = a.p_slot || it.slot;
+            items.forEach(function (r) { if (r !== it && r.equipped_slot === slot && (!r.character_id || r.character_id === charId)) r.equipped_slot = null; });
+            it.equipped_slot = slot;
+            if (charId) it.character_id = charId;
+            return { data: clone(it), error: null };
+        },
+        unequip_item: function (a) {
+            var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
+            if (!it) return { data: null, error: { message: 'unequip_item: item not found' } };
+            it.equipped_slot = null;
+            return { data: clone(it), error: null };
+        },
+        move_item: function (a) {
+            var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
+            if (!it || it.equipped_slot) return { data: null, error: { message: 'move_item: item not found (or it is worn)' } };
+            it.character_id = a.p_to === 'stash' ? null : table('players')[0].active_character_id;
+            return { data: clone(it), error: null };
+        },
+        lock_item: function (a) {
+            var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
+            if (!it) return { data: null, error: { message: 'lock_item: item not found' } };
+            it.locked = !!a.p_locked;
+            return { data: clone(it), error: null };
+        },
         get_my_guild_roster: function () { return { data: [], error: null }; }
     };
 

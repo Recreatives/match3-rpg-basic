@@ -46,6 +46,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 select public.create_character('Ayla', 'mage', 'f', '{"skin": 2, "hair": "long"}');
 commit;
+-- (player 1 can't read it, so remember its id for the checks below)
+select set_config('tst.ayla', (select id::text from public.characters where name = 'Ayla'), false);
 
 begin;
 set local role authenticated;
@@ -77,7 +79,7 @@ do $$ begin
         raise exception 'FAIL: player 1 can read player 2''s characters';
     end if;
 end $$;
-select tst.expect_error($q$select public.select_character((select id from public.characters where name = 'Ayla'))$q$, 'not found');
+select tst.expect_error($q$select public.select_character(current_setting('tst.ayla')::uuid)$q$, 'not found');
 
 -- earn_currency: bounded grants only
 do $$
@@ -116,7 +118,7 @@ select tst.expect_error($q$insert into public.player_items (player_id, base_id, 
 insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level)
     values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 6);
 -- a character can't be given someone else's character's items
-select tst.expect_error($q$insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), (select id from public.characters where name = 'Ayla'), 'blade', 'weapon', 'white', '{"sword": 3}')$q$, 'not your character');
+select tst.expect_error($q$insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), current_setting('tst.ayla')::uuid, 'blade', 'weapon', 'white', '{"sword": 3}')$q$, 'not your character');
 -- and can't be planted in someone else's inventory
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values ('22222222-2222-2222-2222-222222222222', 'blade', 'weapon', 'white', '{"sword": 3}')$q$, 'row-level security');
 

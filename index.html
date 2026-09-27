@@ -357,6 +357,16 @@
         </div>
     </div>
 
+    <!-- Character creator (characters.js): look, class, name. Filled in by
+         renderCharacterCreator; also used once to set up a migrated hero. -->
+    <div id="character-modal" class="modal-overlay" style="z-index:240;">
+        <div class="modal-content char-modal-content">
+            <span class="close-modal" onclick="closeCharacterCreator()">×</span>
+            <h2 id="character-modal-title" class="modal-title" data-i18n-en="NEW HERO">YENİ KAHRAMAN</h2>
+            <div id="character-creator" class="char-creator"></div>
+        </div>
+    </div>
+
     <div id="tutorial-modal" class="modal-overlay" style="z-index:250;">
         <div class="modal-content" style="max-width: 420px;">
             <span class="close-modal" onclick="tutorialSkip()">×</span>
@@ -1014,6 +1024,7 @@
     <script src="catalog.js?v=1.36"></script>
     <script src="items.js?v=1.36"></script>
     <script src="hero.js?v=1.36"></script>
+    <script src="characters.js?v=1.36"></script>
     <script src="achievements.js?v=1.36"></script>
     <script src="sharedboard.js?v=1.36"></script>
     <script src="game.js?v=1.36"></script>

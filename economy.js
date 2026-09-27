@@ -450,7 +450,15 @@ async function fetchWallet() {
         .from('wallets')
         .select('gold, materials')
         .eq('player_id', user.id)
-        .single();
+        .maybeSingle();
+    // the wallet is the active character's purse (schema.sql section 30) -
+    // no character yet means no purse yet, not an error
+    if (!error && !data) {
+        currentWallet = { gold: 0, materials: 0 };
+        updateWalletUI();
+        setWalletStatus('');
+        return currentWallet;
+    }
 
     if (error) {
         console.error('Wallet fetch failed:', error.message);
@@ -573,7 +581,7 @@ async function equipItem(itemRowId) {
     if (!user) return false;
 
     // class and level gate (the server checks the same - see equip_item)
-    const cls = selectedClass ? selectedClass.name.toLowerCase() : null;
+    const cls = selectedClass ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : null);
     const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : undefined;
     if (typeof itemUsableBy === 'function' && !itemUsableBy(item, cls, lvl)) {
         setShopStatus(itemReqLevel(item) > (lvl || 99) ? tf('Bunun için seviye {n} gerekiyor.', { n: itemReqLevel(item) }) : t('Sınıfın bunu kullanamaz.'));
@@ -583,16 +591,21 @@ async function equipItem(itemRowId) {
     const itemSlot = typeof itemSlotOf === 'function' ? itemSlotOf(item) : item.slot;
     const targets = typeof equipSlotsFor === 'function' ? equipSlotsFor(itemSlot) : [itemSlot];
     const worn = typeof activeEquippedItems === 'function' ? activeEquippedItems() : currentOwnedItems.filter(it => it.equipped_slot);
-    const target = targets.find(sl => !worn.some(it => it.equipped_slot === sl)) || targets[0];
+    let target = targets.find(sl => !worn.some(it => it.equipped_slot === sl)) || targets[0];
 
-    let previouslyEquipped = worn.find(it => it.equipped_slot === target);
-    if (previouslyEquipped) {
-        await sb.from('player_items').update({ equipped_slot: null }).eq('id', previouslyEquipped.id).eq('player_id', user.id);
-        previouslyEquipped.equipped_slot = null;
+    // equip_item (security definer) checks class, level and slot again,
+    // takes the item out of the stash if it was there, and puts whatever
+    // was in that slot back in the bag
+    const { data, error } = await sb.rpc('equip_item', { p_item_id: itemRowId, p_slot: target });
+    if (error) {
+        console.error('Equip failed:', error.message);
+        setShopStatus(/requires level/.test(error.message) ? tf('Bunun için seviye {n} gerekiyor.', { n: itemReqLevel(item) }) : /class cannot/.test(error.message) ? t('Sınıfın bunu kullanamaz.') : t('Kuşanılamadı.'));
+        return false;
     }
-
-    const { error } = await sb.from('player_items').update({ equipped_slot: target }).eq('id', itemRowId).eq('player_id', user.id);
-    if (error) { console.error('Equip failed:', error.message); return false; }
+    const placed = (data && data.equipped_slot) || target;
+    worn.forEach(it => { if (it.equipped_slot === placed && it.id !== itemRowId) it.equipped_slot = null; });
+    if (data && data.character_id) item.character_id = data.character_id;
+    target = placed;
     item.equipped_slot = target;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
@@ -606,7 +619,7 @@ async function unequipItem(itemRowId) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return false;
 
-    const { error } = await sb.from('player_items').update({ equipped_slot: null }).eq('id', itemRowId).eq('player_id', user.id);
+    const { error } = await sb.rpc('unequip_item', { p_item_id: itemRowId });
     if (error) { console.error('Unequip failed:', error.message); return false; }
     item.equipped_slot = null;
     if (typeof renderInventory === 'function') renderInventory();
@@ -680,7 +693,8 @@ async function awardLootDrop(dropLevel) {
     if (!user) return null;
 
     const { data, error } = await sb.from('player_items').insert({
-        player_id: user.id, base_id: item.base_id, slot: item.slot,
+        player_id: user.id, character_id: (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.id : null,
+        base_id: item.base_id, slot: item.slot,
         rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key,
         item_level: item.item_level || 1, req_level: item.req_level || 1
     }).select().single();
@@ -1401,6 +1415,8 @@ async function initEconomy() {
         pending.forEach(entry => sb.from('client_errors').insert(entry).then(() => {}, () => {}));
     }
     if (!session) return;
+    // characters first: the wallet, items and talents are the active one's
+    if (typeof initCharacters === 'function') await initCharacters();
     await fetchWallet();
     await fetchOwnedItems();
     await fetchDailyLoginStatus();

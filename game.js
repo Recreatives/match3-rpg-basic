@@ -328,7 +328,13 @@ const tileTypes = [
 
 // --- GAME FLOW ---
 
+// The start screen: the player's characters when the server has them
+// (characters.js), otherwise (offline / still loading) a plain class pick.
 function renderClassButtons() {
+    if (typeof charactersLoaded !== 'undefined' && charactersLoaded && typeof renderCharacterSelect === 'function') {
+        renderCharacterSelect();
+        return;
+    }
     const container = document.getElementById('class-selection');
     container.innerHTML = '';
     container.style.display = 'flex';
@@ -339,29 +345,33 @@ function renderClassButtons() {
         const btn = document.createElement('button');
         btn.className = 'reward-btn rarity-rare';
         btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${t(c.desc)}</small>`;
-        btn.onclick = () => {
-            selectedClass = c;
-            if (typeof trackEvent === 'function') trackEvent('class_selected', { class: key });
-            // getElementById, not querySelector('.stat-box div:first-child') -
-            // pvp-modal/coop-modal have their own .stat-box elements earlier in
-            // the DOM than the solo HUD, so the class selector was silently
-            // writing the class name into a hidden modal instead of the
-            // visible "YOU" label (the same class of bug as gridDisplay above).
-            const playerBox = document.getElementById('player-class-label');
-            playerBox.style.color = 'var(--accent)';
-            playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
-            setMyPortraitEverywhere(c.name.toLowerCase());
-            // Picking a class is also PvP/co-op's own "start of run" moment
-            // (they never call resetGame() - that's solo's own start path),
-            // so this needs the exact same clean-slate rebuild.
-            rebuildTileStats();
-            document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
-            updateUI();
-            container.style.display = 'none';
-            renderModeButtons();
-        };
+        btn.onclick = () => pickClass(c);
         container.appendChild(btn);
     });
+}
+
+// Starts playing as a class (the active character's, or a plain pick).
+function pickClass(c) {
+    selectedClass = c;
+    if (typeof trackEvent === 'function') trackEvent('class_selected', { class: c.name.toLowerCase() });
+    // getElementById, not querySelector('.stat-box div:first-child') -
+    // pvp-modal/coop-modal have their own .stat-box elements earlier in
+    // the DOM than the solo HUD, so the class selector was silently
+    // writing the class name into a hidden modal instead of the
+    // visible "YOU" label (the same class of bug as gridDisplay above).
+    const playerBox = document.getElementById('player-class-label');
+    playerBox.style.color = 'var(--accent)';
+    playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
+    if (typeof charUpdateHudLabel === 'function') charUpdateHudLabel();
+    setMyPortraitEverywhere(c.name.toLowerCase());
+    // Picking a class is also PvP/co-op's own "start of run" moment
+    // (they never call resetGame() - that's solo's own start path),
+    // so this needs the exact same clean-slate rebuild.
+    rebuildTileStats();
+    document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
+    updateUI();
+    document.getElementById('class-selection').style.display = 'none';
+    renderModeButtons();
 }
 
 // Shown right after a class is picked, before anything actually starts -
@@ -538,6 +548,7 @@ function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
