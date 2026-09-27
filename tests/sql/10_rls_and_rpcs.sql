@@ -160,7 +160,8 @@ begin
     if r1.equipped_slot <> 'ring1' or r2.equipped_slot <> 'ring2' then raise exception 'FAIL: rings -> % / %', r1.equipped_slot, r2.equipped_slot; end if;
 end $$;
 select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and item_level = 6 limit 1), null)$q$, 'requires level');
-insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'bow', 'weapon', 'white', '{"energy": 3}');
+-- (no character_id = straight into the shared stash; this one goes in the bag)
+insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), public.my_active_character(), 'bow', 'weapon', 'white', '{"energy": 3}');
 select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and base_id = 'bow' limit 1), null)$q$, 'class cannot');
 
 -- stash, lock, sell

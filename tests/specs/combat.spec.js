@@ -369,7 +369,10 @@ describe('Rewards & gold', { isolate: 'each' }, function () {
 // deliberate, noticed, and the snapshot updated in the same commit. The
 // failure message prints the new fingerprint to paste in.
 describe('Golden master (seeded solo run)', { isolate: 'each', world: { seed: 20260925, pixi: false } }, function () {
-    var EXPECTED = '19/9dda7a99/6:-1:-34:32';
+    // (loot now rolls at the active character's level, which rises during
+    // the run as cleared levels award experience - a different loot pool
+    // consumes the seeded RNG differently from then on)
+    var EXPECTED = '19/a042f413/6:-9:-34:32';
 
     it('40 scripted player moves produce the recorded fingerprint', async function (ctx) {
         var w = ctx.world, trace = [];
