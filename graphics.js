@@ -433,7 +433,12 @@ const CG_RIGS = {
 };
 // when each rig's decisive beat happens (the blow / the release), so a
 // move can time-warp its rig to land that beat exactly on the impact
-const CG_RIG_KEYS = { overhead: 0.5, heavy: 0.52, spin: 0.5, stab: 0.45, xslash: 0.5, bow: 0.47, cast: 0.55, slam: 0.5, charge: 0.4,
+// Variants for painted avatars (avatar.js), whose rest pose is already
+// "ready": the bow is held out at chest height, so aiming only lifts it a
+// little and the drawing hand pulls back (+) and snaps forward on release.
+CG_RIGS.bowA = cgRig({ armL: [Z, [.25, -0.3], [.8, -0.3], ONE], armR: [Z, [.25, 0.25], [.45, 0.55], [.52, -0.25], [.8, 0.1], ONE],
+    torso: [Z, [.25, -0.06], [.5, 0.06], ONE], head: [Z, [.25, 0.08], [.8, 0.08], ONE], legL: [Z, [.25, 0.12], [.8, 0.12], ONE], legR: [Z, [.25, -0.12], [.8, -0.12], ONE] });
+const CG_RIG_KEYS = { bowA: 0.47, overhead: 0.5, heavy: 0.52, spin: 0.5, stab: 0.45, xslash: 0.5, bow: 0.47, cast: 0.55, slam: 0.5, charge: 0.4,
     thrust: 0.45, uppercut: 0.5, backhand: 0.5, kick: 0.5, bash: 0.5, throw: 0.47, push: 0.5, summon: 0.55 };
 function cgRigWarp(rig, target) {
     const a = CG_RIG_KEYS[rig];
@@ -858,6 +863,8 @@ class CombatStage {
     async setPortrait(url) {
         await this.ready;
         this.url = url;
+        this.isAvatar = false;
+        this.rigHandSide = 'R';
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
         this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : (this.charKey.indexOf('monster_') === 0 ? -1 : 1);
         const rigs = await cgLoadRigs(url.replace(/[^/]*$/, ''));
@@ -899,6 +906,8 @@ class CombatStage {
         if (this.url !== token) return; // a newer look won the race
         const parts = {};
         painted.order.forEach((p, i) => { parts[p] = textures[i]; });
+        this.isAvatar = true;
+        this.rigHandSide = painted.handSide || 'R';
         this._installRig(parts, painted.pivots, painted.hand);
     }
 
@@ -1119,7 +1128,7 @@ class CombatStage {
             }
         });
         const sprite = this.portraitSprite;
-        const rigAnim = CG_RIGS[move.rig];
+        const rigAnim = (this.isAvatar && CG_RIGS[move.rig + 'A']) || CG_RIGS[move.rig];
         const keyT = kind === 'ranged' ? (move.launchMs || 230) / ms : kind === 'melee' ? impactMs / ms : null;
         const warp = cgRigWarp(move.rig, keyT);
         const body = typeof cgBodyMotion === 'function' ? cgBodyMotion(move, reach, impactMs / ms) : (t => ({}));

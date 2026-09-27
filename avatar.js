@@ -80,7 +80,8 @@ function avGeom(bodyKey) { return Object.assign({}, AV_BASE, AV_BODIES[bodyKey] 
 // --- skeleton geometry ------------------------------------------------------------
 function avLeg(P, side, wTop, wKnee, wAnk) {
     const sgn = side === 'L' ? -1 : 1;
-    const hx0 = 100 + sgn * P.hipw * 0.55, spread = sgn * 5 * P.k;
+    // fighting stance: front (right) foot forward, back foot set behind
+    const hx0 = 100 + sgn * P.hipw * 0.55, spread = (side === 'L' ? -7 : 9) * P.k;
     const wt = P.hipw * (wTop || 0.78), wk = P.hipw * (wKnee || 0.62), wa = P.hipw * (wAnk || 0.46);
     const ky = (P.hipy + P.fy) / 2 + 4, top = P.hipy - 6, ank = P.fy - 18;
     const kx = hx0 + spread * 0.5, cx = hx0 + spread;
@@ -104,31 +105,60 @@ function avTorsoPath(P, grow) {
         `L${avN(100 - ww)} ${wy} Q${avN(100 - sw + 1)} ${avN((sy + wy) / 2)} ${avN(100 - sw)} ${avN(sy + 6)} Z`;
 }
 
+// Arm poses, as (upper arm, forearm) angles from hanging straight down,
+// positive = toward the enemy (+x). A fighter never stands with its arms
+// dangling: the weapon hand is up and ready, a shield is held across the
+// body, a bow is held out at chest height with an arrow on the string.
+const AV_ARM_POSES = {
+    hang: [4, 6], ready: [8, 46], guard: [12, 84], bowhold: [62, 74], nock: [-22, 100], staff: [10, 40], hold: [16, 30], cast: [16, 92],
+};
 function avArm(P, side) {
     const sgn = side === 'L' ? -1 : 1;
     const ax = 100 + sgn * (P.sw - 4), ay = P.sy + 2;
-    const hx = ax + sgn * 7 * P.k, hy = P.hand;
-    const ex = ax + sgn * 5 * P.k, ey = (ay + hy) / 2;
-    return { sgn, ax, ay, ex, ey, hx, hy };
+    const pose = (P.armPose && P.armPose[side]) || 'hang';
+    const [a1, a2] = AV_ARM_POSES[pose] || AV_ARM_POSES.hang;
+    const len = (P.hand - ay) / 2;
+    const r1 = a1 * Math.PI / 180, r2 = a2 * Math.PI / 180;
+    // a hanging arm splays a little outward instead
+    const out = pose === 'hang' ? sgn : 1;
+    const ex = ax + out * Math.sin(r1) * len + (pose === 'hang' ? sgn * 2 * P.k : 0), ey = ay + Math.cos(r1) * len;
+    const hx = ex + out * Math.sin(r2) * len + (pose === 'hang' ? sgn * 2 * P.k : 0), hy = ey + Math.cos(r2) * len;
+    const dx = hx - ex, dy = hy - ey, dl = Math.hypot(dx, dy) || 1;
+    return { sgn, pose, ax, ay, ex, ey, hx, hy, wx: hx - dx / dl * 4, wy: hy - dy / dl * 4, fdx: dx / dl, fdy: dy / dl };
 }
 
-// a muscular limb: shoulder -> bicep -> elbow -> forearm -> wrist.
-// `from`/`to` (0..1) draw only a section (a sleeve, a bracer).
+// center line of the limb at t (0 shoulder, 0.5 elbow, 1 wrist)
+function avLimbAt(A, t) {
+    return t <= 0.5 ? [A.ax + (A.ex - A.ax) * t / 0.5, A.ay + (A.ey - A.ay) * t / 0.5]
+        : [A.ex + (A.wx - A.ex) * (t - 0.5) / 0.5, A.ey + (A.wy - A.ey) * (t - 0.5) / 0.5];
+}
+function avLimbWidth(wu, we, ww, t) {
+    const W = [[0, wu], [0.25, wu * 1.08], [0.5, we * 0.85], [0.7, we * 1.02], [1, ww]];
+    for (let i = 1; i < W.length; i++) if (t <= W[i][0]) { const u = (t - W[i - 1][0]) / (W[i][0] - W[i - 1][0]); return W[i - 1][1] + (W[i][1] - W[i - 1][1]) * u; }
+    return ww;
+}
+// a muscular limb: shoulder -> bicep -> elbow -> forearm -> wrist, its
+// width laid out perpendicular to the bone (so a bent arm stays solid).
+// `from`/`to` (0..1) draw only a section (a sleeve, a glove cuff).
 function avLimbPath(A, wu, we, ww, from, to) {
-    const at = t => t <= 0.5 ? [A.ax + (A.ex - A.ax) * t / 0.5, A.ay + (A.ey - A.ay) * t / 0.5]
-        : [A.ex + (A.hx - A.ex) * (t - 0.5) / 0.5, A.ey + (A.hy - 4 - A.ey) * (t - 0.5) / 0.5];
-    const width = t => {
-        const W = [[0, wu], [0.25, wu * 1.08], [0.5, we * 0.85], [0.7, we * 1.02], [1, ww]];
-        for (let i = 1; i < W.length; i++) if (t <= W[i][0]) { const u = (t - W[i - 1][0]) / (W[i][0] - W[i - 1][0]); return W[i - 1][1] + (W[i][1] - W[i - 1][1]) * u; }
-        return ww;
-    };
-    const a = from || 0, b = to === undefined ? 1 : to, n = 6;
+    const a = from || 0, b = to === undefined ? 1 : to, n = 10;
     const Lp = [], Rp = [];
-    for (let i = 0; i <= n; i++) { const t = a + (b - a) * i / n, [x, y] = at(t), w = width(t); Lp.push([x - w, y]); Rp.push([x + w, y]); }
+    for (let i = 0; i <= n; i++) {
+        const t = a + (b - a) * i / n, [x, y] = avLimbAt(A, t);
+        const [x2, y2] = avLimbAt(A, Math.min(1, t + 0.02)), [x1, y1] = avLimbAt(A, Math.max(0, t - 0.02));
+        let tx = x2 - x1, ty = y2 - y1; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+        const w = avLimbWidth(wu, we, ww, t);
+        Lp.push([x + ty * w, y - tx * w]); Rp.push([x - ty * w, y + tx * w]);
+    }
     let d = `M${avN(Lp[0][0])} ${avN(Lp[0][1])}`;
     for (let i = 1; i <= n; i++) d += ` L${avN(Lp[i][0])} ${avN(Lp[i][1])}`;
     for (let i = n; i >= 0; i--) d += ` L${avN(Rp[i][0])} ${avN(Rp[i][1])}`;
     return d + ' Z';
+}
+// a line straight across the limb at the wrist (cuff trims)
+function avWristLine(A, w) {
+    const nx = -A.fdy, ny = A.fdx;
+    return `M${avN(A.wx + nx * w)} ${avN(A.wy + ny * w)} L${avN(A.wx - nx * w)} ${avN(A.wy - ny * w)}`;
 }
 
 // --- body, face, hair ---------------------------------------------------------------
@@ -312,9 +342,9 @@ const AV_PAINT = {
             out.torso = s;
             ['L', 'R'].forEach(sd => {
                 const A = avArm(P, sd);
-                out['sleeve' + sd] = S.path(avLimbPath(A, 7 * k, 7.5 * k, 8.5 * k, 0, 0.95), body)
-                    + S.path(`M${avN(A.hx - 9 * k)} ${avN(A.hy - 14)} L${avN(A.hx + 9 * k)} ${avN(A.hy - 14)} L${avN(A.hx + 11 * k)} ${avN(A.hy - 3)} L${avN(A.hx - 11 * k)} ${avN(A.hy - 3)} Z`, body)
-                    + (it.tier >= 2 ? S.line(`M${avN(A.hx - 11 * k)} ${avN(A.hy - 3)} L${avN(A.hx + 11 * k)} ${avN(A.hy - 3)}`, tr, 1.6 * k) : '');
+                out['sleeve' + sd] = S.path(avLimbPath(A, 7 * k, 7.5 * k, 8.5 * k, 0, 0.8), body)
+                    + S.path(avLimbPath(A, 7 * k, 9 * k, 11 * k, 0.72, 1), body)
+                    + (it.tier >= 2 ? S.line(avWristLine(A, 11 * k), tr, 1.6 * k) : '');
             });
             out.back = S.path(`M${avN(100 - P.sw + 3)} ${sy - 4} Q${avN(100 - P.sw * 1.6)} ${avN((sy + fy) / 2)} ${avN(100 - P.sw * 1.3)} ${fy - 2} L${avN(100 + P.sw * 1.1)} ${fy - 2} Q${avN(100 + P.sw * 1.3)} ${avN((sy + fy) / 2)} ${avN(100 + P.sw - 3)} ${sy - 4} Z`, S.cloth(avDark(it.color, 0.25)));
             out.coversLegs = true;
@@ -354,11 +384,12 @@ const AV_PAINT = {
         ['L', 'R'].forEach(sd => {
             const A = avArm(P, sd), hx = A.hx, hy = A.hy;
             const m = it.style === 'gauntlet' ? S.metal(it.color) : S.lin(avLight(it.color, 0.15), avDark(it.color, 0.5));
-            let s = S.path(avLimbPath(A, 7.4 * k, 6.6 * k, 5.9 * k, 0.74, 1), m);
-            s += S.path(`M${avN(hx - 6.5 * k)} ${avN(hy - 17 * k)} L${avN(hx + 6.5 * k)} ${avN(hy - 17 * k)} L${avN(hx + 6 * k)} ${avN(hy - 3)} L${avN(hx - 6 * k)} ${avN(hy - 3)} Z`, m);
-            s += S.circle(hx, hy + 1, 5.3 * k, m);
-            s += avTrimLine(S, `M${avN(hx - 6.5 * k)} ${avN(hy - 17 * k)} L${avN(hx + 6.5 * k)} ${avN(hy - 17 * k)}`, it, 1.4 * k);
-            s += avGem(S, hx, hy - 10 * k, 1.8 * k, it);
+            let s = S.path(avLimbPath(A, 7.4 * k, 7.2 * k, 6.6 * k, 0.72, 1), m);
+            s += S.circle(hx, hy, 5.3 * k, m);
+            const [cx0, cy0] = avLimbAt(A, 0.72);
+            s += avTrimLine(S, `M${avN(cx0 - A.fdy * 7.4 * k)} ${avN(cy0 + A.fdx * 7.4 * k)} L${avN(cx0 + A.fdy * 7.4 * k)} ${avN(cy0 - A.fdx * 7.4 * k)}`, it, 1.4 * k);
+            const [gx, gy] = avLimbAt(A, 0.86);
+            s += avGem(S, gx, gy, 1.8 * k, it);
             out['glove' + sd] = s;
         });
         return out;
@@ -422,9 +453,18 @@ const AV_PAINT = {
     weapon(S, it) {
         const P = S.P, k = P.k, painter = AV_WEAPONS[it.style] || AV_WEAPONS.sword;
         // bows are held in the off hand (the rig draws the string with the other)
-        if (it.style === 'bow') { const A = avArm(P, 'L'); return { weaponL: painter(S, it, A.hx, A.hy + 1) }; }
+        if (it.style === 'bow') {
+            const A = avArm(P, 'L'), R = avArm(P, 'R');
+            // an arrow on the string, held by the drawing hand
+            const tipX = A.hx + 26 * k, tipY = A.hy - 1;
+            const arrow = S.line(`M${avN(R.hx - 4)} ${avN(R.hy)} L${avN(tipX)} ${avN(tipY)}`, '#8a5a2b', 1.6 * k)
+                + S.path(`M${avN(tipX)} ${avN(tipY - 2.6 * k)} L${avN(tipX + 6 * k)} ${avN(tipY)} L${avN(tipX)} ${avN(tipY + 2.6 * k)} Z`, S.metal('#c9d2dc'), P.ol * 0.4)
+                + S.path(`M${avN(R.hx - 4)} ${avN(R.hy)} l${avN(-6 * k)} ${avN(-3 * k)} l${avN(3 * k)} ${avN(3 * k)} l${avN(-3 * k)} ${avN(3 * k)} Z`, it.trim || '#c0392b', P.ol * 0.35);
+            return { weaponL: S.rot(painter(S, it, A.hx, A.hy), 6, A.hx, A.hy), weaponR: arrow };
+        }
         const A = avArm(P, 'R');
-        return { weaponR: S.rot(painter(S, it, A.hx, A.hy + 1), it.style === 'dagger' ? 70 : it.style === 'scythe' ? 8 : 22, A.hx, A.hy) };
+        const ANG = { sword: 18, axe: 0, mace: 16, hammer: 14, spear: 20, dagger: 100, staff: 4, scythe: -10, wand: 40 };
+        return { weaponR: S.rot(painter(S, it, A.hx, A.hy), ANG[it.style] === undefined ? 30 : ANG[it.style], A.hx, A.hy) };
     },
 
     offhand(S, it) {
@@ -566,6 +606,11 @@ function avPaint(spec) {
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
     const skin = S.skin(AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};
+    const W = gear.weapon && gear.weapon.style, O = gear.offhand && gear.offhand.style;
+    P.armPose = {
+        R: W === 'bow' ? 'nock' : (W === 'staff' || W === 'scythe') ? 'staff' : W ? 'ready' : 'hang',
+        L: W === 'bow' ? 'bowhold' : (O === 'kite' || O === 'tower' || O === 'dagger') ? 'guard' : (O === 'orb' || O === 'tome') ? 'cast' : O === 'lantern' ? 'hold' : W ? 'hold' : 'hang',
+    };
     const L = {};
     const add = o => { Object.keys(o || {}).forEach(key => { if (typeof o[key] === 'string') L[key] = (L[key] || '') + o[key]; else L[key] = o[key]; }); };
     Object.keys(gear).forEach(slot => { const it = gear[slot]; if (it && AV_PAINT[slot]) add(AV_PAINT[slot](S, it)); });
@@ -606,7 +651,7 @@ function avPaint(spec) {
         let s = sd === 'R' ? (L.weaponR || '') : '';
         s += S.path(avLimbPath(A, 6.6 * k, 5.8 * k, 5 * k), skin);
         s += L['sleeve' + sd] || S.path(avLimbPath(A, 7.2 * k, 6.3 * k, 5.4 * k, 0, 0.45), S.cloth(linen));
-        s += L['glove' + sd] || S.circle(A.hx, A.hy + 1, 5 * k, skin);
+        s += L['glove' + sd] || S.circle(A.hx, A.hy, 5 * k, skin);
         s += L['shoulder' + sd] || '';
         if (sd === 'L') s += (L.offhandL || '') + (L.weaponL || '');
         parts['arm' + sd] = s;
@@ -623,7 +668,9 @@ function avPaint(spec) {
     const svgs = {};
     order.forEach(p => { if (parts[p]) svgs[p] = wrap(parts[p]); });
     return {
-        parts: svgs, order: order.filter(p => parts[p]), pivots, hand: [avN(7 * k), avN(P.hand - P.sy - 2)],
+        parts: svgs, order: order.filter(p => parts[p]), pivots,
+        hand: (() => { const A = avArm(P, W === 'bow' ? 'L' : 'R'); return [avN(A.hx - A.ax), avN(A.hy - A.ay)]; })(),
+        handSide: W === 'bow' ? 'L' : 'R',
         portrait: wrap('<ellipse cx="100" cy="240" rx="54" ry="8" fill="#000" fill-opacity=".4"/>' + order.map(p => parts[p] || '').join('')),
     };
 }
