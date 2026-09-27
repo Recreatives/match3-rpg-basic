@@ -176,7 +176,7 @@ class CombatArena {
     }
     // where the weapon hand is right now (projectile launch point)
     handPoint(stage) {
-        const arm = stage.joints && (stage.joints['arm' + (stage.rigHandSide || 'R')] || stage.joints.armR || stage.joints.armL);
+        const arm = stage.joints && ((stage.rigHandJoint && stage.joints[stage.rigHandJoint]) || stage.joints['arm' + (stage.rigHandSide || 'R')] || stage.joints.armR || stage.joints.armL);
         if (arm && arm.parent) {
             try {
                 // bottom of the arm part ~ the hand; rig space -> arena space

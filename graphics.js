@@ -359,8 +359,10 @@ function cgKeys(frames) {
         return frames[frames.length - 1][1];
     };
 }
-const CG_JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
-function cgRig(def) { const out = {}; CG_JOINTS.forEach(j => { if (def[j]) out[j] = cgKeys(def[j]); }); return out; }
+// forearms and shins only exist on painted avatars (two-bone limbs); `drop`
+// sinks the body into its knees with the feet kept planted (leg IK).
+const CG_JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR', 'shinL', 'shinR'];
+function cgRig(def) { const out = {}; CG_JOINTS.concat(['drop']).forEach(j => { if (def[j]) out[j] = cgKeys(def[j]); }); return out; }
 const Z = [0, 0], ONE = [1, 0];
 // arm angles: negative swings the arm forward/up toward the enemy (right),
 // about -1.5 is straight forward, about -2.9 straight up over the head.
@@ -432,6 +434,47 @@ const CG_RIGS = {
     knockdown: cgRig({ torso: [Z, [.25, -0.6], [.6, -0.6], ONE], head: [Z, [.25, -0.4], [.6, -0.3], ONE], armL: [Z, [.25, 1.5], [.6, 1.2], ONE],
         armR: [Z, [.25, -1.5], [.6, -1.2], ONE], legL: [Z, [.25, -0.4], [.6, -0.3], ONE], legR: [Z, [.25, -0.9], [.6, -0.8], ONE] }),
 };
+// Elbows, knees and body drop for the two-bone avatars: a wind-up flexes
+// the elbow and the strike whips it straight, the body sinks into its
+// knees on heavy blows and landings, kicks chamber the knee first.
+(function addSecondaryKeys() {
+    const K = (name, def) => { const r = CG_RIGS[name]; if (!r) return; Object.keys(def).forEach(j => { r[j] = cgKeys(def[j]); }); };
+    K('overhead', { foreR: [Z, [.3, -1.2], [.5, 0.25], [.72, 0.05], ONE], foreL: [Z, [.3, -0.5], [.5, 0.2], ONE], drop: [Z, [.3, 1], [.5, 8], [.75, 4], ONE], shinR: [Z, [.45, 0.25], ONE] });
+    K('heavy', { foreR: [Z, [.35, -1.4], [.52, 0.15], ONE], foreL: [Z, [.35, -1.3], [.54, 0.15], ONE], drop: [Z, [.35, 0], [.52, 11], [.8, 6], ONE], shinR: [Z, [.5, 0.35], ONE] });
+    K('spin', { foreR: [Z, [.15, 0.4], [.85, 0.4], ONE], foreL: [Z, [.15, -0.6], [.85, -0.6], ONE], drop: [Z, [.5, 6], ONE] });
+    K('stab', { foreR: [Z, [.3, -1.1], [.45, 0.55], [.7, 0.45], ONE], foreL: [Z, [.35, -0.7], [.55, 0.3], ONE], drop: [Z, [.3, 3], [.45, 7], ONE], shinR: [Z, [.45, 0.35], ONE] });
+    K('thrust', { foreR: [Z, [.3, -1.1], [.45, 0.6], [.7, 0.5], ONE], drop: [Z, [.3, 3], [.45, 7], ONE], shinR: [Z, [.45, 0.3], ONE] });
+    K('xslash', { foreR: [Z, [.3, -1.0], [.5, 0.35], ONE], foreL: [Z, [.35, -0.9], [.55, 0.35], ONE], drop: [Z, [.3, 2], [.5, 7], ONE] });
+    K('uppercut', { foreR: [Z, [.3, 0.7], [.5, -0.7], ONE], drop: [Z, [.3, 9], [.5, 0], ONE], shinR: [Z, [.3, 0.4], [.5, 0], ONE] });
+    K('backhand', { foreR: [Z, [.3, -0.9], [.5, 0.45], ONE], drop: [Z, [.5, 5], ONE] });
+    K('kick', { shinR: [Z, [.3, 1.3], [.5, -0.15], [.68, 0.3], ONE], foreR: [Z, [.5, -0.6], ONE], foreL: [Z, [.5, -0.6], ONE] });
+    K('bash', { foreL: [Z, [.3, -0.7], [.5, 0.35], ONE], drop: [Z, [.3, 3], [.5, 7], ONE] });
+    K('throw', { foreR: [Z, [.3, -1.5], [.47, 0.35], ONE], drop: [Z, [.3, 2], [.47, 6], ONE] });
+    K('push', { foreR: [Z, [.3, -0.9], [.5, 0.35], ONE], foreL: [Z, [.3, -0.9], [.5, 0.35], ONE], drop: [Z, [.5, 4], ONE] });
+    K('cast', { foreR: [Z, [.3, -0.6], [.55, 0.3], ONE], foreL: [Z, [.3, -0.6], [.55, 0.3], ONE], drop: [Z, [.3, 0], [.55, 3], ONE] });
+    K('summon', { foreR: [Z, [.35, -0.5], [.55, 0.3], ONE], foreL: [Z, [.35, -0.5], [.55, 0.3], ONE], drop: [Z, [.35, 0], [.55, 10], ONE] });
+    K('slam', { foreR: [Z, [.35, -1.3], [.5, 0.15], ONE], foreL: [Z, [.35, -1.2], [.5, 0.15], ONE], drop: [Z, [.35, 0], [.5, 13], [.8, 6], ONE] });
+    K('charge', { drop: [Z, [.15, 7], [.4, 4], ONE], foreR: [Z, [.4, 0.3], ONE] });
+    K('block', { foreL: [Z, [.22, -0.4], [.8, -0.4], ONE], drop: [Z, [.22, 6], [.8, 6], ONE] });
+    K('guard', { foreL: [Z, [.2, -0.3], [.8, -0.3], ONE], drop: [Z, [.2, 5], [.8, 5], ONE] });
+    K('heal', { drop: [Z, [.3, 3], [.75, 3], ONE] });
+    K('pray', { foreR: [Z, [.3, -0.6], [.75, -0.6], ONE], foreL: [Z, [.3, -0.6], [.75, -0.6], ONE], drop: [Z, [.3, 4], [.75, 4], ONE] });
+    K('drink', { foreR: [Z, [.3, -1.6], [.7, -1.7], ONE] });
+    K('power', { foreR: [Z, [.2, -0.8], [.45, 0.2], ONE], foreL: [Z, [.2, -0.8], [.45, 0.2], ONE], drop: [Z, [.2, 8], [.45, 0], ONE] });
+    K('roar', { foreR: [Z, [.25, -0.8], [.75, -0.8], ONE], foreL: [Z, [.25, -0.8], [.75, -0.8], ONE], drop: [Z, [.25, 6], [.75, 6], ONE] });
+    K('dodge', { drop: [Z, [.3, 7], ONE] });
+    K('victory', { foreR: [Z, [.3, -0.9], [.8, -0.9], ONE], foreL: [Z, [.3, -0.5], ONE] });
+    K('flinch', { foreR: [Z, [.15, 0.6], [.5, 0.2], ONE], foreL: [Z, [.15, 0.6], [.5, 0.2], ONE], drop: [Z, [.15, 5], ONE] });
+    K('stagger', { foreR: [Z, [.2, 0.7], ONE], foreL: [Z, [.2, 0.7], ONE], drop: [Z, [.2, 7], [.6, 3], ONE] });
+    K('recoil', { foreR: [Z, [.15, -0.5], ONE], foreL: [Z, [.15, -0.5], ONE], drop: [Z, [.15, 6], ONE] });
+    K('knockdown', { foreR: [Z, [.25, 0.8], [.6, 0.6], ONE], foreL: [Z, [.25, 0.8], [.6, 0.6], ONE], drop: [Z, [.25, 10], [.6, 10], ONE] });
+    K('death', { foreR: [Z, [1, 0.9]], foreL: [Z, [1, 0.9]], drop: [Z, [1, 18]], shinL: [Z, [1, 0.5]], shinR: [Z, [1, 0.6]] });
+    K('bowA', { foreR: [Z, [.25, 0.25], [.45, -0.55], [.52, 0.4], [.8, 0.15], ONE], drop: [Z, [.25, 3], [.8, 3], ONE] });
+    // kneeling = sinking into the knees (legs stay planted) for avatars
+    CG_RIGS.kneelA = cgRig({ drop: [Z, [.3, 22], [.75, 22], ONE], torso: [Z, [.3, 0.12], [.75, 0.12], ONE], head: [Z, [.3, 0.18], [.75, 0.18], ONE],
+        armL: [Z, [.3, -0.4], [.75, -0.4], ONE], armR: [Z, [.3, -0.6], [.75, -0.6], ONE], foreR: [Z, [.3, 0.4], [.75, 0.4], ONE] });
+})();
+
 // when each rig's decisive beat happens (the blow / the release), so a
 // move can time-warp its rig to land that beat exactly on the impact
 // Variants for painted avatars (avatar.js), whose rest pose is already
@@ -720,7 +763,29 @@ function cgFrame(ticker) {
         if (stage.paused || !stage.portraitSprite) continue;
         if (!cgIsVisible(stage.arena ? stage.arena.canvasEl : stage.canvasEl)) continue;
         // Idle breathing, only while nothing else is animating the sprite.
-        if (stage.stripH && !stage.dead && stage.activeTweens === 0) {
+        if (stage.stripH && !stage.dead && stage.activeTweens === 0 && stage.idleStyle && stage.joints.shinL) {
+            // painted avatars: a livelier idle at ~30fps - the body sinks into
+            // its knees and rises (feet planted), arms and weapon drift out of
+            // phase, the head settles, each class at its own rhythm
+            const now = performance.now();
+            const step = Math.floor(now / 33);
+            if (step !== stage.lastFrame) {
+                stage.lastFrame = step;
+                const I = stage.idleStyle, sec = now / 1000, ph = stage.breathPhase, w = 2 * Math.PI * I.hz;
+                const b = 0.5 + 0.5 * Math.sin(sec * w + ph);
+                const j = stage.joints;
+                stage.portraitSprite.scale.set(stage.portraitBaseScale);
+                if (j.torso) j.torso.rotation = I.torso * Math.sin(sec * w * 0.5 + ph + 1);
+                if (j.head) j.head.rotation = I.head * Math.sin(sec * w * 0.5 + ph + 2.2);
+                if (j.armR) j.armR.rotation = I.sway * Math.sin(sec * w + ph + 0.9);
+                if (j.foreR) j.foreR.rotation = -I.sway * 1.3 * Math.sin(sec * w + ph + 1.6);
+                if (j.armL) j.armL.rotation = -I.sway * 0.8 * Math.sin(sec * w + ph + 0.3);
+                if (j.foreL) j.foreL.rotation = I.sway * 1.1 * Math.sin(sec * w + ph + 1.1);
+                ['legL', 'legR', 'shinL', 'shinR'].forEach(n => { if (j[n]) j[n].rotation = 0; });
+                stage._setDrop(I.bob * b);
+                stage.needsRender = true;
+            }
+        } else if (stage.stripH && !stage.dead && stage.activeTweens === 0) {
             const now = performance.now();
             const step = Math.floor(now / CG_BREATH_STEP_MS);
             if (step !== stage.lastFrame) {
@@ -737,6 +802,7 @@ function cgFrame(ticker) {
             }
         }
         if (stage._updateAuras(performance.now())) stage.needsRender = true;
+        if (stage._updateCape()) stage.needsRender = true;
         // arena fighters: the arena paints them all at once (cgRenderArenas)
         if (stage.arena) {
             if (stage.needsRender || stage.activeTweens > 0) { stage.arena.dirty = true; stage.needsRender = false; }
@@ -867,6 +933,9 @@ class CombatStage {
         this.url = url;
         this.isAvatar = false;
         this.rigHandSide = 'R';
+        this.rigHandJoint = null;
+        this.rigLegs = null;
+        this.idleStyle = null;
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
         this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : (this.charKey.indexOf('monster_') === 0 ? -1 : 1);
         const rigs = await cgLoadRigs(url.replace(/[^/]*$/, ''));
@@ -911,6 +980,9 @@ class CombatStage {
         painted.order.forEach((p, i) => { parts[p] = textures[i]; });
         this.isAvatar = true;
         this.rigHandSide = painted.handSide || 'R';
+        this.rigHandJoint = painted.handJoint || null;
+        this.rigLegs = painted.legs || null;
+        this.idleStyle = painted.idle || null;
         this._installRig(parts, painted.pivots, painted.hand, painted.box);
     }
 
@@ -944,14 +1016,33 @@ class CombatStage {
         if (mirror) { inner.position.set(200, 0); inner.scale.x = -1; }
         const B = box || [0, 0, 200, 250];
         const sprite = (tex) => { const sp = new PIXI.Sprite(tex); sp.position.set(B[0], B[1]); sp.width = B[2]; sp.height = B[3]; return sp; };
-        const joint = (name) => {
+        const joint = (name, partName) => {
             const c = new PIXI.Container();
             const [px, py] = pivots[name] || [100, 125];
             c.pivot.set(px, py); c.position.set(px, py);
-            if (parts[name]) c.addChild(sprite(parts[name]));
+            const part = parts[partName || name];
+            if (part) c.addChild(sprite(part));
             joints[name] = c;
             return c;
         };
+        if (parts.foreR) {
+            // two-bone avatar: thigh > shin, upper arm > forearm, a cape
+            // joint that swings, and the far hand's held item in front
+            const limb = (upper, lower) => { const u = joint(upper); u.addChild(joint(lower)); return u; };
+            if (parts.back) inner.addChild(joint('cape', 'back'));
+            inner.addChild(limb('legL', 'shinL'));
+            inner.addChild(limb('legR', 'shinR'));
+            const torso = joint('torso');
+            torso.addChildAt(limb('armL', 'foreL'), 0);
+            torso.addChild(joint('head'));
+            if (parts.foreLf) torso.addChild(limb('armLf', 'foreLf'));
+            torso.addChild(limb('armR', 'foreR'));
+            inner.addChild(torso);
+            const root = new PIXI.Container();
+            root.pivot.set(100, 250);
+            root.addChild(inner);
+            return { inner, joints, root };
+        }
         if (parts.back) inner.addChild(sprite(parts.back));
         inner.addChild(joint('legL'));
         inner.addChild(joint('legR'));
@@ -979,6 +1070,52 @@ class CombatStage {
     _syncLinked() {
         const j = this.joints;
         if (j && j.armLf && j.armL) j.armLf.rotation = j.armL.rotation;
+        if (j && j.foreLf && j.foreL) j.foreLf.rotation = j.foreL.rotation;
+    }
+
+    // Sinks the body `dy` px into its knees with the feet kept planted:
+    // hips and torso move down, and each leg is re-solved as a two-bone
+    // chain (hip -> knee -> ankle) on top of whatever the move rotated.
+    _setDrop(dy) {
+        const j = this.joints, legs = this.rigLegs;
+        if (!legs || !j.shinL || !j.torso) return;
+        j.torso.position.y = j.torso.pivot.y + dy;
+        ['L', 'R'].forEach(sd => {
+            const leg = j['leg' + sd], shin = j['shin' + sd], g = legs[sd];
+            if (!leg || !shin) return;
+            leg.position.y = leg.pivot.y + dy;
+            const H = [g.hip[0], g.hip[1] + dy], A = g.ank, K0 = g.knee;
+            const l1 = Math.hypot(K0[0] - g.hip[0], K0[1] - g.hip[1]), l2 = Math.hypot(A[0] - K0[0], A[1] - K0[1]);
+            const dx = A[0] - H[0], dyy = A[1] - H[1], d = Math.min(Math.hypot(dx, dyy), l1 + l2 - 0.01);
+            const base = Math.atan2(dyy, dx), a = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))));
+            // the knee bends toward the enemy (+x)
+            const c1 = [H[0] + l1 * Math.cos(base - a), H[1] + l1 * Math.sin(base - a)], c2 = [H[0] + l1 * Math.cos(base + a), H[1] + l1 * Math.sin(base + a)];
+            const K = c1[0] > c2[0] ? c1 : c2;
+            const thigh = Math.atan2(K[1] - H[1], K[0] - H[0]) - Math.atan2(K0[1] - g.hip[1], K0[0] - g.hip[0]);
+            const shinA = Math.atan2(A[1] - K[1], A[0] - K[0]) - Math.atan2(A[1] - K0[1], A[0] - K0[0]);
+            leg.rotation += thigh;
+            shin.rotation += shinA - thigh;
+        });
+    }
+
+    // The cape trails behind movement: a damped spring driven by how fast
+    // the body travels (and a slow drift when standing).
+    _updateCape() {
+        const cape = this.joints && this.joints.cape;
+        if (!cape) return false;
+        const x = this.portraitSprite.x, now = performance.now();
+        const dt = Math.min(0.05, ((now - (this.capeT || now)) / 1000) || 0.016);
+        this.capeT = now;
+        const vx = (x - (this.capeX === undefined ? x : this.capeX)) / Math.max(dt, 0.001) * this.facing;
+        this.capeX = x;
+        this.capeV = this.capeV || 0; this.capeA = this.capeA || 0;
+        // moving forward pushes the cape back (-), a drift keeps it alive
+        const target = Math.max(-0.5, Math.min(0.35, -vx / 900)) + 0.03 * Math.sin(now / 900 + this.breathPhase);
+        this.capeV += ((target - this.capeA) * 60 - this.capeV * 9) * dt;
+        this.capeA += this.capeV * dt;
+        const prev = cape.rotation;
+        cape.rotation = this.capeA;
+        return Math.abs(prev - cape.rotation) > 0.002;
     }
 
     // Sets joint angles from a rig animation at t (or idle when none).
@@ -988,6 +1125,7 @@ class CombatStage {
             if (!c) return;
             c.rotation = rigAnim && rigAnim[j] ? rigAnim[j](t) : 0;
         });
+        this._setDrop(rigAnim && rigAnim.drop ? Math.max(0, rigAnim.drop(t)) : 0);
     }
 
     // One-off joint animation (hit flinch, death) layered on the body.
@@ -1180,6 +1318,10 @@ class CombatStage {
                 const ph = t * ms / 1000 * 15, j = this.joints;
                 if (j.legL) j.legL.rotation += 0.75 * p.run * Math.sin(ph);
                 if (j.legR) j.legR.rotation -= 0.75 * p.run * Math.sin(ph);
+                // the trailing leg's knee folds, the arms pump
+                if (j.shinL) j.shinL.rotation += 1.0 * p.run * Math.max(0, Math.sin(ph));
+                if (j.shinR) j.shinR.rotation += 1.0 * p.run * Math.max(0, -Math.sin(ph));
+                if (j.foreL) j.foreL.rotation -= 0.35 * p.run * Math.sin(ph);
                 if (j.torso) j.torso.rotation += 0.12 * p.run;
                 const side = Math.sin(ph) > 0 ? 1 : -1;
                 if (arena && side !== stepSide && Math.abs(p.run) > 0.3) { stepSide = side; const q = arena.bodyPoint(this, 0); arena.dust(q.x, q.y, 2, -f); }

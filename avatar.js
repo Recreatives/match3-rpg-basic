@@ -98,6 +98,20 @@ const AV_STANCES = {
     necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: [28, 100], L: [24, 18], wAng: -32 },
 };
 
+// How each class breathes and fidgets while waiting (graphics.js cgFrame):
+// bob = how far the body sinks into the knees (px) and how fast (Hz),
+// sway = arm drift, torso/head = small rotations. A rogue bounces on the
+// balls of its feet, a berserker heaves, a mage barely moves.
+const AV_IDLE = {
+    warrior: { bob: 1.6, hz: 0.45, sway: 0.04, torso: 0.015, head: 0.03 },
+    paladin: { bob: 1.0, hz: 0.32, sway: 0.025, torso: 0.01, head: 0.02 },
+    berserker: { bob: 3.2, hz: 0.62, sway: 0.07, torso: 0.04, head: 0.05 },
+    rogue: { bob: 3.0, hz: 1.5, sway: 0.05, torso: 0.02, head: 0.03 },
+    archer: { bob: 1.4, hz: 0.5, sway: 0.03, torso: 0.015, head: 0.02 },
+    mage: { bob: 1.0, hz: 0.28, sway: 0.05, torso: 0.01, head: 0.035 },
+    necromancer: { bob: 1.2, hz: 0.24, sway: 0.04, torso: 0.045, head: 0.05 },
+};
+
 function avGeom(bodyKey, cls) {
     const P = Object.assign({}, AV_BASE, AV_BODIES[bodyKey] || {});
     const st = AV_STANCES[cls] || AV_STANCES.warrior;
@@ -705,15 +719,40 @@ function avPaint(spec) {
 
     const linen = '#8a7a5e', trouser = '#4e4234';
     const parts = {};
+    const clips = [];
+    // Split a limb at its middle joint (elbow / knee): two clip regions, the
+    // half-plane on each side of the joint; the lower one also takes a disk
+    // around the joint so a bent limb never shows a seam.
+    const splitAt = (id, a, e, c, r) => {
+        let u1x = a[0] - e[0], u1y = a[1] - e[1], u2x = c[0] - e[0], u2y = c[1] - e[1];
+        const l1 = Math.hypot(u1x, u1y) || 1, l2 = Math.hypot(u2x, u2y) || 1;
+        u1x /= l1; u1y /= l1; u2x /= l2; u2y /= l2;
+        let nx = u1x - u2x, ny = u1y - u2y; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+        const px = -ny, py = nx, F = 600;
+        // the lower piece reaches 0.8px past the seam so antialiased edges
+        // never leave a hairline gap between the two pieces
+        const poly = (sg, o) => { const cx = e[0] - sg * nx * (o || 0), cy = e[1] - sg * ny * (o || 0);
+            return [[cx + px * F, cy + py * F], [cx + px * F + sg * nx * F, cy + py * F + sg * ny * F], [cx - px * F + sg * nx * F, cy - py * F + sg * ny * F], [cx - px * F, cy - py * F]]
+                .map(q => avN(q[0]) + ',' + avN(q[1])).join(' '); };
+        // the upper piece is its half-plane minus the joint disk, so the two
+        // pieces never overlap (translucent shading would darken twice)
+        const B = AV_BOX;
+        clips.push(`<mask id="u${id}" maskUnits="userSpaceOnUse" x="${B[0]}" y="${B[1]}" width="${B[2]}" height="${B[3]}"><polygon points="${poly(1)}" fill="#fff"/><circle cx="${avN(e[0])}" cy="${avN(e[1])}" r="${avN(r)}" fill="#000"/></mask>`);
+        clips.push(`<clipPath id="l${id}"><polygon points="${poly(-1, 0.8)}"/><circle cx="${avN(e[0])}" cy="${avN(e[1])}" r="${avN(r + 0.8)}"/></clipPath>`);
+        return { upper: body => `<g mask="url(#u${id})">${body}</g>`, lower: body => `<g clip-path="url(#l${id})">${body}</g>` };
+    };
     parts.back = L.back || '';
-    // legs (the far one first, the near one over it)
+    // legs: thigh + shin (the far leg first, the near one over it)
+    const legs = {};
     ['L', 'R'].forEach(sd => {
         const g = avLeg(P, sd);
         let s = S.path(g.d, skin);
         s += L['leg' + sd] || (S.path(g.d, S.cloth(L.legCloth || trouser)) + S.flat(avLimbPath(g.A, g.wt * 0.45, g.wk * 0.5 / 0.85, g.wa * 0.5, 0.05, 0.95), '#000', 0.2));
-        s += L['boot' + sd] || S.path(avBootPath(P, g, 6), S.lin('#6b4a30', '#3a2414'));
         if (sd === 'L') s += S.flat(g.d, '#000', 0.12); // the far leg sits in a little shadow
-        parts['leg' + sd] = s;
+        const cut = splitAt('K' + sd, g.hip, g.knee, g.ank, g.wk * 1.05);
+        parts['leg' + sd] = cut.upper(s);
+        parts['shin' + sd] = cut.lower(s) + (L['boot' + sd] || S.path(avBootPath(P, g, 6), S.lin('#6b4a30', '#3a2414')));
+        legs[sd] = { hip: [avN(g.hip[0]), avN(g.hip[1] - 2)], knee: [avN(g.knee[0]), avN(g.knee[1])], ank: [avN(g.ank[0]), avN(g.ank[1])] };
     });
     // torso
     let t = S.path(`M${avN(P.neckX - 6 * k)} ${P.neck - 4} L${avN(P.neckX + 6 * k)} ${P.neck - 4} L${avN(P.neckX + 7 * k)} ${P.sy - 4} L${avN(P.neckX - 7 * k)} ${P.sy - 4} Z`, skin);
@@ -731,44 +770,48 @@ function avPaint(spec) {
     if (!L.hidesFace && !L.hideBeard) h += avBeard(S, look);
     h += L.head || '';
     parts.head = h;
-    // arms: the far arm sits behind the body (armL); whatever it holds is
-    // drawn in front of the body (armLf) and turns with it
+    // arms: upper arm + forearm. The far arm sits behind the body; whatever
+    // it holds is drawn in front (armLf > foreLf) and turns with it.
+    const arms = {};
     ['L', 'R'].forEach(sd => {
         const A = avArm(P, sd);
-        let s = sd === 'R' ? (L.weaponR || '') : '';
-        s += S.path(avLimbPath(A, 6.6 * k, 5.8 * k, 5 * k), skin);
+        let s = S.path(avLimbPath(A, 6.6 * k, 5.8 * k, 5 * k), skin);
         s += L['sleeve' + sd] || S.path(avLimbPath(A, 7.2 * k, 6.3 * k, 5.4 * k, 0, 0.45), S.cloth(linen));
-        s += L['glove' + sd] || S.circle(A.hx, A.hy, 5 * k * A.f, skin);
-        s += L['shoulder' + sd] || '';
+        const hand = L['glove' + sd] || S.circle(A.hx, A.hy, 5 * k * A.f, skin);
         if (sd === 'L') s += S.flat(avLimbPath(A, 7.5 * k, 6.5 * k, 5.5 * k), '#000', 0.14);
-        parts['arm' + sd] = s;
+        const cut = splitAt('E' + sd, [A.ax, A.ay], [A.ex, A.ey], [A.hx, A.hy], 6.2 * k * A.f);
+        parts['arm' + sd] = cut.upper(s) + (L['shoulder' + sd] || '');
+        parts['fore' + sd] = cut.lower(s) + hand + (sd === 'R' ? (L.weaponR || '') : '');
+        arms[sd] = A;
     });
-    if (L.held) {
-        // the far hand, repeated in front, wrapped around what it holds
-        const A = avArm(P, 'L');
-        parts.armLf = L.held + (L.gloveL ? '' : '');
-    }
+    if (L.held) parts.foreLf = L.held;
     const pivots = {
-        legL: [avN(P.hipL[0]), avN(P.hipL[1] - 2)], legR: [avN(P.hipR[0]), avN(P.hipR[1] - 2)],
+        legL: legs.L.hip, legR: legs.R.hip, shinL: legs.L.knee, shinR: legs.R.knee,
         torso: [100, P.hipy + 2], head: [avN(P.neckX), P.neck],
-        armL: [avN(P.shL[0]), avN(P.shL[1])], armR: [avN(P.shR[0]), avN(P.shR[1])],
+        armL: [avN(arms.L.ax), avN(arms.L.ay)], armR: [avN(arms.R.ax), avN(arms.R.ay)],
+        foreL: [avN(arms.L.ex), avN(arms.L.ey)], foreR: [avN(arms.R.ex), avN(arms.R.ey)],
+        cape: [avN(P.neckX - 4), P.sy - 6],
     };
     pivots.armLf = pivots.armL;
+    pivots.foreLf = pivots.foreL;
     // Each part is drawn on a canvas bigger than the 200x250 body box
     // (AV_BOX), so a weapon held up, a cape or a wide stance can reach past
     // the body box without being cut off; the engine places it with `box`.
     const B = AV_BOX;
-    const defs = S.defs();
+    const defs = S.defs() + clips.join('');
     const wrap = body => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${B[0]} ${B[1]} ${B[2]} ${B[3]}" width="${B[2] * 2}" height="${B[3] * 2}"><defs>${defs}</defs>${body}</svg>`;
-    const order = ['back', 'legL', 'legR', 'armL', 'torso', 'head', 'armLf', 'armR'];
+    // `back` is the cape (a joint of its own: it swings)
+    const order = ['back', 'legL', 'shinL', 'legR', 'shinR', 'armL', 'foreL', 'torso', 'head', 'foreLf', 'armR', 'foreR'];
     const svgs = {};
     order.forEach(p => { if (parts[p]) svgs[p] = wrap(parts[p]); });
-    const handArm = avArm(P, W === 'bow' ? 'L' : 'R');
+    const handA = arms[W === 'bow' ? 'L' : 'R'];
     return {
         parts: svgs, order: order.filter(p => parts[p]), pivots,
-        hand: [avN(handArm.hx - handArm.ax), avN(handArm.hy - handArm.ay)],
+        // the weapon hand, relative to its elbow (projectile launch point)
+        hand: [avN(handA.hx - handA.ex), avN(handA.hy - handA.ey)],
         handSide: W === 'bow' ? 'L' : 'R',
-        box: AV_BOX,
+        handJoint: W === 'bow' ? 'foreL' : 'foreR',
+        legs, box: AV_BOX, idle: AV_IDLE[spec.cls] || AV_IDLE.warrior,
         portrait: wrap('<ellipse cx="100" cy="240" rx="58" ry="8" fill="#000" fill-opacity=".4"/>' + order.map(p => parts[p] || '').join('')),
     };
 }
