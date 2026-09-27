@@ -77,6 +77,15 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
       - name: RLS / RPC assertions
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/10_rls_and_rpcs.sql
+      - name: Migration from v1.36 (production's schema) with real-looking data
+        run: |
+          createdb legacy
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/00_supabase_shim.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/legacy/schema-v1.36.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/05_legacy_seed.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -f tests/sql/06_legacy_check.sql
 
   trigger-pages-rebuild:
     needs: [test, sql]
