@@ -76,18 +76,47 @@ function avSession(P) {
     return S;
 }
 
-function avGeom(bodyKey) {
+// Every class stands its own way (the silhouette alone should say who it
+// is). front/back: where the feet land relative to the hips; crouch: how
+// much lower the body sits (knees bend more); lean: how far the chest leads
+// the hips; head: forward/down offset; R/L: arm (upper, forearm) angles;
+// wAng / offAng: how the weapon / off-hand item is held.
+const AV_STANCES = {
+    // balanced, shield up, sword upright
+    warrior: { front: 26, back: -36, crouch: 2, lean: 3, head: [0, 0], R: [10, 150], L: [58, 116], wAng: 18 },
+    // upright and stately: hammer on the shoulder, shield planted in front
+    paladin: { front: 16, back: -20, crouch: 0, lean: 1, head: [0, -1], R: [28, 196], L: [14, 58], wAng: -72, offBig: true },
+    // very wide and low, lunging forward, axe raised overhead, free hand clawing
+    berserker: { front: 34, back: -44, crouch: 10, lean: 9, head: [3, 3], R: [140, 195], L: [48, 72], wAng: -55 },
+    // a deep crouch: one dagger in reverse grip low, the other up by the face
+    rogue: { front: 24, back: -32, crouch: 14, lean: 8, head: [2, 3], R: [28, 66], L: [34, 150], wAng: 160, offAng: 35 },
+    // side-on, the bow arm straight out
+    archer: { front: 20, back: -30, crouch: 4, lean: 3, head: [1, 0], R: 'nock', L: 'bowhold', wAng: 6 },
+    // upright and calm, feet close: staff planted, the other hand raised with its magic
+    mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: [6, 16], L: [70, 118], wAng: 0 },
+    // hunched, head low and forward: scythe held across, lantern hanging low
+    necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: [28, 100], L: [24, 18], wAng: -32 },
+};
+
+function avGeom(bodyKey, cls) {
     const P = Object.assign({}, AV_BASE, AV_BODIES[bodyKey] || {});
-    // 3/4 view toward the enemy (+x): the chest leads the hips a little,
-    // the near (right) shoulder is in front, the far (left) one tucked back.
-    const k = P.k, lean = 3 * k;
+    const st = AV_STANCES[cls] || AV_STANCES.warrior;
+    P.stance = st;
+    const k = P.k;
+    // legs keep their length; a crouch lowers everything above them
+    P.legLen = (P.fy - 14 - (P.hipy + 2)) * 0.53;
+    ['hy', 'neck', 'sy', 'wy', 'hipy', 'hand'].forEach(key => { P[key] += st.crouch; });
+    P.hy += st.head[1];
+    // 3/4 view toward the enemy (+x): the chest leads the hips, the near
+    // (right) shoulder is in front, the far (left) one tucked back.
+    const lean = st.lean * k;
     P.lean = lean;
     P.front = 100 + P.sw * 0.25 + lean;                  // sternum / front line
     P.shR = [100 + P.sw * 0.74 + lean, P.sy + 1];         // near shoulder joint
     P.shL = [100 - P.sw * 0.46 + lean, P.sy - 1];         // far shoulder joint
     P.hipR = [100 + P.hipw * 0.38, P.hipy + 2];
     P.hipL = [100 - P.hipw * 0.46, P.hipy + 1];
-    P.headX = 100 + lean + 2;
+    P.headX = 100 + lean + 2 + st.head[0];
     P.neckX = 100 + lean;
     return P;
 }
@@ -109,8 +138,9 @@ function avLeg(P, side) {
     const k = P.k, hip = side === 'R' ? P.hipR : P.hipL;
     // a wide fighting stance: the back leg reaches far behind almost
     // straight, the front leg steps forward with the knee bent
-    const ank = side === 'R' ? [hip[0] + 26 * k, P.fy - 14] : [hip[0] - 36 * k, P.fy - 14];
-    const d = Math.hypot(ank[0] - hip[0], ank[1] - hip[1]), l = d * (side === 'R' ? 0.54 : 0.505);
+    const st = P.stance || AV_STANCES.warrior;
+    const ank = side === 'R' ? [hip[0] + st.front * k, P.fy - 14] : [hip[0] + st.back * k, P.fy - 14];
+    const d = Math.hypot(ank[0] - hip[0], ank[1] - hip[1]), l = Math.max(P.legLen || d * 0.53, d * 0.505);
     const knee = avIK(hip, ank, l, 1);
     const A = { ax: hip[0], ay: hip[1] - 4, ex: knee[0], ey: knee[1], wx: ank[0], wy: ank[1] };
     const f = side === 'L' ? 0.94 : 1; // the far leg reads a touch thinner
@@ -162,7 +192,7 @@ function avArm(P, side) {
         [ex, ey] = avIK([ax, ay], target, len, 1, 'y');
         [hx, hy] = target;
     } else {
-        const [a1, a2] = AV_ARM_POSES[pose] || AV_ARM_POSES.hang;
+        const [a1, a2] = Array.isArray(pose) ? pose : (AV_ARM_POSES[pose] || AV_ARM_POSES.hang);
         const r1 = a1 * Math.PI / 180, r2 = a2 * Math.PI / 180;
         ex = ax + Math.sin(r1) * len; ey = ay + Math.cos(r1) * len;
         hx = ex + Math.sin(r2) * len; hy = ey + Math.cos(r2) * len;
@@ -516,7 +546,8 @@ const AV_PAINT = {
         }
         const A = avArm(P, 'R');
         const ANG = { sword: 18, axe: 6, mace: 12, hammer: 8, spear: 30, dagger: 55, staff: 2, scythe: -6, wand: 40 };
-        return { weaponR: S.rot(painter(S, it, A.hx, A.hy), ANG[it.style] === undefined ? 20 : ANG[it.style], A.hx, A.hy) };
+        const ang = P.stance && P.stance.wAng !== undefined ? P.stance.wAng + (it.style === 'wand' ? 30 : 0) : (ANG[it.style] === undefined ? 20 : ANG[it.style]);
+        return { weaponR: S.rot(painter(S, it, A.hx, A.hy), ang, A.hx, A.hy) };
     },
 
     offhand(S, it) {
@@ -556,7 +587,7 @@ const AV_PAINT = {
             s += S.circle(x, y + 17 * k, 3.4 * k, S.lin('#eae0c8', '#8a7a5a'), P.ol * 0.5);
             return { held: s };
         }
-        if (it.style === 'dagger') return { held: S.rot(AV_WEAPONS.dagger(S, it, x, y), 70, x, y) };
+        if (it.style === 'dagger') return { held: S.rot(AV_WEAPONS.dagger(S, it, x, y), P.stance && P.stance.offAng !== undefined ? P.stance.offAng : 70, x, y) };
         if (it.style === 'quiver') {
             const qx = P.shL[0] - 4, qy = P.sy - 8;
             const s = S.path(`M${avN(qx - 5 * k)} ${avN(qy - 4)} L${avN(qx + 4 * k)} ${avN(qy - 8)} L${avN(qx + 12 * k)} ${avN(P.wy + 8)} L${avN(qx + 3 * k)} ${avN(P.wy + 12)} Z`, avLeather(S, it.color))
@@ -659,16 +690,15 @@ const AV_WEAPONS = {
 function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heavy') + '_' + (spec.gender === 'f' ? 'f' : 'm'); }
 
 function avPaint(spec) {
-    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey), S = avSession(P), k = P.k;
+    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls), S = avSession(P), k = P.k;
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
     const skin = S.skin(AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};
     const W = gear.weapon && gear.weapon.style, O = gear.offhand && gear.offhand.style;
     // arm poses follow what the hands hold
-    P.armPose = {
-        R: W === 'bow' ? 'nock' : (W === 'staff' || W === 'scythe') ? 'staff' : 'ready',
-        L: W === 'bow' ? 'bowhold' : (O === 'kite' || O === 'tower' || O === 'dagger') ? 'guard' : (O === 'orb' || O === 'tome') ? 'cast' : O === 'lantern' ? 'hold' : 'fist',
-    };
+    // arms follow the class stance (a bow always takes the archer's grip)
+    const ST = P.stance;
+    P.armPose = W === 'bow' ? { R: 'nock', L: 'bowhold' } : { R: ST.R === 'nock' ? 'ready' : ST.R, L: ST.L === 'bowhold' ? 'fist' : ST.L };
     const L = {};
     const add = o => { Object.keys(o || {}).forEach(key => { if (typeof o[key] === 'string') L[key] = (L[key] || '') + o[key]; else L[key] = o[key]; }); };
     Object.keys(gear).forEach(slot => { const it = gear[slot]; if (it && AV_PAINT[slot]) add(AV_PAINT[slot](S, it)); });
@@ -696,8 +726,7 @@ function avPaint(spec) {
     // head
     let h = L.headBack || '';
     if (!L.hidesHair) h += avHairBack(S, look);
-    if (!L.hidesFace) h += avFace(S, look);
-    else h += S.path(avHeadPath(P), avDark(AV_SKINS[look.skin || 0][1], 0.5), P.ol * 0.5); // under a closed helm / hood
+    if (!L.hidesFace) h += avFace(S, look); // a hood / closed helm is the whole head
     if (!L.hidesHair) h += avHairFront(S, look);
     if (!L.hidesFace && !L.hideBeard) h += avBeard(S, look);
     h += L.head || '';
