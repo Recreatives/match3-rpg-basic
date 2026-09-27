@@ -1397,6 +1397,10 @@ function endTurnLogic() {
         else { gridDisplay.classList.remove('locked'); startPlayerTimer(); }
     } else {
         isPlayerTurn = !isPlayerTurn;
+        // Back to the player: clear processing BEFORE updateUI, which
+        // derives the ULT button's disabled state from it - the other order
+        // left a 100% ult unpressable until something else refreshed the UI.
+        if (isPlayerTurn) isProcessing = false;
         updateTurnBanner();
         updateUI();
         if (!isPlayerTurn) {
@@ -1405,7 +1409,6 @@ function endTurnLogic() {
             setTimeout(enemyPlayTurn, 1500);
         } else {
             gridDisplay.classList.remove('locked');
-            isProcessing = false;
             startPlayerTimer();
         }
     }
@@ -1454,10 +1457,10 @@ function enemyPlayTurn() {
     } else {
         log(t("Düşman hamle bulamadı. Pas geçiyor..."), "log-enemy");
         isPlayerTurn = true;
+        isProcessing = false; // before updateUI - it derives the ULT button's disabled state from this
         updateTurnBanner();
         updateUI();
         gridDisplay.classList.remove('locked');
-        isProcessing = false;
         startPlayerTimer();
     }
 }
@@ -1609,7 +1612,11 @@ function updateUI() {
     document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
     document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
 
-    document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
+    const ultBtn = document.getElementById('ult-btn');
+    ultBtn.disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
+    // Re-derived every refresh: the static data-i18n-en text would otherwise
+    // replace the class's ult name on a language switch.
+    if (selectedClass) ultBtn.innerText = tf('{name} KULLAN (%100)', { name: selectedClass.ultName });
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
     // Stat readout (own + enemy) lives in the hover tooltip now (see
     // renderStatsTooltip) - rendered on demand, not every UI tick.

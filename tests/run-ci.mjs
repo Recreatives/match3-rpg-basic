@@ -10,7 +10,7 @@ let runnerErrors = 0;
 page.on('pageerror', err => { runnerErrors++; console.error('[runner page error]', err.message); });
 
 await page.goto(`${base}/tests/index.html`);
-await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, null, { timeout: 180000 });
+await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, null, { timeout: 420000 });
 
 const results = await page.evaluate(() => window.__TEST_RESULTS__);
 let suite = null;

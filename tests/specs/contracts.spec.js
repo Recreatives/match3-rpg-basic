@@ -227,10 +227,13 @@ describe('i18n completeness', { world: { pixi: false } }, function () {
 
     it('switching to English and back re-renders static UI without errors', function (ctx) {
         var w = ctx.world;
+        // with a class picked the button names its ult in both languages;
+        // without one it shows the generic static text
+        var cls = w.g('selectedClass && selectedClass.ultName');
         w.g("setLanguage('en')");
-        expect(w.$('ult-btn').textContent).toMatch(/ULTIMATE|USE/);
+        expect(w.$('ult-btn').textContent).toMatch(cls ? new RegExp('USE ' + cls) : /ULTIMATE|USE/);
         w.g("setLanguage('tr')");
-        expect(w.$('ult-btn').textContent).toMatch(/ULT/);
+        expect(w.$('ult-btn').textContent).toMatch(cls ? new RegExp(cls + ' KULLAN') : /ULT/);
     });
 });
 
