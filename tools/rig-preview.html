@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><base href="../"><title>Rig preview</title>
+<!-- Dev tool: every class x action rig pose, frozen at the slider's t (or
+     looping). Serve the repo root and open /tools/rig-preview.html. -->
+<style>
+  body { margin: 0; background: #16202a; color: #e8eef4; font: 13px sans-serif; padding: 10px; }
+  table { border-collapse: collapse; } td, th { padding: 2px 4px; text-align: center; }
+  canvas { width: 150px; height: 177px; background: #24323f; border-radius: 6px; display: block; }
+  #bar { margin-bottom: 8px; }
+  body.one canvas { width: 140px; height: 165px; } body.one tr { display: flex; flex-wrap: wrap; }
+</style></head><body>
+<div id="bar">t <input id="t" type="range" min="0" max="1" step="0.01" value="0.45"> <span id="tv"></span>
+  <label><input id="loop" type="checkbox"> loop</label></div>
+<table id="grid"></table>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
+<script src="graphics.js"></script>
+<script>
+const CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+const ACTS = ['sword', 'skull', 'shield', 'heart', 'energy', 'ult'];
+const MON = Object.keys(CG_MONSTER_RIGS);
+const rows = CLASSES.map(c => ({ key: c, url: CHARACTER_SPRITES[c], rigs: ACTS.map(a => CG_CLASS_RIGS[c][a]) }))
+  .concat(MON.map(m => ({ key: m, url: 'assets/characters/' + m + '.svg', rigs: [CG_MONSTER_RIGS[m].attack, CG_MONSTER_RIGS[m].buff] })));
+const only = new URLSearchParams(location.search).get('row'); // ?row=N shows one character, larger
+if (only !== null) rows.forEach((r, i) => { if (i !== +only) r.rigs = []; });
+const grid = document.getElementById('grid');
+grid.innerHTML = '<tr><th></th>' + ACTS.map(a => '<th>' + a + '</th>').join('') + '</tr>' + rows.map((r, i) =>
+  '<tr><th>' + r.key + '</th>' + r.rigs.map((g, j) => '<td><canvas id="c' + i + '_' + j + '" width="220" height="260"></canvas>' + g + '</td>').join('') + '</tr>').join('');
+if (only !== null) document.body.className = 'one';
+const stages = [];
+rows.forEach((r, i) => r.rigs.forEach((g, j) => {
+  const st = cgGetStage('c' + i + '_' + j);
+  st.setPortrait(r.url).then(() => { st.activeTweens = 1; });
+  stages.push({ st, rig: CG_RIGS[g] });
+}));
+const tIn = document.getElementById('t'), loop = document.getElementById('loop');
+function apply(t) { document.getElementById('tv').textContent = t.toFixed(2); stages.forEach(s => { s.st._applyRig(s.rig, t); s.st.needsRender = true; }); }
+tIn.oninput = () => apply(+tIn.value);
+(function frame(now) { if (loop.checked) { const t = (now / 1400) % 1; tIn.value = t; apply(t); } requestAnimationFrame(frame); })(0);
+setTimeout(() => apply(+tIn.value), 1500);
+</script></body></html>

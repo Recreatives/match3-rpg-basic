@@ -87,6 +87,7 @@ function pvpUpdateSpeedBonusUI() {
     let el = document.getElementById('pvp-speed-bonus');
     if (!el) return;
     let mult = pvpGetTimeMultiplier();
+    if (pvpTurnStartTime && pvpMyTurn && !pvpProcessing && !pvpMatchOver) sbMaybeShowHint(pvpBoard, Date.now() - pvpTurnStartTime);
     if (!pvpTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
@@ -102,6 +103,7 @@ function pvpStartSpeedTimer() {
 }
 
 function pvpStopSpeedTimer() {
+    if (typeof sbClearHint === 'function') sbClearHint(pvpBoard);
     clearInterval(pvpSpeedBonusInterval);
     pvpSpeedBonusInterval = null;
     pvpTurnStartTime = null;
@@ -319,6 +321,7 @@ function pvpResetSessionState() {
     pvpMoveTimeMultiplier = 1;
     pvpUltCharge = 0;
     pvpExtraTurnTriggered = false;
+    pvpBoard.cascadeDepth = 0; // see startLevel's cascadeDepth reset (game.js)
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
     pvpIncomingStats = { damage: 0 };
     pvpOpponentId = null;
@@ -367,7 +370,7 @@ async function pvpConnectChannel(code) {
                 // presence already exists for, and it means pvpCheckPresence can
                 // read the opponent's class off the same state it already uses to
                 // find them, rather than adding a second handshake.
-                await pvpChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
+                await pvpChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null, avatar: typeof myAvatarPayload === 'function' ? myAvatarPayload() : null });
                 resolve();
             }
         });
@@ -392,7 +395,10 @@ function pvpCheckPresence() {
         // Falls back to a random class portrait if the opponent's client is
         // an older cached build that never tracked className - still shows
         // SOMETHING rather than an empty canvas for that mismatch window.
-        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+        // their painted hero, with their real gear (hero.js); an older client
+        // that sends no avatar gets a starter look for its class
+        if (stage && typeof heroRemoteSpec === 'function' && typeof avPaint === 'function') stage.setAvatar(heroRemoteSpec(state[opponent.key][0].avatar, pvpOpponentClassName));
+        else if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
     }
 
     pvpStarted = true;
@@ -433,10 +439,9 @@ function pvpStartMatch() {
     // the same empty grid and waits for that broadcast - see sharedboard.js.
     sbCreateBoardDOM('pvp-grid', 'pvp-tile-', pvpTiles, pvpHandleTap);
     pvpSelectedTile = null;
-    if (pvpMyTurn) {
-        sbRandomizeBoard(pvpTiles);
-        pvpResolveMatches(true);
-    }
+    pvpBoard.cascadeDepth = 0;
+    if (typeof cgStageDo === 'function') { cgStageDo('pvp-my-sprite', 'revive'); cgStageDo('pvp-opp-sprite', 'revive'); }
+    if (pvpMyTurn) sbDealBoard(pvpBoard);
     pvpUpdateUI();
     pvpLog(pvpBetrayalMode ? t('⚔️ İhanet düellosu başladı.') : t('🟢 Rakip bağlı - eşleşme başladı.'));
     if (pvpMyTurn) {
@@ -501,7 +506,7 @@ function pvpApplyIncomingDamage(amount, direct) {
         pvpMyHP -= remainder;
     }
     pvpIncomingStats.damage += amount;
-    showFloatingText(`-${amount}`, document.getElementById('pvp-my-hp-bar'), '#e74c3c');
+    pvpCombatText('me', '-' + amount, 'dmg', false);
     pvpUpdateUI();
 
     if (pvpMyHP <= 0 && before > 0) {
@@ -517,10 +522,24 @@ function pvpApplyIncomingDamage(amount, direct) {
 // Mirrors game.js's soloPlayHit for the two-canvas PvP layout - 'me' is
 // always pvp-my-sprite, 'opp' is always pvp-opp-sprite, regardless of who
 // actually dealt the hit (each client only ever renders its own two slots).
+// Combat number over a PvP portrait ('me' | 'opp'); `delay` false for
+// things that arrive over the network (no shot to wait for).
+function pvpCombatText(side, text, kind, delay) {
+    if (typeof cgCombatText !== 'function') return;
+    let d = delay === false ? 0 : CG_IMPACT_DELAY_MS;
+    let portrait = document.getElementById(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
+    cgCombatText(portrait, text, kind, d);
+    if (side === 'me') {
+        let bar = document.getElementById('pvp-my-hp-bar-container');
+        if (kind === 'heal') { cgBarPulse(bar, 'heal', d); cgHealSparkles(portrait, d); }
+        else if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', d);
+    }
+}
+
 function pvpPlayHit(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
-    if (stage) stage.playHit(tileType);
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 // Sword/skull actually damage the receiving side - see game.js's
@@ -529,21 +548,22 @@ function pvpPlayHit(side, tileType) {
 function pvpPlayHitReaction(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(side === 'me' ? 'pvp-my-sprite' : 'pvp-opp-sprite');
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 function pvpReceiveAttack(payload) {
     if (pvpMatchOver) return;
     if (payload.type === 'ult') {
-        let stage = typeof cgGetStage === 'function' ? cgGetStage('pvp-my-sprite') : null;
-        if (stage) stage.playUlt(pvpOpponentClassName || 'warrior');
+        // the opponent casts it (on their side of the arena); it lands on me
+        let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
+        if (oppStage) oppStage.playUlt(pvpOpponentClassName || 'warrior'); // its impact makes me react
     } else {
         pvpPlayHitReaction('me', payload.type || 'sword');
         // The opponent's own class motion, played on THEIR portrait (as I see
         // it) - the only signal I get of their own matches at all is this
         // attack broadcast, so this is the one place it can fire.
         let oppStage = typeof cgGetStage === 'function' ? cgGetStage('pvp-opp-sprite') : null;
-        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName, payload.type || 'sword');
+        if (oppStage && pvpOpponentClassName) oppStage.playClassMotion(pvpOpponentClassName, payload.type || 'sword', payload.power || 1);
     }
     pvpApplyIncomingDamage(payload.amount || 0, !!payload.direct);
     // Turn handoff does NOT happen here - see pvpReceiveTurnEnd. It used to
@@ -569,6 +589,7 @@ function pvpReceiveTurnEnd() {
 function pvpOnOpponentDefeated() {
     if (pvpMatchOver) return;
     pvpMatchOver = true;
+    if (typeof cgStageDo === 'function') cgStageDo('pvp-opp-sprite', 'playDeath');
     pvpStopThinkingAnimation();
     pvpSetStatus(t('KAZANDIN!'));
     pvpLog(t('Rakip yenildi - kazandın!'));
@@ -589,6 +610,8 @@ function pvpOnOpponentDefeated() {
     // message got reordered or dropped.
     pvpApplyOpponentStatus(sbHealthTier(0));
     pvpUpdateUI();
+    // a won duel is worth about a cleared dungeon level at your own level
+    if (typeof awardRunXp === 'function' && typeof activeCharacter !== 'undefined' && activeCharacter) awardRunXp(activeCharacter.level, 2);
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
     // Betrayal duels already have their own currency-stakes reward (steal %
     // or the small loyal-survivor bonus) - loot drops are only for a
@@ -648,6 +671,7 @@ function pvpResolveBetrayalPayoutIfNeeded() {
 // run's achievement buffs are gone (see achievements.js's "ACTIVE" vs
 // "lifetime" split).
 function pvpOnDefeat() {
+    if (typeof cgStageDo === 'function') cgStageDo('pvp-my-sprite', 'playDeath');
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof playSound === 'function') playSound('defeat');
     if (typeof cgCelebrate === 'function') cgCelebrate('defeat');
@@ -838,76 +862,48 @@ function pvpAttemptSwap(tile1, tile2) {
     // the countdown is about how fast the decision was made.
     pvpMoveTimeMultiplier = pvpGetTimeMultiplier();
     pvpStopSpeedTimer();
-
     pvpProcessing = true;
-    let t = tile1.dataset.type, h = tile1.innerHTML;
-    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-    tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // opponent sees the swap as it happens
-
-    let matched = pvpResolveMatches(false);
-    if (!matched) {
-        setTimeout(() => {
-            let t2 = tile1.dataset.type, h2 = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = t2; tile2.innerHTML = h2;
-            pvpProcessing = false;
-            sbBroadcastStep(pvpChannel, pvpTiles, 'swap'); // ...and the revert too, if it wasn't a match
-            // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
-            pvpStartSpeedTimer();
-        }, 150);
-    }
-}
-
-// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
-// rationale (same per-mode counter, mirrored here since this file
-// duplicates game.js's board logic rather than sharing it).
-let pvpCascadeDepth = 0;
-
-function pvpResolveMatches(isInitial) {
-    // Same match-detection (including L/T cross-shapes) single-player uses,
-    // just pointed at pvpTiles instead of the single-player `tiles` array.
-    let groups = findMatchGroups(pvpTiles, PVP_WIDTH);
-    if (groups.length === 0) {
-        if (!isInitial) { pvpProcessing = false; pvpCascadeDepth = 0; }
-        return false;
-    }
-
-    if (!isInitial) {
-        pvpCascadeDepth++;
-        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
-        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('pvp-grid'), maxMultiplier);
-        if (pvpCascadeDepth >= 2) showFloatingText(`KOMBO x${pvpCascadeDepth}`, document.getElementById('pvp-grid'), '#ff9f1c');
-    }
-
-    groups.forEach(g => pvpApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(pvpChannel, pvpTiles, 'clear'); // opponent sees the matched tiles clear
-    setTimeout(() => pvpDropAndRefill(isInitial), isInitial ? 0 : 350);
-    return true;
-}
-
-function pvpApplyGroupEffect(group, isInitial) {
-    let count = group.indices.length;
-    let isCross = (group.subShape === 'cross');
-    // Same size/shape -> multiplier/extra-turn/ult-charge priority rules as
-    // single-player (getMatchShapeInfo lives in game.js). The speed bonus
-    // scales the tile EFFECT the same way single-player does - ultBonus
-    // stays a flat add, not scaled by it (matching game.js's processMatch).
-    let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
-    let multiplier = shapeMultiplier * pvpMoveTimeMultiplier;
-    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
-
-    group.indices.forEach(i => {
-        if (!isInitial) {
-            pvpTiles[i].classList.add('matched');
-            if (shapeMultiplier >= 2) pvpTiles[i].classList.add('matched-big');
-            if (typeof cgTileBurst === 'function') cgTileBurst(pvpTiles[i], group.type);
-        }
-        else pvpTiles[i].innerHTML = '';
-        pvpTiles[i].dataset.type = '';
+    // Slide, commit, broadcast, resolve (sharedboard.js). An invalid swap
+    // slides back and doesn't cost the turn - fresh speed-bonus window.
+    sbTrySwap(pvpBoard, tile1, tile2, () => {
+        pvpProcessing = false;
+        pvpStartSpeedTimer();
     });
+}
 
+// --- PVP BOARD (sharedboard.js's engine) ---
+// Only the active mover's client ever runs this; every step is broadcast
+// (channel) so the other client paints the same board.
+const pvpBoard = {
+    tiles: pvpTiles, width: PVP_WIDTH, pool: tileTypes,
+    gridEl: () => document.getElementById('pvp-grid'),
+    clearDelayMs: 520,
+    initialDelayMs: 0,
+    channel: () => pvpChannel,
+    cascadeDepth: 0,
+    isLive: () => !pvpMatchOver,
+    applyGroup: (group, shape, isInitial) => pvpApplyGroupEffect(group, shape, isInitial),
+    onChainEnd: () => pvpOnChainEnd(),
+    onNoMatch: () => { pvpProcessing = false; },
+    onReshuffle: () => pvpLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!')),
+    setBusy: (busy) => { pvpProcessing = busy; }
+};
+
+// PvP's game effects for one matched group (the engine has already popped
+// the tiles). Same size/shape -> multiplier/extra-turn/ult-charge rules as
+// single-player (getMatchShapeInfo); the speed bonus scales the tile EFFECT,
+// ultBonus stays a flat add (matching game.js's soloApplyGroup).
+function pvpApplyGroupEffect(group, shape, isInitial) {
     if (isInitial) return;
+    let count = group.indices.length;
+    let { extraTurn, ultBonus } = shape;
+    let multiplier = shape.multiplier * pvpMoveTimeMultiplier;
+    if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+    // G3 - shot from the matched tiles to the opponent (attack) or to me.
+    if (typeof cgProjectile === 'function') {
+        let targetId = 'pvp-my-sprite'; // charges me; my attack then crosses the arena
+        cgProjectile(pvpTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
+    }
 
     if (extraTurn) pvpExtraTurnTriggered = true;
     if (ultBonus > 0) {
@@ -923,7 +919,7 @@ function pvpApplyGroupEffect(group, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('pvp-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type, shape.multiplier, pvpBoard.cascadeDepth);
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -942,14 +938,17 @@ function pvpApplyGroupEffect(group, isInitial) {
                 recoil = payload.recoil;
             }
             pvpMyTurnStats.damage += amount;
-            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'skull');
+            pvpCombatText('opp', '-' + amount, 'crit');
+            if (recoil > 0) pvpCombatText('me', '-' + recoil, 'self');
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
         } else {
             pvpMyTurnStats.damage += amount;
-            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type } });
+            pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'sword');
+            pvpCombatText('opp', '-' + amount, 'dmg');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
@@ -957,18 +956,21 @@ function pvpApplyGroupEffect(group, isInitial) {
         pvpMyHP = Math.min(pvpMyHP + heal, PVP_MAX_HP);
         pvpMyTurnStats.heal += heal;
         pvpPlayHit('me', 'heart');
+        pvpCombatText('me', '+' + heal, 'heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
     } else if (group.type === 'shield') {
         let gain = Math.floor(TILE_STATS.shield * multiplier);
         pvpMyArmor += gain;
         pvpMyTurnStats.armor += gain;
         pvpPlayHit('me', 'shield');
+        pvpCombatText('me', '+' + gain, 'armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
     } else if (group.type === 'energy') {
         let gain = Math.floor(TILE_STATS.energy * multiplier);
         pvpUltCharge = Math.min(pvpUltCharge + gain, 100);
         pvpMyTurnStats.ultGain += gain;
         pvpPlayHit('me', 'energy');
+        pvpCombatText('me', '+' + gain + '%', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     }
 
@@ -996,39 +998,9 @@ function pvpLogTurnSummary() {
     pvpMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0 };
 }
 
-function pvpDropAndRefill(isInitial) {
-    for (let col = 0; col < PVP_WIDTH; col++) {
-        let colTiles = [];
-        for (let row = 0; row < PVP_WIDTH; row++) {
-            let i = col + row * PVP_WIDTH;
-            if (pvpTiles[i].dataset.type !== '') colTiles.push({ type: pvpTiles[i].dataset.type, html: pvpTiles[i].innerHTML });
-        }
-        let missing = PVP_WIDTH - colTiles.length;
-        for (let i = 0; i < missing; i++) {
-            let rt = tileTypes[Math.floor(Math.random() * tileTypes.length)];
-            colTiles.unshift({ type: rt.type, html: rt.symbol });
-        }
-        for (let row = 0; row < PVP_WIDTH; row++) {
-            let i = col + row * PVP_WIDTH;
-            pvpTiles[i].dataset.type = colTiles[row].type;
-            pvpTiles[i].innerHTML = colTiles[row].html;
-            // See game.js's fillBoard for why matched-big must be cleared
-            // here too, not just 'matched' - its forwards-filled end state
-            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
-            // and hides whatever new tile gravity just assigned it.
-            pvpTiles[i].classList.remove('matched', 'matched-big');
-        }
-    }
-    sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the refilled board settle
-    let chained = pvpResolveMatches(isInitial);
-    if (!chained && !pvpMatchOver && !boardHasValidMove(pvpTiles, PVP_WIDTH)) {
-        reshuffleBoard(pvpTiles, PVP_WIDTH, tileTypes);
-        sbBroadcastStep(pvpChannel, pvpTiles, 'refill'); // opponent sees the reshuffled board too
-        pvpLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
-        chained = pvpResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
-    }
-    if (chained || isInitial || pvpMatchOver) return;
-
+// The whole move (including cascades) has resolved and the fight is still
+// on: extra turn, or hand the turn over.
+function pvpOnChainEnd() {
     pvpLogTurnSummary();
     pvpProcessing = false;
 
@@ -1094,7 +1066,8 @@ function pvpUpdateUI() {
     let ultBtn = document.getElementById('pvp-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = pvpUltCharge < 100 || !pvpMyTurn || pvpMatchOver || pvpProcessing || !selectedClass;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(pvpUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
+        document.getElementById('pvp-ult-btn-label').innerText = selectedClass ? selectedClass.ultName : t('ULT (sınıf seçilmedi)');
+        if (typeof cgStageDo === 'function') cgStageDo('pvp-my-sprite', 'setUltReady', pvpUltCharge >= 100);
     }
 
     let grid = document.getElementById('pvp-grid');

@@ -450,7 +450,15 @@ async function fetchWallet() {
         .from('wallets')
         .select('gold, materials')
         .eq('player_id', user.id)
-        .single();
+        .maybeSingle();
+    // the wallet is the active character's purse (schema.sql section 30) -
+    // no character yet means no purse yet, not an error
+    if (!error && !data) {
+        currentWallet = { gold: 0, materials: 0 };
+        updateWalletUI();
+        setWalletStatus('');
+        return currentWallet;
+    }
 
     if (error) {
         console.error('Wallet fetch failed:', error.message);
@@ -520,6 +528,7 @@ async function fetchOwnedItems() {
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
     return currentOwnedItems;
 }
 
@@ -571,17 +580,42 @@ async function equipItem(itemRowId) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return false;
 
-    let previouslyEquipped = currentOwnedItems.find(it => it.slot === item.slot && it.equipped_slot === item.slot);
-    if (previouslyEquipped) {
-        await sb.from('player_items').update({ equipped_slot: null }).eq('id', previouslyEquipped.id).eq('player_id', user.id);
-        previouslyEquipped.equipped_slot = null;
+    // class and level gate (the server checks the same - see equip_item)
+    const cls = selectedClass ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : null);
+    const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : undefined;
+    if (typeof itemUsableBy === 'function' && !itemUsableBy(item, cls, lvl)) {
+        setShopStatus(itemReqLevel(item) > (lvl || 99) ? tf('Bunun için seviye {n} gerekiyor.', { n: itemReqLevel(item) }) : t('Sınıfın bunu kullanamaz.'));
+        return false;
     }
+    // which slot: its own, or a free ring slot (else the first one)
+    const itemSlot = typeof itemSlotOf === 'function' ? itemSlotOf(item) : item.slot;
+    const targets = typeof equipSlotsFor === 'function' ? equipSlotsFor(itemSlot) : [itemSlot];
+    const worn = typeof activeEquippedItems === 'function' ? activeEquippedItems() : currentOwnedItems.filter(it => it.equipped_slot);
+    let target = targets.find(sl => !worn.some(it => it.equipped_slot === sl)) || targets[0];
 
-    const { error } = await sb.from('player_items').update({ equipped_slot: item.slot }).eq('id', itemRowId).eq('player_id', user.id);
-    if (error) { console.error('Equip failed:', error.message); return false; }
-    item.equipped_slot = item.slot;
+    // equip_item (security definer) checks class, level and slot again,
+    // takes the item out of the stash if it was there, and puts whatever
+    // was in that slot back in the bag
+    const { data, error } = await sb.rpc('equip_item', { p_item_id: itemRowId, p_slot: target });
+    if (error) {
+        console.error('Equip failed:', error.message);
+        setShopStatus(/requires level/.test(error.message) ? tf('Bunun için seviye {n} gerekiyor.', { n: itemReqLevel(item) }) : /class cannot/.test(error.message) ? t('Sınıfın bunu kullanamaz.') : t('Kuşanılamadı.'));
+        return false;
+    }
+    const placed = (data && data.equipped_slot) || target;
+    worn.forEach(it => { if (it.equipped_slot === placed && it.id !== itemRowId) it.equipped_slot = null; });
+    if (data && data.character_id) item.character_id = data.character_id;
+    target = placed;
+    item.equipped_slot = target;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+    // the equip flourish: on the inventory figure and on my fighter
+    const rc = RARITY_DEFS[item.rarity] ? RARITY_DEFS[item.rarity].color : '#ffffff';
+    const fig = document.getElementById('inv-figure');
+    if (fig) { fig.classList.remove('flourish'); void fig.offsetWidth; fig.style.setProperty('--fc', rc); fig.classList.add('flourish'); }
+    if (typeof cgStageDo === 'function') ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => cgStageDo(id, 'playFlourish', parseInt(rc.replace('#', ''), 16)));
+    if (typeof playSound === 'function') playSound('gold');
     return true;
 }
 
@@ -591,11 +625,35 @@ async function unequipItem(itemRowId) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return false;
 
-    const { error } = await sb.from('player_items').update({ equipped_slot: null }).eq('id', itemRowId).eq('player_id', user.id);
+    const { error } = await sb.rpc('unequip_item', { p_item_id: itemRowId });
     if (error) { console.error('Unequip failed:', error.message); return false; }
     item.equipped_slot = null;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+    return true;
+}
+
+// Bag <-> shared stash (move_item) and lock / unlock (lock_item) - both
+// security definer, supabase/schema.sql section 30.
+async function moveItem(itemId, to) {
+    const { data, error } = await sb.rpc('move_item', { p_item_id: itemId, p_to: to });
+    if (error) {
+        console.error('move_item failed:', error.message);
+        setShopStatus(/full/.test(error.message) ? (to === 'stash' ? t('Ortak depo dolu.') : t('Çantan dolu.')) : t('Taşınamadı.'));
+        return false;
+    }
+    const item = currentOwnedItems.find(it => it.id === itemId);
+    if (item && data) item.character_id = data.character_id;
+    setShopStatus(to === 'stash' ? t('🏛️ Ortak depoya kondu.') : t('🎒 Çantaya alındı.'));
+    return true;
+}
+
+async function lockItem(itemId, locked) {
+    const { data, error } = await sb.rpc('lock_item', { p_item_id: itemId, p_locked: !!locked });
+    if (error) { console.error('lock_item failed:', error.message); return false; }
+    const item = currentOwnedItems.find(it => it.id === itemId);
+    if (item) item.locked = data ? !!data.locked : !!locked;
     return true;
 }
 
@@ -608,7 +666,7 @@ async function scrapItem(itemId) {
     const { data, error } = await sb.rpc('scrap_item', { p_item_id: itemId });
     if (error) {
         console.error('scrap_item failed:', error.message);
-        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Hurdaya çevrilemedi.'));
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : error.message.includes('locked') ? t('Kilitli eşya.') : t('Hurdaya çevrilemedi.'));
         return false;
     }
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
@@ -624,7 +682,7 @@ async function sellItem(itemId) {
     const { data, error } = await sb.rpc('sell_item', { p_item_id: itemId });
     if (error) {
         console.error('sell_item failed:', error.message);
-        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Satılamadı.'));
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : error.message.includes('locked') ? t('Kilitli eşya.') : t('Satılamadı.'));
         return false;
     }
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
@@ -657,20 +715,28 @@ async function upgradeItem(itemId) {
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.
-async function awardLootDrop() {
-    let item = rollLootDrop(currentOwnedItems);
+// dropLevel: the item level to roll at (default: the character's level).
+// Deeper floors roll up to 5 levels above the character (the server's
+// insert guard allows exactly that much).
+async function awardLootDrop(dropLevel) {
+    const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
+    if (dropLevel) dropLevel = Math.min(lvl + 5, dropLevel);
+    let item = rollLootDrop(currentOwnedItems, { level: Math.max(1, Math.min(50, dropLevel || lvl)), cls: selectedClass ? selectedClass.name.toLowerCase() : null });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
     const { data, error } = await sb.from('player_items').insert({
-        player_id: user.id, base_id: item.base_id, slot: item.slot,
-        rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key
+        player_id: user.id, character_id: (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.id : null,
+        base_id: item.base_id, slot: item.slot,
+        rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key,
+        item_level: item.item_level || 1, req_level: item.req_level || 1
     }).select().single();
 
     if (error) { console.error('Loot drop insert failed:', error.message); return null; }
     currentOwnedItems.push(data);
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof showLootToast === 'function') showLootToast(item);
+    if (typeof cgLootBeam === 'function') cgLootBeam(item.rarity);
     return data;
 }
 
@@ -1383,6 +1449,8 @@ async function initEconomy() {
         pending.forEach(entry => sb.from('client_errors').insert(entry).then(() => {}, () => {}));
     }
     if (!session) return;
+    // characters first: the wallet, items and talents are the active one's
+    if (typeof initCharacters === 'function') await initCharacters();
     await fetchWallet();
     await fetchOwnedItems();
     await fetchDailyLoginStatus();
@@ -1631,7 +1699,7 @@ async function renderTalentsPanel() {
     container.innerHTML = '';
     let header = document.createElement('p');
     header.style.cssText = 'font-size:0.85rem; color:#f1c40f; margin-bottom:8px;';
-    header.innerText = tf('Kullanılabilir Puan: {n} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)', { n: available });
+    header.innerText = tf('Kullanılabilir Puan: {n} (bu karakterin her 5 seviyesinde 1 puan, 50. seviyeden sonra her ustalık puanında 1 puan)', { n: available });
     container.appendChild(header);
 
     Object.entries(TALENT_CATALOG).forEach(([id, def]) => {

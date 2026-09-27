@@ -14,6 +14,26 @@
     --epic: #9b59b6;      /* Purple */
     --legendary: #e67e22; /* Orange */
 
+    /* Tile-type palette - the same colors the rune tiles
+       (assets/tiles/, tools/make_tiles.py) and graphics.js's
+       TILE_BURST_COLORS / HIT_EFFECT_SPRITES tints use, in one place. */
+    --c-sword: #e6edf5;
+    --c-heart: #ff5c8a;
+    --c-shield: #4f9dff;
+    --c-energy: #ffe24a;
+    --c-skull: #ff4a3a;
+    --c-teamheal: #4fe88a;
+    --c-hp: #2ecc71;
+    /* G3 - combat backdrop default (crypt); [data-floor] overrides these on
+       the HUD / co-op battle view (cgSetSceneTier). */
+    --scene-a: #2e3d4d; --scene-b: #1f2a36; --scene-glow: rgba(52, 152, 219, 0.22);
+    --c-enemy-hp: #e74c3c;
+
+    /* Display font for titles/banners (Cinzel - carved-stone fantasy caps,
+       Google Fonts latin-ext covers ğüşıöçİ). Body text and numbers stay a
+       system font for readability. */
+    --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+
     /* --- RESPONSIVE SIZING ---
        Everything below scales off --board-size, which grows with the
        viewport (via vmin, so it works in both portrait and landscape)
@@ -26,7 +46,17 @@
        than the "full" one with no address bar, which is what 100vh/vmin
        assume and why layouts can overflow a real phone screen. */
     --board-size: clamp(270px, 80vmin, 560px);
-    --board-size: clamp(270px, 80dvmin, 560px);
+    /* T5 (roadmap v2) - the board also has to leave room for everything
+       stacked above/below it (top bar, header, HUD, log, ULT button =
+       --chrome-h), otherwise a 360x640 phone had the ULT button and a
+       1280x800 laptop had the board's bottom row pushed off-screen.
+       tests/specs/layout.spec.js checks this at 7 viewport sizes. */
+    --chrome-h: 395px;
+    --board-size: clamp(220px, min(94vw, 100dvh - var(--chrome-h)), 560px);
+    /* UI rows (top bar, HUD, log, ULT) no longer shrink with the board -
+       a narrower top bar just wraps into MORE rows and steals even more
+       height from the board. */
+    --ui-width: max(var(--panel-width), min(100%, 400px));
     --tile-size: calc(var(--board-size) / 8);
     --panel-width: calc(var(--board-size) + 8px); /* board content + its 2x4px border */
 
@@ -87,6 +117,7 @@ body {
 
 @media (min-width: 700px) {
     #app { font-size: 16px; }
+    :root { --chrome-h: 405px; }
 }
 
 /* --- ANIMATIONS & TRANSITIONS --- */
@@ -162,7 +193,7 @@ body {
    width line to itself, the button row gets its own full width to wrap
    and center within, so however many fit per row are evenly spread out. */
 .top-bar {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     display: flex;
     flex-direction: column;
@@ -196,7 +227,7 @@ body {
    (3-4 rows total before you even reached the HUD). Collapsed into one
    compact row so the board gets pushed into view sooner on short screens. */
 .battle-header {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     box-sizing: border-box;
     display: flex;
@@ -224,6 +255,7 @@ body {
 }
 
 .turn-indicator {
+    font-family: var(--font-display);
     font-size: 0.85rem; font-weight: bold; padding: 4px 12px;
     border-radius: 16px; background: #222; color: #777;
     transition: all 0.3s;
@@ -264,7 +296,7 @@ body {
 }
 
 .hud {
-    width: var(--panel-width);
+    width: var(--ui-width);
     max-width: 100%;
     display: flex; justify-content: space-between;
     margin-bottom: 5px; background: rgba(0,0,0,0.2);
@@ -290,7 +322,6 @@ body {
 .bar { height: 100%; transition: width 0.2s ease; position: relative; z-index: 1; }
 #player-hp-bar { background-color: #2ecc71; width: 100%; }
 #enemy-hp-bar { background-color: #e74c3c; width: 100%; }
-#ult-bar { background-color: #f1c40f; width: 0%; }
 #player-armor-bar { background-color: var(--armor-color); width: 0%; }
 #enemy-armor-bar { background-color: var(--armor-color); width: 0%; }
 .hp-text { font-size: 0.8rem; display: block; margin-top: 2px; font-weight: bold; }
@@ -332,6 +363,55 @@ body {
     0%, 100% { box-shadow: 0 0 0 rgba(241, 196, 15, 0); }
     50% { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.85); }
 }
+
+/* --- COMBAT ARENA (arena.js) ---
+   One canvas both fighters share, with each fighter's name/HP bars
+   floating over their side. Sized off --portrait-h so the arena takes
+   the same height budget (--chrome-h) the old portrait row did: the
+   board never loses room on a small phone. */
+:root {
+    --arena-hud-h: 42px;
+    --arena-h: calc(var(--portrait-h) * 1.3 + var(--arena-hud-h));
+}
+.hud.arena {
+    position: relative; display: block;
+    height: var(--arena-h); padding: 0; overflow: hidden;
+}
+.arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.fighter-hud {
+    position: absolute; top: 4px; width: 42%; z-index: 1;
+    text-align: center; font-size: 0.8rem; line-height: 1.1;
+    text-shadow: 0 1px 2px #000;
+}
+.fighter-hud .bar-container { margin-top: 2px; height: 8px; }
+.fighter-hud .armor-container { height: 4px; margin-top: 1px; }
+.fighter-hud .hp-text { margin-top: 1px; font-size: 0.72rem; }
+.fighter-name { font-weight: bold; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fighter-left { left: 3%; }
+.fighter-right { right: 3%; }
+/* where each fighter stands - empty, the canvas draws them */
+.arena-slot { position: absolute; top: var(--arena-hud-h); bottom: 0; width: 40%; pointer-events: none; }
+.slot-left { left: 5%; }
+.slot-right { right: 5%; }
+/* co-op: teammate, you, enemy from left to right */
+.coop-arena .fighter-hud { width: 31%; }
+.coop-arena .fighter-ally { left: 1.5%; }
+.coop-arena .fighter-left { left: 34.5%; }
+.coop-arena .fighter-right { right: 1.5%; }
+.coop-arena .slot-ally { left: 1%; width: 30%; }
+.coop-arena .slot-left { left: 24%; width: 32%; }
+.coop-arena .slot-right { right: 2%; width: 38%; }
+.mp-arena { width: 100%; margin-bottom: 4px; }
+
+/* ULT button = its own charge meter (no separate ULT box any more) */
+.ult-meter-btn { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ult-meter { position: absolute; inset: 0; pointer-events: none; }
+.ult-fill { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, rgba(241, 196, 15, 0.25), rgba(241, 196, 15, 0.55)); transition: width 0.3s ease; }
+.ult-label, .ult-pct { position: relative; z-index: 1; }
+.ult-pct { font-size: 0.8em; opacity: 0.85; }
+.ult-meter-btn:disabled .ult-fill { background: linear-gradient(90deg, rgba(241, 196, 15, 0.12), rgba(241, 196, 15, 0.35)); }
+.ult-meter.ult-ready .ult-fill { background: linear-gradient(90deg, #f39c12, #f1c40f); }
+.ult-meter-btn:has(.ult-ready):not(:disabled) { animation: barUltReadyPulse 1.2s ease-in-out infinite; }
 
 /* --- STATS BAR (GRID) --- */
 /* Used inside the Stats/Loot modal (#history-modal) rather than the main
@@ -428,13 +508,43 @@ body {
     border: 2px solid var(--accent); border-radius: 4px; transform: scale(1.12);
     box-shadow: 0 0 12px rgba(241, 196, 15, 0.65);
 }
-.falling { animation: dropIn 0.4s cubic-bezier(0.34, 1.2, 0.64, 1); will-change: transform, opacity; }
+/* G1 (graphics roadmap v2) - real gravity. The board engine
+   (sharedboard.js's sbDropAndRefill) sets --fall-rows (how many rows this
+   tile actually fell) and --fall-col (its column) on every falling tile:
+   the start offset and duration grow with the distance, each column starts
+   a few ms after the one to its left, and the tile lands with a small
+   squash. transform/opacity only - same mobile-GPU budget as before. */
+.falling {
+    animation-name: dropIn;
+    animation-duration: calc(220ms + var(--fall-rows, 1) * 45ms);
+    animation-delay: calc(var(--fall-col, 0) * 15ms);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
+    animation-fill-mode: backwards;
+    will-change: transform, opacity;
+}
 @keyframes dropIn {
-    0% { transform: translateY(calc(var(--tile-size) * -1)); opacity: 0; }
-    100% { transform: translateY(0px); opacity: 1; }
+    0% { transform: translateY(calc(var(--tile-size) * -1 * var(--fall-rows, 1))); opacity: 0; }
+    15% { opacity: 1; }
+    80% { transform: translateY(0) scale(1.06, 0.9); animation-timing-function: ease-out; }
+    100% { transform: translateY(0) scale(1, 1); opacity: 1; }
+}
+/* G1 - idle hint (sbMaybeShowHint): a gentle pulse on the two tiles of a
+   valid move. Brightness+scale on just two tiles, never a layout change. */
+.tile.hint { animation: tileHint 1.1s ease-in-out infinite; border-radius: 6px; }
+@keyframes tileHint {
+    0%, 100% { transform: scale(1); filter: brightness(1); background-color: transparent; }
+    50% { transform: scale(1.14); filter: brightness(1.45); background-color: rgba(241, 196, 15, 0.35); }
+}
+/* G1 - a swap that makes no match bounces back with a short shake
+   (sbTrySwap adds this for the return slide). */
+.tile.invalid-swap { animation: tileInvalid 0.28s ease-in-out; }
+@keyframes tileInvalid {
+    0%, 100% { translate: 0 0; }
+    25% { translate: -3px 0; }
+    75% { translate: 3px 0; }
 }
 .matched {
-    animation: matchPop 0.4s forwards ease-in-out; z-index: 10;
+    animation: matchPop 0.55s forwards ease-in-out; z-index: 10;
     will-change: transform, filter;
 }
 @keyframes matchPop {
@@ -445,6 +555,109 @@ body {
     40% { transform: scale(1.3); opacity: 1; }
     100% { transform: scale(0); opacity: 0; }
 }
+/* Board tiles are rune medallions (vector SVG, tools/make_tiles.py) drawn
+   as the tile's background by data-type. Game logic is untouched:
+   dataset.type still drives everything and the emoji stays in the DOM
+   (logs, board-sync broadcasts, screen readers) - it's just rendered at
+   font-size 0. Inlined as data: URIs so a new board never paints blank. */
+.tile[data-type] {
+    font-size: 0 !important;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 96%;
+}
+.tile[data-type="sword"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffffff%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%23c9d2dc%22/%3E%3Cstop offset=%221%22 stop-color=%22%236b7784%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffffff%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ffffff%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3ClinearGradient id=%22bladeL%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220%22 stop-color=%22%23e8eef5%22/%3E%3Cstop offset=%221%22 stop-color=%22%2398a8ba%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22bladeR%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220%22 stop-color=%22%235f6f82%22/%3E%3Cstop offset=%221%22 stop-color=%22%232e3a48%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22gold%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23fff3b8%22/%3E%3Cstop offset=%22.45%22 stop-color=%22%23e8b43a%22/%3E%3Cstop offset=%221%22 stop-color=%22%238a5208%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22grip%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220%22 stop-color=%22%239a5a2e%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2410%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22gem%22 cx=%2235%25%22 cy=%2230%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23bfe3ff%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%231f7ae0%22/%3E%3Cstop offset=%221%22 stop-color=%22%23062a5a%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg transform=%22translate%2850 50%29 scale%28.92%29 translate%28-50 -50%29%22%3E%3Cg transform=%22rotate%28-38 50 50%29%22%3E%3Cpath d=%22M50 0 L60 13 L60 60 L40 60 L40 13 Z%22 fill=%22%230d1016%22/%3E%3Cpath d=%22M50 3 L50 58 L42.5 58 L42.5 14 Z%22 fill=%22url%28%23bladeL%29%22/%3E%3Cpath d=%22M50 3 L57.5 14 L57.5 58 L50 58 Z%22 fill=%22url%28%23bladeR%29%22/%3E%3Cpath d=%22M50 12 L50 55%22 stroke=%22%232f3944%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M50 12 L50 55%22 stroke=%22%23aebbc8%22 stroke-width=%22.9%22/%3E%3Cpath d=%22M45 15 L45 54%22 stroke=%22%23ffffff%22 stroke-opacity=%22.95%22 stroke-width=%221.4%22/%3E%3Cpath d=%22M21 60 Q24 52 32 55 L44 57 Q50 53 56 57 L68 55 Q76 52 79 60 Q76 68 68 65 L56 63 Q50 67 44 63 L32 65 Q24 68 21 60 Z%22 fill=%22url%28%23gold%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22 stroke-linejoin=%22round%22/%3E%3Ccircle cx=%2222.5%22 cy=%2260%22 r=%223%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.2%22/%3E%3Ccircle cx=%2277.5%22 cy=%2260%22 r=%223%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.2%22/%3E%3Cpath d=%22M44 55 L50 49 L56 55 L50 61 Z%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.6%22/%3E%3Crect x=%2245%22 y=%2265%22 width=%2210%22 height=%2219%22 rx=%222.5%22 fill=%22url%28%23grip%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M45 69 L55 72 M45 74 L55 77 M45 79 L55 82%22 stroke=%22%232a1206%22 stroke-width=%221.5%22/%3E%3Cpath d=%22M43 86 Q50 82 57 86 L55 94 Q50 97 45 94 Z%22 fill=%22url%28%23gold%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22 stroke-linejoin=%22round%22/%3E%3C/g%3E%3Cg transform=%22rotate%2838 50 50%29%22%3E%3Cpath d=%22M50 0 L60 13 L60 60 L40 60 L40 13 Z%22 fill=%22%230d1016%22/%3E%3Cpath d=%22M50 3 L50 58 L42.5 58 L42.5 14 Z%22 fill=%22url%28%23bladeL%29%22/%3E%3Cpath d=%22M50 3 L57.5 14 L57.5 58 L50 58 Z%22 fill=%22url%28%23bladeR%29%22/%3E%3Cpath d=%22M50 12 L50 55%22 stroke=%22%232f3944%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M50 12 L50 55%22 stroke=%22%23aebbc8%22 stroke-width=%22.9%22/%3E%3Cpath d=%22M45 15 L45 54%22 stroke=%22%23ffffff%22 stroke-opacity=%22.95%22 stroke-width=%221.4%22/%3E%3Cpath d=%22M21 60 Q24 52 32 55 L44 57 Q50 53 56 57 L68 55 Q76 52 79 60 Q76 68 68 65 L56 63 Q50 67 44 63 L32 65 Q24 68 21 60 Z%22 fill=%22url%28%23gold%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22 stroke-linejoin=%22round%22/%3E%3Ccircle cx=%2222.5%22 cy=%2260%22 r=%223%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.2%22/%3E%3Ccircle cx=%2277.5%22 cy=%2260%22 r=%223%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.2%22/%3E%3Cpath d=%22M44 55 L50 49 L56 55 L50 61 Z%22 fill=%22url%28%23gem%29%22 stroke=%22%230d1016%22 stroke-width=%221.6%22/%3E%3Crect x=%2245%22 y=%2265%22 width=%2210%22 height=%2219%22 rx=%222.5%22 fill=%22url%28%23grip%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M45 69 L55 72 M45 74 L55 77 M45 79 L55 82%22 stroke=%22%232a1206%22 stroke-width=%221.5%22/%3E%3Cpath d=%22M43 86 Q50 82 57 86 L55 94 Q50 97 45 94 Z%22 fill=%22url%28%23gold%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22 stroke-linejoin=%22round%22/%3E%3C/g%3E%3C/g%3E%3Cpath d=%22M50 20 l2.6 7 7 2.6 -7 2.6 -2.6 7 -2.6 -7 -7 -2.6 7 -2.6Z%22 fill=%22%23ffffff%22/%3E%3C/g%3E%3C/svg%3E"); }
+.tile[data-type="heart"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ff5c8a%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%23c4144a%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a0418%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffb3c8%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ffb3c8%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3CradialGradient id=%22ruby%22 cx=%2235%25%22 cy=%2230%25%22 r=%2280%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ff8aa6%22/%3E%3Cstop offset=%22.45%22 stop-color=%22%23e3143f%22/%3E%3Cstop offset=%221%22 stop-color=%22%236a0016%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d=%22M50 90 C16 68 5 48 11 30 C17 12 40 10 50 25 C60 10 83 12 89 30 C95 48 84 68 50 90Z%22 fill=%22url%28%23ruby%29%22 stroke=%22%230d1016%22 stroke-width=%223.5%22 stroke-linejoin=%22round%22/%3E%3Cg stroke=%22%235a0012%22 stroke-opacity=%22.55%22 stroke-width=%221.2%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M50 25 L36 40 L50 55 L64 40 Z%22 fill=%22%23ff5c7c%22 fill-opacity=%22.55%22/%3E%3Cpath d=%22M36 40 L19 34 L22 52 Z%22 fill=%22%23ff9fb3%22 fill-opacity=%22.5%22/%3E%3Cpath d=%22M64 40 L81 34 L78 52 Z%22 fill=%22%23b8002a%22 fill-opacity=%22.45%22/%3E%3Cpath d=%22M36 40 L22 52 L50 55 Z%22 fill=%22%23f02a56%22 fill-opacity=%22.4%22/%3E%3Cpath d=%22M64 40 L78 52 L50 55 Z%22 fill=%22%239a0022%22 fill-opacity=%22.45%22/%3E%3Cpath d=%22M22 52 L50 86 L50 55 Z%22 fill=%22%23c8002e%22 fill-opacity=%22.35%22/%3E%3Cpath d=%22M78 52 L50 86 L50 55 Z%22 fill=%22%237a0018%22 fill-opacity=%22.45%22/%3E%3C/g%3E%3Cpath d=%22M20 30 Q24 19 35 18%22 stroke=%22%23fff%22 stroke-opacity=%22.9%22 stroke-width=%223.2%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M66 20 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2Z%22 fill=%22%23fff%22 fill-opacity=%22.95%22/%3E%3C/g%3E%3C/svg%3E"); }
+.tile[data-type="shield"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%234f9dff%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%231653c4%22/%3E%3Cstop offset=%221%22 stop-color=%22%23051c4a%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23b8dcff%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23b8dcff%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3ClinearGradient id=%22rim%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23f2f5f8%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%239aa6b3%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a5460%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22field%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%234f9bff%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%231a4fb8%22/%3E%3Cstop offset=%221%22 stop-color=%22%230a2466%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22gold%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23fff0a8%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23e2b23e%22/%3E%3Cstop offset=%221%22 stop-color=%22%238a5a0e%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=%22M50 6 L86 18 L86 46 C86 70 70 84 50 94 C30 84 14 70 14 46 L14 18 Z%22 fill=%22url%28%23rim%29%22 stroke=%22%230d1016%22 stroke-width=%223.5%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M50 14 L78 24 L78 46 C78 65 65 77 50 85 C35 77 22 65 22 46 L22 24 Z%22 fill=%22url%28%23field%29%22 stroke=%22%230d1016%22 stroke-width=%222%22/%3E%3Cpath d=%22M50 14 L78 24 L78 46 C78 65 65 77 50 85 Z%22 fill=%22%23000%22 fill-opacity=%22.18%22/%3E%3Cpath d=%22M44 24 H56 V40 H70 V52 H56 V76 H44 V52 H30 V40 H44 Z%22 fill=%22url%28%23gold%29%22 stroke=%22%230d1016%22 stroke-width=%222.2%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M46 26 V40 M32 42 H44%22 stroke=%22%23fff%22 stroke-opacity=%22.75%22 stroke-width=%221.6%22/%3E%3Ccircle cx=%2222%22 cy=%2222%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Ccircle cx=%2278%22 cy=%2222%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Ccircle cx=%2220%22 cy=%2246%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Ccircle cx=%2280%22 cy=%2246%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Ccircle cx=%2234%22 cy=%2274%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Ccircle cx=%2266%22 cy=%2274%22 r=%222.1%22 fill=%22%23f4f6f8%22 stroke=%22%230d1016%22 stroke-width=%221.1%22/%3E%3Cpath d=%22M26 26 Q34 20 46 18%22 stroke=%22%23fff%22 stroke-opacity=%22.7%22 stroke-width=%222.4%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/g%3E%3C/svg%3E"); }
+.tile[data-type="energy"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffe24a%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%23c79a00%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a3500%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23fff3a8%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23fff3a8%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3ClinearGradient id=%22bolt%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffffff%22/%3E%3Cstop offset=%22.35%22 stop-color=%22%23fff27a%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ff9a00%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22aura%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffe45a%22 stop-opacity=%22.75%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ffb000%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2242%22 fill=%22url%28%23aura%29%22/%3E%3Cpath d=%22M20 30 L28 36 L24 40 M78 62 L86 66 L80 72 M72 18 L78 12 M22 76 L16 82%22 stroke=%22%23fff6b0%22 stroke-width=%222.4%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M62 4 L22 58 L46 58 L37 96 L80 38 L56 38 Z%22 fill=%22url%28%23bolt%29%22 stroke=%22%230d1016%22 stroke-width=%223.6%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M58 12 L32 52 L44 52%22 stroke=%22%23ffffff%22 stroke-width=%222.6%22 fill=%22none%22 stroke-linejoin=%22round%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M56 38 L80 38 L50 80%22 stroke=%22%23c46800%22 stroke-opacity=%22.6%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/g%3E%3C/svg%3E"); }
+.tile[data-type="skull"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%235a5a66%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%2326262e%22/%3E%3Cstop offset=%221%22 stop-color=%22%2308080b%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ff5a4a%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ff5a4a%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3CradialGradient id=%22bone%22 cx=%2240%25%22 cy=%2230%25%22 r=%2280%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23fffdf5%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%23e2d6bb%22/%3E%3Cstop offset=%221%22 stop-color=%22%239c8a68%22/%3E%3C/radialGradient%3E%3CradialGradient id=%22socket%22 cx=%2250%25%22 cy=%2245%25%22 r=%2260%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffe0c8%22/%3E%3Cstop offset=%22.35%22 stop-color=%22%23ff2a1a%22/%3E%3Cstop offset=%221%22 stop-color=%22%23200404%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d=%22M50 8 C26 8 12 25 12 45 C12 59 19 67 28 71 L28 86 Q28 92 34 92 L66 92 Q72 92 72 86 L72 71 C81 67 88 59 88 45 C88 25 74 8 50 8Z%22 fill=%22url%28%23bone%29%22 stroke=%22%230d1016%22 stroke-width=%223.5%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M50 8 C74 8 88 25 88 45 C88 59 81 67 72 71 L72 86 Q72 92 66 92 L60 92 Q72 60 50 8Z%22 fill=%22%236a5a3e%22 fill-opacity=%22.22%22/%3E%3Cpath d=%22M30 52 Q36 34 46 44 Q46 60 34 60 Q28 58 30 52Z%22 fill=%22url%28%23socket%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M70 52 Q64 34 54 44 Q54 60 66 60 Q72 58 70 52Z%22 fill=%22url%28%23socket%29%22 stroke=%22%230d1016%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M50 60 L44 72 Q50 75 56 72 Z%22 fill=%22%232a1d10%22 stroke=%22%230d1016%22 stroke-width=%221.8%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M34 80 H66 M38 76 V92 M44 76 V92 M50 76 V92 M56 76 V92 M62 76 V92%22 stroke=%22%230d1016%22 stroke-width=%222%22 stroke-opacity=%22.85%22/%3E%3Cpath d=%22M60 12 L56 22 L61 27 L57 34%22 stroke=%22%235a4a30%22 stroke-width=%221.6%22 fill=%22none%22/%3E%3Cpath d=%22M24 34 Q30 18 44 14%22 stroke=%22%23fff%22 stroke-opacity=%22.85%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/g%3E%3C/svg%3E"); }
+.tile[data-type="teamheal"] { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3CradialGradient id=%22disc%22 cx=%2245%25%22 cy=%2238%25%22 r=%2270%25%22%3E%3Cstop offset=%220%22 stop-color=%22%234fe88a%22/%3E%3Cstop offset=%22.6%22 stop-color=%22%2312994a%22/%3E%3Cstop offset=%221%22 stop-color=%22%23033a18%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22ring%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffeaa0%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%23b8892c%22/%3E%3Cstop offset=%221%22 stop-color=%22%234a2f06%22/%3E%3C/linearGradient%3E%3CradialGradient id=%22halo%22 cx=%2250%25%22 cy=%2250%25%22 r=%2250%25%22%3E%3Cstop offset=%220%22 stop-color=%22%23bfffd6%22 stop-opacity=%22.45%22/%3E%3Cstop offset=%221%22 stop-color=%22%23bfffd6%22 stop-opacity=%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2252%22 r=%2247%22 fill=%22%23000%22 fill-opacity=%22.45%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2247%22 fill=%22url%28%23ring%29%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22url%28%23disc%29%22 stroke=%22%230a0c10%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22url%28%23halo%29%22/%3E%3Cg transform=%22translate%2850 50%29 scale%28.84%29 translate%28-50 -50%29%22%3E%3Cdefs%3E%3ClinearGradient id=%22liquid%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%239dffc2%22/%3E%3Cstop offset=%22.5%22 stop-color=%22%231fcf64%22/%3E%3Cstop offset=%221%22 stop-color=%22%23067a34%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22glass%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220%22 stop-color=%22%23ffffff%22 stop-opacity=%22.5%22/%3E%3Cstop offset=%22.4%22 stop-color=%22%23ffffff%22 stop-opacity=%22.08%22/%3E%3Cstop offset=%221%22 stop-color=%22%23ffffff%22 stop-opacity=%22.25%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22cork%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23d9a36a%22/%3E%3Cstop offset=%221%22 stop-color=%22%237a4a22%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=%22M40 22 L40 36 Q16 46 16 66 Q16 92 50 92 Q84 92 84 66 Q84 46 60 36 L60 22 Z%22 fill=%22%23dff7ea%22 fill-opacity=%22.25%22 stroke=%22%230d1016%22 stroke-width=%223.5%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M19 62 Q34 54 50 62 Q66 70 81 62 Q84 90 50 90 Q16 90 19 62Z%22 fill=%22url%28%23liquid%29%22/%3E%3Ccircle cx=%2238%22 cy=%2274%22 r=%223%22 fill=%22%23dfffe9%22 fill-opacity=%22.8%22/%3E%3Ccircle cx=%2258%22 cy=%2280%22 r=%222%22 fill=%22%23dfffe9%22 fill-opacity=%22.8%22/%3E%3Ccircle cx=%2250%22 cy=%2268%22 r=%221.6%22 fill=%22%23dfffe9%22 fill-opacity=%22.8%22/%3E%3Cpath d=%22M40 22 L40 36 Q16 46 16 66 Q16 92 50 92 Q84 92 84 66 Q84 46 60 36 L60 22 Z%22 fill=%22url%28%23glass%29%22/%3E%3Crect x=%2236%22 y=%2210%22 width=%2228%22 height=%2214%22 rx=%224%22 fill=%22url%28%23cork%29%22 stroke=%22%230d1016%22 stroke-width=%223%22/%3E%3Cpath d=%22M44 58 H56 M50 52 V64%22 stroke=%22%23ffffff%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M24 58 Q26 48 36 42%22 stroke=%22%23fff%22 stroke-opacity=%22.85%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/g%3E%3C/svg%3E"); }
+
+/* G3 (roadmap v2) - cgProjectile's shot (graphics.js). Starts on the
+   matched tiles, flies to the affected portrait along --dx/--dy. */
+.cg-projectile {
+    position: fixed;
+    width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, var(--shot-color) 42%, transparent 72%);
+    box-shadow: 0 0 14px 4px var(--shot-color);
+    pointer-events: none;
+    z-index: 16;
+    animation: cgShot 0.5s cubic-bezier(0.45, 0, 0.8, 0.4) forwards;
+    will-change: transform, opacity;
+}
+@keyframes cgShot {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0.2; }
+    15% { opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(1.5); opacity: 0.9; }
+}
+
+/* Combat numbers (cgCombatText): big, outlined, colored by what happened.
+   Pop in -> hold -> float up and fade, ~1.4s total. */
+.cg-combat-text {
+    position: fixed;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.9rem;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 30;
+    white-space: nowrap;
+    -webkit-text-stroke: 1.5px #140a05;
+    text-shadow: 0 3px 0 #000, 0 0 12px currentColor;
+    animation: cgCombatText 1.4s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.cg-ct-dmg { color: #ff4a3d; }
+.cg-ct-crit { color: #ffcf3a; font-size: 2.4rem; }
+.cg-ct-heal { color: #4dff8f; }
+.cg-ct-armor { color: #6ab8ff; }
+.cg-ct-energy { color: #ffe066; }
+.cg-ct-self { color: #ff9a6a; font-size: 1.5rem; }
+@keyframes cgCombatText {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    14% { transform: translate(-50%, -60%) scale(1.35); opacity: 1; }
+    26% { transform: translate(-50%, -60%) scale(1); }
+    65% { transform: translate(-50%, -85%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -150%) scale(0.9); opacity: 0; }
+}
+/* Heal sparkles (cgHealSparkles) rising around a portrait */
+.cg-sparkle-layer { position: fixed; inset: 0; pointer-events: none; z-index: 25; }
+.cg-sparkle {
+    position: fixed; width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle, #eaffef 0%, #4dff8f 45%, transparent 70%);
+    box-shadow: 0 0 8px 2px rgba(77, 255, 143, 0.6);
+    animation: cgSparkle 1.1s ease-out forwards; opacity: 0;
+}
+@keyframes cgSparkle {
+    0% { transform: translateY(0) scale(0.4); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateY(-46px) scale(1.2); opacity: 0; }
+}
+/* HP bar pulse on hit / heal (cgBarPulse) */
+.cg-bar-hit { animation: cgBarHit 0.8s ease-out; }
+.cg-bar-heal { animation: cgBarHeal 0.8s ease-out; }
+@keyframes cgBarHit { 0%, 100% { box-shadow: none; } 20% { box-shadow: 0 0 0 2px #ff3b30, 0 0 14px 3px rgba(255, 59, 48, 0.8); } }
+@keyframes cgBarHeal { 0%, 100% { box-shadow: none; } 20% { box-shadow: 0 0 0 2px #4dff8f, 0 0 14px 3px rgba(77, 255, 143, 0.8); } }
+
+/* Combat backdrop behind the portraits: a torch-lit stone chamber - two
+   warm torch glows, a floor glow tinted by the floor theme, a faint block
+   texture and an inner vignette. Static gradients only (painted once).
+   Re-themed every 5 floors via data-floor (cgSetSceneTier). */
+.hud {
+    background:
+        radial-gradient(circle at 8% 22%, rgba(255, 176, 72, 0.30), transparent 26%),
+        radial-gradient(circle at 92% 22%, rgba(255, 176, 72, 0.30), transparent 26%),
+        radial-gradient(ellipse at 50% 118%, var(--scene-glow), transparent 64%),
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0 1px, transparent 1px 22px),
+        linear-gradient(var(--scene-a), var(--scene-b));
+    box-shadow: inset 0 0 0 1px rgba(255, 220, 150, 0.14), inset 0 -24px 30px rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+}
+[data-floor="moss"] { --scene-a: #2c4235; --scene-b: #1b2a21; --scene-glow: rgba(46, 204, 113, 0.22); }
+[data-floor="ember"] { --scene-a: #4a2d26; --scene-b: #2a1714; --scene-glow: rgba(230, 126, 34, 0.28); }
+[data-floor="abyss"] { --scene-a: #33264a; --scene-b: #1b1428; --scene-glow: rgba(155, 89, 182, 0.28); }
+
 /* Faz 1 - a 4+/cross match (getMatchShapeInfo's multiplier >= 2) pops
    noticeably bigger/brighter than a plain 3-match, applied ALONGSIDE
    .matched (both classes on the same tile - see processMatch/
@@ -453,7 +666,7 @@ body {
    transform+filter:brightness-only budget as matchPop, no new expensive
    properties. */
 .matched-big {
-    animation: matchPopBig 0.45s forwards ease-in-out;
+    animation: matchPopBig 0.6s forwards ease-in-out;
 }
 @keyframes matchPopBig {
     0% { transform: scale(1); filter: brightness(2.6); text-shadow: 0 0 10px #fff; background-color: rgba(255,255,255,0.55); }
@@ -469,15 +682,16 @@ body {
     position: absolute;
     transform: translate(-50%, -50%);
     border-radius: 50%;
-    background: radial-gradient(circle, var(--burst-color) 0%, transparent 70%);
+    /* a bright ring (shockwave) with a soft core, in the tile's color */
+    background: radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 32%, var(--burst-color) 44%, transparent 62%);
     pointer-events: none;
     z-index: 15;
-    animation: cgTileBurst 0.45s ease-out forwards;
+    animation: cgTileBurst 0.7s ease-out forwards;
     will-change: transform, opacity;
 }
 @keyframes cgTileBurst {
     0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.85; }
-    100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
 }
 
 /* Faz 3 (graphics roadmap) - cgCelebrate's victory/defeat overlays
@@ -526,7 +740,7 @@ body {
 }
 
 /* Overlay Content */
-.overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
+.overlay-title { font-size: 1.8rem; color: var(--accent); margin-bottom: 15px; text-shadow: 2px 2px 0 #000; font-family: var(--font-display); letter-spacing: 0.5px; }
 .overlay-btn {
     padding: 15px 30px; font-size: 1.1rem; background: #27ae60;
     color: white; border: 2px solid #2ecc71; border-radius: 8px;
@@ -658,7 +872,7 @@ body {
 
 /* Popups */
 .pop-text {
-    position: absolute; font-weight: bold; font-size: 1.4rem;
+    position: absolute; font-weight: 800; font-size: 1.4rem; font-family: var(--font-display);
     pointer-events: none; animation: floatUp 1.5s forwards;
     text-shadow: 2px 2px 0 #000; z-index: 20; white-space: nowrap;
 }
@@ -669,15 +883,12 @@ body {
     100% { transform: translateY(-60px) scale(1); opacity: 0; }
 }
 
-/* Character/monster portrait canvas (graphics.js draws into it via PixiJS) -
-   sits at the top of a .stat-box, above its class/HP label. image-rendering
-   keeps the pixel art crisp when the canvas's CSS size differs from its
-   backing resolution (see CombatStage's resolution handling in graphics.js). */
+/* Character/monster portrait canvas (graphics.js draws the vector portrait
+   into it via the shared PixiJS renderer) - sits at the top of a .stat-box,
+   above its class/HP label. */
 .combat-portrait {
     display: block;
     margin: 0 auto 4px;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
 }
 /* Faz 10 (graphics roadmap, 2nd wave) - cgSetClassGlow's per-class rings
    (graphics.js), applied to the player's OWN combat-portrait canvas. A
@@ -742,7 +953,7 @@ body {
    history, but not something that needs to permanently cost ~100px of a
    small screen's height while you're trying to see the board. */
 .log-toggle {
-    width: var(--panel-width); max-width: 100%; box-sizing: border-box;
+    width: var(--ui-width); max-width: 100%; box-sizing: border-box;
     display: flex; align-items: center; gap: 8px;
     background: rgba(0,0,0,0.4); border: 1px solid #555; border-radius: 6px;
     margin-top: 8px; padding: 6px 10px; font-size: 0.8rem;
@@ -755,7 +966,7 @@ body {
 .log-toggle.open .log-chevron { transform: rotate(180deg); }
 
 #log {
-    width: var(--panel-width); max-width: 100%;
+    width: var(--ui-width); max-width: 100%;
     background: rgba(0,0,0,0.4);
     padding: 0 8px; font-size: 0.85rem;
     overflow-y: hidden; border-radius: 0 0 6px 6px; font-family: 'Consolas', monospace;
@@ -781,13 +992,41 @@ body {
 .action-btn {
     margin-top: 8px; padding: 10px 25px; background: var(--accent);
     border: none; cursor: pointer; font-weight: bold; border-radius: 6px;
-    font-size: 1rem; color: #2c3e50; width: var(--panel-width);
+    font-size: 1rem; color: #2c3e50; width: var(--ui-width);
     max-width: 100%;
     box-sizing: border-box;
     flex-shrink: 0;
     margin-bottom: 4px;
 }
 .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+/* T5 (roadmap v2) - landscape phones. Stacking everything vertically put
+   the board almost entirely below a 360-420px-tall screen. Short landscape
+   screens get two columns instead: the UI on the left, the board on the
+   right, sized to the full height. */
+@media (orientation: landscape) and (max-height: 600px) {
+    :root {
+        --board-size: clamp(200px, min(100dvh - 30px, 56vw), 560px);
+        --ui-width: 100%;
+    }
+    #app {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-auto-rows: min-content;
+        column-gap: 10px;
+        align-content: start;
+        align-items: start;
+        justify-items: stretch;
+    }
+    #app > * { grid-column: 1; }
+    #app > #grid { grid-column: 2; grid-row: 1 / span 20; align-self: center; }
+    .version { display: none; }
+    .top-bar { margin-bottom: 2px; }
+    .hud { padding: 4px; margin-bottom: 3px; }
+    .log-toggle, .action-btn { margin-top: 4px; }
+    .log-toggle { padding: 3px 8px; }
+    .action-btn { padding: 6px 12px; margin-bottom: 0; }
+}
 
 /* INFO MODAL */
 .modal-overlay {
@@ -839,10 +1078,55 @@ body {
     cursor: pointer; color: #bdc3c7;
 }
 .modal-section { margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; }
-.modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; }
+.modal-title { color: var(--accent); margin-top: 0; font-size: 1.4rem; font-family: var(--font-display); }
 h4 { margin-bottom: 5px; color: #3498db; font-size: 1.1rem; }
 ul { padding-left: 20px; margin-top: 5px; }
 li { margin-bottom: 5px; }
+
+/* T5 (roadmap v2) - PvP/co-op battle view. While a match is on, the
+   modal kept its title + long intro paragraph and stacked every stat box
+   on its own full-width row, so the shared board started ~600px down -
+   below the fold on EVERY screen, including a 1280x800 laptop. :has()
+   keys off the same inline style.display='block' pvp.js/coop.js already set
+   when the battle starts (no extra JS state to keep in sync); a browser
+   without :has() just keeps the old scrolling layout. */
+.modal-content:has(#pvp-battle[style*="block"]),
+.modal-content:has(#coop-battle[style*="block"]) {
+    width: 96%; max-height: 96dvh; padding: 8px 10px;
+}
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section > .modal-title,
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section > p:not([id]),
+.modal-content:has(#coop-battle[style*="block"]) .modal-section > .modal-title,
+.modal-content:has(#coop-battle[style*="block"]) .modal-section > p:not([id]) { display: none; }
+.modal-content:has(#pvp-battle[style*="block"]) .modal-section,
+.modal-content:has(#coop-battle[style*="block"]) .modal-section { margin-bottom: 0; padding-bottom: 0; }
+#pvp-battle > .stat-box, #coop-battle > .stat-box {
+    display: inline-block; vertical-align: top; margin-bottom: 4px !important;
+}
+#pvp-battle > p, #coop-battle > p { margin: 2px 0; }
+/* Board: as wide as the modal allows, but never taller than what's left
+   of the screen under the (now compact) HUD rows. */
+#pvp-grid, #coop-grid { width: min(100%, max(220px, 100dvh - 330px)); }
+#coop-grid { width: min(100%, max(220px, 100dvh - 350px)); }
+#pvp-ult-btn, #coop-ult-btn { margin-bottom: 4px !important; padding: 8px; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+    .modal-content:has(#pvp-battle[style*="block"]),
+    .modal-content:has(#coop-battle[style*="block"]) { max-width: 96vw !important; }
+    #pvp-battle[style*="block"], #coop-battle[style*="block"] {
+        display: grid !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+        grid-auto-rows: min-content;
+        column-gap: 6px;
+        align-items: start;
+    }
+    #pvp-battle > *, #coop-battle > * { grid-column: 1 / 7; }
+    #pvp-battle > p, #coop-battle > p { font-size: 0.75rem; }
+    #pvp-grid, #coop-grid {
+        grid-column: 7; grid-row: 1 / span 20;
+        width: min(100dvh - 40px, 52vw) !important; margin: 0 !important;
+    }
+}
 
 /* --- MANUAL SPECIFIC STYLES --- */
 .manual-grid {
@@ -981,6 +1265,7 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
@@ -998,6 +1283,170 @@ table.stat-table td:first-child { color: var(--accent); font-weight: bold; width
    staying instant rather than easing in). */
 html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mode *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
 }
+
+/* --- Characters (characters.js): the start-screen list and the creator ---- */
+.char-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.char-card {
+    position: relative; display: flex; align-items: center; gap: 10px; width: 100%;
+    box-sizing: border-box; padding: 6px 34px 6px 6px; text-align: left; cursor: pointer;
+    font-family: inherit; color: #fff; background: rgba(20, 22, 30, 0.9);
+    border: 2px solid #4a5566; border-radius: 8px;
+}
+.char-card:hover, .char-card:focus-visible { border-color: var(--accent); }
+.char-card.active { border-color: var(--legendary); box-shadow: 0 0 12px rgba(230, 126, 34, 0.35); }
+.char-card.needs-setup { border-style: dashed; }
+.char-portrait {
+    width: 56px; height: 58px; flex: 0 0 56px; object-fit: cover; object-position: 50% 12%;
+    border-radius: 6px; background: radial-gradient(circle at 50% 35%, #3a4356, #151820);
+}
+.char-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.char-info b { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.char-info small { font-size: 0.75rem; color: #bdc3c7; }
+.char-xp { height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+.char-xp > div { height: 100%; background: linear-gradient(90deg, #6a5acd, #9b8cff); }
+.char-delete {
+    position: absolute; top: 4px; right: 6px; width: 24px; height: 24px; line-height: 24px;
+    text-align: center; color: #95a5a6; border-radius: 50%; font-size: 0.8rem;
+}
+.char-delete:hover { color: #e74c3c; background: rgba(231, 76, 60, 0.15); }
+.char-new { margin-top: 4px; }
+
+.char-modal-content { max-width: 460px; max-height: 92dvh; padding: 14px; }
+.char-creator { display: flex; flex-direction: column; gap: 10px; }
+.char-preview {
+    display: flex; flex-direction: column; align-items: center;
+    background: radial-gradient(ellipse at 50% 40%, #3d4760, #161a24 75%); border-radius: 8px; padding: 6px;
+}
+.char-preview-img { width: min(56vw, 230px); height: auto; animation: char-breathe 3.2s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes char-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.012) translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { .char-preview-img { animation: none; } }
+.char-blurb { margin: 4px 0 0; font-size: 0.75rem; color: #d0d6dc; text-align: center; }
+.char-form { display: flex; flex-direction: column; gap: 8px; }
+.char-row { display: flex; flex-direction: column; gap: 4px; }
+.char-row-label { font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+.char-opts { display: flex; flex-wrap: wrap; gap: 5px; }
+.char-opt {
+    min-height: 32px; padding: 4px 9px; font-family: inherit; font-size: 0.8rem; color: #fff;
+    background: #222834; border: 2px solid #4a5566; border-radius: 6px; cursor: pointer;
+}
+.char-opt.on { border-color: var(--accent); background: #2f3a4c; }
+.char-opt.swatch { width: 32px; padding: 0; }
+.char-opt.swatch.on { box-shadow: 0 0 0 2px #fff inset; }
+#char-name-input {
+    width: 100%; box-sizing: border-box; padding: 8px; font-family: inherit; font-size: 16px;
+    color: #fff; background: #1b2029; border: 2px solid #4a5566; border-radius: 6px;
+}
+.char-msg { min-height: 1em; font-size: 0.8rem; color: #e74c3c; }
+
+/* --- Inventory (inventory.js): paper doll, stats, bag grid, detail sheet -- */
+.inv { display: flex; flex-direction: column; gap: 10px; }
+.inv-doll {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr) 46px; gap: 6px; align-items: start;
+    padding: 8px; border-radius: 10px;
+    background: radial-gradient(ellipse at 50% 45%, #3b4459 0%, #1a1e28 70%); border: 1px solid #56627a;
+}
+.inv-col { display: flex; flex-direction: column; gap: 6px; }
+.inv-slot, .inv-cell {
+    position: relative; display: flex; align-items: center; justify-content: center; padding: 0;
+    font-family: inherit; color: #fff; cursor: pointer; overflow: hidden; --rc: #4a5566;
+    background: linear-gradient(160deg, rgba(255,255,255,0.06), rgba(0,0,0,0.35)), #151922;
+    border: 2px solid var(--rc); border-radius: 7px;
+}
+.inv-slot { width: 46px; height: 46px; }
+.inv-slot.filled, .inv-cell { box-shadow: inset 0 0 12px color-mix(in srgb, var(--rc) 35%, transparent); }
+.inv-slot.selected, .inv-cell.selected { outline: 2px solid #fff; outline-offset: 1px; }
+.inv-slot-empty { opacity: 0.28; font-size: 1.2rem; filter: grayscale(1); }
+.inv-icon { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.inv-emoji { font-size: 1.35rem; pointer-events: none; }
+.inv-figure { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.inv-figure-img { width: 100%; max-width: 210px; height: auto; animation: char-breathe 3.4s ease-in-out infinite; transform-origin: 50% 90%; }
+@media (prefers-reduced-motion: reduce) { .inv-figure-img { animation: none; } }
+.inv-power { font-size: 0.75rem; color: var(--accent); margin: 2px 0 6px; text-align: center; }
+.inv-hands { display: flex; gap: 10px; justify-content: center; }
+.inv-stats {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px;
+    padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.22); font-size: 0.75rem;
+}
+.inv-stats .inv-muted, .inv-set { grid-column: 1 / -1; }
+.inv-stat { display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.inv-stat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d0d6dc; }
+.inv-stat b { white-space: nowrap; }
+.inv-stat i { font-style: normal; font-weight: normal; }
+.inv-stat.up i { color: #4ade80; }
+.inv-stat.down i { color: #f87171; }
+.inv-stat.power { border-top: 1px solid #3a4456; padding-top: 3px; margin-top: 2px; }
+.inv-set { font-size: 0.72rem; color: #9fb0a4; }
+.inv-set.on { color: #22c55e; }
+.inv-muted { color: #8a96a3; font-size: 0.75rem; margin: 2px 0; }
+.inv-tabs { display: flex; gap: 6px; }
+.inv-tab {
+    flex: 1; min-height: 34px; font-family: inherit; font-size: 0.8rem; color: #ccc; cursor: pointer;
+    background: #2a3140; border: 2px solid #4a5566; border-radius: 7px;
+}
+.inv-tab.on { color: #fff; border-color: var(--accent); background: #34405a; }
+.inv-tools { display: flex; gap: 6px; }
+.inv-tools select {
+    flex: 1; min-width: 0; min-height: 32px; font-family: inherit; font-size: 0.8rem; color: #fff;
+    background: #1b2029; border: 1px solid #4a5566; border-radius: 6px;
+}
+.inv-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); grid-auto-rows: 46px;
+    grid-auto-flow: dense; gap: 5px;
+}
+.inv-grid > .inv-muted { grid-column: 1 / -1; }
+.inv-cell.tall { grid-row: span 2; }
+.inv-cell.unusable::after { content: "⛔"; position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 1px 2px; font-size: 0.55rem; background: rgba(150, 20, 20, 0.22); pointer-events: none; }
+.inv-lvl {
+    position: absolute; left: 2px; bottom: 1px; font-size: 0.6rem; line-height: 1; color: #fff;
+    text-shadow: 0 0 2px #000, 0 0 2px #000; pointer-events: none;
+}
+.inv-lock { position: absolute; right: 1px; top: 0; font-size: 0.6rem; pointer-events: none; }
+.inv-better { position: absolute; right: 2px; bottom: 0; font-size: 0.7rem; color: #4ade80; text-shadow: 0 0 3px #000; pointer-events: none; }
+.inv-detail {
+    position: sticky; bottom: -20px; z-index: 4; margin: 0 -8px -20px; padding: 10px 10px 14px;
+    border-top: 3px solid var(--rc, #4a5566); border-radius: 10px 10px 0 0;
+    background: #1d2330; box-shadow: 0 -8px 20px rgba(0,0,0,0.45);
+}
+.inv-detail-head { display: flex; gap: 10px; align-items: flex-start; }
+.inv-detail-fig { flex: 0 0 84px; height: 88px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: radial-gradient(circle at 50% 40%, #3a4356, #151820); overflow: hidden; }
+.inv-tryon-img { width: 84px; height: auto; }
+.inv-detail-icon { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+.inv-detail-icon .inv-emoji { font-size: 2.2rem; }
+.inv-detail-txt { min-width: 0; flex: 1; }
+.inv-name { display: block; color: var(--rc); font-size: 0.95rem; }
+.inv-sub { font-size: 0.72rem; color: #bdc3c7; }
+.inv-sub.bad { color: #f87171; }
+.inv-sub.good { color: #4ade80; }
+.inv-detail-stats { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: 0.78rem; }
+.inv-passive { font-size: 0.75rem; color: #f97316; font-style: italic; }
+.inv-passive.set { color: #22c55e; }
+.inv-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.inv-act { width: auto !important; margin: 0 !important; flex: 1 1 auto; min-height: 34px; font-size: 0.78rem; }
+.inv-act.primary { background: #2e7d32; }
+.inv-act.upgrade { background: #8e44ad; }
+.inv-act.scrap { background: #7f8c8d; }
+.inv-act.sell { background: #b8860b; }
+.inv-act:disabled { opacity: 0.45; }
+
+/* The shop / inventory modal: taller on phones (the inventory needs the
+   room) and a one-line tab row that never spills past the edge. */
+#shop-modal .modal-content { max-height: 94dvh; }
+#shop-tab-btn, #inventory-tab-btn, #prestige-tab-btn {
+    min-width: 0; padding: 8px 4px; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#shop-modal .stats-bar { padding: 6px; }
+#shop-modal .stats-bar .stat-item { flex-direction: row; gap: 6px; }
+#shop-modal .stats-bar .stat-item span:first-child { margin: 0; font-size: 1rem; }
+/* equip flourish (economy.js equipItem): a light sweep over the figure */
+.inv-figure { position: relative; --fc: #ffd24a; }
+.inv-figure.flourish::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--fc) 55%, transparent), transparent 65%);
+    animation: inv-flourish 0.8s ease-out forwards;
+}
+@keyframes inv-flourish { 0% { opacity: 0; transform: scale(0.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .inv-figure.flourish::after { animation: none; opacity: 0; } }

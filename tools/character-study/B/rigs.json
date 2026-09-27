@@ -1,0 +1,128 @@
+{
+ "warrior": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    90.1,
+    144.0
+   ],
+   "legR": [
+    109.9,
+    144.0
+   ],
+   "torso": [
+    100.0,
+    148.0
+   ],
+   "head": [
+    100.0,
+    72.0
+   ],
+   "armL": [
+    73.0,
+    86.0
+   ],
+   "armR": [
+    127.0,
+    86.0
+   ]
+  },
+  "monster": false,
+  "hand": [
+   9.1,
+   78.0
+  ]
+ },
+ "mage": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    90.1,
+    144.0
+   ],
+   "legR": [
+    109.9,
+    144.0
+   ],
+   "torso": [
+    100.0,
+    148.0
+   ],
+   "head": [
+    100.0,
+    72.0
+   ],
+   "armL": [
+    73.0,
+    86.0
+   ],
+   "armR": [
+    127.0,
+    86.0
+   ]
+  },
+  "monster": false,
+  "hand": [
+   9.1,
+   78.0
+  ]
+ },
+ "monster_boss": {
+  "parts": [
+   "back",
+   "legL",
+   "legR",
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    87.9,
+    137.6
+   ],
+   "legR": [
+    112.1,
+    137.6
+   ],
+   "torso": [
+    100.0,
+    141.9
+   ],
+   "head": [
+    100.0,
+    61.3
+   ],
+   "armL": [
+    63.2,
+    76.2
+   ],
+   "armR": [
+    136.8,
+    76.2
+   ]
+  },
+  "monster": true,
+  "hand": [
+   9.6,
+   82.7
+  ]
+ }
+}

@@ -44,36 +44,61 @@ jobs:
           sleep 2
 
       - name: Run tests/index.html headlessly
+        run: node tests/run-ci.mjs
+
+  # T6 (roadmap v2) - supabase/schema.sql against a real Postgres. There
+  # is no staging database (see CLAUDE.md), so this is the only place a
+  # schema/RPC/RLS change gets exercised before the user re-runs the file in
+  # the Supabase SQL Editor. Applies a small Supabase shim, then the real
+  # schema TWICE (it must be safely re-runnable), then security assertions.
+  sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Supabase shim
+        run: psql -v ON_ERROR_STOP=1 -q -f tests/sql/00_supabase_shim.sql
+      - name: Apply supabase/schema.sql (1st run)
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: Apply supabase/schema.sql again (must be re-runnable)
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: RLS / RPC assertions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/10_rls_and_rpcs.sql
+      - name: Migration from v1.36 (production's schema) with real-looking data
         run: |
-          cat > run-tests.mjs <<'EOF'
-          import { chromium } from 'playwright';
-
-          const browser = await chromium.launch();
-          const page = await browser.newPage();
-          page.on('console', msg => console.log('[browser]', msg.text()));
-          page.on('pageerror', err => console.error('[browser error]', err.message));
-
-          await page.goto('http://localhost:8080/tests/index.html');
-          await page.waitForFunction(() => window.__TEST_PASS__ !== undefined, { timeout: 30000 });
-
-          const results = await page.evaluate(() => window.__TEST_RESULTS__);
-          const pass = await page.evaluate(() => window.__TEST_PASS__);
-
-          for (const r of results) {
-            console.log(`${r.pass ? '✓' : '✗'} ${r.name}${r.detail ? ' - ' + r.detail : ''}`);
-          }
-          console.log(`\n${results.filter(r => r.pass).length}/${results.length} passed`);
-
-          await browser.close();
-          if (!pass) {
-            console.error('\nTEST SUITE FAILED');
-            process.exit(1);
-          }
-          EOF
-          node run-tests.mjs
+          createdb legacy
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/00_supabase_shim.sql
+          # v1.36 only ever applied cleanly on top of itself (production was
+          # built up run by run), so: a tolerant first pass, then a strict one
+          PGDATABASE=legacy psql -q -f tests/sql/legacy/schema-v1.36.sql > /dev/null 2>&1 || true
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/legacy/schema-v1.36.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f tests/sql/05_legacy_seed.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -f tests/sql/06_legacy_check.sql
+      - name: Supabase SQL Editor's "Run and enable RLS" (appends enable RLS for every create table it sees)
+        run: |
+          grep -ioE '^create table (if not exists )?public\.[a-z_]+' supabase/schema.sql | grep -oE 'public\.[a-z_]+' | sort -u \
+            | sed 's/.*/alter table & enable row level security;/' > /tmp/studio_rls.sql
+          cat /tmp/studio_rls.sql
+          PGDATABASE=legacy psql -v ON_ERROR_STOP=1 -q -f /tmp/studio_rls.sql
+          psql -v ON_ERROR_STOP=1 -q -f /tmp/studio_rls.sql
 
   trigger-pages-rebuild:
-    needs: test
+    needs: [test, sql]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

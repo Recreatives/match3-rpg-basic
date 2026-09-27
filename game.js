@@ -38,6 +38,8 @@ let TILE_STATS = {
 function rebuildTileStats() {
     TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
     if (selectedClass) selectedClass.passive(TILE_STATS);
+    // the character's level (characters.js CLASS_GROWTH)
+    if (selectedClass && typeof applyCharacterLevelBonuses === 'function') applyCharacterLevelBonuses(TILE_STATS, selectedClass.name.toLowerCase());
     applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
     applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
     applyLearnedTalentBonuses(TILE_STATS, currentLearnedTalents);
@@ -131,6 +133,9 @@ function getTimeMultiplier() {
 function updateSpeedBonusUI() {
     let el = document.getElementById('speed-bonus');
     let mult = getTimeMultiplier();
+    // G1 - an idle player gets a gentle hint after a few seconds (see
+    // sharedboard.js's sbMaybeShowHint); rides this existing 100ms ticker.
+    if (turnStartTime && isPlayerTurn && !isProcessing && currentState === STATE.PLAYING) sbMaybeShowHint(soloBoard, Date.now() - turnStartTime);
     if (!turnStartTime || mult <= 1.02) {
         el.style.display = 'none';
         return;
@@ -150,6 +155,7 @@ function startPlayerTimer() {
 }
 
 function stopPlayerTimer() {
+    if (typeof sbClearHint === 'function') sbClearHint(soloBoard);
     clearInterval(speedBonusInterval);
     speedBonusInterval = null;
     turnStartTime = null;
@@ -190,7 +196,7 @@ const CLASSES = {
     },
     BERSERKER: {
         name: "Berserker", emoji: "🪓",
-        desc: "<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%35 DAHA FAZLA HASAR</b> alır.",
+        desc: "<b>DPS:</b> +5 Kılıç / +15 Kafatası Hasarı, ama <b>%25 DAHA FAZLA HASAR</b> alır.",
         passive: (stats) => { stats.sword += 5; stats.skull_dmg += 15; },
         dodgeChance: 0, incomingDmgMult: 1.25,
         ultName: "BLOOD LUST",
@@ -270,7 +276,10 @@ let selectedClass = null;
 // The single-player implementation of the combat context described above.
 function makeSinglePlayerCombatContext() {
     return {
-        dealDamageToOpponent(amount) { inflictDamage('enemy', amount); },
+        dealDamageToOpponent(amount) {
+            inflictDamage('enemy', amount);
+            if (typeof cgCombatText === 'function') cgCombatText(document.getElementById('enemy-sprite'), '-' + amount, 'crit', CG_IMPACT_DELAY_MS);
+        },
         dealDirectDamageToOpponent(amount) {
             if (enemyHP > 0) {
                 enemyHP -= amount;
@@ -321,7 +330,13 @@ const tileTypes = [
 
 // --- GAME FLOW ---
 
+// The start screen: the player's characters when the server has them
+// (characters.js), otherwise (offline / still loading) a plain class pick.
 function renderClassButtons() {
+    if (typeof charactersLoaded !== 'undefined' && charactersLoaded && typeof renderCharacterSelect === 'function') {
+        renderCharacterSelect();
+        return;
+    }
     const container = document.getElementById('class-selection');
     container.innerHTML = '';
     container.style.display = 'flex';
@@ -332,29 +347,33 @@ function renderClassButtons() {
         const btn = document.createElement('button');
         btn.className = 'reward-btn rarity-rare';
         btn.innerHTML = `<b>${c.emoji} ${c.name}</b><small>${t(c.desc)}</small>`;
-        btn.onclick = () => {
-            selectedClass = c;
-            if (typeof trackEvent === 'function') trackEvent('class_selected', { class: key });
-            // getElementById, not querySelector('.stat-box div:first-child') -
-            // pvp-modal/coop-modal have their own .stat-box elements earlier in
-            // the DOM than the solo HUD, so the class selector was silently
-            // writing the class name into a hidden modal instead of the
-            // visible "YOU" label (the same class of bug as gridDisplay above).
-            const playerBox = document.getElementById('player-class-label');
-            playerBox.style.color = 'var(--accent)';
-            playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
-            setMyPortraitEverywhere(c.name.toLowerCase());
-            // Picking a class is also PvP/co-op's own "start of run" moment
-            // (they never call resetGame() - that's solo's own start path),
-            // so this needs the exact same clean-slate rebuild.
-            rebuildTileStats();
-            document.getElementById('ult-btn').innerText = `USE ${c.ultName} (100%)`;
-            updateUI();
-            container.style.display = 'none';
-            renderModeButtons();
-        };
+        btn.onclick = () => pickClass(c);
         container.appendChild(btn);
     });
+}
+
+// Starts playing as a class (the active character's, or a plain pick).
+function pickClass(c) {
+    selectedClass = c;
+    if (typeof trackEvent === 'function') trackEvent('class_selected', { class: c.name.toLowerCase() });
+    // getElementById, not querySelector('.stat-box div:first-child') -
+    // pvp-modal/coop-modal have their own .stat-box elements earlier in
+    // the DOM than the solo HUD, so the class selector was silently
+    // writing the class name into a hidden modal instead of the
+    // visible "YOU" label (the same class of bug as gridDisplay above).
+    const playerBox = document.getElementById('player-class-label');
+    playerBox.style.color = 'var(--accent)';
+    playerBox.innerHTML = `${c.emoji} ${c.name.toUpperCase()}`;
+    if (typeof charUpdateHudLabel === 'function') charUpdateHudLabel();
+    setMyPortraitEverywhere(c.name.toLowerCase());
+    // Picking a class is also PvP/co-op's own "start of run" moment
+    // (they never call resetGame() - that's solo's own start path),
+    // so this needs the exact same clean-slate rebuild.
+    rebuildTileStats();
+    document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
+    updateUI();
+    document.getElementById('class-selection').style.display = 'none';
+    renderModeButtons();
 }
 
 // Shown right after a class is picked, before anything actually starts -
@@ -410,7 +429,8 @@ function restoreMainMenuOverlay() {
 }
 
 function resetGame() {
-    playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
+    maxPlayerHP = 100 + (typeof characterMaxHpBonus === 'function' ? characterMaxHpBonus() : 0);
+    playerHP = maxPlayerHP; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
     rebuildTileStats();
     ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
@@ -446,15 +466,17 @@ function startLevel() {
     swiftBonusUsed = false;
     bossEnraged = false;
     enemySprite.classList.remove('enraged');
+    if (typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'setEnraged', false);
     enemyArmor = currentMinionType === 'armored' ? Math.round(maxEnemyHP * MINION_ARMORED_PCT) : 0;
 
     let name = isBoss ? tf('BOSS Sv. {level}', { level }) : tf('Canavar Sv. {level}', { level });
     document.getElementById('enemy-name').innerText = name;
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[currentMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('enemy-sprite', currentMinionType, level);
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
+    // G3 - backdrop changes every 5 floors; the player's portrait stands
+    // back up if the last fight ended with it toppled.
+    if (typeof cgSetSceneTier === 'function') cgSetSceneTier(document.getElementById('solo-hud'), level);
+    if (typeof cgStageDo === 'function') cgStageDo('player-sprite', 'revive');
 
     if (isBoss) {
         log(t("UYARI: BOSS SAVAŞI!"), "log-crit");
@@ -467,6 +489,10 @@ function startLevel() {
     isPlayerTurn = true;
     isProcessing = false;
     extraTurnTriggered = false;
+    // A chain cut short by the enemy dying mid-cascade never reaches the
+    // engine's "no more matches" reset - without this the next level's very
+    // first match would pop a stale "KOMBO x4".
+    soloBoard.cascadeDepth = 0;
 
     createBoard();
     updateUI();
@@ -482,6 +508,7 @@ function checkWinCondition() {
 
 function triggerDeathSequence(who) {
     currentState = STATE.GAMEOVER;
+    if (typeof cgStageDo === 'function') cgStageDo(who === 'enemy' ? 'enemy-sprite' : 'player-sprite', 'playDeath');
     isProcessing = true;
     stopPlayerTimer();
     if (who === 'enemy') {
@@ -520,7 +547,9 @@ function goldRewardForKill(lvl, isBoss) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
-    if (typeof awardLootDrop === 'function') awardLootDrop();
+    // loot rolls at the character's level, a little higher on deeper floors
+    if (typeof awardLootDrop === 'function') awardLootDrop(typeof characterLevel === 'function' ? characterLevel() + Math.floor((level - 1) / 5) : undefined);
+    if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
@@ -559,7 +588,7 @@ function winLevel() {
 
 function updateRewardTitle() {
     if (rewardPicksLeft > 0) {
-        overlayTitle.innerText = tf('VICTORY! PICK {n}', { n: rewardPicksLeft });
+        overlayTitle.innerText = tf('ZAFER! {n} ÖDÜL SEÇ', { n: rewardPicksLeft });
         return;
     }
     rewardArea.style.display = 'none';
@@ -813,12 +842,17 @@ function createBoard() {
             });
         }, {passive: false});
     }
-    resolveMatches(true);
+    // Same settle path as every refill (sharedboard.js): initial matches
+    // cleaned up silently, and a dead board (no valid move) reshuffled - the
+    // opening deal used to skip that check entirely.
+    sbDropAndRefill(soloBoard, true);
+    extraTurnTriggered = false;
     updateUI();
 }
 
 function handleInputStart(tile) {
     if (currentState !== STATE.PLAYING || isProcessing || !isPlayerTurn) return;
+    sbClearHint(soloBoard);
     isMouseDown = true;
     if (!selectedTile) {
         selectedTile = tile;
@@ -865,29 +899,13 @@ function attemptSwap(tile1, tile2) {
         currentMoveTimeMultiplier = getTimeMultiplier();
         stopPlayerTimer();
     }
-
     isProcessing = true;
-    let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
-    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-    tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
-
-    let hasMatch = checkForMatches(false);
-    if (!hasMatch) {
-        setTimeout(() => {
-            let tempType = tile1.dataset.type; let tempHTML = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = tempType; tile2.innerHTML = tempHTML;
-            isProcessing = false;
-            // Invalid swap didn't cost the turn, so give the player a
-            // fresh speed-bonus window for their next attempt.
-            if (isPlayerTurn) startPlayerTimer();
-        }, 200);
-    }
-}
-
-function resolveMatches(isInitial) {
-    checkForMatches(isInitial);
-    extraTurnTriggered = false;
+    // Slide, commit, resolve (sharedboard.js). A swap that makes no match
+    // slides back and doesn't cost the turn - fresh speed-bonus window.
+    sbTrySwap(soloBoard, tile1, tile2, () => {
+        isProcessing = false;
+        if (isPlayerTurn) startPlayerTimer();
+    });
 }
 
 // --- NEW MERGE LOGIC ---
@@ -1040,86 +1058,68 @@ function getMatchShapeInfo(count, isCross) {
     return { shapeLabel: '3', multiplier: 1, extraTurn: false, ultBonus: 0 };
 }
 
-// Faz 1 (graphics roadmap) - counts how many resolution steps deep the
-// CURRENT chain reaction is (2nd+ step = a real cascade, not just the
-// player's own initial match). Reset whenever a step finds no matches -
-// that's the natural end of a chain, whether the chain was the player's own
-// combo or just a one-off reshuffle-triggered match (see checkForMatches'
-// else branch) - so a reshuffle never inflates a REAL combo's count, and a
-// genuine cascade always starts counting fresh.
-let soloCascadeDepth = 0;
+// --- SOLO BOARD (sharedboard.js's engine) ---
+// Everything board-mechanical (pop, gravity, chains, dead-board reshuffle,
+// swap animation, KOMBO counter in cascadeDepth) is the shared engine's;
+// this object is just what's solo-specific about it.
+const soloBoard = {
+    tiles, width, pool: tileTypes,
+    gridEl: () => gridDisplay,
+    clearDelayMs: 560,
+    initialDelayMs: 400,
+    channel: null,
+    cascadeDepth: 0,
+    isLive: () => currentState === STATE.PLAYING,
+    applyGroup: (group, shape, isInitial, validTiles) => soloApplyGroup(group, shape, isInitial, validTiles),
+    onChainEnd: () => endTurnLogic(),
+    onNoMatch: () => { isProcessing = false; },
+    onReshuffle: () => log(t("Hiç hamle kalmamıştı, tahta karıştırıldı!"), "log-turn"),
+    setBusy: (busy) => { isProcessing = busy; }
+};
 
-function checkForMatches(isInitial) {
-    if (!isInitial && currentState !== STATE.PLAYING) return false;
-    let finalGroups = findMatchGroups(tiles, width);
+// Kept as thin wrappers - the enemy AI, ultimates and tests reach the
+// board through these names.
+function checkForMatches(isInitial) { return sbResolveMatches(soloBoard, isInitial); }
+function fillBoard(isInitial) { sbDropAndRefill(soloBoard, isInitial); }
 
-    if (finalGroups.length > 0) {
-        if (!isInitial) {
-            soloCascadeDepth++;
-            let maxMultiplier = Math.max(...finalGroups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
-            if (typeof cgBoardImpact === 'function') cgBoardImpact(gridDisplay, maxMultiplier);
-            if (soloCascadeDepth >= 2) showFloatingText(`KOMBO x${soloCascadeDepth}`, gridDisplay, '#ff9f1c');
-        }
-        finalGroups.forEach(group => processMatch(group, isInitial));
-        if (currentState === STATE.PLAYING || isInitial) {
-            setTimeout(() => fillBoard(isInitial), 400);
-        }
-        return true;
-    } else {
-        if (!isInitial) { isProcessing = false; soloCascadeDepth = 0; }
-        return false;
-    }
-}
-
-function processMatch(group, isInitial) {
-    if (currentState !== STATE.PLAYING && !isInitial) return;
-
+// Solo's game effects for one matched group (the engine has already popped
+// the tiles).
+function soloApplyGroup(group, shape, isInitial, validTiles) {
+    // Never for isInitial: the board's own setup cascade can land a 4+/5
+    // match by pure chance, and counting it used to hand the player a free
+    // extra turn (and +30% ult for a 5) on their first move of the level.
+    if (isInitial) return;
     let count = group.indices.length;
-    let isCross = (group.subShape === 'cross');
-    let { shapeLabel, multiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
+    let { shapeLabel, multiplier, extraTurn, ultBonus } = shape;
 
     if (extraTurn) extraTurnTriggered = true;
-    if (ultBonus > 0 && isPlayerTurn) ultCharge += ultBonus;
+    if (ultBonus > 0 && isPlayerTurn) ultCharge = Math.min(ultCharge + ultBonus, 100);
 
     // Speed Bonus: the player's own moves (and any chain reaction they
     // trigger) are further scaled by how fast the swap was made.
     let finalMultiplier = isPlayerTurn ? multiplier * currentMoveTimeMultiplier : multiplier;
 
-    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+    if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
 
-    // --- VISUALS & LOGS ---
-    if (!isInitial && finalMultiplier > 1) { // Only log if it's special
+    if (finalMultiplier > 1) { // Only log if it's special
         let user = isPlayerTurn ? "Oyuncu" : "Düşman";
         let displayMult = Math.round(finalMultiplier * 10) / 10;
-
         log(tf('{user}: {shapeLabel} Eşleşme! (x{displayMult})', { user: t(user), shapeLabel, displayMult }), "log-match");
-
         let centerTile = tiles[group.indices[1]];
         let color = (finalMultiplier >= 3) ? "#f1c40f" : "#e74c3c";
         showFloatingText(`${shapeLabel}x${displayMult}`, centerTile, color);
     }
 
-    let validTiles = 0;
-    group.indices.forEach(index => {
-        if (tiles[index].dataset.type !== '') {
-            if (!isInitial) {
-                tiles[index].classList.add('matched');
-                // Faz 1 - a 4+/cross match pops bigger/brighter (matched-big,
-                // style.css) than the everyday 3-match, ON TOP OF .matched
-                // rather than instead of it.
-                if (multiplier >= 2) tiles[index].classList.add('matched-big');
-                // Faz 2 - a small tile-type-colored burst right at this tile.
-                if (typeof cgTileBurst === 'function') cgTileBurst(tiles[index], group.type);
-            }
-            else tiles[index].innerHTML = '';
-            tiles[index].dataset.type = '';
-            validTiles++;
-        }
-    });
-
-    if (validTiles > 0 && !isInitial) {
-        applyRPGEffects(group.type, finalMultiplier);
+    // G3 - a shot flies from the matched tiles to whoever this match
+    // affects: the opponent for sword/skull, the matcher for everything else.
+    if (validTiles > 0 && typeof cgProjectile === 'function') {
+        // The tiles' energy flies to whoever matched them; an attack then
+        // travels on through the arena (the class/monster move itself).
+        let targetId = isPlayerTurn ? 'player-sprite' : 'enemy-sprite';
+        cgProjectile(tiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
     }
+
+    if (validTiles > 0) applyRPGEffects(group.type, finalMultiplier);
 }
 
 function showFloatingText(text, tileElement, color) {
@@ -1141,11 +1141,10 @@ function showFloatingText(text, tileElement, color) {
 // to remember to sync it when its own battle starts.
 function setMyPortraitEverywhere(classKey) {
     if (typeof cgGetStage !== 'function' || typeof CHARACTER_SPRITES === 'undefined') return;
-    let url = CHARACTER_SPRITES[classKey];
-    if (!url) return;
+    if (!CHARACTER_SPRITES[classKey]) return;
+    // the painted hero (hero.js): class, looks and whatever is equipped
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar(true);
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
-        let stage = cgGetStage(id);
-        if (stage) stage.setPortrait(url);
         // Faz 10 (graphics roadmap, 2nd wave) - class identity glow, synced
         // here alongside the portrait art itself.
         if (typeof cgSetClassGlow === 'function') cgSetClassGlow(id, classKey);
@@ -1163,7 +1162,19 @@ function setMyPortraitEverywhere(classKey) {
 function soloPlayHit(sideStr, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
-    if (stage) stage.playHit(tileType);
+    // timed to when the shot from the board lands (graphics.js)
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
+}
+
+// Combat number + bar pulse over a solo portrait ('player' | 'enemy'),
+// landing together with the shot (see graphics.js's cgCombatText).
+function soloCombatText(sideStr, text, kind) {
+    if (typeof cgCombatText !== 'function') return;
+    let portrait = document.getElementById(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
+    let bar = document.getElementById(sideStr === 'player' ? 'player-hp-bar-container' : 'enemy-hp-bar-container');
+    cgCombatText(portrait, text, kind, CG_IMPACT_DELAY_MS);
+    if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', CG_IMPACT_DELAY_MS);
+    if (kind === 'heal') { cgBarPulse(bar, 'heal', CG_IMPACT_DELAY_MS); cgHealSparkles(portrait, CG_IMPACT_DELAY_MS); }
 }
 
 // Sword/skull actually damage the receiving side - a real knockback, not
@@ -1173,7 +1184,7 @@ function soloPlayHit(sideStr, tileType) {
 function soloPlayHitReaction(sideStr, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let stage = cgGetStage(sideStr === 'player' ? 'player-sprite' : 'enemy-sprite');
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 function applyRPGEffects(type, multiplier) {
@@ -1194,16 +1205,19 @@ function applyRPGEffects(type, multiplier) {
     // has no class, so the enemy's own turn never triggers this.
     if (isPlayerTurn && selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('player-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type, multiplier, soloBoard.cascadeDepth);
     }
 
     if (type === 'sword') {
         let baseVal = Math.floor(stats.sword * multiplier);
         inflictDamage(target, baseVal);
         soloPlayHitReaction(target, 'sword');
+        soloCombatText(target, '-' + baseVal, 'dmg');
         log(tf('{user} Saldırı {val}', { user: t(user), val: baseVal }), isPlayerTurn ? 'log-hit' : 'log-enemy');
         if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount: baseVal });
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        // G3 - a monster's own landed hit gets a visible lunge.
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', multiplier);
         if (typeof playSound === 'function') playSound('hit');
 
     } else if (type === 'heart') {
@@ -1211,6 +1225,8 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerHP = Math.min(playerHP + baseVal, maxPlayerHP);
         else enemyHP = Math.min(enemyHP + baseVal, maxEnemyHP);
         soloPlayHit(actor, 'heart');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
+        soloCombatText(actor, '+' + baseVal, 'heal');
         log(tf('{user} İyileşme +{val}', { user: t(user), val: baseVal }), 'log-heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('heal');
@@ -1220,6 +1236,8 @@ function applyRPGEffects(type, multiplier) {
         if (isPlayerTurn) playerArmor += baseVal;
         else enemyArmor += baseVal;
         soloPlayHit(actor, 'shield');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
+        soloCombatText(actor, '+' + baseVal, 'armor');
         log(tf('{user} Zırh +{val}', { user: t(user), val: baseVal }), 'log-armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: baseVal });
         if (isPlayerTurn && typeof playSound === 'function') playSound('shield');
@@ -1227,13 +1245,16 @@ function applyRPGEffects(type, multiplier) {
     } else if (type === 'energy') {
         let baseVal = Math.floor(stats.energy * multiplier);
         soloPlayHit(actor, 'energy');
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playBuff');
         if (isPlayerTurn) {
             ultCharge = Math.min(ultCharge + baseVal, 100);
+            soloCombatText('player', '+' + baseVal + '%', 'energy');
             log(tf('Ult +{val}%', { val: baseVal }), 'log-hit');
             if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: baseVal });
         } else {
             let absorb = Math.floor(baseVal / 2);
             enemyHP = Math.min(enemyHP + absorb, maxEnemyHP);
+            soloCombatText('enemy', '+' + absorb, 'heal');
             log(tf('Düşman {val} emdi', { val: absorb }), "log-enemy");
         }
 
@@ -1256,8 +1277,12 @@ function applyRPGEffects(type, multiplier) {
         inflictDamage(target, dmgToOpponent);
         inflictDamage(self, recoil);
         soloPlayHitReaction(target, 'skull');
+        soloCombatText(target, '-' + dmgToOpponent, 'crit');
+        if (recoil > 0) soloCombatText(self, '-' + recoil, 'self');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        // G3 - a monster's own landed hit gets a visible lunge.
+        if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', multiplier);
         if (typeof playSound === 'function') playSound('crit');
     }
 
@@ -1292,6 +1317,7 @@ function checkBossEnrage() {
         ENEMY_TILE_STATS.sword = Math.round(ENEMY_TILE_STATS.sword * BOSS_ENRAGE_STAT_MULT);
         ENEMY_TILE_STATS.skull_dmg = Math.round(ENEMY_TILE_STATS.skull_dmg * BOSS_ENRAGE_STAT_MULT);
         enemySprite.classList.add('enraged');
+        if (typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'setEnraged', true);
         log(t('⚠️ BOSS ENRAGED! Saldırıları %30 daha güçlü!'), 'log-crit');
         // Faz 8 (graphics roadmap, 2nd wave) - a one-time flash+shake for the
         // TRANSITION itself, on top of the ongoing .enraged pulse this
@@ -1362,61 +1388,6 @@ function inflictDamage(targetStr, amount) {
     }
 }
 
-function fillBoard(isInitial) {
-    if (!isInitial && currentState !== STATE.PLAYING) return;
-    // Tiles that need their fall-in animation restarted this pass. Collected
-    // and reflowed once at the end instead of once per tile - triggering a
-    // forced synchronous layout inside this loop (as this used to do) is
-    // "layout thrashing" and is exactly the kind of thing that makes a board
-    // full of falling tiles feel janky instead of silky smooth.
-    let tilesToAnimate = [];
-    for (let col = 0; col < width; col++) {
-        let columnTiles = [];
-        for (let row = 0; row < width; row++) {
-            let index = col + (row * width);
-            if (tiles[index].dataset.type !== '') {
-                columnTiles.push({ type: tiles[index].dataset.type, html: tiles[index].innerHTML });
-            }
-        }
-        let missingCount = width - columnTiles.length;
-        for (let i = 0; i < missingCount; i++) {
-            let randomType = Math.floor(Math.random() * tileTypes.length);
-            columnTiles.unshift({ type: tileTypes[randomType].type, html: tileTypes[randomType].symbol, isNew: true });
-        }
-        for (let row = 0; row < width; row++) {
-            let index = col + (row * width);
-            let tileData = columnTiles[row];
-            if (tiles[index].dataset.type !== tileData.type || tileData.isNew) {
-                tiles[index].dataset.type = tileData.type;
-                tiles[index].innerHTML = tileData.html;
-                // matched-big (Faz 1, style.css) ends its animation with
-                // `forwards` fill mode - scale(0)/opacity:0 as the very last
-                // keyframe - which otherwise stays stuck on this DOM node
-                // (tiles are a reused fixed pool, not recreated per match)
-                // even after gravity hands it a brand new tile type, making
-                // that new tile permanently invisible. Must be cleared
-                // alongside 'matched' every time a tile gets recycled here.
-                tiles[index].classList.remove('matched', 'matched-big');
-                if (!isInitial) {
-                    tiles[index].classList.remove('falling');
-                    tilesToAnimate.push(tiles[index]);
-                }
-            }
-        }
-    }
-    if (tilesToAnimate.length > 0) {
-        void gridDisplay.offsetWidth; // one batched reflow instead of one per tile
-        tilesToAnimate.forEach(t => t.classList.add('falling'));
-    }
-    let chainReaction = checkForMatches(isInitial);
-    if (!chainReaction && !boardHasValidMove(tiles, width)) {
-        reshuffleBoard(tiles, width, tileTypes);
-        log(t("Hiç hamle kalmamıştı, tahta karıştırıldı!"), "log-turn");
-        chainReaction = checkForMatches(isInitial); // resolve any matches the reshuffle happened to land
-    }
-    if (!chainReaction && !isInitial) endTurnLogic();
-}
-
 function endTurnLogic() {
     if (currentState !== STATE.PLAYING) return;
     if (enemyHP <= 0 || playerHP <= 0) return;
@@ -1440,6 +1411,10 @@ function endTurnLogic() {
         else { gridDisplay.classList.remove('locked'); startPlayerTimer(); }
     } else {
         isPlayerTurn = !isPlayerTurn;
+        // Back to the player: clear processing BEFORE updateUI, which
+        // derives the ULT button's disabled state from it - the other order
+        // left a 100% ult unpressable until something else refreshed the UI.
+        if (isPlayerTurn) isProcessing = false;
         updateTurnBanner();
         updateUI();
         if (!isPlayerTurn) {
@@ -1448,7 +1423,6 @@ function endTurnLogic() {
             setTimeout(enemyPlayTurn, 1500);
         } else {
             gridDisplay.classList.remove('locked');
-            isProcessing = false;
             startPlayerTimer();
         }
     }
@@ -1497,10 +1471,10 @@ function enemyPlayTurn() {
     } else {
         log(t("Düşman hamle bulamadı. Pas geçiyor..."), "log-enemy");
         isPlayerTurn = true;
+        isProcessing = false; // before updateUI - it derives the ULT button's disabled state from this
         updateTurnBanner();
         updateUI();
         gridDisplay.classList.remove('locked');
-        isProcessing = false;
         startPlayerTimer();
     }
 }
@@ -1652,7 +1626,12 @@ function updateUI() {
     document.getElementById('hp-text').innerHTML = `${Math.floor(Math.max(0,playerHP))}/${maxPlayerHP}${pArmorText}`;
     document.getElementById('enemy-hp-text').innerHTML = `${Math.floor(Math.max(0,enemyHP))}/${maxEnemyHP}${eArmorText}`;
 
-    document.getElementById('ult-btn').disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
+    const ultBtn = document.getElementById('ult-btn');
+    ultBtn.disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
+    // Re-derived every refresh: the static data-i18n-en text would otherwise
+    // replace the class's ult name on a language switch.
+    if (selectedClass) document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: selectedClass.ultName });
+    if (typeof cgStageDo === 'function') cgStageDo('player-sprite', 'setUltReady', ultCharge >= 100);
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
     // Stat readout (own + enemy) lives in the hover tooltip now (see
     // renderStatsTooltip) - rendered on demand, not every UI tick.
@@ -1967,33 +1946,3 @@ function bootGame() {
         bootGame();
     }
 })();
-
-// --- TEST HOOKS (tests/fixture.html) -----------------------------------
-// tiles/gridDisplay/width/STATE are declared with let/const, which (unlike
-// var or a function declaration) never become a window.X property on their
-// own - the existing pure-function tests (findMatchGroups, reshuffleBoard,
-// ...) work around that by building their own throwaway tiles array rather
-// than touching the real board. checkForMatches/processMatch/fillBoard
-// don't take tiles as a parameter though - they close over these
-// module-scope bindings directly - so exercising THEM against a regression
-// scenario (e.g. "a 4+ match's tile must end up visible again after
-// gravity refills it", the exact bug a missing matched-big cleanup caused
-// once already on this project) needs the real bindings, not a copy.
-// tiles/gridDisplay/width are exposed once, by reference: tiles is mutated
-// in place (push/length=0, never reassigned) so this stays live;
-// gridDisplay/width never change at all. currentState IS reassigned
-// throughout this file, so a raw snapshot would go stale immediately - the
-// getter/setter pair lets a test both read and force it (e.g. into
-// STATE.PLAYING) without driving a full class-select + startLevel() flow
-// just to test board-resolution logic in isolation.
-window.tiles = tiles;
-window.gridDisplay = gridDisplay;
-window.width = width;
-window.STATE = STATE;
-Object.defineProperty(window, 'currentState', {
-    get: () => currentState,
-    set: (v) => { currentState = v; }
-});
-window.checkForMatches = checkForMatches;
-window.processMatch = processMatch;
-window.fillBoard = fillBoard;

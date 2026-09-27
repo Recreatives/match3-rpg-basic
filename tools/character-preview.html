@@ -1,0 +1,5 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Karakter önizleme</title>
+<style>body{margin:0;background:#141c26;color:#dfe7ef;font:13px sans-serif;padding:10px}
+.g{display:flex;flex-wrap:wrap;gap:8px}.c{background:radial-gradient(ellipse at 50% 110%,rgba(52,152,219,.25),transparent 60%),linear-gradient(#2e3d4d,#1f2a36);border-radius:10px;padding:6px;text-align:center;width:108px}
+img{width:100px;height:125px;display:block}</style></head><body><div class="g" id="g"></div>
+<script>['warrior','berserker','rogue','archer','mage','necromancer','paladin','monster_normal','monster_armored','monster_swift','monster_drain','monster_boss'].forEach(k=>{document.getElementById('g').insertAdjacentHTML('beforeend',`<div class="c"><img src="../assets/characters/${k}.svg?${Date.now()}"><div>${k.replace('monster_','')}</div></div>`)})</script></body></html>

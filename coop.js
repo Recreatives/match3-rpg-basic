@@ -132,6 +132,7 @@ function coopUpdateSpeedBonusUI() {
     let el = document.getElementById('coop-speed-bonus');
     if (!el) return;
     let mult = coopGetTimeMultiplier();
+    if (coopTurnStartTime && coopMyTurn && !coopProcessing && !coopMatchOver) sbMaybeShowHint(coopBoard, Date.now() - coopTurnStartTime);
     if (!coopTurnStartTime || mult <= 1.02) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerText = `⚡x${mult.toFixed(1)}`;
@@ -147,6 +148,7 @@ function coopStartSpeedTimer() {
 }
 
 function coopStopSpeedTimer() {
+    if (typeof sbClearHint === 'function') sbClearHint(coopBoard);
     clearInterval(coopSpeedBonusInterval);
     coopSpeedBonusInterval = null;
     coopTurnStartTime = null;
@@ -264,6 +266,7 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'turn-done' }, ({ payload }) => { if (coopIsHost) coopHostResolveTurnEnd(payload.role); });
     coopChannel.on('broadcast', { event: 'revive' }, ({ payload }) => coopOnRevive(payload));
     coopChannel.on('broadcast', { event: 'ally-heal' }, ({ payload }) => coopOnAllyHeal(payload));
+    coopChannel.on('broadcast', { event: 'ally-move' }, ({ payload }) => coopOnAllyMove(payload));
     coopChannel.on('broadcast', { event: 'party-wiped' }, () => coopOnPartyWiped());
     coopChannel.on('broadcast', { event: 'vote-open' }, ({ payload }) => coopOpenVote(payload.kind, payload.context));
     coopChannel.on('broadcast', { event: 'vote-choice' }, ({ payload }) => coopOnAllyVote(payload));
@@ -280,7 +283,7 @@ async function coopJoinRoom() {
             // className rides along on presence the same way pvp.js's does -
             // coopCheckPresence reads it straight off the same state it
             // already uses to find the ally, no separate handshake needed.
-            await coopChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
+            await coopChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null, avatar: typeof myAvatarPayload === 'function' ? myAvatarPayload() : null });
             coopSetStatus(tf('Oda "{code}" - takım arkadaşı bekleniyor…', { code: coopRoomCode }));
         }
     });
@@ -301,7 +304,10 @@ async function coopCheckPresence() {
         coopAllyClassName = state[ally.key][0].className;
         let url = coopAllyClassName && CHARACTER_SPRITES[coopAllyClassName];
         let stage = cgGetStage('coop-ally-sprite');
-        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+        // their painted hero, with their real gear (hero.js); an older client
+        // that sends no avatar gets a starter look for its class
+        if (stage && typeof heroRemoteSpec === 'function' && typeof avPaint === 'function') stage.setAvatar(heroRemoteSpec(state[ally.key][0].avatar, coopAllyClassName));
+        else if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
     }
 
     coopStarted = true;
@@ -398,6 +404,8 @@ function coopOnLevelStart(payload) {
     else coopApplyLevelClearHeal();
 
     coopLevel = payload.level;
+    if (typeof cgSetSceneTier === 'function') cgSetSceneTier(document.getElementById('coop-battle'), payload.level);
+    coopBoard.cascadeDepth = 0; // see startLevel's cascadeDepth reset (game.js)
     coopIsBossLevel = payload.isBoss;
     coopEnemyHP = payload.enemyHP;
     coopEnemyMaxHP = payload.enemyMaxHP;
@@ -408,10 +416,7 @@ function coopOnLevelStart(payload) {
     coopProcessing = false;
     coopMyTurn = (payload.continuingRole === coopRole);
 
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('coop-enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('coop-enemy-sprite', coopMinionType, coopLevel);
     // Faz 8 (graphics roadmap, 2nd wave) - same boss-entrance beat solo gets
     // (game.js's startLevel), mirrored here since co-op has boss levels too.
     // Only here, not in the resync/rejoin path below - that's an existing
@@ -426,10 +431,7 @@ function coopOnLevelStart(payload) {
     // empty grid and waits for that broadcast.
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
-    if (coopIsHost) {
-        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
-        coopResolveMatches(true);
-    }
+    if (coopIsHost) sbDealBoard(coopBoard);
     coopUpdateUI();
     coopLog(payload.isBoss ? tf('⚠️ BOSS - Lvl {level} başlıyor!', { level: payload.level }) : tf('Lvl {level} başlıyor. {minion}', { level: payload.level, minion: t(COOP_MINION_LOG[coopMinionType]) }));
     if (coopMyTurn) { coopStopThinkingAnimation(); coopSetStatus(t('Senin sıran!')); coopStartSpeedTimer(); }
@@ -497,10 +499,7 @@ function coopApplySessionResume(state) {
     coopLevel = state.level;
     coopIsBossLevel = state.isBossLevel;
     coopMinionType = state.minionType;
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('coop-enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('coop-enemy-sprite', coopMinionType, coopLevel);
     coopEnemyHP = state.enemyHP;
     coopEnemyMaxHP = state.enemyMaxHP;
     coopEnemyArmor = state.enemyArmor;
@@ -523,10 +522,7 @@ function coopApplySessionResume(state) {
     // just gets a fresh board, authored by the host same as any other level.
     sbCreateBoardDOM('coop-grid', 'coop-tile-', coopTiles, coopHandleTap);
     coopSelectedTile = null;
-    if (coopIsHost) {
-        sbRandomizeBoard(coopTiles, COOP_TILE_TYPES);
-        coopResolveMatches(true);
-    }
+    if (coopIsHost) sbDealBoard(coopBoard);
     // Whose turn it was isn't persisted either - the host simply takes the
     // next turn after a resume, the same simple default this file already
     // uses whenever turn continuity doesn't matter enough to track.
@@ -539,6 +535,7 @@ function coopApplySessionResume(state) {
 }
 
 function coopOnEnemyDefeated(payload) {
+    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playDeath');
     coopLog(payload.isBoss ? tf('Boss (Lvl {level}) yenildi!', { level: payload.level }) : tf('Minion (Lvl {level}) yenildi!', { level: payload.level }));
     if (typeof playSound === 'function') playSound('victory');
     if (typeof cgCelebrate === 'function') cgCelebrate('victory', payload.isBoss);
@@ -552,6 +549,7 @@ function coopOnEnemyDefeated(payload) {
     // reasoning for gold (goldRewardForKill, game.js) - each player earns
     // their own pay for the kill, not a shared pot split between them.
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (typeof awardRunXp === 'function') awardRunXp(payload.level, payload.isBoss ? 3 : 1);
     if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
         let goldReward = goldRewardForKill(payload.level, payload.isBoss);
         adjustWallet(goldReward, 0).then(result => { if (result) coopLog(tf('+{val} 🪙 kazandın!', { val: goldReward })); });
@@ -633,15 +631,27 @@ function coopApplyIncomingDamage(amount, drainUlt) {
     else { coopMyHP -= (amount - coopMyArmor); coopMyArmor = 0; }
 
     coopPlayHitReaction('me', 'sword');
-    showFloatingText(`-${amount}`, document.getElementById('coop-my-hp-bar'), '#e74c3c');
+    coopCombatText('me', '-' + amount, 'dmg', false);
     coopLog(tf('Düşman sana {val} hasar verdi.', { val: amount }));
     coopSyncSelfState();
 }
 
 function coopOnEnemyAttack(payload) {
     if (coopMatchOver) return;
+    // the enemy runs at whichever hero it actually hit
+    if (typeof cgStageDo === 'function') cgStageDo('coop-enemy-sprite', 'playAttack', 1, payload.role === coopRole ? 'coop-my-sprite' : 'coop-ally-sprite');
     if (payload.role === coopRole) coopApplyIncomingDamage(payload.amount || 0, payload.drainUlt || 0);
     else coopLog(tf('Düşman takım arkadaşına {val} hasar verdi.', { val: payload.amount }));
+}
+
+// My teammate matched something: their fighter performs the move in the
+// arena, and the enemy flinches if it was an attack. Purely visual - the
+// real damage arrives through enemy-damage / enemy-hp-sync.
+function coopOnAllyMove(payload) {
+    if (coopMatchOver || typeof cgGetStage !== 'function' || !payload) return;
+    let ally = cgGetStage('coop-ally-sprite');
+    if (ally && payload.cls) ally.playClassMotion(payload.cls, payload.type, payload.power || 1);
+    if (payload.type === 'sword' || payload.type === 'skull') coopPlayHitReaction('enemy', payload.type);
 }
 
 function coopOnAllyHpSync(payload) {
@@ -1059,35 +1069,36 @@ function coopAttemptSwap(tile1, tile2) {
     // the countdown is about how fast the decision was made.
     coopMoveTimeMultiplier = coopGetTimeMultiplier();
     coopStopSpeedTimer();
-
     coopProcessing = true;
-    let t = tile1.dataset.type, h = tile1.innerHTML;
-    tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-    tile2.dataset.type = t; tile2.innerHTML = h;
-    sbBroadcastStep(coopChannel, coopTiles, 'swap'); // teammate sees the swap as it happens
-
-    let matched = coopResolveMatches(false);
-    if (!matched) {
-        setTimeout(() => {
-            let t2 = tile1.dataset.type, h2 = tile1.innerHTML;
-            tile1.dataset.type = tile2.dataset.type; tile1.innerHTML = tile2.innerHTML;
-            tile2.dataset.type = t2; tile2.innerHTML = h2;
-            coopProcessing = false;
-            sbBroadcastStep(coopChannel, coopTiles, 'swap'); // ...and the revert too, if it wasn't a match
-            // Invalid swap didn't cost the turn - fresh speed-bonus window for the next attempt.
-            coopStartSpeedTimer();
-        }, 150);
-    }
+    // Slide, commit, broadcast, resolve (sharedboard.js). An invalid swap
+    // slides back and doesn't cost the turn - fresh speed-bonus window.
+    sbTrySwap(coopBoard, tile1, tile2, () => {
+        coopProcessing = false;
+        coopStartSpeedTimer();
+    });
 }
 
 // Mirrors game.js's soloPlayHit for co-op's three-canvas layout. 'ally'
 // is used by coopOnAllyHeal below, not by coopApplyGroupEffect - a teamheal
 // match only ever benefits the ally once THEIR client applies the broadcast.
+// Combat number over a co-op portrait ('me' | 'ally' | 'enemy').
+function coopCombatText(side, text, kind, delay) {
+    if (typeof cgCombatText !== 'function') return;
+    let d = delay === false ? 0 : CG_IMPACT_DELAY_MS;
+    let portrait = document.getElementById(side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite');
+    cgCombatText(portrait, text, kind, d);
+    if (side === 'me') {
+        let bar = document.getElementById('coop-my-hp-bar-container');
+        if (kind === 'heal') { cgBarPulse(bar, 'heal', d); cgHealSparkles(portrait, d); }
+        else if (kind === 'dmg' || kind === 'crit' || kind === 'self') cgBarPulse(bar, 'hit', d);
+    } else if (kind === 'heal') cgHealSparkles(portrait, d);
+}
+
 function coopPlayHit(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
     let stage = cgGetStage(id);
-    if (stage) stage.playHit(tileType);
+    if (stage) stage.playHit(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
 // Sword/skull actually damage the shared enemy - see game.js's
@@ -1097,55 +1108,43 @@ function coopPlayHitReaction(side, tileType) {
     if (typeof cgGetStage !== 'function') return;
     let id = side === 'me' ? 'coop-my-sprite' : side === 'ally' ? 'coop-ally-sprite' : 'coop-enemy-sprite';
     let stage = cgGetStage(id);
-    if (stage) stage.playHitReaction(tileType);
+    if (stage) stage.playHitReaction(tileType, typeof CG_IMPACT_DELAY_MS !== 'undefined' ? CG_IMPACT_DELAY_MS : 0);
 }
 
-// Faz 1 (graphics roadmap) - see game.js's soloCascadeDepth for the full
-// rationale (same per-mode counter, mirrored here since this file
-// duplicates game.js's board logic rather than sharing it).
-let coopCascadeDepth = 0;
+// --- CO-OP BOARD (sharedboard.js's engine) ---
+// Only the current mover's client runs this; every step is broadcast so the
+// teammate paints the same board. The host deals each level's board.
+const coopBoard = {
+    tiles: coopTiles, width: COOP_WIDTH, pool: COOP_TILE_TYPES,
+    gridEl: () => document.getElementById('coop-grid'),
+    clearDelayMs: 520,
+    initialDelayMs: 0,
+    channel: () => coopChannel,
+    cascadeDepth: 0,
+    isLive: () => !coopMatchOver,
+    applyGroup: (group, shape, isInitial) => coopApplyGroupEffect(group, shape, isInitial),
+    onChainEnd: () => { coopLogTurnSummary(); coopProcessing = false; coopEndOwnTurn(); },
+    onNoMatch: () => { coopProcessing = false; },
+    onReshuffle: () => coopLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!')),
+    setBusy: (busy) => { coopProcessing = busy; }
+};
 
-function coopResolveMatches(isInitial) {
-    let groups = findMatchGroups(coopTiles, COOP_WIDTH);
-    if (groups.length === 0) {
-        if (!isInitial) { coopProcessing = false; coopCascadeDepth = 0; }
-        return false;
-    }
-
-    if (!isInitial) {
-        coopCascadeDepth++;
-        let maxMultiplier = Math.max(...groups.map(g => getMatchShapeInfo(g.indices.length, g.subShape === 'cross').multiplier));
-        if (typeof cgBoardImpact === 'function') cgBoardImpact(document.getElementById('coop-grid'), maxMultiplier);
-        if (coopCascadeDepth >= 2) showFloatingText(`KOMBO x${coopCascadeDepth}`, document.getElementById('coop-grid'), '#ff9f1c');
-    }
-
-    groups.forEach(g => coopApplyGroupEffect(g, isInitial));
-    sbBroadcastStep(coopChannel, coopTiles, 'clear'); // teammate sees the matched tiles clear
-    setTimeout(() => coopDropAndRefill(isInitial), isInitial ? 0 : 350);
-    return true;
-}
-
-function coopApplyGroupEffect(group, isInitial) {
-    let count = group.indices.length;
-    let isCross = (group.subShape === 'cross');
-    // The speed bonus scales the tile EFFECT the same way single-player does
-    // (game.js's processMatch) - ultBonus stays a flat add, not scaled by it.
-    let { multiplier: shapeMultiplier, extraTurn, ultBonus } = getMatchShapeInfo(count, isCross);
-    let multiplier = shapeMultiplier * coopMoveTimeMultiplier;
-    if (!isInitial && typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
-
-    group.indices.forEach(i => {
-        if (!isInitial) {
-            coopTiles[i].classList.add('matched');
-            if (shapeMultiplier >= 2) coopTiles[i].classList.add('matched-big');
-            if (typeof cgTileBurst === 'function') cgTileBurst(coopTiles[i], group.type);
-        }
-        else coopTiles[i].innerHTML = '';
-        coopTiles[i].dataset.type = '';
-    });
-
+// Co-op's game effects for one matched group (the engine has already
+// popped the tiles). The speed bonus scales the tile EFFECT the same way
+// single-player does (game.js's soloApplyGroup) - ultBonus stays a flat add.
+function coopApplyGroupEffect(group, shape, isInitial) {
     if (isInitial) return;
     if (coopMatchOver) return;
+    let count = group.indices.length;
+    let { extraTurn, ultBonus } = shape;
+    let multiplier = shape.multiplier * coopMoveTimeMultiplier;
+    if (typeof playSound === 'function') playSound(count >= 4 ? 'match_big' : 'match');
+    // G3 - shot from the matched tiles to the enemy (attack), my teammate
+    // (teamheal) or me (everything else).
+    if (typeof cgProjectile === 'function') {
+        let targetId = group.type === 'teamheal' ? 'coop-ally-sprite' : 'coop-my-sprite';
+        cgProjectile(coopTiles[group.indices[Math.floor(count / 2)]], document.getElementById(targetId), group.type);
+    }
 
     if (extraTurn) coopExtraTurnTriggered = true;
     if (ultBonus > 0) {
@@ -1160,7 +1159,9 @@ function coopApplyGroupEffect(group, isInitial) {
 
     if (selectedClass && typeof cgGetStage === 'function') {
         let stage = cgGetStage('coop-my-sprite');
-        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type);
+        if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), group.type, shape.multiplier, coopBoard.cascadeDepth);
+        // cosmetic only: lets my teammate see my move on their screen too
+        if (coopChannel) coopChannel.send({ type: 'broadcast', event: 'ally-move', payload: { cls: selectedClass.name.toLowerCase(), type: group.type, power: shape.multiplier } });
     }
 
     if (group.type === 'sword' || group.type === 'skull') {
@@ -1177,12 +1178,15 @@ function coopApplyGroupEffect(group, isInitial) {
             }
             coopApplyDamageToEnemy(amount);
             coopPlayHitReaction('enemy', 'skull');
+            coopCombatText('enemy', '-' + amount, 'crit');
+            if (recoil > 0) coopCombatText('me', '-' + recoil, 'self');
             if (coopMyArmor >= recoil) coopMyArmor -= recoil; else { coopMyHP -= (recoil - coopMyArmor); coopMyArmor = 0; }
             coopMyTurnStats.selfDamage += recoil;
             coopSyncSelfState();
         } else {
             coopApplyDamageToEnemy(amount);
             coopPlayHitReaction('enemy', 'sword');
+            coopCombatText('enemy', '-' + amount, 'dmg');
             if (passiveCtx) triggerPassiveHook('sword', passiveCtx, { amount });
         }
     } else if (group.type === 'heart') {
@@ -1190,6 +1194,7 @@ function coopApplyGroupEffect(group, isInitial) {
         coopMyHP = Math.min(coopMyHP + heal, COOP_MAX_HP);
         coopMyTurnStats.heal += heal;
         coopPlayHit('me', 'heart');
+        coopCombatText('me', '+' + heal, 'heal');
         if (passiveCtx) triggerPassiveHook('heart', passiveCtx, { amount: heal });
         coopSyncSelfState();
     } else if (group.type === 'shield') {
@@ -1197,6 +1202,7 @@ function coopApplyGroupEffect(group, isInitial) {
         coopMyArmor += gain;
         coopMyTurnStats.armor += gain;
         coopPlayHit('me', 'shield');
+        coopCombatText('me', '+' + gain, 'armor');
         if (passiveCtx) triggerPassiveHook('shield', passiveCtx, { amount: gain });
         coopSyncSelfState();
     } else if (group.type === 'energy') {
@@ -1204,6 +1210,7 @@ function coopApplyGroupEffect(group, isInitial) {
         coopUltCharge = Math.min(coopUltCharge + gain, 100);
         coopMyTurnStats.ultGain += gain;
         coopPlayHit('me', 'energy');
+        coopCombatText('me', '+' + gain + '%', 'energy');
         if (passiveCtx) triggerPassiveHook('energy', passiveCtx, { amount: gain });
     } else if (group.type === 'teamheal') {
         // Heals the ALLY, not me - only ever appears on a co-op board
@@ -1214,6 +1221,7 @@ function coopApplyGroupEffect(group, isInitial) {
         let allyRole = coopRole === 'host' ? 'guest' : 'host';
         coopChannel.send({ type: 'broadcast', event: 'ally-heal', payload: { targetRole: allyRole, amount: heal } });
         coopMyTurnStats.teamHeal += heal;
+        coopCombatText('ally', '+' + heal, 'heal');
         coopLog(tf('Takım arkadaşını {val} can iyileştirdin.', { val: heal }));
     }
 
@@ -1238,44 +1246,6 @@ function coopLogTurnSummary() {
     if (coopMyTurnStats.teamHeal > 0) parts.push(tf('takım arkadaşını {val} can iyileştirdin', { val: coopMyTurnStats.teamHeal }));
     coopLog(parts.length > 0 ? tf('Hamlen: {parts}.', { parts: parts.join(', ') }) : t('Hamlen bir etki yaratmadı.'));
     coopMyTurnStats = { damage: 0, heal: 0, armor: 0, selfDamage: 0, ultGain: 0, teamHeal: 0 };
-}
-
-function coopDropAndRefill(isInitial) {
-    for (let col = 0; col < COOP_WIDTH; col++) {
-        let colTiles = [];
-        for (let row = 0; row < COOP_WIDTH; row++) {
-            let i = col + row * COOP_WIDTH;
-            if (coopTiles[i].dataset.type !== '') colTiles.push({ type: coopTiles[i].dataset.type, html: coopTiles[i].innerHTML });
-        }
-        let missing = COOP_WIDTH - colTiles.length;
-        for (let i = 0; i < missing; i++) {
-            let rt = COOP_TILE_TYPES[Math.floor(Math.random() * COOP_TILE_TYPES.length)];
-            colTiles.unshift({ type: rt.type, html: rt.symbol });
-        }
-        for (let row = 0; row < COOP_WIDTH; row++) {
-            let i = col + row * COOP_WIDTH;
-            coopTiles[i].dataset.type = colTiles[row].type;
-            coopTiles[i].innerHTML = colTiles[row].html;
-            // See game.js's fillBoard for why matched-big must be cleared
-            // here too, not just 'matched' - its forwards-filled end state
-            // (scale(0)/opacity:0) otherwise sticks to this reused tile node
-            // and hides whatever new tile gravity just assigned it.
-            coopTiles[i].classList.remove('matched', 'matched-big');
-        }
-    }
-    sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the refilled board settle
-    let chained = coopResolveMatches(isInitial);
-    if (!chained && !coopMatchOver && !boardHasValidMove(coopTiles, COOP_WIDTH)) {
-        reshuffleBoard(coopTiles, COOP_WIDTH, COOP_TILE_TYPES);
-        sbBroadcastStep(coopChannel, coopTiles, 'refill'); // teammate sees the reshuffled board too
-        coopLog(t('Hiç hamle kalmamıştı, tahta karıştırıldı!'));
-        chained = coopResolveMatches(isInitial); // resolve any matches the reshuffle happened to land
-    }
-    if (chained || isInitial || coopMatchOver) return;
-
-    coopLogTurnSummary();
-    coopProcessing = false;
-    coopEndOwnTurn();
 }
 
 // Common "my move is fully done" tail, reached both from a normal cascade
@@ -1346,7 +1316,8 @@ function coopUpdateUI() {
     let ultBtn = document.getElementById('coop-ult-btn');
     if (ultBtn) {
         ultBtn.disabled = coopUltCharge < 100 || !coopMyTurn || coopMatchOver || coopProcessing || !selectedClass || coopMyDown;
-        ultBtn.innerText = selectedClass ? `${selectedClass.ultName} (${Math.floor(coopUltCharge)}%)` : t('ULT (sınıf seçilmedi)');
+        document.getElementById('coop-ult-btn-label').innerText = selectedClass ? selectedClass.ultName : t('ULT (sınıf seçilmedi)');
+        if (typeof cgStageDo === 'function') cgStageDo('coop-my-sprite', 'setUltReady', coopUltCharge >= 100);
     }
 
     let grid = document.getElementById('coop-grid');

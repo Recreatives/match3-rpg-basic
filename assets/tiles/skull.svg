@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+  <radialGradient id="disc" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#5a5a66"/><stop offset=".6" stop-color="#26262e"/><stop offset="1" stop-color="#08080b"/></radialGradient>
+  <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffeaa0"/><stop offset=".5" stop-color="#b8892c"/><stop offset="1" stop-color="#4a2f06"/></linearGradient>
+  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ff5a4a" stop-opacity=".45"/><stop offset="1" stop-color="#ff5a4a" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="50" cy="52" r="47" fill="#000" fill-opacity=".45"/>
+<circle cx="50" cy="50" r="47" fill="url(#ring)"/>
+<circle cx="50" cy="50" r="44" fill="url(#disc)" stroke="#0a0c10" stroke-width="1.5"/>
+<circle cx="50" cy="50" r="40" fill="url(#halo)"/>
+<g transform="translate(50 50) scale(.84) translate(-50 -50)">
+<defs>
+  <radialGradient id="bone" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#fffdf5"/><stop offset=".6" stop-color="#e2d6bb"/><stop offset="1" stop-color="#9c8a68"/></radialGradient>
+  <radialGradient id="socket" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffe0c8"/><stop offset=".35" stop-color="#ff2a1a"/><stop offset="1" stop-color="#200404"/></radialGradient>
+</defs>
+<path d="M50 8 C26 8 12 25 12 45 C12 59 19 67 28 71 L28 86 Q28 92 34 92 L66 92 Q72 92 72 86 L72 71 C81 67 88 59 88 45 C88 25 74 8 50 8Z" fill="url(#bone)" stroke="#0d1016" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M50 8 C74 8 88 25 88 45 C88 59 81 67 72 71 L72 86 Q72 92 66 92 L60 92 Q72 60 50 8Z" fill="#6a5a3e" fill-opacity=".22"/>
+<path d="M30 52 Q36 34 46 44 Q46 60 34 60 Q28 58 30 52Z" fill="url(#socket)" stroke="#0d1016" stroke-width="2.4"/>
+<path d="M70 52 Q64 34 54 44 Q54 60 66 60 Q72 58 70 52Z" fill="url(#socket)" stroke="#0d1016" stroke-width="2.4"/>
+<path d="M50 60 L44 72 Q50 75 56 72 Z" fill="#2a1d10" stroke="#0d1016" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M34 80 H66 M38 76 V92 M44 76 V92 M50 76 V92 M56 76 V92 M62 76 V92" stroke="#0d1016" stroke-width="2" stroke-opacity=".85"/>
+<path d="M60 12 L56 22 L61 27 L57 34" stroke="#5a4a30" stroke-width="1.6" fill="none"/>
+<path d="M24 34 Q30 18 44 14" stroke="#fff" stroke-opacity=".85" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+</svg>
