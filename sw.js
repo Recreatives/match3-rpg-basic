@@ -24,6 +24,7 @@ const APP_SHELL = [
     './i18n-dict.js',
     './sound.js',
     './economy.js',
+    './catalog.js',
     './items.js',
     './hero.js',
     './achievements.js',

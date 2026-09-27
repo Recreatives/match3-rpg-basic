@@ -4,6 +4,14 @@
 // key order at runtime). A template key uses {name}-style placeholders,
 // matching exactly the argument name passed to tf() at its call site.
 const EN_DICT = {
+    // === characters / catalog (phase 1-2) ===
+    'Bunun için seviye {n} gerekiyor.': 'You need level {n} for this.',
+    'Sınıfın bunu kullanamaz.': 'Your class cannot use this.',
+    'Yan El': 'Off-hand',
+    'Kolye': 'Amulet',
+    'Kemer': 'Belt',
+    'Pantolon': 'Legs',
+    'Yüzük': 'Ring',
     // === game.js ===
     'ULT: Shield Slam {dmg} hasar verdi!': 'ULT: Shield Slam dealt {dmg} damage!',
     'ULT: Blood Lust çift hasar verdi!': 'ULT: Blood Lust dealt double damage!',

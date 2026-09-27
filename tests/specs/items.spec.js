@@ -21,10 +21,40 @@ describe('Item catalog', function () {
         });
     });
 
-    it('every unique rarity has exactly one legendary per slot', function (ctx) {
-        var w = ctx.world, U = w.g('UNIQUE_LEGENDARIES');
+    it('every unique is keyed by its real slot', function (ctx) {
+        var w = ctx.world, U = w.g('UNIQUE_LEGENDARIES'), slots = w.g('ITEM_SLOTS');
         ['orange', 'red', 'teal'].forEach(function (r) {
-            expect(Object.keys(U[r]).sort(), r).toEqual(w.g('ITEM_SLOTS').slice().sort());
+            expect(Object.keys(U[r]).length, r).toBe(8);
+            Object.keys(U[r]).forEach(function (slot) { expect(slots, r + '/' + slot).toContain(slot); });
+        });
+    });
+
+    it('every catalog base has a band, classes, a size and (except rings) a look the painter knows', function (ctx) {
+        var w = ctx.world, B = w.g('CATALOG_BASES'), P = w.g('AV_PAINT'), W = w.g('AV_WEAPONS');
+        var styles = { helmet: ['greathelm', 'horned', 'nasal', 'hood', 'cowl', 'circlet'], chest: ['plate', 'mail', 'leather', 'robe'], shoulders: ['plate', 'spiked', 'leather', 'mantle'],
+            gloves: ['gauntlet', 'leather'], legs: ['plate', 'leather', 'cloth'], boots: ['plate', 'leather', 'cloth'], belt: ['leather', 'sash'], amulet: ['pendant'],
+            offhand: ['kite', 'tower', 'orb', 'tome', 'lantern', 'dagger', 'quiver'] };
+        Object.keys(B).forEach(function (id) {
+            var b = B[id];
+            expect(b.min >= 1 && b.max <= 50 && b.min < b.max, id + ' band').toBe(true);
+            expect(b.cls.length, id + ' classes').toBeGreaterThan(0);
+            expect([1, 2], id + ' size').toContain(b.size);
+            if (b.slot === 'ring') return;
+            expect(!!b.vis && !!P[b.vis.slot], id + ' look').toBe(true);
+            if (b.vis.slot === 'weapon') expect(typeof W[b.vis.style], id + ' weapon style').toBe('function');
+            else expect(styles[b.vis.slot], id + ' style').toContain(b.vis.style);
+        });
+    });
+
+    it('every class can dress every slot at every level band', function (ctx) {
+        var w = ctx.world, bases = w.g('ITEM_BASES'), bands = w.g('CATALOG_BANDS');
+        ['warrior', 'paladin', 'berserker', 'rogue', 'archer', 'mage', 'necromancer'].forEach(function (cls) {
+            ['weapon', 'helmet', 'shoulder', 'amulet', 'chest', 'gloves', 'belt', 'legs', 'boots', 'ring'].forEach(function (slot) {
+                bands.forEach(function (band) {
+                    var ok = bases[slot].some(function (b) { return !b.legacy && b.classes.indexOf(cls) !== -1 && b.minLevel === band[0]; });
+                    expect(ok, cls + ' ' + slot + ' ' + band[0]).toBe(true);
+                });
+            });
         });
     });
 
@@ -49,15 +79,34 @@ describe('Item catalog', function () {
 });
 
 describe('Item generation', function () {
-    it('orange/red/teal always generate their exact fixed identity', function (ctx) {
+    it('orange/red/teal always generate a fixed identity (that slot\'s, when it has one)', function (ctx) {
         var w = ctx.world, gen = w.g('generateItem'), U = w.g('UNIQUE_LEGENDARIES');
         ['orange', 'red', 'teal'].forEach(function (r) {
+            var ids = Object.values(U[r]).map(function (u) { return u.id; });
             w.g('ITEM_SLOTS').forEach(function (slot) {
                 var item = gen(slot, r);
-                expect(item.base_id).toBe(U[r][slot].id);
-                expect(item.rolled_stats).toEqual(U[r][slot].stats);
+                if (U[r][slot]) { expect(item.base_id).toBe(U[r][slot].id); expect(item.rolled_stats).toEqual(U[r][slot].stats); }
+                else expect(ids, r + ' fallback for ' + slot).toContain(item.base_id);
+                expect(item.req_level, item.base_id + ' level').toBeGreaterThanOrEqual(30);
             });
         });
+    });
+
+    it('rolls pick a base from the level\'s band, for the class when asked, and scale with the item level', function (ctx) {
+        var w = ctx.world, gen = w.g('generateItem');
+        for (var n = 0; n < 40; n++) {
+            var low = gen('chest', 'white', { level: 3, cls: 'mage' }), high = gen('chest', 'white', { level: 47, cls: 'mage' });
+            var bl = w.g('CATALOG_BASES')[low.base_id], bh = w.g('CATALOG_BASES')[high.base_id];
+            expect(bl.cls, low.base_id).toContain('mage');
+            expect(bh.cls, high.base_id).toContain('mage');
+            expect(low.item_level >= bl.min && low.item_level <= bl.max, 'in band').toBe(true);
+            expect(high.item_level).toBe(47);
+            expect(high.req_level).toBe(47);
+        }
+        expect(w.g('itemLevelMult(50)')).toBeCloseTo(2.47, 0.01);
+        expect(w.g("itemUsableBy({ base_id: 'plate_chest_3', req_level: 22 }, 'mage', 30)"), 'mages wear cloth').toBe(false);
+        expect(w.g("itemUsableBy({ base_id: 'cloth_chest_3', req_level: 22 }, 'mage', 20)"), 'too low level').toBe(false);
+        expect(w.g("itemUsableBy({ base_id: 'cloth_chest_3', req_level: 22 }, 'mage', 22)")).toBe(true);
     });
 
     it('procedural items roll exactly affixCount stats, primary stat always first', function (ctx) {
@@ -91,7 +140,7 @@ describe('Item generation', function () {
     it('loot drop rarity follows dropWeight (seeded, 20000 rolls)', function (ctx) {
         var w = ctx.world, R = w.g('RARITY_DEFS'), counts = {}, N = 20000;
         var total = Object.values(R).reduce(function (s, r) { return s + r.dropWeight; }, 0);
-        for (var i = 0; i < N; i++) { var it2 = w.g('rollLootDrop([])'); counts[it2.rarity] = (counts[it2.rarity] || 0) + 1; }
+        for (var i = 0; i < N; i++) { var it2 = w.g('rollLootDrop([], { level: 50 })'); counts[it2.rarity] = (counts[it2.rarity] || 0) + 1; }
         ['grey', 'white', 'blue', 'yellow'].forEach(function (k) {
             expect((counts[k] || 0) / N, k).toBeCloseTo(R[k].dropWeight / total, 0.015);
         });
@@ -106,11 +155,21 @@ describe('Item generation', function () {
         w.g("Object.keys(RARITY_DEFS).forEach(k => RARITY_DEFS[k].dropWeight = k === 'green' ? 1 : 0)");
         try {
             for (var i = 0; i < 30; i++) {
-                var item = w.g('rollLootDrop')(owned);
+                var item = w.g('rollLootDrop')(owned, { level: 50 });
                 if (item.set_key === setKey) expect(item.base_id).toBe(pieces[0]);
             }
         } finally {
             w.g("(function(b){ Object.keys(b).forEach(k => RARITY_DEFS[k].dropWeight = b[k]); })(JSON.parse(RARITY_DEFS_BACKUP))");
+        }
+    });
+});
+
+describe('Loot below the unique / set levels', function () {
+    it('a low-level character never gets uniques or set pieces it could not wear for ages', function (ctx) {
+        var w = ctx.world;
+        for (var i = 0; i < 3000; i++) {
+            var it2 = w.g('rollLootDrop([], { level: 5 })');
+            expect(['orange', 'red', 'teal', 'green'].indexOf(it2.rarity), it2.rarity).toBe(-1);
         }
     });
 });

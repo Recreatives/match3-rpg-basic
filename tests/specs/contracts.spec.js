@@ -22,12 +22,20 @@ function sqlInsertRows(sql, table) {
             continue;
         }
         if (ch === "'") { inStr = true; tok = ''; }
+        else if (cur && body.substr(i, 6).toLowerCase() === 'array[') {
+            // array['a','b']::text[] -> ['a', 'b']
+            var end = body.indexOf(']', i), inner = body.slice(i + 6, end);
+            cur.push({ a: (inner.match(/'([^']*)'/g) || []).map(function (q) { return q.slice(1, -1); }) });
+            i = end;
+            if (body.substr(i + 1, 8) === '::text[]') i += 8;
+            tok = '';
+        }
         else if (ch === '(' && !cur) { cur = []; tok = ''; }
         else if (ch === ',' && cur) { if (tok.trim()) cur.push({ n: tok.trim() }); tok = ''; }
         else if (ch === ')' && cur) {
             if (tok.trim()) cur.push({ n: tok.trim() });
             var row = {};
-            cur.forEach(function (v, idx) { row[cols[idx]] = v.s !== undefined ? v.s : Number(v.n); });
+            cur.forEach(function (v, idx) { row[cols[idx]] = v.a !== undefined ? v.a : v.s !== undefined ? v.s : (v.n === 'true' ? true : v.n === 'false' ? false : Number(v.n)); });
             rows.push(row); cur = null; tok = '';
         }
         else if (cur) tok += ch;
@@ -39,40 +47,39 @@ describe('schema.sql <-> items.js catalog sync', { world: { pixi: false } }, fun
     var sql;
     beforeAll(async function () { sql = await readSource('supabase/schema.sql'); });
 
-    it('item_bases lists exactly ITEM_BASES (slot, base_id, primary_stat)', function (ctx) {
-        var w = ctx.world, fromJs = [], fromSql = sqlInsertRows(sql, 'item_bases');
-        w.g('ITEM_SLOTS').forEach(function (slot) {
-            w.g('ITEM_BASES')[slot].forEach(function (b) { fromJs.push(slot + '/' + b.id + '/' + b.primaryStat); });
+    it('item_bases lists exactly the catalog bases (slot, id, stat, classes, band, legacy)', function (ctx) {
+        var w = ctx.world, B = w.g('CATALOG_BASES'), rows = sqlInsertRows(sql, 'item_bases');
+        var fromSql = {};
+        rows.forEach(function (r) { fromSql[r.base_id] = r; });
+        Object.keys(B).forEach(function (id) {
+            var b = B[id], r = fromSql[id];
+            expect(!!r, id + ' in schema.sql').toBe(true);
+            if (!r) return;
+            expect([r.slot, r.primary_stat, r.min_level, r.max_level, r.legacy], id).toEqual([b.slot, b.stat, b.min, b.max, !!b.legacy]);
+            expect(r.classes.slice().sort(), id + ' classes').toEqual(b.cls.slice().sort());
         });
-        var sqlKeys = fromSql.map(function (r) { return r.slot + '/' + r.base_id + '/' + r.primary_stat; });
-        expect(sqlKeys.filter(function (k) { return fromJs.indexOf(k) === -1; }), 'in schema.sql but not items.js').toEqual([]);
-        expect(fromJs.filter(function (k) { return sqlKeys.indexOf(k) === -1; }), 'in items.js but not schema.sql').toEqual([]);
+        expect(Object.keys(fromSql).filter(function (id) { return !B[id]; }), 'stale rows in schema.sql').toEqual([]);
     });
 
-    it('item_fixed_defs lists every unique legendary with its exact stats', function (ctx) {
-        var w = ctx.world, U = w.g('UNIQUE_LEGENDARIES');
-        var rows = sqlInsertRows(sql, 'item_fixed_defs');
-        var byKey = {};
-        rows.forEach(function (r) { byKey[r.rarity + '/' + r.base_id] = JSON.parse(r.rolled_stats); });
-        var jsKeys = [];
-        ['orange', 'red', 'teal'].forEach(function (r) {
-            Object.values(U[r]).forEach(function (u) {
-                jsKeys.push(r + '/' + u.id);
-                expect(byKey[r + '/' + u.id], r + '/' + u.id).toEqual(u.stats);
-            });
+    it('item_fixed_defs lists every set piece and unique with its exact stats, slot, classes and level', function (ctx) {
+        var w = ctx.world, F = w.g('CATALOG_FIXED'), U = w.g('UNIQUE_LEGENDARIES'), rows = sqlInsertRows(sql, 'item_fixed_defs'), byId = {};
+        rows.forEach(function (r) { byId[r.base_id] = r; });
+        Object.keys(F).forEach(function (id) {
+            var f = F[id], r = byId[id];
+            expect(!!r, id).toBe(true);
+            if (!r) return;
+            expect([r.rarity, r.slot, r.req_level], id).toEqual([f.rarity, f.slot, f.req]);
+            expect(JSON.parse(r.rolled_stats), id + ' stats').toEqual(f.stats);
+            expect(r.classes.slice().sort(), id + ' classes').toEqual(f.cls.slice().sort());
         });
-        var sqlUniques = Object.keys(byKey).filter(function (k) { return k.indexOf('green/') !== 0; });
-        expect(sqlUniques.filter(function (k) { return jsKeys.indexOf(k) === -1; }), 'stale rows in schema.sql').toEqual([]);
-    });
-
-    it('item_fixed_defs lists every set piece with its exact stats', function (ctx) {
-        var w = ctx.world, rows = sqlInsertRows(sql, 'item_fixed_defs'), byId = {};
-        rows.filter(function (r) { return r.rarity === 'green'; }).forEach(function (r) { byId[r.base_id] = JSON.parse(r.rolled_stats); });
-        var jsIds = [];
+        expect(Object.keys(byId).filter(function (id) { return !F[id]; }), 'stale rows').toEqual([]);
+        // items.js' own tables agree with the catalog
+        ['orange', 'red', 'teal'].forEach(function (rk) {
+            Object.entries(U[rk]).forEach(function (e) { expect([F[e[1].id] && F[e[1].id].slot, F[e[1].id] && F[e[1].id].stats], e[1].id).toEqual([e[0], e[1].stats]); });
+        });
         Object.values(w.g('ITEM_SETS')).forEach(function (set) {
-            Object.entries(set.pieces).forEach(function (e) { jsIds.push(e[0]); expect(byId[e[0]], e[0]).toEqual(e[1].stats); });
+            Object.entries(set.pieces).forEach(function (e) { expect([F[e[0]] && F[e[0]].slot, F[e[0]] && F[e[0]].stats], e[0]).toEqual([e[1].slot, e[1].stats]); });
         });
-        expect(Object.keys(byId).filter(function (id) { return jsIds.indexOf(id) === -1; }), 'stale set rows').toEqual([]);
     });
 
     // The server rejects any procedural item whose affix count or |stat|
@@ -182,6 +189,7 @@ describe('i18n completeness', { world: { pixi: false } }, function () {
         });
         Object.values(w.g('UNIQUE_LEGENDARIES')).forEach(function (bySlot) { Object.values(bySlot).forEach(function (u) { need('unique', u.name); }); });
         w.g('ITEM_SLOTS').forEach(function (slot) { w.g('ITEM_BASES')[slot].forEach(function (b) { need('base', b.name); }); });
+        Object.values(w.g('SLOT_LABELS')).forEach(function (s) { need('slot', s); });
         Object.values(w.g('COOP_VOTE_COPY')).forEach(function (c) { need('vote', c.desc); need('vote', c.labelA); need('vote', c.labelB); });
         expect(missing).toEqual([]);
     });

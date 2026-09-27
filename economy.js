@@ -572,15 +572,28 @@ async function equipItem(itemRowId) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return false;
 
-    let previouslyEquipped = currentOwnedItems.find(it => it.slot === item.slot && it.equipped_slot === item.slot);
+    // class and level gate (the server checks the same - see equip_item)
+    const cls = selectedClass ? selectedClass.name.toLowerCase() : null;
+    const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : undefined;
+    if (typeof itemUsableBy === 'function' && !itemUsableBy(item, cls, lvl)) {
+        setShopStatus(itemReqLevel(item) > (lvl || 99) ? tf('Bunun için seviye {n} gerekiyor.', { n: itemReqLevel(item) }) : t('Sınıfın bunu kullanamaz.'));
+        return false;
+    }
+    // which slot: its own, or a free ring slot (else the first one)
+    const itemSlot = typeof itemSlotOf === 'function' ? itemSlotOf(item) : item.slot;
+    const targets = typeof equipSlotsFor === 'function' ? equipSlotsFor(itemSlot) : [itemSlot];
+    const worn = typeof activeEquippedItems === 'function' ? activeEquippedItems() : currentOwnedItems.filter(it => it.equipped_slot);
+    const target = targets.find(sl => !worn.some(it => it.equipped_slot === sl)) || targets[0];
+
+    let previouslyEquipped = worn.find(it => it.equipped_slot === target);
     if (previouslyEquipped) {
         await sb.from('player_items').update({ equipped_slot: null }).eq('id', previouslyEquipped.id).eq('player_id', user.id);
         previouslyEquipped.equipped_slot = null;
     }
 
-    const { error } = await sb.from('player_items').update({ equipped_slot: item.slot }).eq('id', itemRowId).eq('player_id', user.id);
+    const { error } = await sb.from('player_items').update({ equipped_slot: target }).eq('id', itemRowId).eq('player_id', user.id);
     if (error) { console.error('Equip failed:', error.message); return false; }
-    item.equipped_slot = item.slot;
+    item.equipped_slot = target;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
     if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
@@ -660,14 +673,16 @@ async function upgradeItem(itemId) {
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.
-async function awardLootDrop() {
-    let item = rollLootDrop(currentOwnedItems);
+async function awardLootDrop(dropLevel) {
+    const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
+    let item = rollLootDrop(currentOwnedItems, { level: Math.max(1, Math.min(50, dropLevel || lvl)), cls: selectedClass ? selectedClass.name.toLowerCase() : null });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
     const { data, error } = await sb.from('player_items').insert({
         player_id: user.id, base_id: item.base_id, slot: item.slot,
-        rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key
+        rarity: item.rarity, rolled_stats: item.rolled_stats, set_key: item.set_key,
+        item_level: item.item_level || 1, req_level: item.req_level || 1
     }).select().single();
 
     if (error) { console.error('Loot drop insert failed:', error.message); return null; }
