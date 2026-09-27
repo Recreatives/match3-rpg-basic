@@ -921,7 +921,7 @@ class CombatStage {
         if (this.stripW) {
             // Fit within the canvas while preserving aspect ratio, leaving
             // side room for the class actions to lunge/dash into.
-            const scale = Math.min((h * 0.9) / this.stripH, (w * 0.8) / this.stripW, 4);
+            const scale = Math.min((h * 0.9) / this.stripH, (w * 0.8) / this.stripW, 4) * (this.sizeBoost || 1);
             this.portraitBaseScale = scale;
         }
         sprite.scale.set(this.portraitBaseScale);
@@ -940,6 +940,7 @@ class CombatStage {
         this.rigLegs = null;
         this.idleStyle = null;
         this.charKey = url.split('/').pop().replace(/\.[a-z]+$/, '');
+        this.sizeBoost = 1;
         this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : (this.charKey.indexOf('monster_') === 0 ? -1 : 1);
         const rigs = await cgLoadRigs(url.replace(/[^/]*$/, ''));
         const rig = rigs[this.charKey];
@@ -975,7 +976,8 @@ class CombatStage {
         if (typeof avPaint !== 'function') return;
         const painted = avPaint(spec);
         const token = this.url = 'avatar:' + JSON.stringify(spec);
-        this.charKey = 'avatar_' + (spec.cls || 'hero');
+        this.charKey = spec.charKey || ('avatar_' + (spec.cls || 'hero'));
+        this.sizeBoost = spec.sizeBoost || 1; // a boss stands a head taller
         this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : 1;
         const textures = await Promise.all(painted.order.map(p => cgTextureFromSVG(painted.parts[p])));
         if (this.url !== token) return; // a newer look won the race
@@ -1135,6 +1137,14 @@ class CombatStage {
                 g.circle(p.x, p.y, 5 * s).fill({ color: 0xffffff, alpha: 0.18 });
             }
         });
+    }
+
+    // A painted monster (avatar.js avMonsterSpec): its type's race and
+    // gear, varied by floor. Walks in like the file-based ones did.
+    async setMonster(type, level) {
+        if (typeof avMonsterSpec !== 'function') return this.setPortrait(MONSTER_SPRITES[type] || MONSTER_SPRITES.normal);
+        await this.setAvatar(avMonsterSpec(type, level));
+        if (this.arena && this.side === 'right') this.playEntrance();
     }
 
     _installRig(parts, pivots, hand, box) {
@@ -1895,6 +1905,13 @@ function cgGearFxFrom(spec) {
     });
     if (spec && spec.setAura) out.push({ fx: 'set', color: hex(spec.setAura), at: 'body' });
     return out.slice(0, 5);
+}
+
+// The mode files' one-liner for "this floor's monster".
+function cgSetMonster(canvasId, type, level) {
+    if (typeof cgGetStage !== 'function') return;
+    const stage = cgGetStage(canvasId);
+    if (stage) stage.setMonster(type || 'normal', level || 1);
 }
 
 // A unique's passive fired (items.js triggerPassiveHook): play it on my

@@ -416,10 +416,7 @@ function coopOnLevelStart(payload) {
     coopProcessing = false;
     coopMyTurn = (payload.continuingRole === coopRole);
 
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('coop-enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('coop-enemy-sprite', coopMinionType, coopLevel);
     // Faz 8 (graphics roadmap, 2nd wave) - same boss-entrance beat solo gets
     // (game.js's startLevel), mirrored here since co-op has boss levels too.
     // Only here, not in the resync/rejoin path below - that's an existing
@@ -502,10 +499,7 @@ function coopApplySessionResume(state) {
     coopLevel = state.level;
     coopIsBossLevel = state.isBossLevel;
     coopMinionType = state.minionType;
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('coop-enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[coopMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('coop-enemy-sprite', coopMinionType, coopLevel);
     coopEnemyHP = state.enemyHP;
     coopEnemyMaxHP = state.enemyMaxHP;
     coopEnemyArmor = state.enemyArmor;

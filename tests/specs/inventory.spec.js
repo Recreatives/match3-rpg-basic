@@ -156,3 +156,25 @@ describe('Item animation', function () {
         expect(w.g('__beams')).toEqual([false, true]);
     });
 });
+
+describe('Painted monsters', function () {
+    it('every monster type paints at every floor, keeping its move set key', function (ctx) {
+        var w = ctx.world;
+        var bad = w.g("(function(){ var out=[]; ['normal','armored','swift','drain','boss'].forEach(function(t){ [1,6,11,16,26,41,50].forEach(function(L){ var sp=avMonsterSpec(t,L); var p=avPaint(sp); if (!p.parts.torso || !p.parts.head || sp.charKey !== 'monster_'+t) out.push(t+'@'+L); }); }); return out; })()");
+        expect(bad).toEqual([]);
+        // the floor theme changes its colors, deeper floors its gear
+        expect(w.g("JSON.stringify(avMonsterSpec('normal',1)) !== JSON.stringify(avMonsterSpec('normal',6))")).toBe(true);
+        expect(w.g("avMonsterSpec('normal',1).gear.weapon.style + '/' + avMonsterSpec('normal',15).gear.weapon.style")).toBe('mace/axe');
+        expect(w.g("avMonsterSpec('boss',5).sizeBoost")).toBeGreaterThan(1);
+    });
+
+    it('a solo floor puts its painted monster on the enemy stage', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR', { level: 5 });
+        var st = w.g("cgGetStage('enemy-sprite')");
+        await awaitInWorld(w, st.ready);
+        for (var i = 0; i < 40 && st.charKey !== 'monster_boss'; i++) { await w.tick(50); await new Promise(function (r) { setTimeout(r, 20); }); }
+        expect(st.charKey).toBe('monster_boss');
+        expect(st.isAvatar).toBe(true);
+    });
+});

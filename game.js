@@ -471,10 +471,7 @@ function startLevel() {
 
     let name = isBoss ? tf('BOSS Sv. {level}', { level }) : tf('Canavar Sv. {level}', { level });
     document.getElementById('enemy-name').innerText = name;
-    if (typeof cgGetStage === 'function' && typeof MONSTER_SPRITES !== 'undefined') {
-        let stage = cgGetStage('enemy-sprite');
-        if (stage) stage.setPortrait(MONSTER_SPRITES[currentMinionType] || MONSTER_SPRITES.normal);
-    }
+    if (typeof cgSetMonster === 'function') cgSetMonster('enemy-sprite', currentMinionType, level);
     ENEMY_TILE_STATS = getEnemyStatsForLevel(level, isBoss);
     // G3 - backdrop changes every 5 floors; the player's portrait stands
     // back up if the last fight ended with it toppled.

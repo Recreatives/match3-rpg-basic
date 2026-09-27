@@ -279,7 +279,7 @@ function avHeadPath(P, grow) {
 }
 function avFace(S, look) {
     const P = S.P, hx = P.headX, hy = P.hy, r = P.hr, f = P.female;
-    const skin = AV_SKINS[look.skin || 0];
+    const skin = look.skinTone || AV_SKINS[look.skin || 0];
     let s = S.path(avHeadPath(P), S.skin(skin));
     s += S.flat(`M${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Q${avN(hx - r * 1.0)} ${avN(hy - r * 1.05)} ${avN(hx - r * 0.1)} ${avN(hy - r * 1.08)} Q${avN(hx - r * 0.35)} ${avN(hy)} ${avN(hx - r * 0.2)} ${avN(hy + r * 0.75)} Q${avN(hx - r * 0.7)} ${avN(hy + r * 0.55)} ${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Z`, '#000', 0.16);
     // ear on the back half of the head
@@ -295,11 +295,94 @@ function avFace(S, look) {
         s += S.line(f ? `M${avN(x - w)} ${avN(ey - r * 0.18)} Q${avN(x)} ${avN(ey - r * 0.27)} ${avN(x + w * 1.1)} ${avN(ey - r * 0.2)}`
                       : `M${avN(x - w * 1.2)} ${avN(ey - r * 0.27)} L${avN(x + w * 1.1)} ${avN(ey - r * 0.18)}`, brow, f ? P.ol * 0.5 : P.ol * 0.9);
     });
+    s += avRaceFace(S, look, skin);
     // cheekbone, mouth
     s += S.line(`M${avN(hx + r * 0.2)} ${avN(hy + r * 0.42)} Q${avN(hx + r * 0.4)} ${avN(hy + r * 0.5)} ${avN(hx + r * 0.55)} ${avN(hy + r * 0.42)}`, avDark(skin[1], 0.2), P.ol * 0.35, 0.6);
     s += f ? S.path(`M${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.61)} ${avN(hx + r * 0.85)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.76)} ${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Z`, '#a85a52', P.ol * 0.3)
         : S.line(`M${avN(hx + r * 0.55)} ${avN(hy + r * 0.68)} Q${avN(hx + r * 0.7)} ${avN(hy + r * 0.66)} ${avN(hx + r * 0.84)} ${avN(hy + r * 0.7)}`, avDark(skin[1], 0.45), P.ol * 0.55);
     return s;
+}
+
+// Monster races (avMonsterSpec): what sets their faces apart - a long
+// pointed ear, glowing eyes, an orc's tusks, a demon's horns, a lich's
+// sunken cheeks.
+function avRaceFace(S, look, skin) {
+    const race = look.race;
+    if (!race) return '';
+    const P = S.P, hx = P.headX, hy = P.hy, r = P.hr;
+    let s = '';
+    if (race === 'orc' || race === 'ghoul' || race === 'lich' || race === 'demon') {
+        s += S.path(`M${avN(hx - r * 0.32)} ${avN(hy - r * 0.05)} L${avN(hx - r * 1.25)} ${avN(hy - r * 0.55)} L${avN(hx - r * 0.5)} ${avN(hy + r * 0.45)} Z`, S.skin(skin), P.ol * 0.6);
+    }
+    if (race === 'orc') {
+        // heavy brow and two tusks jutting up from the jaw
+        s += S.flat(`M${avN(hx + r * 0.05)} ${avN(hy - r * 0.2)} L${avN(hx + r * 1.0)} ${avN(hy - r * 0.12)} L${avN(hx + r * 0.95)} ${avN(hy + r * 0.02)} L${avN(hx + r * 0.1)} ${avN(hy - r * 0.02)} Z`, '#000', 0.25);
+        [[0.62, 1], [0.86, 0.8]].forEach(([o, k]) => { s += S.path(`M${avN(hx + r * o - r * 0.07 * k)} ${avN(hy + r * 0.78)} L${avN(hx + r * o)} ${avN(hy + r * (0.78 - 0.34 * k))} L${avN(hx + r * o + r * 0.07 * k)} ${avN(hy + r * 0.78)} Z`, '#efe6cf', P.ol * 0.4); });
+    }
+    if (race === 'lich' || race === 'ghoul') {
+        s += S.flat(`M${avN(hx + r * 0.15)} ${avN(hy + r * 0.25)} Q${avN(hx + r * 0.4)} ${avN(hy + r * 0.6)} ${avN(hx + r * 0.7)} ${avN(hy + r * 0.3)} Z`, '#000', 0.3);
+    }
+    if (race === 'demon') {
+        s += S.path(`M${avN(hx - r * 0.2)} ${avN(hy - r * 0.85)} Q${avN(hx - r * 0.8)} ${avN(hy - r * 1.9)} ${avN(hx - r * 1.6)} ${avN(hy - r * 1.7)} Q${avN(hx - r * 0.9)} ${avN(hy - r * 1.35)} ${avN(hx - r * 0.55)} ${avN(hy - r * 0.6)} Z`, S.lin('#e8dcc0', '#4a3a2a', true), P.ol * 0.8);
+        s += S.path(`M${avN(hx + r * 0.3)} ${avN(hy - r * 0.95)} Q${avN(hx + r * 0.5)} ${avN(hy - r * 1.9)} ${avN(hx + r * 1.2)} ${avN(hy - r * 2.0)} Q${avN(hx + r * 0.75)} ${avN(hy - r * 1.4)} ${avN(hx + r * 0.75)} ${avN(hy - r * 0.8)} Z`, S.lin('#e8dcc0', '#4a3a2a', true), P.ol * 0.8);
+    }
+    if (look.eyeGlow) {
+        const ey = hy + r * 0.08;
+        [[0.4, 1], [0.82, 0.7]].forEach(([o, k]) => { s += S.glow(hx + r * o, ey, r * 0.3 * k, look.eyeGlow, 0.7) + S.circle(hx + r * o, ey, r * 0.1 * k, look.eyeGlow, 0); });
+    }
+    return s;
+}
+
+// --- MONSTERS ----------------------------------------------------------------------
+// Every monster is painted like a hero (same bodies, same gear painters):
+// a race for the face and skin, a gear set per monster type, and a
+// variant by floor - the floor's color theme (crypt / moss / ember / abyss,
+// every 5 floors, like the backdrop) and heavier, more ornate gear every
+// 10 floors.
+const AV_MONSTER_THEMES = {
+    crypt: { cloth: '#4a4650', metal: '#8a8f96', trim: '#b8a070', glow: '#ff5a3a' },
+    moss: { cloth: '#3a4a2a', metal: '#6a7a5a', trim: '#9aa04a', glow: '#9aff4a' },
+    ember: { cloth: '#5a2a1a', metal: '#7a4a3a', trim: '#ff8a2a', glow: '#ffb02a' },
+    abyss: { cloth: '#2a1a3a', metal: '#4a3a6a', trim: '#b05cff', glow: '#c07aff' },
+};
+function avMonsterSpec(type, level) {
+    const L = Math.max(1, level | 0);
+    const themes = ['crypt', 'moss', 'ember', 'abyss'];
+    const T = AV_MONSTER_THEMES[themes[Math.floor((L - 1) / 5) % themes.length]];
+    const tier = L <= 10 ? 1 : L <= 25 ? 2 : 3;
+    const pick = list => list[Math.min(list.length - 1, Math.floor((L - 1) / 10))];
+    const g = (slot, style, color, extra) => Object.assign({ slot, style, tier, color, trim: T.trim, glow: tier >= 2 ? T.glow : undefined }, extra || {});
+    if (type === 'armored') {
+        // a dead knight: sealed plate, a tower shield, the eye slit burning
+        return { cls: 'warrior', race: 'undead', gender: 'm', skinTone: ['#d8d2c0', '#8a8270'], hair: 'shaved', beard: 'none', charKey: 'monster_armored',
+            gear: { helmet: g('helmet', 'greathelm', T.metal, { glow: T.glow }), chest: g('chest', 'plate', T.metal, { tabard: T.cloth }), shoulders: g('shoulders', pick(['plate', 'spiked']), T.metal),
+                gloves: g('gloves', 'gauntlet', T.metal), legs: g('legs', 'plate', T.metal), boots: g('boots', 'plate', T.metal),
+                weapon: g('weapon', pick(['sword', 'mace', 'sword']), '#b8c0c8'), offhand: g('offhand', 'tower', T.metal) } };
+    }
+    if (type === 'swift') {
+        // a ghoul stalker: hooded, lean, twin blades
+        return { cls: 'rogue', race: 'ghoul', gender: 'm', skinTone: ['#9a96a8', '#4a4658'], eyeGlow: '#ffe04a', hair: 'shaved', beard: 'none', charKey: 'monster_swift',
+            gear: { helmet: g('helmet', 'hood', T.cloth), chest: g('chest', 'leather', T.cloth), legs: g('legs', 'leather', '#2a2430'), boots: g('boots', 'leather', '#2a2020'),
+                gloves: g('gloves', 'leather', '#3a2a2a'), belt: g('belt', 'sash', T.trim), weapon: g('weapon', 'dagger', '#c9d2dc'), offhand: g('offhand', 'dagger', '#c9d2dc') } };
+    }
+    if (type === 'drain') {
+        // a lich: robed, cowled, a staff and a soul lantern
+        return { cls: 'necromancer', race: 'lich', gender: 'm', skinTone: ['#a8b4b8', '#4a5860'], eyeGlow: T.glow, hair: 'shaved', beard: 'none', charKey: 'monster_drain',
+            gear: { helmet: g('helmet', 'cowl', T.cloth), chest: g('chest', 'robe', T.cloth), boots: g('boots', 'cloth', '#1a1a1a'), belt: g('belt', 'sash', T.trim),
+                weapon: g('weapon', 'staff', '#3a2a3a', { glow: T.glow }), offhand: g('offhand', 'lantern', T.metal, { glow: T.glow }), amulet: g('amulet', 'pendant', T.glow, { glow: T.glow }) } };
+    }
+    if (type === 'boss') {
+        // a demon warlord: horns, spiked plate, a cape and a great double axe
+        return { cls: 'berserker', race: 'demon', gender: 'm', skinTone: ['#b8503a', '#5a1a0a'], eyeGlow: '#ffd24a', hair: 'shaved', beard: 'none', charKey: 'monster_boss', sizeBoost: 1.14,
+            gear: { chest: g('chest', pick(['leather', 'mail', 'plate']), T.metal, { cape: T.cloth, tier: Math.max(2, tier) }), shoulders: g('shoulders', 'spiked', T.metal, { tier: Math.max(2, tier) }),
+                gloves: g('gloves', 'gauntlet', T.metal), legs: g('legs', 'plate', T.metal), boots: g('boots', 'plate', T.metal), belt: g('belt', 'leather', '#3a2010'),
+                weapon: g('weapon', 'axe', '#8a8f96', { double: true, tier: Math.max(2, tier), glow: T.glow }), amulet: g('amulet', 'pendant', T.glow, { glow: T.glow }) } };
+    }
+    // an orc brute: tusks, crude leather, a club that gets meaner by floor
+    return { cls: 'warrior', race: 'orc', gender: 'm', skinTone: ['#7e9a5a', '#3a5222'], hair: 'topknot', hairColor: 0, beard: 'none', charKey: 'monster_normal',
+        gear: { chest: g('chest', pick(['leather', 'leather', 'mail']), '#5a3a22'), legs: g('legs', 'leather', '#3a2a1a'), boots: g('boots', 'leather', '#3a2616'),
+            belt: g('belt', 'leather', '#4a3020', { pouch: true }), shoulders: L > 10 ? g('shoulders', 'spiked', T.metal) : undefined,
+            weapon: g('weapon', pick(['mace', 'axe', 'hammer']), '#8a8f96') } };
 }
 
 function avHairBack(S, look) {
@@ -809,7 +892,7 @@ function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heav
 function avPaint(spec) {
     const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls), S = avSession(P), k = P.k;
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
-    const skin = S.skin(AV_SKINS[look.skin || 0]);
+    const skin = S.skin(look.skinTone || AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};
     const W = gear.weapon && gear.weapon.style, O = gear.offhand && gear.offhand.style;
     // arm poses follow what the hands hold
@@ -872,6 +955,11 @@ function avPaint(spec) {
     if (!L.hidesHair) h += avHairFront(S, look);
     if (!L.hidesFace && !L.hideBeard) h += avBeard(S, look);
     h += L.head || '';
+    // eyes that burn out of the dark under a hood / cowl (monsters)
+    if (L.hidesFace && look.eyeGlow) {
+        const r = P.hr, ey = P.hy + r * 0.1;
+        [[0.42, 1], [0.8, 0.7]].forEach(([o, sc]) => { h += S.glow(P.headX + r * o, ey, r * 0.28 * sc, look.eyeGlow, 0.8) + S.ell(P.headX + r * o, ey, r * 0.11 * sc, r * 0.06 * sc, look.eyeGlow, 0); });
+    }
     parts.head = h;
     // arms: upper arm + forearm. The far arm sits behind the body; whatever
     // it holds is drawn in front (armLf > foreLf) and turns with it.
