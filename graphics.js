@@ -767,8 +767,9 @@ function cgFrame(ticker) {
             // painted avatars: a livelier idle at ~30fps - the body sinks into
             // its knees and rises (feet planted), arms and weapon drift out of
             // phase, the head settles, each class at its own rhythm
+            // (15fps in low graphics - weak phones, auto-detected or chosen)
             const now = performance.now();
-            const step = Math.floor(now / 33);
+            const step = Math.floor(now / (cgLowGraphics ? CG_BREATH_STEP_MS : 33));
             if (step !== stage.lastFrame) {
                 stage.lastFrame = step;
                 const I = stage.idleStyle, sec = now / 1000, ph = stage.breathPhase, w = 2 * Math.PI * I.hz;

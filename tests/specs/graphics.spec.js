@@ -75,7 +75,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         expect(stage.renderCount).toBe(0);
     });
 
-    it('an idle visible portrait breathes at ~15fps, never full frame rate', async function (ctx) {
+    it('an idle visible arena breathes at ~30fps (15 in low graphics), never full frame rate', async function (ctx) {
         var w = ctx.world;
         onScreen(w);
         await startSolo(w, 'WARRIOR');
@@ -85,8 +85,15 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         var before = stage.renderCount;
         await pumpFrames(w, 1000);
         var perSecond = stage.renderCount - before;
-        expect(perSecond, 'renders in 1s idle').toBeLessThan(22);
+        // painted fighters (the monsters too, since v1.37) idle at ~30fps
+        expect(perSecond, 'renders in 1s idle').toBeLessThan(40);
         expect(perSecond, 'idle breathing does repaint').toBeGreaterThan(5);
+        // low graphics (weak phones): ~15fps
+        w.g('cgToggleLowGraphics()');
+        before = stage.renderCount;
+        await pumpFrames(w, 1000);
+        expect(stage.renderCount - before, 'renders in 1s idle, low graphics').toBeLessThan(22);
+        w.g('cgToggleLowGraphics()');
     });
 
     it('an effect makes it repaint every frame, then settle back down', async function (ctx) {
