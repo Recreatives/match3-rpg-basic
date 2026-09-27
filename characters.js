@@ -171,6 +171,7 @@ function charLookOf(c) {
     const a = (c && c.appearance) || {};
     return { gender: c && c.gender === 'f' ? 'f' : 'm', skin: a.skin | 0, hair: a.hair || 'short', hairColor: a.hairColor | 0, beard: a.beard || 'none' };
 }
+const CHAR_PORTRAIT_CACHE = new Map();
 // A standalone <img> of a hero (its own document, so painter ids never clash).
 function charPortraitImg(cls, look, items, cssClass) {
     const img = document.createElement('img');
@@ -178,10 +179,21 @@ function charPortraitImg(cls, look, items, cssClass) {
     img.alt = '';
     if (typeof avPaint === 'function' && typeof heroSpecFor === 'function') {
         try {
-            let svg = avPaint(heroSpecFor(cls, look, items || [])).portrait;
-            // list cards show head and shoulders (the body box is 0 0 200 250)
-            if (cssClass !== 'char-preview-img') svg = svg.replace(/viewBox="[^"]*" width="[^"]*" height="[^"]*"/, 'viewBox="5 -5 190 190" width="190" height="190"');
-            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+            // painting a hero is the costly part - the inventory redraws its
+            // figure on every tap, so each look is painted once
+            const bust = cssClass !== 'char-preview-img' && cssClass !== 'inv-figure-img' && cssClass !== 'inv-tryon-img';
+            const spec = heroSpecFor(cls, look, items || []);
+            const key = (bust ? 'b|' : 'f|') + JSON.stringify(spec);
+            let src = CHAR_PORTRAIT_CACHE.get(key);
+            if (!src) {
+                let svg = avPaint(spec).portrait;
+                // list cards show head and shoulders (the body box is 0 0 200 250)
+                if (bust) svg = svg.replace(/viewBox="[^"]*" width="[^"]*" height="[^"]*"/, 'viewBox="5 -5 190 190" width="190" height="190"');
+                src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+                if (CHAR_PORTRAIT_CACHE.size > 80) CHAR_PORTRAIT_CACHE.delete(CHAR_PORTRAIT_CACHE.keys().next().value);
+                CHAR_PORTRAIT_CACHE.set(key, src);
+            }
+            img.src = src;
         } catch (e) { console.warn('portrait:', e); }
     }
     return img;

@@ -1,6 +1,6 @@
 # Characters, visible gear & inventory - roadmap
 
-Status: approved direction (2026-09-27). Work happens on a feature branch;
+Status: phases 0-10 implemented on `feature/characters-gear` (v1.37), waiting for the user's own test and the production schema run. Work happens on a feature branch;
 nothing merges to `main` without the user's own test and explicit go-ahead.
 
 ## Decisions (from the user)

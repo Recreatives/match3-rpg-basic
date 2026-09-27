@@ -178,3 +178,19 @@ describe('Painted monsters', function () {
         expect(st.isAvatar).toBe(true);
     });
 });
+
+describe('Every item on every body', function () {
+    it('each catalog piece paints on each body that may wear it (male and female), inside the painter box', function (ctx) {
+        var w = ctx.world;
+        var res = w.g("(function(){ var bad=[], n=0, byBody={};"
+            + "Object.keys(AV_CLASS_BODY).forEach(function(c){ var b=AV_CLASS_BODY[c]; if(!byBody[b]) byBody[b]=c; });"
+            + "var all = Object.keys(CATALOG_BASES).map(function(id){ return [id, CATALOG_BASES[id]]; }).concat(Object.keys(CATALOG_FIXED).map(function(id){ return [id, CATALOG_FIXED[id]]; }));"
+            + "all.forEach(function(e){ var id=e[0], d=e[1]; if (!d.vis) return; var bodies={}; (d.cls||[]).forEach(function(c){ bodies[AV_CLASS_BODY[c]] = bodies[AV_CLASS_BODY[c]] || c; });"
+            + "  Object.keys(bodies).forEach(function(b){ ['m','f'].forEach(function(g){ n++; try { var it={ base_id:id, slot:d.slot, rarity: d.rarity || 'blue', rolled_stats:{}, equipped_slot: d.slot };"
+            + "    var p = avPaint(heroSpecFor(bodies[b], { gender:g, skin:1, hair: g==='f'?'long':'short', hairColor:1, beard:'none' }, [it]));"
+            + "    if (!p.parts.torso || /NaN|undefined/.test(p.portrait)) bad.push(id+'@'+b+g); } catch(err) { bad.push(id+'@'+b+g+': '+err.message); } }); }); });"
+            + "return { n: n, bad: bad }; })()");
+        expect(res.bad).toEqual([]);
+        expect(res.n).toBeGreaterThan(400);
+    }, { timeout: 60000 });
+});
