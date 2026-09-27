@@ -14,6 +14,7 @@
 // Coordinates: a 200x250 box, feet at y=238, facing right.
 
 const AV_INK = '#0b0d12';
+const AV_BOX = [-50, -60, 300, 310]; // x, y, width, height of every painted part (the body box is 0 0 200 250)
 const AV_BASE = { hy: 43, hr: 17, neck: 62, sy: 74, sw: 28, wy: 124, ww: 17, hipy: 135, hipw: 16.5, fy: 238, hand: 155, k: 1.15, ol: 2.7 };
 const AV_BODIES = {
     heavy_m: { sw: 31, ww: 19, hipw: 17.5, k: 1.22 },
@@ -106,8 +107,10 @@ function avIK(a, c, l, bendSign, bendAxis) {
 // legs: a fighting stance - knees bent, front foot forward, back foot behind
 function avLeg(P, side) {
     const k = P.k, hip = side === 'R' ? P.hipR : P.hipL;
-    const ank = side === 'R' ? [hip[0] + 13 * k, P.fy - 14] : [hip[0] - 15 * k, P.fy - 14];
-    const d = Math.hypot(ank[0] - hip[0], ank[1] - hip[1]), l = d * (side === 'R' ? 0.535 : 0.515);
+    // a wide fighting stance: the back leg reaches far behind almost
+    // straight, the front leg steps forward with the knee bent
+    const ank = side === 'R' ? [hip[0] + 26 * k, P.fy - 14] : [hip[0] - 36 * k, P.fy - 14];
+    const d = Math.hypot(ank[0] - hip[0], ank[1] - hip[1]), l = d * (side === 'R' ? 0.54 : 0.505);
     const knee = avIK(hip, ank, l, 1);
     const A = { ax: hip[0], ay: hip[1] - 4, ex: knee[0], ey: knee[1], wx: ank[0], wy: ank[1] };
     const f = side === 'L' ? 0.94 : 1; // the far leg reads a touch thinner
@@ -144,7 +147,7 @@ function avTorsoShade(S, P, grow) {
 // dangling: the weapon is up and ready, a shield held across the body, a
 // bow out at chest height with the other hand on the string.
 const AV_ARM_POSES = {
-    hang: [4, 8], ready: [10, 58], guard: [40, 108], bowhold: [66, 82], staff: [10, 36], hold: [20, 44], cast: [26, 102], fist: [22, 78],
+    hang: [4, 8], ready: [10, 150], guard: [58, 116], bowhold: [66, 82], staff: [14, 132], hold: [34, 74], cast: [52, 122], fist: [58, 118],
 };
 function avArm(P, side) {
     const sh = side === 'L' ? P.shL : P.shR;
@@ -384,11 +387,11 @@ const AV_PAINT = {
         } else if (it.style === 'robe') {
             const body = S.cloth(it.color), fy = P.fy, tr = it.trim || '#d4a84a';
             let s = S.path(`M${avN(100 - P.sw * 0.56 + P.lean)} ${avN(sy - 5)} Q${avN(100 + P.lean)} ${avN(sy - 13)} ${avN(100 + P.sw * 0.8 + P.lean)} ${avN(sy - 6)} Q${avN(100 + P.sw * 0.98 + P.lean)} ${avN(sy + 4)} ${avN(100 + P.sw * 0.9 + P.lean)} ${avN(sy + 16)} ` +
-                `Q${avN(100 + ww * 1.7)} ${avN(wy + 22)} ${avN(100 + ww * 2.7)} ${fy - 14} Q${avN(100 + ww * 0.3)} ${fy - 7} ${avN(100 - ww * 2.2)} ${fy - 14} Q${avN(100 - ww * 1.1)} ${wy} ${avN(100 - P.sw * 0.64 + P.lean)} ${avN(sy + 10)} Z`, body);
-            s += S.flat(`M${avN(100 - P.sw * 0.56 + P.lean)} ${avN(sy - 5)} L${avN(100 + P.lean - 2)} ${avN(sy - 11)} Q${avN(100 - 6)} ${wy} ${avN(100 - ww * 0.4)} ${fy - 10} L${avN(100 - ww * 2.2)} ${fy - 14} Q${avN(100 - ww * 1.1)} ${wy} ${avN(100 - P.sw * 0.64 + P.lean)} ${avN(sy + 10)} Z`, '#000', 0.28);
+                `Q${avN(100 + ww * 1.7)} ${avN(wy + 22)} ${avN(100 + ww * 2.7)} ${fy - 14} Q${avN(100 + ww * 0.3)} ${fy - 7} ${avN(100 - ww * 2.9)} ${fy - 14} Q${avN(100 - ww * 1.2)} ${wy} ${avN(100 - P.sw * 0.64 + P.lean)} ${avN(sy + 10)} Z`, body);
+            s += S.flat(`M${avN(100 - P.sw * 0.56 + P.lean)} ${avN(sy - 5)} L${avN(100 + P.lean - 2)} ${avN(sy - 11)} Q${avN(100 - 6)} ${wy} ${avN(100 - ww * 0.4)} ${fy - 10} L${avN(100 - ww * 2.9)} ${fy - 14} Q${avN(100 - ww * 1.2)} ${wy} ${avN(100 - P.sw * 0.64 + P.lean)} ${avN(sy + 10)} Z`, '#000', 0.28);
             // the front opening of the robe
             s += S.line(`M${avN(fx)} ${avN(sy + 2)} Q${avN(fx + 2)} ${wy} ${avN(fx + ww * 0.5)} ${fy - 13}`, it.tier >= 2 ? tr : avDark(it.color, 0.5), (it.tier >= 2 ? 2.4 : 1.4) * k);
-            if (it.tier >= 2) s += S.line(`M${avN(100 - ww * 2.15)} ${fy - 15} Q${avN(100 + ww * 0.3)} ${fy - 8} ${avN(100 + ww * 2.62)} ${fy - 15}`, tr, 2.2 * k);
+            if (it.tier >= 2) s += S.line(`M${avN(100 - ww * 2.85)} ${fy - 15} Q${avN(100 + ww * 0.3)} ${fy - 8} ${avN(100 + ww * 2.62)} ${fy - 15}`, tr, 2.2 * k);
             if (it.tier >= 3) for (let i = 0; i < 4; i++) { const y = wy + 12 + i * (fy - wy - 30) / 4, x = fx + 1 + i * ww * 0.12; s += S.path(`M${avN(x - 3 * k)} ${avN(y)} L${avN(x)} ${avN(y - 4 * k)} L${avN(x + 3 * k)} ${avN(y)} L${avN(x)} ${avN(y + 4 * k)} Z`, avLight(tr, 0.4), 0.8); }
             out.torso = s;
             ['L', 'R'].forEach(sd => {
@@ -512,7 +515,7 @@ const AV_PAINT = {
             return { held: S.rot(painter(S, it, A.hx, A.hy), 6, A.hx, A.hy), weaponR: arrow };
         }
         const A = avArm(P, 'R');
-        const ANG = { sword: 16, axe: 0, mace: 14, hammer: 12, spear: 18, dagger: 100, staff: 4, scythe: -10, wand: 40 };
+        const ANG = { sword: 18, axe: 6, mace: 12, hammer: 8, spear: 30, dagger: 55, staff: 2, scythe: -6, wand: 40 };
         return { weaponR: S.rot(painter(S, it, A.hx, A.hy), ANG[it.style] === undefined ? 20 : ANG[it.style], A.hx, A.hy) };
     },
 
@@ -553,7 +556,7 @@ const AV_PAINT = {
             s += S.circle(x, y + 17 * k, 3.4 * k, S.lin('#eae0c8', '#8a7a5a'), P.ol * 0.5);
             return { held: s };
         }
-        if (it.style === 'dagger') return { held: S.rot(AV_WEAPONS.dagger(S, it, x, y), 95, x, y) };
+        if (it.style === 'dagger') return { held: S.rot(AV_WEAPONS.dagger(S, it, x, y), 70, x, y) };
         if (it.style === 'quiver') {
             const qx = P.shL[0] - 4, qy = P.sy - 8;
             const s = S.path(`M${avN(qx - 5 * k)} ${avN(qy - 4)} L${avN(qx + 4 * k)} ${avN(qy - 8)} L${avN(qx + 12 * k)} ${avN(P.wy + 8)} L${avN(qx + 3 * k)} ${avN(P.wy + 12)} Z`, avLeather(S, it.color))
@@ -663,8 +666,8 @@ function avPaint(spec) {
     const W = gear.weapon && gear.weapon.style, O = gear.offhand && gear.offhand.style;
     // arm poses follow what the hands hold
     P.armPose = {
-        R: W === 'bow' ? 'nock' : (W === 'staff' || W === 'scythe') ? 'staff' : W ? 'ready' : 'hang',
-        L: W === 'bow' ? 'bowhold' : (O === 'kite' || O === 'tower' || O === 'dagger') ? 'guard' : (O === 'orb' || O === 'tome') ? 'cast' : O === 'lantern' ? 'hold' : W ? 'fist' : 'hang',
+        R: W === 'bow' ? 'nock' : (W === 'staff' || W === 'scythe') ? 'staff' : 'ready',
+        L: W === 'bow' ? 'bowhold' : (O === 'kite' || O === 'tower' || O === 'dagger') ? 'guard' : (O === 'orb' || O === 'tome') ? 'cast' : O === 'lantern' ? 'hold' : 'fist',
     };
     const L = {};
     const add = o => { Object.keys(o || {}).forEach(key => { if (typeof o[key] === 'string') L[key] = (L[key] || '') + o[key]; else L[key] = o[key]; }); };
@@ -722,12 +725,12 @@ function avPaint(spec) {
         armL: [avN(P.shL[0]), avN(P.shL[1])], armR: [avN(P.shR[0]), avN(P.shR[1])],
     };
     pivots.armLf = pivots.armL;
-    // the figure sits a little back in its box so a weapon held out toward
-    // the enemy still fits
-    const SHIFT = -12;
-    Object.keys(pivots).forEach(key => { pivots[key] = [avN(pivots[key][0] + SHIFT), pivots[key][1]]; });
+    // Each part is drawn on a canvas bigger than the 200x250 body box
+    // (AV_BOX), so a weapon held up, a cape or a wide stance can reach past
+    // the body box without being cut off; the engine places it with `box`.
+    const B = AV_BOX;
     const defs = S.defs();
-    const wrap = body => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 250" width="400" height="500"><defs>${defs}</defs><g transform="translate(${SHIFT} 0)">${body}</g></svg>`;
+    const wrap = body => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${B[0]} ${B[1]} ${B[2]} ${B[3]}" width="${B[2] * 2}" height="${B[3] * 2}"><defs>${defs}</defs>${body}</svg>`;
     const order = ['back', 'legL', 'legR', 'armL', 'torso', 'head', 'armLf', 'armR'];
     const svgs = {};
     order.forEach(p => { if (parts[p]) svgs[p] = wrap(parts[p]); });
@@ -736,6 +739,7 @@ function avPaint(spec) {
         parts: svgs, order: order.filter(p => parts[p]), pivots,
         hand: [avN(handArm.hx - handArm.ax), avN(handArm.hy - handArm.ay)],
         handSide: W === 'bow' ? 'L' : 'R',
+        box: AV_BOX,
         portrait: wrap('<ellipse cx="100" cy="240" rx="58" ry="8" fill="#000" fill-opacity=".4"/>' + order.map(p => parts[p] || '').join('')),
     };
 }

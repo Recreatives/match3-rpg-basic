@@ -275,7 +275,7 @@ const CG_VFX = {
         if (!st.rigParts) return;
         const sprite = st.portraitSprite;
         for (let i = 1; i <= n; i++) {
-            const ghost = st._buildRig(st.rigParts, st.rigPivots, st.facing < 0);
+            const ghost = st._buildRig(st.rigParts, st.rigPivots, st.facing < 0, st.rigBox);
             ghost.root.tint = color; ghost.root.alpha = 0;
             CG_JOINTS.forEach(j => { if (ghost.joints[j] && st.joints[j]) ghost.joints[j].rotation = st.joints[j].rotation; });
             if (ghost.joints.armLf && st.joints.armL) ghost.joints.armLf.rotation = st.joints.armL.rotation;
@@ -881,6 +881,7 @@ class CombatStage {
         this.rigPivots = rig.pivots;
         this.rigHand = rig.hand || [6, 58]; // weapon hand, relative to the arm pivot
         this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
+        this.rigBox = null;
         const built = this._buildRig(parts, rig.pivots, this.facing < 0);
         this.portraitSprite.addChild(built.inner);
         this.joints = built.joints;
@@ -910,15 +911,16 @@ class CombatStage {
         painted.order.forEach((p, i) => { parts[p] = textures[i]; });
         this.isAvatar = true;
         this.rigHandSide = painted.handSide || 'R';
-        this._installRig(parts, painted.pivots, painted.hand);
+        this._installRig(parts, painted.pivots, painted.hand, painted.box);
     }
 
-    _installRig(parts, pivots, hand) {
+    _installRig(parts, pivots, hand, box) {
+        this.rigBox = box || null;
         this.rigParts = parts;
         this.rigPivots = pivots;
         this.rigHand = hand || [6, 58];
         this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
-        const built = this._buildRig(parts, pivots, this.facing < 0);
+        const built = this._buildRig(parts, pivots, this.facing < 0, this.rigBox);
         this.portraitSprite.addChild(built.inner);
         this.joints = built.joints;
         this.stripW = 200;
@@ -934,11 +936,14 @@ class CombatStage {
     // the body, the torso joint carrying head and both arms. Returns the
     // (optionally mirrored) inner container, its joints, and a standalone
     // root for clones (afterimages).
-    _buildRig(parts, pivots, mirror) {
+    // `box` [x, y, w, h]: where each part image sits in the 200x250 body
+    // space (painted avatars draw on a bigger canvas than the body box).
+    _buildRig(parts, pivots, mirror, box) {
         const joints = {};
         const inner = new PIXI.Container();
         if (mirror) { inner.position.set(200, 0); inner.scale.x = -1; }
-        const sprite = (tex) => { const sp = new PIXI.Sprite(tex); sp.width = 200; sp.height = 250; return sp; };
+        const B = box || [0, 0, 200, 250];
+        const sprite = (tex) => { const sp = new PIXI.Sprite(tex); sp.position.set(B[0], B[1]); sp.width = B[2]; sp.height = B[3]; return sp; };
         const joint = (name) => {
             const c = new PIXI.Container();
             const [px, py] = pivots[name] || [100, 125];
