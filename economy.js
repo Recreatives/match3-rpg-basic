@@ -715,8 +715,12 @@ async function upgradeItem(itemId) {
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.
+// dropLevel: the item level to roll at (default: the character's level).
+// Deeper floors roll up to 5 levels above the character (the server's
+// insert guard allows exactly that much).
 async function awardLootDrop(dropLevel) {
     const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
+    if (dropLevel) dropLevel = Math.min(lvl + 5, dropLevel);
     let item = rollLootDrop(currentOwnedItems, { level: Math.max(1, Math.min(50, dropLevel || lvl)), cls: selectedClass ? selectedClass.name.toLowerCase() : null });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -1695,7 +1699,7 @@ async function renderTalentsPanel() {
     container.innerHTML = '';
     let header = document.createElement('p');
     header.style.cssText = 'font-size:0.85rem; color:#f1c40f; margin-bottom:8px;';
-    header.innerText = tf('Kullanılabilir Puan: {n} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)', { n: available });
+    header.innerText = tf('Kullanılabilir Puan: {n} (bu karakterin her 5 seviyesinde 1 puan, 50. seviyeden sonra her ustalık puanında 1 puan)', { n: available });
     container.appendChild(header);
 
     Object.entries(TALENT_CATALOG).forEach(([id, def]) => {

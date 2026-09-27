@@ -140,6 +140,31 @@ function charUpdateHudLabel() {
     else el.textContent = `${selectedClass.emoji} ${selectedClass.name.toUpperCase()}`;
 }
 
+// --- growth -----------------------------------------------------------------------------
+// A character grows with its level along its class's lines (per level,
+// fractional - a level 50 warrior has +5 shield, +3 sword, +1 heart over a
+// level 1 one), on top of the class passive and before gear. Solo runs
+// also get +2 max HP per level (+1 per mastery point); PvP / co-op keep the
+// shared 100 HP both sides see.
+const CLASS_GROWTH = {
+    warrior: { shield: 0.12, sword: 0.08, heart: 0.04 },
+    paladin: { heart: 0.1, shield: 0.1, teamHeal: 0.04 },
+    berserker: { sword: 0.12, skull_dmg: 0.3 },
+    rogue: { energy: 0.1, sword: 0.1 },
+    archer: { sword: 0.1, energy: 0.08, ult_dmg: 0.1 },
+    mage: { ult_dmg: 0.3, energy: 0.08 },
+    necromancer: { skull_dmg: 0.25, heart: 0.06, ult_dmg: 0.1 },
+};
+function characterLevel() { return (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1; }
+function applyCharacterLevelBonuses(stats, classKey, level) {
+    const L = Math.max(1, level || characterLevel()), g = CLASS_GROWTH[classKey] || {};
+    Object.keys(g).forEach(k => { stats[k] = (stats[k] || 0) + Math.floor((L - 1) * g[k]); });
+    return stats;
+}
+function characterMaxHpBonus() {
+    return (characterLevel() - 1) * 2 + ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.mastery || 0 : 0);
+}
+
 // --- the look (portrait images) ------------------------------------------------------
 
 function charLookOf(c) {

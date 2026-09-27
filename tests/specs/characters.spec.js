@@ -94,6 +94,20 @@ describe('Characters: level curve', function () {
     });
 });
 
+describe('Characters: growth', function () {
+    it('a character grows along its class lines, and solo HP with its level', async function (ctx) {
+        var w = ctx.world;
+        expect(w.g("applyCharacterLevelBonuses({ shield: 0, sword: 0, heart: 0 }, 'warrior', 50)")).toEqual({ shield: 5, sword: 3, heart: 1 });
+        expect(w.g("applyCharacterLevelBonuses({ shield: 0 }, 'warrior', 1)")).toEqual({ shield: 0 });
+        w.g('activeCharacter.level = 11; activeCharacter.mastery = 0');
+        await startSolo(w, 'WARRIOR');
+        expect(w.g('maxPlayerHP')).toBe(120);
+        // level 11 warrior: base 5 shield + 2 passive + floor(10 * 0.12) = 1
+        expect(w.g('TILE_STATS.shield')).toBe(8);
+        w.g('activeCharacter.level = 1');
+    });
+});
+
 describe('Characters: the screens fit a small phone', { world: false }, function () {
     [[360, 640], [640, 360]].forEach(function (vp) {
         it('creator ' + vp[0] + 'x' + vp[1], async function () {

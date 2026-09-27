@@ -38,6 +38,8 @@ let TILE_STATS = {
 function rebuildTileStats() {
     TILE_STATS = { sword: 6, heart: 4, shield: 5, energy: 12, skull_dmg: 25, skull_self_dmg: 12, ult_dmg: 35, lifeSteal: 0, teamHeal: 6 };
     if (selectedClass) selectedClass.passive(TILE_STATS);
+    // the character's level (characters.js CLASS_GROWTH)
+    if (selectedClass && typeof applyCharacterLevelBonuses === 'function') applyCharacterLevelBonuses(TILE_STATS, selectedClass.name.toLowerCase());
     applyEquippedItemBonuses(TILE_STATS, currentOwnedItems);
     applyActiveAchievementBonuses(TILE_STATS, currentActiveAchievements);
     applyLearnedTalentBonuses(TILE_STATS, currentLearnedTalents);
@@ -427,7 +429,8 @@ function restoreMainMenuOverlay() {
 }
 
 function resetGame() {
-    playerHP = 100; maxPlayerHP = 100; playerArmor = 0; ultCharge = 0;
+    maxPlayerHP = 100 + (typeof characterMaxHpBonus === 'function' ? characterMaxHpBonus() : 0);
+    playerHP = maxPlayerHP; playerArmor = 0; ultCharge = 0;
     level = 1; logCounter = 1;
     rebuildTileStats();
     ENEMY_TILE_STATS = getEnemyStatsForLevel(1, false);
@@ -547,7 +550,8 @@ function goldRewardForKill(lvl, isBoss) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
-    if (typeof awardLootDrop === 'function') awardLootDrop();
+    // loot rolls at the character's level, a little higher on deeper floors
+    if (typeof awardLootDrop === 'function') awardLootDrop(typeof characterLevel === 'function' ? characterLevel() + Math.floor((level - 1) / 5) : undefined);
     if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 

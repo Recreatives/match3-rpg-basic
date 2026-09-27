@@ -321,7 +321,6 @@ const EN_DICT = {
     'Katıl': 'Join',
     'Etkinliğe katıldın! +{gold} altın kazandın.': 'Joined the event! +{gold} gold earned.',
     'Yüklenemedi.': 'Failed to load.',
-    'Kullanılabilir Puan: {n} (PvP galibiyeti + tamamlanan günlük görev sayısından kazanılır)': 'Available Points: {n} (earned from PvP wins + completed daily quests)',
     'Öğren (1 puan)': 'Learn (1 point)',
     'Prestij Seviyesi: <b style="color:#f1c40f;">{level}</b> (+%{pct} kalıcı altın kazanımı)': 'Prestige Level: <b style="color:#f1c40f;">{level}</b> (+{pct}% permanent gold gain)',
     '{threshold} altına ulaşınca altınını sıfırlayıp kalıcı bir bonus kazanabilirsin.': 'Once you reach {threshold} gold, you can reset it for a permanent bonus.',
@@ -548,4 +547,5 @@ const EN_DICT = {
     '🏛️ Ortak depoya kondu.': '🏛️ Put in the shared stash.',
     '🔒 Kilitle': '🔒 Lock',
     '🔓 Kilidi aç': '🔓 Unlock',
+    'Kullanılabilir Puan: {n} (bu karakterin her 5 seviyesinde 1 puan, 50. seviyeden sonra her ustalık puanında 1 puan)': 'Available points: {n} (1 point every 5 levels of this character, 1 per mastery point after level 50)',
 };
