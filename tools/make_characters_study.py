@@ -21,6 +21,8 @@ STYLES = {
     # hipy/hipw: hips; fy: feet; hand: hand y; k: width multiplier; ol: outline
     'A': dict(hy=36, hr=13.5, neck=52, sy=64, sw=25, wy=112, ww=15, hipy=124, hipw=15, fy=238, hand=146, k=1.0, ol=2.2),
     'B': dict(hy=50, hr=21, neck=72, sy=84, sw=31, wy=136, ww=19, hipy=146, hipw=18, fy=238, hand=164, k=1.3, ol=3.2),
+    # C: the balance point between A and B (head ~1/5)
+    'C': dict(hy=43, hr=17, neck=62, sy=74, sw=28, wy=124, ww=17, hipy=135, hipw=16.5, fy=238, hand=155, k=1.15, ol=2.7),
 }
 
 

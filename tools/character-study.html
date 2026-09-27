@@ -12,7 +12,7 @@
   h1 { font-family: Cinzel, Georgia, serif; color: var(--gold); margin: 0 0 4px; font-size: 1.5rem; }
   h2 { font-family: Cinzel, Georgia, serif; font-size: 1.1rem; margin: 26px 0 8px; color: var(--gold); }
   p.lead { color: var(--muted); margin: 0 0 12px; max-width: 760px; }
-  .gallery { display: grid; grid-template-columns: 110px repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 900px; align-items: center; }
+  .gallery { display: grid; grid-template-columns: 110px repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 1100px; align-items: center; }
   .gallery .hd { font-weight: 700; text-align: center; padding: 6px; border-radius: 8px; background: var(--panel); }
   .gallery .hd small { display: block; color: var(--muted); font-weight: 400; font-size: .78rem; }
   .gallery .rowname { font-weight: 700; color: var(--muted); }
@@ -34,7 +34,7 @@
   button:hover { background: #2f4260; }
   button.on { background: var(--gold); color: #1a1406; border-color: var(--gold); }
   .note { background: var(--panel); border-left: 3px solid var(--gold); padding: 10px 12px; border-radius: 6px; max-width: 900px; color: #cfd9e3; margin-top: 14px; }
-  @media (max-width: 600px) { .gallery { grid-template-columns: 70px repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 600px) { .gallery { grid-template-columns: 60px repeat(4, minmax(0, 1fr)); } }
 </style></head><body>
 <h1>Karakter stili çalışması</h1>
 <p class="lead">Mevcut (chibi) çizimler ile iki epik yön yan yana. Tasarımlar aynı, yalnızca oranlar ve çizgi dili değişiyor. Altta karakterler oyunun gerçek arena motorunda, telefon genişliğinde (360 px) hareket ediyor.</p>
@@ -63,6 +63,7 @@ const SETS = [
   { key: 'cur', name: 'Mevcut', sub: 'chibi, kafa ≈ 1/2', dir: 'assets/characters/' },
   { key: 'epa', name: 'A · Epik gerçekçi', sub: 'kafa ≈ 1/6, ince çizgi', dir: 'tools/character-study/A/' },
   { key: 'epb', name: 'B · Epik stilize', sub: 'kafa ≈ 1/4, kalın çizgi', dir: 'tools/character-study/B/' },
+  { key: 'epc', name: 'C · Denge', sub: 'kafa ≈ 1/5, A ile B arası', dir: 'tools/character-study/C/' },
 ];
 const ROWS = [['warrior', 'Savaşçı'], ['mage', 'Büyücü'], ['monster_boss', 'Minotor (boss)']];
 const g = document.getElementById('gallery');
