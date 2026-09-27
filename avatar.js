@@ -912,6 +912,8 @@ function avPaint(spec) {
         parts: svgs, order: order.filter(p => parts[p]), pivots,
         // the weapon hand, relative to its elbow (projectile launch point)
         hand: [avN(handA.hx - handA.ex), avN(handA.hy - handA.ey)],
+        // the off hand, relative to its elbow (off-hand item effects)
+        handL: [avN(arms.L.hx - arms.L.ex), avN(arms.L.hy - arms.L.ey)],
         handSide: W === 'bow' ? 'L' : 'R',
         handJoint: W === 'bow' ? 'foreL' : 'foreR',
         legs, box: AV_BOX, idle: AV_IDLE[spec.cls] || AV_IDLE.warrior,

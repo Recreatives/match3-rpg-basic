@@ -113,3 +113,17 @@ describe('Item icons', function () {
         expect(sq).toContain('width="96"');
     });
 });
+
+describe('Gear effects', function () {
+    it('worn uniques carry their idle effect to the body part wearing them; a full set adds the set aura', function (ctx) {
+        var w = ctx.world;
+        var fx = w.g("cgGearFxFrom(heroSpecFor('warrior', null, ['uniq_starfall_helm','uniq_the_throatreaver','uniq_shattered_time_aegis'].map(function(id){ var f=CATALOG_FIXED[id]; return { base_id:id, slot:f.slot, rarity:'red', rolled_stats:{}, equipped_slot:f.slot }; })))");
+        var at = {}; fx.forEach(function (f) { at[f.fx] = f.at; });
+        expect(at).toEqual({ stars: 'head', blood: 'hand', void: 'offhand' });
+        var withSet = w.g("cgGearFxFrom({ gear: {}, setAura: '#22c55e' })");
+        expect(withSet.map(function (f) { return f.fx; })).toEqual(['set']);
+        // another client's payload can't smuggle in an unknown effect
+        var remote = w.g("heroRemoteSpec({ cls: 'warrior', gear: { helmet: { style: 'circlet', color: '#ffffff', fx: 'nuke' } } })");
+        expect(remote.gear.helmet.fx).toBe(undefined);
+    });
+});

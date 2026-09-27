@@ -874,6 +874,9 @@ class CombatStage {
         this.breathPhase = Math.random() * Math.PI * 2; // two portraits never breathe in lockstep
         this.portraitBaseScale = 1;
         this.root.addChild(this.portraitSprite);
+        // worn uniques' idle effects sit ON the hero (in front of it)
+        this.gearG = new PIXI.Graphics();
+        this.root.addChild(this.gearG);
         this.effectLayer = new PIXI.Container();
         this.root.addChild(this.effectLayer);
         // persistent auras (ULT ready, legendary item, enrage) - their own
@@ -984,6 +987,91 @@ class CombatStage {
         this.rigLegs = painted.legs || null;
         this.idleStyle = painted.idle || null;
         this._installRig(parts, painted.pivots, painted.hand, painted.box);
+        this.rigHandL = painted.handL || null;
+        this.gearFx = cgGearFxFrom(spec);
+        this.needsRender = true;
+    }
+
+    // Where on the body a worn item's effect plays, in root space (rig
+    // units scale with the fighter). Joint pivots: head = neck, torso = hips,
+    // arm = shoulder, fore = elbow, shin = knee.
+    _gearPoint(at) {
+        const J = this.joints || {};
+        const spots = {
+            hand: [J[this.rigHandJoint || 'foreR'] || J.foreR, this.rigHand || [6, 58]],
+            offhand: [J.foreLf || J.foreL, this.rigHandL || [2, 44]],
+            head: [J.head, [0, -22]], chest: [J.torso, [4, -52]], waist: [J.torso, [0, -12]],
+            shoulder: [J.armR, [0, 2]], foot: [J.shinR, [2, 48]], knee: [J.shinR, [0, 4]],
+        };
+        const sp = spots[at];
+        if (!sp || !sp[0] || !sp[0].parent) return null;
+        try {
+            const j = sp[0], g = j.toGlobal(new PIXI.Point(j.pivot.x + sp[1][0], j.pivot.y + sp[1][1]));
+            return this.root.toLocal(g);
+        } catch (e) { return null; }
+    }
+
+    // The worn uniques' idle effects and the full-set aura (see
+    // cgGearFxFrom), drawn into the aura layer each breath step.
+    _drawGearFx(back, g, now, cx, cy, bodyH) {
+        const list = this.gearFx;
+        if (!list || !list.length || !cgEffectsEnabled()) return;
+        // effects are sized for readability, a little larger than life
+        const s = bodyH / 150, T = now / 1000;
+        list.forEach((f, n) => {
+            if (f.fx === 'set') {
+                const pulse = 0.5 + 0.5 * Math.sin(T * 2.2);
+                back.ellipse(cx, cy + bodyH * 0.47, bodyH * 0.34, bodyH * 0.07).stroke({ color: f.color, width: 1.5 * s + 1, alpha: 0.35 + 0.25 * pulse });
+                for (let i = 0; i < 6; i++) {
+                    const ph = (T * 0.45 + i / 6) % 1, a = i * 1.05 + T * 0.6;
+                    const x = cx + Math.cos(a) * bodyH * 0.3, y = cy + bodyH * 0.47 - ph * bodyH * 0.8;
+                    const r = (1.4 + pulse * 0.6) * s + 0.6;
+                    back.poly([x, y - r, x + r * 0.87, y - r / 2, x + r * 0.87, y + r / 2, x, y + r, x - r * 0.87, y + r / 2, x - r * 0.87, y - r / 2]).fill({ color: f.color, alpha: 0.7 * (1 - ph) });
+                }
+                return;
+            }
+            const p = this._gearPoint(f.at);
+            if (!p) return;
+            const seed = n * 1.7;
+            if (f.fx === 'ember') {
+                for (let i = 0; i < 5; i++) {
+                    const ph = (T * 0.8 + i / 5 + seed) % 1;
+                    const x = p.x + Math.sin(i * 2.1 + T * 2 + seed) * 10 * s, y = p.y - ph * 34 * s;
+                    g.circle(x, y, (1.8 - ph) * s + 0.8).fill({ color: i % 2 ? 0xffd24a : f.color, alpha: 0.9 * (1 - ph) });
+                }
+            } else if (f.fx === 'blood') {
+                for (let i = 0; i < 3; i++) {
+                    const ph = (T * 0.6 + i / 3 + seed) % 1;
+                    const x = p.x + (i - 1) * 4 * s, y = p.y + ph * 26 * s;
+                    g.ellipse(x, y, 1.4 * s + 0.6, (2.2 + ph * 1.5) * s + 0.6).fill({ color: 0xb0101a, alpha: 0.85 * (1 - ph * ph) });
+                }
+                g.circle(p.x, p.y, 7 * s).fill({ color: f.color, alpha: 0.12 + 0.08 * Math.sin(T * 3 + seed) });
+            } else if (f.fx === 'stars') {
+                for (let i = 0; i < 4; i++) {
+                    const a = T * 1.3 + i * Math.PI / 2 + seed, r = 13 * s;
+                    const x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r * 0.45;
+                    const tw = 0.5 + 0.5 * Math.sin(T * 6 + i * 1.9), k = (2 + 2 * tw) * s + 0.5;
+                    g.poly([x, y - k, x + k * 0.28, y - k * 0.28, x + k, y, x + k * 0.28, y + k * 0.28, x, y + k, x - k * 0.28, y + k * 0.28, x - k, y, x - k * 0.28, y - k * 0.28]).fill({ color: i % 2 ? 0xffffff : f.color, alpha: 0.45 + 0.5 * tw });
+                }
+            } else if (f.fx === 'void') {
+                for (let i = 0; i < 2; i++) g.ellipse(p.x, p.y, (12 + i * 5) * s, (5 + i * 2) * s).stroke({ color: f.color, width: 1.4 * s + 0.4, alpha: 0.3 + 0.2 * Math.sin(T * 2 + i) });
+                for (let i = 0; i < 5; i++) {
+                    const ph = 1 - ((T * 0.7 + i / 5 + seed) % 1), a = i * 1.26 + T;
+                    g.circle(p.x + Math.cos(a) * 22 * s * ph, p.y + Math.sin(a) * 12 * s * ph, 1.4 * s + 0.5).fill({ color: 0x1a0a2a, alpha: 0.9 * ph }).stroke({ color: f.color, width: 0.8, alpha: 0.6 * ph });
+                }
+            } else if (f.fx === 'spark') {
+                const flick = Math.floor(T * 12 + seed * 7);
+                for (let i = 0; i < 2; i++) {
+                    if ((flick + i) % 3 === 0) continue;
+                    const a = ((flick * 7 + i * 13) % 12) / 12 * Math.PI * 2, L = 14 * s;
+                    const pts = [p.x, p.y];
+                    for (let k = 1; k <= 3; k++) pts.push(p.x + Math.cos(a) * L * k / 3 + ((k * flick + i) % 3 - 1) * 3 * s, p.y + Math.sin(a) * L * k / 3 + ((k + flick) % 3 - 1) * 3 * s);
+                    for (let k = 0; k + 3 < pts.length; k += 2) g.moveTo(pts[k], pts[k + 1]).lineTo(pts[k + 2], pts[k + 3]);
+                    g.stroke({ color: f.color, width: 1.3 * s + 0.4, alpha: 0.9 });
+                }
+                g.circle(p.x, p.y, 5 * s).fill({ color: 0xffffff, alpha: 0.18 });
+            }
+        });
     }
 
     _installRig(parts, pivots, hand, box) {
@@ -1382,8 +1470,12 @@ class CombatStage {
     _updateAuras(now) {
         const a = this.auras, g = this.auraG;
         if (!g) return false;
-        const any = a.ult !== null || a.legendary !== null || a.enraged;
-        if (!any) { if (g.visible) { g.clear(); g.visible = false; return true; } return false; }
+        const any = a.ult !== null || a.legendary !== null || a.enraged || (this.gearFx && this.gearFx.length && cgEffectsEnabled());
+        if (!any) {
+            if (this.gearG && this.gearG.visible) { this.gearG.clear(); this.gearG.visible = false; }
+            if (g.visible) { g.clear(); g.visible = false; return true; }
+            return false;
+        }
         const step = Math.floor(now / CG_BREATH_STEP_MS);
         if (step === this.auraStep && !this.activeTweens) return false;
         this.auraStep = step;
@@ -1395,6 +1487,8 @@ class CombatStage {
         const ring = (color, r, alpha) => { for (let i = 3; i >= 1; i--) g.ellipse(cx, cy, r * 0.42 * i / 3 + 4, r * 0.55 * i / 3 + 4).fill({ color, alpha: alpha / i }); };
         if (a.enraged) ring(0xff2a1a, bodyH * 1.05, 0.22 + 0.18 * pulse);
         if (a.legendary !== null) ring(a.legendary, bodyH * 0.95, 0.14 + 0.1 * pulse);
+        if (this.gearG) { this.gearG.clear(); this.gearG.visible = !this.dead; }
+        if (!this.dead) this._drawGearFx(g, this.gearG || g, now, cx, cy, bodyH);
         if (a.ult !== null) {
             ring(a.ult, bodyH * 0.9, 0.16 + 0.16 * pulse);
             // rising motes
@@ -1719,6 +1813,22 @@ function cgSetClassGlow(canvasId, classKey) {
     if (el.tagName !== 'CANVAS') { cgStageDo(canvasId, 'setGroundGlow', CLASS_GLOW_COLORS[classKey] === undefined ? null : CLASS_GLOW_COLORS[classKey]); return; }
     CLASS_GLOW_KEYS.forEach(k => el.classList.remove('class-glow-' + k));
     if (classKey && CLASS_GLOW_KEYS.includes(classKey)) el.classList.add('class-glow-' + classKey);
+}
+
+// Which idle effects a painted hero carries: each worn piece with an `fx`
+// (the catalog's uniques: blood / ember / stars / void / spark) plays at
+// the body part that wears it, and a complete set adds the set aura.
+const CG_GEAR_FX_AT = { weapon: 'hand', offhand: 'offhand', helmet: 'head', chest: 'chest', shoulders: 'shoulder', gloves: 'hand', boots: 'foot', legs: 'knee', belt: 'waist', amulet: 'chest' };
+const CG_GEAR_FX_KINDS = ['blood', 'ember', 'stars', 'void', 'spark'];
+function cgGearFxFrom(spec) {
+    const out = [];
+    const hex = c => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? parseInt(c.slice(1), 16) : 0xffd24a);
+    Object.keys((spec && spec.gear) || {}).forEach(slot => {
+        const it = spec.gear[slot];
+        if (it && CG_GEAR_FX_KINDS.indexOf(it.fx) !== -1 && CG_GEAR_FX_AT[slot]) out.push({ fx: it.fx, color: hex(it.glow), at: CG_GEAR_FX_AT[slot] });
+    });
+    if (spec && spec.setAura) out.push({ fx: 'set', color: hex(spec.setAura), at: 'body' });
+    return out.slice(0, 5);
 }
 
 // Faz 10 - a persistent aura on the player's own portrait while an

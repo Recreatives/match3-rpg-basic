@@ -80,7 +80,11 @@ function heroEquippedItems() {
 
 function myAvatarSpec() {
     const cls = selectedClass ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : 'warrior');
-    return heroSpecFor(cls, heroCurrentLook(), heroEquippedItems());
+    const worn = heroEquippedItems();
+    const spec = heroSpecFor(cls, heroCurrentLook(), worn);
+    // every piece of a set worn: the set aura (graphics.js cgGearFxFrom)
+    if (typeof getSetProgress === 'function' && Object.values(getSetProgress(worn)).some(p => p.isActive)) spec.setAura = '#22c55e';
+    return spec;
 }
 
 const HERO_MY_SLOTS = ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'];
@@ -109,9 +113,11 @@ function heroRemoteSpec(payload, clsFallback) {
             const g = payload.gear[slot];
             if (!g || typeof g !== 'object' || typeof AV_PAINT === 'undefined' || !AV_PAINT[slot]) return;
             gear[slot] = { slot, style: String(g.style || ''), tier: Math.max(1, Math.min(3, g.tier | 0)), color: heroSafeColor(g.color), trim: heroSafeColor(g.trim), glow: g.glow ? heroSafeColor(g.glow) : undefined,
-                cape: g.cape ? heroSafeColor(g.cape) : undefined, tabard: g.tabard ? heroSafeColor(g.tabard) : undefined, plume: g.plume ? heroSafeColor(g.plume) : undefined, double: !!g.double, feathers: !!g.feathers, pouch: !!g.pouch };
+                cape: g.cape ? heroSafeColor(g.cape) : undefined, tabard: g.tabard ? heroSafeColor(g.tabard) : undefined, plume: g.plume ? heroSafeColor(g.plume) : undefined, double: !!g.double, feathers: !!g.feathers, pouch: !!g.pouch,
+                fx: ['blood', 'ember', 'stars', 'void', 'spark'].indexOf(g.fx) !== -1 ? g.fx : undefined };
         });
-        return { cls, gender: payload.gender === 'f' ? 'f' : 'm', skin: Math.max(0, Math.min(4, payload.skin | 0)), hair: String(payload.hair || 'short'), hairColor: Math.max(0, Math.min(5, payload.hairColor | 0)), beard: String(payload.beard || 'none'), gear };
+        return { cls, gender: payload.gender === 'f' ? 'f' : 'm', skin: Math.max(0, Math.min(4, payload.skin | 0)), hair: String(payload.hair || 'short'), hairColor: Math.max(0, Math.min(5, payload.hairColor | 0)), beard: String(payload.beard || 'none'), gear,
+            setAura: payload.setAura ? '#22c55e' : undefined };
     }
     return heroSpecFor(cls, heroLookDefault(), []);
 }
