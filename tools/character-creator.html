@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karakter oluşturucu</title>
+<!-- Phase 0 preview of the layered avatar engine (avatar.js): style C bodies
+     (heavy / agile / robed x male / female), appearance options and three
+     demo gear tiers painted onto the same rig the combat arena animates.
+     Serve the repo root and open /tools/character-creator.html. -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0e141b; --panel: #172230; --ink: #e8eef4; --muted: #93a4b5; --gold: #e8c35a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(ellipse at 50% 0%, #22324a, var(--bg) 60%); color: var(--ink); font: 15px/1.45 'Segoe UI', system-ui, sans-serif; padding: 16px; min-height: 100vh; }
+  h1 { font-family: Cinzel, Georgia, serif; color: var(--gold); margin: 0 0 2px; font-size: 1.45rem; }
+  h2 { font-family: Cinzel, Georgia, serif; color: var(--gold); font-size: 1.05rem; margin: 22px 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 14px; max-width: 820px; }
+  .layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; max-width: 1100px; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: rgba(23, 34, 48, .85); border: 1px solid #2c3d55; border-radius: 12px; padding: 12px; }
+  .row { margin-bottom: 12px; }
+  .row label { display: block; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { background: #253449; color: var(--ink); border: 1px solid #3c5170; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: .86rem; cursor: pointer; }
+  button:hover { background: #2f4260; }
+  button.on { background: var(--gold); color: #1a1406; border-color: var(--gold); font-weight: 600; }
+  button:disabled { opacity: .35; cursor: default; }
+  .sw { width: 30px; height: 30px; border-radius: 50%; padding: 0; border: 2px solid #3c5170; }
+  .sw.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .portrait { display: flex; justify-content: center; align-items: flex-end; height: 360px; border-radius: 12px; background: radial-gradient(ellipse at 50% 35%, #2d3e52, #121a24 72%); border: 1px solid #2c3d55; overflow: hidden; }
+  .portrait img { height: 100%; }
+  .tiername { text-align: center; font-family: Cinzel, Georgia, serif; color: var(--gold); margin: 6px 0 0; }
+  .arena { position: relative; height: 150px; width: 100%; max-width: 380px; border-radius: 10px; overflow: hidden; margin: 0 auto;
+           background: radial-gradient(circle at 8% 22%, rgba(255,176,72,.3), transparent 26%), radial-gradient(circle at 92% 22%, rgba(255,176,72,.3), transparent 26%), linear-gradient(#3a3040, #1d1822);
+           box-shadow: inset 0 0 0 1px rgba(255,220,150,.14); }
+  .arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .arena-slot { position: absolute; top: 30px; bottom: 0; width: 40%; }
+  .slot-left { left: 5%; } .slot-right { right: 5%; }
+  .bodies { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; max-width: 1100px; }
+  @media (max-width: 760px) { .bodies { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .bodies figure { margin: 0; background: radial-gradient(ellipse at 50% 30%, #2d3e52, #16202c 70%); border-radius: 10px; padding: 6px 4px 4px; text-align: center; }
+  .bodies img { width: 100%; }
+  .bodies figcaption { font-size: .78rem; color: var(--muted); }
+  .note { background: var(--panel); border-left: 3px solid var(--gold); padding: 10px 12px; border-radius: 6px; max-width: 1100px; color: #cfd9e3; margin-top: 16px; }
+</style></head><body>
+<h1>Karakter oluşturucu · Faz 0 ön gösterimi</h1>
+<p class="lead">Stil C. Karakterler artık dosyadan değil, veriden çiziliyor: beden tipi + görünüm + giyilen eşyalar. Her eşya iskelete oturan ayrı bir katman; seçimleri değiştirdikçe karakter anında yeniden çiziliyor ve arenada aynı animasyonlarla dövüşüyor.</p>
+
+<div class="layout">
+  <div class="panel" id="controls">
+    <div class="row"><label>Sınıf</label><div class="opts" id="o-cls"></div></div>
+    <div class="row"><label>Cinsiyet</label><div class="opts" id="o-gender"></div></div>
+    <div class="row"><label>Ten rengi</label><div class="opts" id="o-skin"></div></div>
+    <div class="row"><label>Saç</label><div class="opts" id="o-hair"></div></div>
+    <div class="row"><label>Saç rengi</label><div class="opts" id="o-hairColor"></div></div>
+    <div class="row"><label>Sakal</label><div class="opts" id="o-beard"></div></div>
+    <div class="row"><label>Ekipman (örnek seviyeler)</label><div class="opts" id="o-tier"></div></div>
+  </div>
+  <div class="stage">
+    <div class="portrait"><img id="portrait" alt="karakter"></div>
+    <div class="tiername" id="tiername"></div>
+    <div class="arena" id="cc-arena"><canvas class="arena-canvas" id="cc-arena-canvas"></canvas>
+      <div class="arena-slot slot-left" id="cc-hero" data-arena="cc" data-side="left"></div>
+      <div class="arena-slot slot-right" id="cc-foe" data-arena="cc" data-side="right"></div></div>
+  </div>
+</div>
+
+<h2>Altı beden tipi · başlangıç kıyafetleriyle, farklı görünümler</h2>
+<div class="bodies" id="bodies"></div>
+
+<div class="note"><b>Bu aşamada:</b> 6 beden (ağır / çevik / cübbeli × erkek / kadın), 5 ten, 8 saç stili, 6 saç rengi, 4 sakal ve eşya katmanlarının iskelete oturması. Ekipman setleri örnek: gerçek eşya kataloğu (13 slot, seviye gereksinimleri, sınıfa özel silahlar) Faz 2'de kurulacak. Karşıdaki minotor da stil C.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
+<script src="graphics.js"></script>
+<script src="arena.js"></script>
+<script src="moves.js"></script>
+<script src="avatar.js"></script>
+<script>
+var CLASSES = {
+  WARRIOR: { name: 'Warrior', ultName: 'SHIELD SLAM' }, BERSERKER: { name: 'Berserker', ultName: 'BLOOD LUST' }, ROGUE: { name: 'Rogue', ultName: 'ASSASSINATE' },
+  ARCHER: { name: 'Archer', ultName: 'PIERCING SHOT' }, MAGE: { name: 'Mage', ultName: 'ARCANE BLAST' }, NECROMANCER: { name: 'Necromancer', ultName: 'SOUL SIPHON' }, PALADIN: { name: 'Paladin', ultName: 'DIVINE JUDGEMENT' },
+};
+const CLS = [['warrior', 'Savaşçı'], ['berserker', 'Barbar'], ['paladin', 'Paladin'], ['rogue', 'Haydut'], ['archer', 'Okçu'], ['mage', 'Büyücü'], ['necromancer', 'Nekromansır']];
+const TIERS = ['Başlangıç · Sv.1', 'Demir Yemin · Sv.20', 'Ejder Çağı · Sv.45'];
+
+// demo gear per class and tier (the real catalog comes in Phase 2)
+function demoGear(cls, t) {
+  const I = (slot, style, tier, color, extra) => Object.assign({ slot, style, tier, color }, extra || {});
+  const heavy = cls === 'warrior' || cls === 'paladin' || cls === 'berserker';
+  const agile = cls === 'rogue' || cls === 'archer';
+  const G = {};
+  if (heavy) {
+    const pal = cls === 'paladin', ber = cls === 'berserker';
+    const steel = t === 2 ? (pal ? '#d8d2c0' : '#5a6070') : '#aab4c0';
+    const glow = pal ? '#ffe08a' : ber ? '#ff4a1a' : '#ff7a2a';
+    if (t === 0) { G.chest = I('chest', 'leather', 1, '#6b4a30'); G.boots = I('boots', 'leather', 1, '#5a3a22'); G.belt = I('belt', 'leather', 1, '#4a3020'); }
+    else {
+      G.helmet = ber ? (t === 2 ? I('helmet', 'horned', 3, '#6a5040', { glow }) : null) : I('helmet', t === 2 ? (pal ? 'greathelm' : 'horned') : 'nasal', t + 1, steel, { glow, trim: pal ? '#fff2c0' : '#d4a84a', plume: pal ? '#e8e4d8' : '#b3261e' });
+      G.chest = ber ? I('chest', 'leather', t + 1, t === 2 ? '#4a2a1a' : '#6b4a30', { trim: '#c9a24a', glow, cape: t === 2 ? '#5a0a0a' : null })
+                    : I('chest', t === 1 ? 'mail' : 'plate', t + 1, steel, { tabard: pal ? '#e8e4d8' : (t === 2 ? '#3a0a0a' : '#8e1b1b'), cape: pal ? '#e8e4d8' : (t === 2 ? '#4a0808' : '#7a1616'), trim: pal ? '#ffd24a' : '#d4a84a', glow });
+      G.shoulders = I('shoulders', t === 2 && !pal ? 'spiked' : 'plate', t + 1, ber ? '#7a7f88' : steel, { trim: '#d4a84a', glow });
+      G.gloves = I('gloves', ber ? 'leather' : 'gauntlet', t + 1, ber ? '#4a3020' : steel, { glow });
+      G.legs = I('legs', ber ? 'leather' : 'plate', t + 1, ber ? '#3a2a1a' : steel, { trim: '#d4a84a', glow });
+      G.boots = I('boots', ber ? 'leather' : 'plate', t + 1, ber ? '#3a2616' : steel, { trim: '#d4a84a', glow });
+      G.belt = I('belt', 'leather', t + 1, '#4a3020', { glow });
+      if (t === 2) G.amulet = I('amulet', 'pendant', 3, '#d4a84a', { glow });
+    }
+    G.weapon = cls === 'paladin' ? I('weapon', 'hammer', t + 1, t === 2 ? '#fff2c0' : '#d4a84a', { glow: t === 2 ? glow : null })
+             : ber ? I('weapon', 'axe', t + 1, '#c9d2dc', { double: t > 0, glow: t === 2 ? glow : null })
+             : I('weapon', 'sword', t + 1, t === 2 ? '#8a90a0' : '#c9d2dc', { glow: t === 2 ? glow : null });
+    if (!ber) G.offhand = I('offhand', t === 2 ? (pal ? 'kite' : 'tower') : 'kite', t + 1, pal ? '#e8e4d8' : (t === 2 ? '#3a0a0a' : '#9c1f1a'), { trim: '#c9a24a', emblem: pal ? '#e8c35a' : '#e8c35a', glow });
+  } else if (agile) {
+    const archer = cls === 'archer';
+    const main = t === 2 ? '#1c1c26' : archer ? '#2e4a2a' : '#3a2a4a', glow = t === 2 ? '#3fe0c0' : (archer ? '#9aff6a' : '#b05cff');
+    if (t === 0) { G.chest = I('chest', 'leather', 1, '#6b4a30'); G.boots = I('boots', 'leather', 1, '#5a3a22'); }
+    else {
+      G.helmet = I('helmet', 'cowl', t + 1, main, { glow, trim: t === 2 ? '#3fe0c0' : '#c9a24a' });
+      G.chest = I('chest', 'leather', t + 1, main, { trim: t === 2 ? '#3fe0c0' : '#c9a24a', glow, cape: t === 2 ? '#101018' : (archer ? '#243a20' : '#2a1a3a') });
+      G.shoulders = I('shoulders', 'leather', t + 1, main, { feathers: t === 2, glow, trim: '#c9a24a' });
+      G.gloves = I('gloves', 'leather', t + 1, avDark(main, 0.1), { glow });
+      G.legs = I('legs', 'leather', t + 1, avDark(main, 0.2), { trim: '#c9a24a' });
+      G.boots = I('boots', 'leather', t + 1, avDark(main, 0.3), { glow });
+      G.belt = I('belt', 'sash', t + 1, t === 2 ? '#3a1a1a' : '#6b3a2a', { pouch: true, glow });
+    }
+    if (archer) { G.weapon = I('weapon', 'bow', t + 1, t === 2 ? '#2a2a3a' : '#7a5230', { glow: t === 2 ? glow : null }); G.offhand = I('offhand', 'quiver', t + 1, '#5a3a22', { trim: t === 2 ? '#3fe0c0' : '#c0392b' }); }
+    else { G.weapon = I('weapon', 'dagger', t + 1, '#c9d2dc', { glow: t === 2 ? glow : null }); G.offhand = I('offhand', 'dagger', t + 1, '#c9d2dc', { glow: t === 2 ? glow : null }); }
+  } else {
+    const nec = cls === 'necromancer';
+    const robe = t === 0 ? '#6b5a44' : nec ? (t === 2 ? '#141a14' : '#223022') : (t === 2 ? '#3a1a6a' : '#2c3a8a');
+    const glow = nec ? '#7dff7a' : t === 2 ? '#c890ff' : '#5fd8ff';
+    G.chest = I('chest', 'robe', t + 1, robe, { trim: nec ? '#8ab08a' : '#d4a84a', glow });
+    G.boots = I('boots', 'cloth', 1, '#3a2a1a');
+    if (t > 0) {
+      G.helmet = I('helmet', 'hood', t + 1, robe, { glow, trim: nec ? '#8ab08a' : '#d4a84a' });
+      G.shoulders = I('shoulders', 'mantle', t + 1, avDark(robe, 0.15), { trim: nec ? '#8ab08a' : '#d4a84a', glow });
+      G.belt = I('belt', 'sash', t + 1, nec ? '#3a4a3a' : '#6a2a2a', { glow });
+      G.gloves = I('gloves', 'leather', t + 1, '#2a2020');
+    }
+    G.weapon = nec ? I('weapon', t === 0 ? 'staff' : 'scythe', t + 1, '#b8c0c8', { glow }) : I('weapon', t === 1 ? 'wand' : 'staff', t + 1, '#7a5230', { glow });
+    if (t > 0) G.offhand = nec ? I('offhand', 'lantern', t + 1, '#5a5f66', { glow }) : I('offhand', t === 2 ? 'orb' : 'tome', t + 1, '#2c3a8a', { glow });
+  }
+  Object.keys(G).forEach(k => { if (!G[k]) delete G[k]; });
+  return G;
+}
+
+const state = { cls: 'warrior', gender: 'm', skin: 1, hair: 'short', hairColor: 1, beard: 'full', tier: 1 };
+function spec(over) { const s = Object.assign({}, state, over || {}); return { cls: s.cls, gender: s.gender, skin: s.skin, hair: s.hair, hairColor: s.hairColor, beard: s.gender === 'f' ? 'none' : s.beard, gear: demoGear(s.cls, s.tier) }; }
+const svgUrl = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+function buttons(id, list, key, render) {
+  const el = document.getElementById(id);
+  el.innerHTML = list.map(([v, label, bg]) => `<button data-v="${v}" class="${bg ? 'sw' : ''}" ${bg ? `style="background:${bg}" title="${label}"` : ''}>${bg ? '' : label}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('button'); if (!b || b.disabled) return; const v = b.dataset.v; state[key] = isNaN(+v) ? v : +v; if (key === 'gender') state.hair = AV_HAIR[state.gender][0]; update(); };
+}
+function sync() {
+  document.querySelectorAll('#controls .opts').forEach(el => {
+    const key = el.id.slice(2);
+    el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(state[key]) === b.dataset.v));
+  });
+  document.querySelectorAll('#o-beard button').forEach(b => { b.disabled = state.gender === 'f'; });
+}
+buttons('o-cls', CLS, 'cls');
+buttons('o-gender', [['m', 'Erkek'], ['f', 'Kadın']], 'gender');
+buttons('o-skin', AV_SKINS.map((c, i) => [i, 'Ten ' + (i + 1), c[0]]), 'skin');
+buttons('o-hairColor', AV_HAIR_COLORS.map((c, i) => [i, 'Renk ' + (i + 1), c]), 'hairColor');
+buttons('o-beard', [['none', 'Yok'], ['stubble', 'Kirli sakal'], ['full', 'Gür'], ['braided', 'Örgülü']], 'beard');
+buttons('o-tier', TIERS.map((n, i) => [i, n]), 'tier');
+const HAIR_NAMES = { short: 'Kısa', long: 'Uzun', topknot: 'Tepe topuz', shaved: 'Kazınmış', braid: 'Örgü', bun: 'Topuz', bob: 'Küt' };
+
+let hero = null, foe = null;
+async function update() {
+  buttons('o-hair', AV_HAIR[state.gender].map(h => [h, HAIR_NAMES[h]]), 'hair');
+  sync();
+  const painted = avPaint(spec());
+  document.getElementById('portrait').src = svgUrl(painted.portrait);
+  document.getElementById('tiername').textContent = TIERS[state.tier];
+  if (hero) { await hero.ready; hero.setAvatar(spec()); hero.setGroundGlow(CLASS_GLOW_COLORS[state.cls]); }
+  // the six bodies, same gear tier
+  const B = document.getElementById('bodies');
+  const bodies = [['warrior', 'm', 'Ağır · E'], ['warrior', 'f', 'Ağır · K'], ['rogue', 'm', 'Çevik · E'], ['rogue', 'f', 'Çevik · K'], ['mage', 'm', 'Cübbeli · E'], ['mage', 'f', 'Cübbeli · K']];
+  B.innerHTML = bodies.map(([c, g, n], i) => `<figure><img alt="${n}" src="${svgUrl(avPaint({ cls: c, gender: g, skin: (i + 1) % 5, hair: AV_HAIR[g][i % 4], hairColor: (i * 2) % 6, beard: g === 'm' ? AV_BEARDS[(i + 2) % 4] : 'none', gear: {} }).portrait)}"><figcaption>${n}</figcaption></figure>`).join('');
+}
+(async () => {
+  hero = cgGetStage('cc-hero'); foe = cgGetStage('cc-foe');
+  await hero.ready; await foe.ready;
+  foe.setPortrait('tools/character-study/C/monster_boss.svg');
+  update();
+  const cycle = ['sword', 'skull', 'shield', 'sword', 'heart', 'energy', 'ult'];
+  let i = 0;
+  setInterval(() => {
+    const a = cycle[i++ % cycle.length];
+    if (a === 'ult') { hero.playUlt(state.cls); return; }
+    if (i % 4 === 0) { foe.playAttack(1); hero.playHitReaction('skull', 480, 1); return; }
+    hero.playClassMotion(state.cls, a, 1 + (i % 3));
+    if (a === 'sword' || a === 'skull') foe.playHitReaction(a, 480, 1 + (i % 3));
+  }, 2200);
+})();
+</script></body></html>

@@ -325,6 +325,22 @@ const CG_VFX = {
 // radians, +clockwise); heroes face right, monsters are mirrored.
 // rigs.json sits next to the portraits it describes (one per art set)
 let cgRigsPromises = {};
+
+// SVG markup -> texture (painted avatars), cached by content so the same
+// look on several stages (or re-equipping the same item) costs nothing.
+const cgSvgTextures = new Map();
+function cgTextureFromSVG(svg) {
+    if (cgSvgTextures.has(svg)) return cgSvgTextures.get(svg);
+    const p = new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { const tex = PIXI.Texture.from(img); tex.source.scaleMode = 'linear'; resolve(tex); };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+    cgSvgTextures.set(svg, p);
+    if (cgSvgTextures.size > 400) cgSvgTextures.delete(cgSvgTextures.keys().next().value);
+    return p;
+}
 function cgLoadRigs(dir) {
     const d = dir || 'assets/characters/';
     if (!cgRigsPromises[d]) cgRigsPromises[d] = fetch(d + 'rigs.json').then(r => r.json()).catch(() => ({}));
@@ -868,6 +884,39 @@ class CombatStage {
         this.needsRender = true;
         // a fresh monster in the arena walks in from its side
         if (this.arena && this.side === 'right' && this.charKey.indexOf('monster_') === 0) this.playEntrance();
+    }
+
+    // A layered avatar (avatar.js): painted from data (body, looks, gear)
+    // instead of loaded from files. Same rig, same animations.
+    async setAvatar(spec) {
+        await this.ready;
+        if (typeof avPaint !== 'function') return;
+        const painted = avPaint(spec);
+        const token = this.url = 'avatar:' + JSON.stringify(spec);
+        this.charKey = 'avatar_' + (spec.cls || 'hero');
+        this.facing = this.embedded ? (this.side === 'right' ? -1 : 1) : 1;
+        const textures = await Promise.all(painted.order.map(p => cgTextureFromSVG(painted.parts[p])));
+        if (this.url !== token) return; // a newer look won the race
+        const parts = {};
+        painted.order.forEach((p, i) => { parts[p] = textures[i]; });
+        this._installRig(parts, painted.pivots, painted.hand);
+    }
+
+    _installRig(parts, pivots, hand) {
+        this.rigParts = parts;
+        this.rigPivots = pivots;
+        this.rigHand = hand || [6, 58];
+        this.portraitSprite.removeChildren().forEach(c => c.destroy({ children: true }));
+        const built = this._buildRig(parts, pivots, this.facing < 0);
+        this.portraitSprite.addChild(built.inner);
+        this.joints = built.joints;
+        this.stripW = 200;
+        this.stripH = 250;
+        this.portraitSprite.tint = 0xffffff;
+        this.portraitSprite.alpha = 1;
+        this.dead = false;
+        this._fitPortrait();
+        this.needsRender = true;
     }
 
     // Builds the joint hierarchy for a set of part textures: back and legs on
