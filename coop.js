@@ -283,7 +283,7 @@ async function coopJoinRoom() {
             // className rides along on presence the same way pvp.js's does -
             // coopCheckPresence reads it straight off the same state it
             // already uses to find the ally, no separate handshake needed.
-            await coopChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
+            await coopChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null, avatar: typeof myAvatarPayload === 'function' ? myAvatarPayload() : null });
             coopSetStatus(tf('Oda "{code}" - takım arkadaşı bekleniyor…', { code: coopRoomCode }));
         }
     });
@@ -304,7 +304,10 @@ async function coopCheckPresence() {
         coopAllyClassName = state[ally.key][0].className;
         let url = coopAllyClassName && CHARACTER_SPRITES[coopAllyClassName];
         let stage = cgGetStage('coop-ally-sprite');
-        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+        // their painted hero, with their real gear (hero.js); an older client
+        // that sends no avatar gets a starter look for its class
+        if (stage && typeof heroRemoteSpec === 'function' && typeof avPaint === 'function') stage.setAvatar(heroRemoteSpec(state[ally.key][0].avatar, coopAllyClassName));
+        else if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
     }
 
     coopStarted = true;

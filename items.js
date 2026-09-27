@@ -110,6 +110,60 @@ const RARITY_DEFS = {
     teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
 };
 
+// How an item looks on the painted hero (hero.js / avatar.js): which avatar
+// layer it is, the painter style and its colors. Keyed by base id; set
+// pieces and uniques fall back to their slot's look with their own colors.
+const ITEM_VISUALS = {
+    blade: { slot: 'weapon', style: 'sword', color: '#c9d2dc', trim: '#d4a84a' },
+    axe: { slot: 'weapon', style: 'axe', color: '#b8c0c8' },
+    scepter: { slot: 'weapon', style: 'staff', color: '#7a5230' },
+    dagger: { slot: 'weapon', style: 'dagger', color: '#c9d2dc' },
+    bow: { slot: 'weapon', style: 'bow', color: '#7a5230' },
+    spear: { slot: 'weapon', style: 'spear', color: '#c9d2dc' },
+    mace: { slot: 'weapon', style: 'mace', color: '#a9b4c0' },
+    kite_shield: { slot: 'offhand', style: 'kite', color: '#9c1f1a', trim: '#c9a24a' },
+    tower_shield: { slot: 'offhand', style: 'tower', color: '#3a4a6a', trim: '#aab4c0' },
+    buckler: { slot: 'offhand', style: 'kite', color: '#6b4a30', trim: '#8a8f96' },
+    dragon_shield: { slot: 'offhand', style: 'tower', color: '#2a5a3a', trim: '#d4a84a' },
+    helm: { slot: 'helmet', style: 'nasal', color: '#aab4c0', trim: '#d4a84a' },
+    hood: { slot: 'helmet', style: 'hood', color: '#34438e', trim: '#d4a84a' },
+    crown: { slot: 'helmet', style: 'circlet', color: '#d4a84a' },
+    skull_mask: { slot: 'helmet', style: 'cowl', color: '#3a3242', trim: '#eae0c8' },
+    breastplate: { slot: 'chest', style: 'plate', color: '#aab4c0', trim: '#d4a84a', tabard: '#8e1b1b' },
+    robe: { slot: 'chest', style: 'robe', color: '#2c3a8a', trim: '#d4a84a' },
+    leather_vest: { slot: 'chest', style: 'leather', color: '#6b4a30', trim: '#c9a24a' },
+    scale_armor: { slot: 'chest', style: 'mail', color: '#7a8a7a', trim: '#d4a84a', tabard: '#2a4a3a' },
+    pauldron: { slot: 'shoulders', style: 'plate', color: '#aab4c0', trim: '#d4a84a' },
+    spiked_pauldron: { slot: 'shoulders', style: 'spiked', color: '#7a7f88', trim: '#d4a84a' },
+    winged_pauldron: { slot: 'shoulders', style: 'leather', color: '#4a4a5a', feathers: true },
+    gauntlets: { slot: 'gloves', style: 'gauntlet', color: '#aab4c0' },
+    assassin_gloves: { slot: 'gloves', style: 'leather', color: '#2a2430' },
+    healing_gloves: { slot: 'gloves', style: 'leather', color: '#e8e0cc' },
+    leather_boots: { slot: 'boots', style: 'leather', color: '#5a3a22' },
+    wind_boots: { slot: 'boots', style: 'leather', color: '#4a6a8a' },
+    earth_boots: { slot: 'boots', style: 'plate', color: '#8a7a5a' },
+    amulet: { slot: 'amulet', style: 'pendant', color: '#d4a84a' },
+    necklace: { slot: 'amulet', style: 'pendant', color: '#d4a84a' },
+};
+// slot -> a generic look, for set pieces and uniques
+const SLOT_VISUAL_FALLBACK = {
+    weapon: { slot: 'weapon', style: 'sword', color: '#c9d2dc' },
+    shield: { slot: 'offhand', style: 'kite', color: '#9c1f1a', trim: '#d4a84a' },
+    offhand: { slot: 'offhand', style: 'kite', color: '#9c1f1a', trim: '#d4a84a' },
+    helmet: { slot: 'helmet', style: 'greathelm', color: '#aab4c0', trim: '#d4a84a' },
+    chest: { slot: 'chest', style: 'plate', color: '#aab4c0', trim: '#d4a84a', tabard: '#5a1a1a' },
+    shoulder: { slot: 'shoulders', style: 'plate', color: '#aab4c0', trim: '#d4a84a' },
+    gloves: { slot: 'gloves', style: 'gauntlet', color: '#aab4c0' },
+    boots: { slot: 'boots', style: 'plate', color: '#aab4c0' },
+    trinket: { slot: 'amulet', style: 'pendant', color: '#d4a84a' },
+};
+function catalogVisual(item) {
+    if (!item) return null;
+    if (item.base_id === 'ring' || item.base_id === 'charm') return null; // too small to see
+    const v = ITEM_VISUALS[item.base_id] || SLOT_VISUAL_FALLBACK[item.slot];
+    return v ? Object.assign({}, v) : null;
+}
+
 // Faz 10 (graphics roadmap, 2nd wave) - re-checks currentOwnedItems
 // (economy.js) for an equipped isUnique item and updates the player's own
 // combat-portrait aura (cgSetLegendaryAura, graphics.js) across all three

@@ -370,7 +370,7 @@ async function pvpConnectChannel(code) {
                 // presence already exists for, and it means pvpCheckPresence can
                 // read the opponent's class off the same state it already uses to
                 // find them, rather than adding a second handshake.
-                await pvpChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null });
+                await pvpChannel.track({ joined_at: Date.now(), className: selectedClass ? selectedClass.name.toLowerCase() : null, avatar: typeof myAvatarPayload === 'function' ? myAvatarPayload() : null });
                 resolve();
             }
         });
@@ -395,7 +395,10 @@ function pvpCheckPresence() {
         // Falls back to a random class portrait if the opponent's client is
         // an older cached build that never tracked className - still shows
         // SOMETHING rather than an empty canvas for that mismatch window.
-        if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
+        // their painted hero, with their real gear (hero.js); an older client
+        // that sends no avatar gets a starter look for its class
+        if (stage && typeof heroRemoteSpec === 'function' && typeof avPaint === 'function') stage.setAvatar(heroRemoteSpec(state[opponent.key][0].avatar, pvpOpponentClassName));
+        else if (stage) stage.setPortrait(url || CHARACTER_SPRITES.warrior);
     }
 
     pvpStarted = true;

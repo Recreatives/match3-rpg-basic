@@ -1129,11 +1129,10 @@ function showFloatingText(text, tileElement, color) {
 // to remember to sync it when its own battle starts.
 function setMyPortraitEverywhere(classKey) {
     if (typeof cgGetStage !== 'function' || typeof CHARACTER_SPRITES === 'undefined') return;
-    let url = CHARACTER_SPRITES[classKey];
-    if (!url) return;
+    if (!CHARACTER_SPRITES[classKey]) return;
+    // the painted hero (hero.js): class, looks and whatever is equipped
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar(true);
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
-        let stage = cgGetStage(id);
-        if (stage) stage.setPortrait(url);
         // Faz 10 (graphics roadmap, 2nd wave) - class identity glow, synced
         // here alongside the portrait art itself.
         if (typeof cgSetClassGlow === 'function') cgSetClassGlow(id, classKey);

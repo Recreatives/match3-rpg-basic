@@ -520,6 +520,7 @@ async function fetchOwnedItems() {
     if (typeof renderShop === 'function') renderShop();
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
     return currentOwnedItems;
 }
 
@@ -582,6 +583,7 @@ async function equipItem(itemRowId) {
     item.equipped_slot = item.slot;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
     return true;
 }
 
@@ -596,6 +598,7 @@ async function unequipItem(itemRowId) {
     item.equipped_slot = null;
     if (typeof renderInventory === 'function') renderInventory();
     if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
     return true;
 }
 

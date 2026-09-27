@@ -602,3 +602,52 @@ describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 
         w.g('cgToggleLowGraphics()');
     });
 });
+
+describe('Painted heroes (avatar.js + hero.js)', { isolate: 'each' }, function () {
+    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+
+    it('every class x gender paints all its parts and installs a two-bone rig', async function (ctx) {
+        var w = ctx.world, st = w.g("cgGetStage('player-sprite')");
+        await awaitInWorld(w, st.ready);
+        for (var i = 0; i < CLASSES.length; i++) {
+            for (var g = 0; g < 2; g++) {
+                var spec = w.g('heroSpecFor')(CLASSES[i], { gender: g ? 'f' : 'm', skin: i % 5, hair: g ? 'braid' : 'long', hairColor: i % 6, beard: 'full' }, []);
+                var painted = w.g('avPaint')(spec);
+                ['legL', 'shinL', 'legR', 'shinR', 'armL', 'foreL', 'torso', 'head', 'armR', 'foreR'].forEach(function (p) {
+                    expect(!!painted.parts[p], CLASSES[i] + ' ' + p).toBe(true);
+                });
+                expect(painted.legs.L.knee.length, 'leg IK data').toBe(2);
+            }
+        }
+        await awaitInWorld(w, st.setAvatar(w.g('heroSpecFor')('paladin', null, [])));
+        expect(st.isAvatar).toBe(true);
+        ['foreR', 'shinL', 'foreLf'].forEach(function (j) { expect(!!st.joints[j], j).toBe(true); });
+    });
+
+    it('equipping an item changes how the hero looks; an ill-fitting off-hand is hidden', function (ctx) {
+        var w = ctx.world, spec = w.g('heroSpecFor');
+        var bare = spec('warrior', null, []);
+        var armored = spec('warrior', null, [{ base_id: 'breastplate', slot: 'chest', rarity: 'blue', equipped_slot: 'chest' }, { base_id: 'helm', slot: 'helmet', rarity: 'red', equipped_slot: 'helmet' }]);
+        expect(bare.gear.chest.style).toBe('leather');
+        expect(armored.gear.chest.style).toBe('plate');
+        expect(armored.gear.chest.tier).toBe(2);
+        expect(armored.gear.helmet.tier).toBe(3);
+        expect(!!armored.gear.helmet.glow).toBe(true);
+        var archer = spec('warrior', null, [{ base_id: 'bow', slot: 'weapon', rarity: 'white', equipped_slot: 'weapon' }]);
+        expect(archer.gear.weapon.style).toBe('bow');
+        expect(archer.gear.offhand, 'no shield with a bow').toBe(undefined);
+    });
+
+    it("another player's look is sanitised before it is painted", function (ctx) {
+        var w = ctx.world;
+        var spec = w.g('heroRemoteSpec')({ cls: 'rogue', gender: 'f', skin: 99, hairColor: -4, gear: { chest: { style: 'leather', color: 'red"/><script>', tier: 9 }, evil: { style: 'x' } } }, 'rogue');
+        expect(spec.skin).toBe(4);
+        expect(spec.hairColor).toBe(0);
+        expect(spec.gear.chest.color).toBe('#888888');
+        expect(spec.gear.chest.tier).toBe(3);
+        expect(spec.gear.evil).toBe(undefined);
+        var fallback = w.g('heroRemoteSpec')(null, 'mage');
+        expect(fallback.cls).toBe('mage');
+        expect(fallback.gear.weapon.style).toBe('staff');
+    });
+});
