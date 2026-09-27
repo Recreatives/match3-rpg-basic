@@ -555,6 +555,7 @@ function coopOnEnemyDefeated(payload) {
     // reasoning for gold (goldRewardForKill, game.js) - each player earns
     // their own pay for the kill, not a shared pot split between them.
     if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (typeof awardRunXp === 'function') awardRunXp(payload.level, payload.isBoss ? 3 : 1);
     if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
         let goldReward = goldRewardForKill(payload.level, payload.isBoss);
         adjustWallet(goldReward, 0).then(result => { if (result) coopLog(tf('+{val} 🪙 kazandın!', { val: goldReward })); });

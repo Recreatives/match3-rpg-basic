@@ -639,7 +639,12 @@ function renderShop() {
     if (!container) return;
     container.innerHTML = '';
 
-    ITEM_SLOTS.forEach(slot => {
+    // only slots the shop can actually roll for this character: a base its
+    // class may wear in its level band (purchase_item does the same)
+    const cls = (typeof selectedClass !== 'undefined' && selectedClass) ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : null);
+    const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
+    const priceMult = 1 + (lvl - 1) * 0.05;
+    ITEM_SLOTS.filter(slot => !cls || ITEM_BASES[slot].some(b => !b.legacy && b.classes.indexOf(cls) !== -1 && lvl >= b.minLevel && lvl <= b.maxLevel)).forEach(slot => {
         let section = document.createElement('div');
         section.className = 'modal-section';
         let header = document.createElement('h4');
@@ -661,7 +666,7 @@ function renderShop() {
             let btn = document.createElement('button');
             btn.className = 'action-btn';
             btn.style.width = 'auto'; btn.style.margin = '0'; btn.style.flexShrink = '0';
-            btn.innerText = `🪙${Math.round(20 * rarity.costMult)}`;
+            btn.innerText = `🪙${Math.round(20 * rarity.costMult * priceMult)}`;
             btn.onclick = () => purchaseItem(slot, rarityKey);
             row.appendChild(btn);
 
@@ -738,138 +743,8 @@ function renderEquippedSlotsInto(containerId) {
     });
 }
 
-function renderInventory() {
-    let container = document.getElementById('inventory-list');
-    if (!container) return;
-    container.innerHTML = '';
-
-    let slotsDiv = document.createElement('div');
-    slotsDiv.className = 'modal-section';
-    slotsDiv.id = 'inventory-equipped-slots';
-    container.appendChild(slotsDiv);
-    renderEquippedSlotsInto('inventory-equipped-slots');
-
-    let listDiv = document.createElement('div');
-    listDiv.className = 'modal-section';
-    listDiv.innerHTML = `<h4>${t('Envanter')}</h4>`;
-    if (currentOwnedItems.length === 0) {
-        listDiv.innerHTML += `<p style="color:#7f8c8d; font-size:0.8rem;">${t('Henüz eşyan yok.')}</p>`;
-    }
-
-    function buildInventoryRow(item) {
-        let rarity = RARITY_DEFS[item.rarity];
-        let info = itemDisplayInfo(item);
-        let row = document.createElement('div');
-        row.className = 'manual-tile';
-        // Wraps onto its own second row (desc above, buttons below) instead
-        // of overflowing past the modal's edge once an item picks up its
-        // 3rd action button (KUŞAN/ÇIKAR + upgrade + scrap) - flex's
-        // default nowrap let both sides keep their full natural width and
-        // just spill out sideways.
-        row.style.justifyContent = 'space-between';
-        row.style.flexWrap = 'wrap';
-        row.style.rowGap = '6px';
-
-        let desc = document.createElement('div');
-        desc.className = 'manual-desc';
-        desc.style.color = rarity.color;
-        // flex-basis:100% (not just a min width) FORCES this onto its own
-        // full-width line whenever the row wraps, rather than leaving it to
-        // flex's default auto-sizing to decide how much of the row each
-        // side gets - that auto-sizing is exactly what let btnWrap keep
-        // claiming its full 3-button width below and spill past the card
-        // edge instead of actually wrapping. Same flex-basis:100% on
-        // btnWrap below for the same reason.
-        desc.style.flex = '1 1 100%';
-        desc.style.minWidth = '0';
-        let setLine = '';
-        if (item.set_key) {
-            let set = ITEM_SETS[item.set_key];
-            let totalCount = Object.keys(set.pieces).length;
-            let equippedCount = currentOwnedItems.filter(it => it.set_key === item.set_key && it.equipped_slot).length;
-            // Tells a player exactly how close they are to the bonus, right
-            // on the item itself - previously this only said the set's NAME,
-            // with no indication of how many pieces it needs or what
-            // equipping them all actually does.
-            setLine = ' · ' + tf('Set: {name} ({eq}/{total}) → {bonus}', { name: t(set.name), eq: equippedCount, total: totalCount, bonus: t(set.bonusDesc) });
-        }
-        let passiveLine = info.passiveDesc ? `<br><span style="color:#f97316; font-style:italic;">✨ ${info.passiveDesc}</span>` : '';
-        desc.innerHTML = `<b>${info.emoji} ${info.name} (${rarity.mark} ${t(rarity.label)}) · 💎${itemPower(item)}</b>${formatRolledStats(item.rolled_stats)}${setLine}${passiveLine}`;
-        row.appendChild(desc);
-
-        let btnWrap = document.createElement('div');
-        btnWrap.style.display = 'flex'; btnWrap.style.gap = '4px'; btnWrap.style.flexWrap = 'wrap';
-        btnWrap.style.flex = '1 1 100%'; btnWrap.style.minWidth = '0';
-
-        let btn = document.createElement('button');
-        btn.className = 'action-btn';
-        btn.style.width = 'auto'; btn.style.margin = '0';
-        if (item.equipped_slot) { btn.innerText = t('ÇIKAR'); btn.onclick = () => unequipItem(item.id); }
-        else { btn.innerText = t('KUŞAN'); btn.onclick = () => equipItem(item.id); }
-        btnWrap.appendChild(btn);
-
-        // Scrap/upgrade only make sense for an item that's just sitting in
-        // the bag - an equipped item stays put until you take it off
-        // (scrap_item/upgrade_item, supabase/schema.sql, enforce this
-        // server-side too, this just avoids offering a button that would
-        // fail).
-        if (!item.equipped_slot) {
-            if (ITEM_UPGRADE_COSTS[item.rarity]) {
-                let uc = ITEM_UPGRADE_COSTS[item.rarity];
-                let upBtn = document.createElement('button');
-                upBtn.className = 'action-btn';
-                upBtn.style.width = 'auto'; upBtn.style.margin = '0'; upBtn.style.background = '#8e44ad';
-                upBtn.innerText = `⬆️ ${uc.gold}🪙 ${uc.materials}🪨`;
-                upBtn.onclick = () => upgradeItem(item.id);
-                btnWrap.appendChild(upBtn);
-            }
-            let scrapBtn = document.createElement('button');
-            scrapBtn.className = 'action-btn';
-            scrapBtn.style.width = 'auto'; scrapBtn.style.margin = '0'; scrapBtn.style.background = '#7f8c8d';
-            scrapBtn.innerText = `♻️ +${ITEM_SCRAP_VALUES[item.rarity] || 1}🪨`;
-            scrapBtn.title = t('Hurdaya çevir');
-            scrapBtn.onclick = () => scrapItem(item.id);
-            btnWrap.appendChild(scrapBtn);
-
-            // Sat (sell for gold) sits next to Hurdaya çevir (scrap for
-            // materials) - same item, two different currencies, so a player
-            // short on gold vs. short on materials has an actual choice
-            // instead of always getting materials back.
-            let sellBtn = document.createElement('button');
-            sellBtn.className = 'action-btn';
-            sellBtn.style.width = 'auto'; sellBtn.style.margin = '0'; sellBtn.style.background = '#b8860b';
-            sellBtn.innerText = `💰 +${ITEM_SELL_VALUES[item.rarity] || 1}🪙`;
-            sellBtn.title = t('Sat');
-            sellBtn.onclick = () => sellItem(item.id);
-            btnWrap.appendChild(sellBtn);
-        }
-        row.appendChild(btnWrap);
-        return row;
-    }
-
-    // Grouped by slot (Silah/Kalkan/Miğfer/...) instead of one flat list
-    // sorted only by rarity - a bag of 15 mixed items in rarity order made
-    // it hard to find "which shields do I have" at a glance. Within each
-    // slot, still highest rarity first. Slots with nothing in them are
-    // skipped entirely rather than shown empty, unlike the equipped-slots
-    // list above (which always shows all 8 to make gaps in a loadout
-    // obvious) - here an empty section would just be noise.
-    let rarityOrder = Object.keys(RARITY_DEFS);
-    ITEM_SLOTS.forEach(slot => {
-        let itemsInSlot = currentOwnedItems
-            .filter(it => itemSlotOf(it) === slot && (!(typeof activeCharacter !== 'undefined' && activeCharacter) || !('character_id' in it) || it.character_id === activeCharacter.id))
-            .sort((a, b) => rarityOrder.indexOf(b.rarity) - rarityOrder.indexOf(a.rarity));
-        if (itemsInSlot.length === 0) return;
-
-        let slotHeader = document.createElement('div');
-        slotHeader.style.cssText = 'font-size:0.75rem; color:#7f8c8d; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; font-weight:bold;';
-        slotHeader.innerText = `${t(SLOT_LABELS[slot])} (${itemsInSlot.length})`;
-        listDiv.appendChild(slotHeader);
-
-        itemsInSlot.forEach(item => listDiv.appendChild(buildInventoryRow(item)));
-    });
-    container.appendChild(listDiv);
-}
+// renderInventory (the Diablo-style bag, paper doll and detail sheet)
+// lives in inventory.js.
 
 function showLootToast(item) {
     let rarity = RARITY_DEFS[item.rarity];

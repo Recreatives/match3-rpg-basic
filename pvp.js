@@ -610,6 +610,8 @@ function pvpOnOpponentDefeated() {
     // message got reordered or dropped.
     pvpApplyOpponentStatus(sbHealthTier(0));
     pvpUpdateUI();
+    // a won duel is worth about a cleared dungeon level at your own level
+    if (typeof awardRunXp === 'function' && typeof activeCharacter !== 'undefined' && activeCharacter) awardRunXp(activeCharacter.level, 2);
     if (pvpBetrayalMode) pvpResolveBetrayalPayoutIfNeeded().then(() => pvpShowBetrayalSummary(true));
     // Betrayal duels already have their own currency-stakes reward (steal %
     // or the small loyal-survivor bonus) - loot drops are only for a

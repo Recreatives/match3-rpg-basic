@@ -718,6 +718,90 @@ const AV_WEAPONS = {
     },
 };
 
+// --- item icons ----------------------------------------------------------------------
+// The inventory draws every item with the same painter that puts it on
+// the hero: weapons lie diagonally like a loot icon, armor is painted on an
+// invisible mannequin (only the item's own layers), rings and amulets get
+// their own little drawings. The crop is measured (getBBox) once per look
+// and cached, so any new catalog piece gets a tight icon for free.
+const AV_ICON_CACHE = new Map();
+const AV_ICON_ORDER = ['back', 'legL', 'bootL', 'legR', 'bootR', 'sleeveL', 'shoulderL', 'gloveL', 'torso', 'belt', 'amulet', 'headBack', 'head', 'sleeveR', 'shoulderR', 'gloveR', 'held', 'weaponR'];
+// which body an item is shown on (robes need the robed body, etc.)
+function avIconBody(vis, classes) {
+    const cls = (classes && classes[0]) || 'warrior';
+    return { key: (AV_CLASS_BODY[cls] || 'heavy') + '_m', cls };
+}
+function avMeasure(inner) {
+    if (typeof document === 'undefined' || !document.body) return null;
+    let host = document.getElementById('av-measure');
+    if (!host) {
+        host = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        host.id = 'av-measure';
+        host.setAttribute('width', '0'); host.setAttribute('height', '0');
+        host.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none';
+        document.body.appendChild(host);
+    }
+    host.innerHTML = '<g>' + inner + '</g>';
+    try { const b = host.firstChild.getBBox(); return b.width > 0 && b.height > 0 ? { x: b.x, y: b.y, w: b.width, h: b.height } : null; } catch (e) { return null; } finally { host.innerHTML = ''; }
+}
+function avIconRing(S, it) {
+    const c = it.glow || '#8fd0ff', g = S.metal(it.trim && it.trim !== '#888888' ? it.trim : '#d4a84a');
+    return S.glow(50, 38, 14, c, 0.45)
+        + `<ellipse cx="50" cy="58" rx="22" ry="20" fill="none" stroke="${AV_INK}" stroke-width="10"/><ellipse cx="50" cy="58" rx="22" ry="20" fill="none" stroke="${g}" stroke-width="6.5"/>`
+        + S.path('M38 40 L50 26 L62 40 L50 50 Z', S.lin(avLight(c, 0.6), avDark(c, 0.35), true), 2) + S.circle(46, 36, 2.2, '#fff', 0);
+}
+function avIconAmulet(S, it) {
+    const c = it.glow || '#e83a3a';
+    return S.line('M22 14 Q50 70 78 14', AV_INK, 5) + S.line('M22 14 Q50 70 78 14', '#c9a24a', 2.6)
+        + S.glow(50, 66, 16, c, 0.5) + S.path('M50 50 L63 64 L50 84 L37 64 Z', S.metal('#c9a24a'), 2)
+        + S.circle(50, 66, 7, S.lin(avLight(c, 0.55), avDark(c, 0.3)), 1.6) + S.circle(47.5, 63.5, 2, '#fff', 0);
+}
+// SVG markup for an item's icon, or null if there's nothing to draw.
+// A two-cell item (itemSize 2) gets a tall 1:2 icon, weapons upright.
+// opts.square forces a square icon (the paper doll's slots).
+function avItemIcon(item, opts) {
+    if (!item) return null;
+    const vis = typeof heroItemVisual === 'function' ? heroItemVisual(item) : null;
+    const slot = typeof itemSlotOf === 'function' ? itemSlotOf(item) : item.slot;
+    const tall = !(opts && opts.square) && typeof itemSize === 'function' && itemSize(item) === 2;
+    const key = slot + '|' + JSON.stringify(vis) + '|' + item.rarity + (tall ? '|t' : '');
+    if (AV_ICON_CACHE.has(key)) return AV_ICON_CACHE.get(key);
+    const classes = typeof itemClasses === 'function' ? itemClasses(item) : null;
+    const body = avIconBody(vis, classes);
+    const P = avGeom(body.key, body.cls), S = avSession(P);
+    P.armPose = { R: P.stance.R, L: P.stance.L };
+    let inner = '', box = null;
+    const it = vis || { color: '#9aa4b0', trim: '#c9a24a', tier: 1 };
+    if (slot === 'ring' || (!vis && slot === 'ring')) { inner = avIconRing(S, it); box = { x: 0, y: 0, w: 100, h: 100 }; }
+    else if (slot === 'amulet') { inner = avIconAmulet(S, it); box = { x: 0, y: 0, w: 100, h: 100 }; }
+    else if (!vis) { AV_ICON_CACHE.set(key, null); return null; }
+    else if (vis.slot === 'weapon' && AV_WEAPONS[vis.style]) {
+        // upright at the grip, then laid diagonally
+        const drawn = AV_WEAPONS[vis.style](S, Object.assign({}, it, { drawnTo: false }), 100, 150);
+        inner = tall ? drawn : S.rot(drawn, vis.style === 'bow' ? 38 : 42, 100, 110);
+    } else if (AV_PAINT[vis.slot]) {
+        const layers = AV_PAINT[vis.slot](S, it) || {};
+        // a chest piece's cape would swamp the icon
+        if (vis.slot === 'chest' && layers.torso) delete layers.back;
+        // a pair (gloves, boots, pauldrons) reads better as one big piece
+        if (['gloves', 'boots', 'shoulders'].indexOf(vis.slot) !== -1) Object.keys(layers).forEach(k => { if (/L$/.test(k) && layers[k.slice(0, -1) + 'R']) delete layers[k]; });
+        const keys = AV_ICON_ORDER.filter(k => typeof layers[k] === 'string').concat(Object.keys(layers).filter(k => typeof layers[k] === 'string' && AV_ICON_ORDER.indexOf(k) === -1));
+        inner = keys.map(k => layers[k]).join('');
+    }
+    if (!inner) { AV_ICON_CACHE.set(key, null); return null; }
+    if (!box) {
+        box = avMeasure(inner) || { x: 40, y: 20, w: 120, h: 160 };
+        // square (or 1:2 for a tall item), centered, with room for strokes and glows
+        const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+        const h = Math.max(box.h, tall ? box.w * 2 : box.w) * 1.12 + 6, w = tall ? h / 2 : h;
+        box = { x: cx - w / 2, y: cy - h / 2, w, h };
+    }
+    const glow = it.tier >= 3 && it.glow ? `<circle cx="${avN(box.x + box.w / 2)}" cy="${avN(box.y + box.h / 2)}" r="${avN(Math.min(box.w, box.h) * 0.42)}" fill="${it.glow}" fill-opacity=".22" filter="url(#avblur)"/>` : '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${avN(box.x)} ${avN(box.y)} ${avN(box.w)} ${avN(box.h)}" width="${tall ? 48 : 96}" height="96"><defs>${S.defs()}</defs>${glow}${inner}</svg>`;
+    AV_ICON_CACHE.set(key, svg);
+    return svg;
+}
+
 // --- composition --------------------------------------------------------------------
 // spec: { cls, gender 'm'|'f', skin, hair, hairColor, beard, eyeColor, gear: { slot: item } }
 function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heavy') + '_' + (spec.gender === 'f' ? 'f' : 'm'); }

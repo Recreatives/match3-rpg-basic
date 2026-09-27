@@ -628,6 +628,29 @@ async function unequipItem(itemRowId) {
     return true;
 }
 
+// Bag <-> shared stash (move_item) and lock / unlock (lock_item) - both
+// security definer, supabase/schema.sql section 30.
+async function moveItem(itemId, to) {
+    const { data, error } = await sb.rpc('move_item', { p_item_id: itemId, p_to: to });
+    if (error) {
+        console.error('move_item failed:', error.message);
+        setShopStatus(/full/.test(error.message) ? (to === 'stash' ? t('Ortak depo dolu.') : t('Çantan dolu.')) : t('Taşınamadı.'));
+        return false;
+    }
+    const item = currentOwnedItems.find(it => it.id === itemId);
+    if (item && data) item.character_id = data.character_id;
+    setShopStatus(to === 'stash' ? t('🏛️ Ortak depoya kondu.') : t('🎒 Çantaya alındı.'));
+    return true;
+}
+
+async function lockItem(itemId, locked) {
+    const { data, error } = await sb.rpc('lock_item', { p_item_id: itemId, p_locked: !!locked });
+    if (error) { console.error('lock_item failed:', error.message); return false; }
+    const item = currentOwnedItems.find(it => it.id === itemId);
+    if (item) item.locked = data ? !!data.locked : !!locked;
+    return true;
+}
+
 // --- SCRAP & UPGRADE ---------------------------------------------------------
 // Materials had no real source or sink before this - scrapping an unwanted,
 // unequipped item is now the main way to earn them (scrap_item, security
@@ -637,7 +660,7 @@ async function scrapItem(itemId) {
     const { data, error } = await sb.rpc('scrap_item', { p_item_id: itemId });
     if (error) {
         console.error('scrap_item failed:', error.message);
-        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Hurdaya çevrilemedi.'));
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : error.message.includes('locked') ? t('Kilitli eşya.') : t('Hurdaya çevrilemedi.'));
         return false;
     }
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);
@@ -653,7 +676,7 @@ async function sellItem(itemId) {
     const { data, error } = await sb.rpc('sell_item', { p_item_id: itemId });
     if (error) {
         console.error('sell_item failed:', error.message);
-        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : t('Satılamadı.'));
+        setShopStatus(error.message.includes('unequip it first') ? t('Önce çıkarman lazım.') : error.message.includes('locked') ? t('Kilitli eşya.') : t('Satılamadı.'));
         return false;
     }
     currentOwnedItems = currentOwnedItems.filter(it => it.id !== itemId);

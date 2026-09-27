@@ -28,6 +28,7 @@ const APP_SHELL = [
     './items.js',
     './hero.js',
     './characters.js',
+    './inventory.js',
     './achievements.js',
     './game.js',
     './sharedboard.js',

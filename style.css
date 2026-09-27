@@ -1341,3 +1341,103 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
     color: #fff; background: #1b2029; border: 2px solid #4a5566; border-radius: 6px;
 }
 .char-msg { min-height: 1em; font-size: 0.8rem; color: #e74c3c; }
+
+/* --- Inventory (inventory.js): paper doll, stats, bag grid, detail sheet -- */
+.inv { display: flex; flex-direction: column; gap: 10px; }
+.inv-doll {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr) 46px; gap: 6px; align-items: start;
+    padding: 8px; border-radius: 10px;
+    background: radial-gradient(ellipse at 50% 45%, #3b4459 0%, #1a1e28 70%); border: 1px solid #56627a;
+}
+.inv-col { display: flex; flex-direction: column; gap: 6px; }
+.inv-slot, .inv-cell {
+    position: relative; display: flex; align-items: center; justify-content: center; padding: 0;
+    font-family: inherit; color: #fff; cursor: pointer; overflow: hidden; --rc: #4a5566;
+    background: linear-gradient(160deg, rgba(255,255,255,0.06), rgba(0,0,0,0.35)), #151922;
+    border: 2px solid var(--rc); border-radius: 7px;
+}
+.inv-slot { width: 46px; height: 46px; }
+.inv-slot.filled, .inv-cell { box-shadow: inset 0 0 12px color-mix(in srgb, var(--rc) 35%, transparent); }
+.inv-slot.selected, .inv-cell.selected { outline: 2px solid #fff; outline-offset: 1px; }
+.inv-slot-empty { opacity: 0.28; font-size: 1.2rem; filter: grayscale(1); }
+.inv-icon { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.inv-emoji { font-size: 1.35rem; pointer-events: none; }
+.inv-figure { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.inv-figure-img { width: 100%; max-width: 210px; height: auto; animation: char-breathe 3.4s ease-in-out infinite; transform-origin: 50% 90%; }
+@media (prefers-reduced-motion: reduce) { .inv-figure-img { animation: none; } }
+.inv-power { font-size: 0.75rem; color: var(--accent); margin: 2px 0 6px; text-align: center; }
+.inv-hands { display: flex; gap: 10px; justify-content: center; }
+.inv-stats {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px;
+    padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.22); font-size: 0.75rem;
+}
+.inv-stats .inv-muted, .inv-set { grid-column: 1 / -1; }
+.inv-stat { display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.inv-stat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d0d6dc; }
+.inv-stat b { white-space: nowrap; }
+.inv-stat i { font-style: normal; font-weight: normal; }
+.inv-stat.up i { color: #4ade80; }
+.inv-stat.down i { color: #f87171; }
+.inv-stat.power { border-top: 1px solid #3a4456; padding-top: 3px; margin-top: 2px; }
+.inv-set { font-size: 0.72rem; color: #9fb0a4; }
+.inv-set.on { color: #22c55e; }
+.inv-muted { color: #8a96a3; font-size: 0.75rem; margin: 2px 0; }
+.inv-tabs { display: flex; gap: 6px; }
+.inv-tab {
+    flex: 1; min-height: 34px; font-family: inherit; font-size: 0.8rem; color: #ccc; cursor: pointer;
+    background: #2a3140; border: 2px solid #4a5566; border-radius: 7px;
+}
+.inv-tab.on { color: #fff; border-color: var(--accent); background: #34405a; }
+.inv-tools { display: flex; gap: 6px; }
+.inv-tools select {
+    flex: 1; min-width: 0; min-height: 32px; font-family: inherit; font-size: 0.8rem; color: #fff;
+    background: #1b2029; border: 1px solid #4a5566; border-radius: 6px;
+}
+.inv-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); grid-auto-rows: 46px;
+    grid-auto-flow: dense; gap: 5px;
+}
+.inv-grid > .inv-muted { grid-column: 1 / -1; }
+.inv-cell.tall { grid-row: span 2; }
+.inv-cell.unusable::after { content: "⛔"; position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 1px 2px; font-size: 0.55rem; background: rgba(150, 20, 20, 0.22); pointer-events: none; }
+.inv-lvl {
+    position: absolute; left: 2px; bottom: 1px; font-size: 0.6rem; line-height: 1; color: #fff;
+    text-shadow: 0 0 2px #000, 0 0 2px #000; pointer-events: none;
+}
+.inv-lock { position: absolute; right: 1px; top: 0; font-size: 0.6rem; pointer-events: none; }
+.inv-better { position: absolute; right: 2px; bottom: 0; font-size: 0.7rem; color: #4ade80; text-shadow: 0 0 3px #000; pointer-events: none; }
+.inv-detail {
+    position: sticky; bottom: -20px; z-index: 4; margin: 0 -8px -20px; padding: 10px 10px 14px;
+    border-top: 3px solid var(--rc, #4a5566); border-radius: 10px 10px 0 0;
+    background: #1d2330; box-shadow: 0 -8px 20px rgba(0,0,0,0.45);
+}
+.inv-detail-head { display: flex; gap: 10px; align-items: flex-start; }
+.inv-detail-fig { flex: 0 0 84px; height: 88px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: radial-gradient(circle at 50% 40%, #3a4356, #151820); overflow: hidden; }
+.inv-tryon-img { width: 84px; height: auto; }
+.inv-detail-icon { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+.inv-detail-icon .inv-emoji { font-size: 2.2rem; }
+.inv-detail-txt { min-width: 0; flex: 1; }
+.inv-name { display: block; color: var(--rc); font-size: 0.95rem; }
+.inv-sub { font-size: 0.72rem; color: #bdc3c7; }
+.inv-sub.bad { color: #f87171; }
+.inv-sub.good { color: #4ade80; }
+.inv-detail-stats { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: 0.78rem; }
+.inv-passive { font-size: 0.75rem; color: #f97316; font-style: italic; }
+.inv-passive.set { color: #22c55e; }
+.inv-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.inv-act { width: auto !important; margin: 0 !important; flex: 1 1 auto; min-height: 34px; font-size: 0.78rem; }
+.inv-act.primary { background: #2e7d32; }
+.inv-act.upgrade { background: #8e44ad; }
+.inv-act.scrap { background: #7f8c8d; }
+.inv-act.sell { background: #b8860b; }
+.inv-act:disabled { opacity: 0.45; }
+
+/* The shop / inventory modal: taller on phones (the inventory needs the
+   room) and a one-line tab row that never spills past the edge. */
+#shop-modal .modal-content { max-height: 94dvh; }
+#shop-tab-btn, #inventory-tab-btn, #prestige-tab-btn {
+    min-width: 0; padding: 8px 4px; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#shop-modal .stats-bar { padding: 6px; }
+#shop-modal .stats-bar .stat-item { flex-direction: row; gap: 6px; }
+#shop-modal .stats-bar .stat-item span:first-child { margin: 0; font-size: 1rem; }
