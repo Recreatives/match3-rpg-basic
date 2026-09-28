@@ -163,8 +163,8 @@
         award_run_xp: function (a) {
             var p = table('players')[0], c = table('characters').find(function (r) { return r.id === p.active_character_id; });
             if (!c) return { data: null, error: { message: 'no active character' } };
-            c.xp += Math.min(40 + a.p_floor * 12 + Math.min(a.p_kills, 10) * 4, 800);
-            var total = function (L) { var s = 0; for (var i = 1; i < L; i++) s += Math.round(60 * Math.pow(i, 1.5)); return s; };
+            c.xp += Math.min(30 + a.p_floor * 9 + Math.min(a.p_kills, 10) * 3, 600);
+            var total = function (L) { var s = 0; for (var i = 1; i < L; i++) s += Math.round(80 * Math.pow(i, 1.6)); return s; };
             while (c.level < 50 && c.xp >= total(c.level + 1)) c.level++;
             return { data: [{ level: c.level, xp: c.xp, mastery: c.mastery, leveled_up: false }], error: null };
         },
@@ -188,6 +188,14 @@
             var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
             if (!it || it.equipped_slot) return { data: null, error: { message: 'move_item: item not found (or it is worn)' } };
             it.character_id = a.p_to === 'stash' ? null : table('players')[0].active_character_id;
+            return { data: clone(it), error: null };
+        },
+        lose_item_on_death: function () {
+            var charId = table('players')[0].active_character_id;
+            var worn = table('player_items').filter(function (r) { return r.equipped_slot && (!r.character_id || r.character_id === charId); });
+            if (!worn.length) return { data: null, error: null };
+            var it = worn[0];
+            db.player_items = table('player_items').filter(function (r) { return r !== it; });
             return { data: clone(it), error: null };
         },
         lock_item: function (a) {

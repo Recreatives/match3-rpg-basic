@@ -56,11 +56,11 @@ describe('Characters', { world: false }, function () {
             await w.settle(1000);
             var call = w.stub.calls.filter(function (c) { return c.fn === 'award_run_xp'; })[0];
             expect(call && call.args.p_floor).toBe(1);
-            // 40 + 12 per floor + 4 per kill
-            expect(w.g('activeCharacter.xp')).toBe(56);
+            // 30 + 9 per floor + 3 per kill
+            expect(w.g('activeCharacter.xp')).toBe(42);
             expect(w.g('activeCharacter.level')).toBe(1);
             await awaitInWorld(w, w.g('awardRunXp(5, 3)'));
-            expect(w.g('activeCharacter.xp')).toBe(56 + 112);
+            expect(w.g('activeCharacter.xp')).toBe(42 + 84);
             expect(w.g('activeCharacter.level')).toBe(2);
             expect(w.$('player-class-label').textContent).toContain('Sv. 2');
             expect(w.g('characterLevelProgress(activeCharacter).need')).toBe(w.g('xpTotalFor(3) - xpTotalFor(2)'));
@@ -86,11 +86,23 @@ describe('Characters', { world: false }, function () {
 });
 
 describe('Characters: level curve', function () {
-    it('the level curve matches schema.sql (level 2 at 60 xp)', function (ctx) {
+    it('the level curve matches schema.sql (level 2 at 80 xp)', function (ctx) {
         var w = ctx.world;
         expect(w.g('xpTotalFor(1)')).toBe(0);
-        expect(w.g('xpTotalFor(2)')).toBe(60);
-        expect(w.g('xpTotalFor(3)')).toBe(60 + Math.round(60 * Math.pow(2, 1.5)));
+        expect(w.g('xpTotalFor(2)')).toBe(80);
+        expect(w.g('xpTotalFor(3)')).toBe(80 + Math.round(80 * Math.pow(2, 1.6)));
+    });
+});
+
+describe('Characters: death penalty', function () {
+    it('dying in a solo run costs one worn item, through the server function', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g("currentOwnedItems = [{ id: 'd1', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: 'weapon', character_id: 'char-1' }, { id: 'd2', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: null, character_id: 'char-1' }]; __stub.db.player_items = JSON.parse(JSON.stringify(currentOwnedItems));");
+        w.g('gameOver()');
+        await w.settle(1000);
+        expect(w.stub.calls.some(function (c) { return c.fn === 'lose_item_on_death' && c.args.p_mode === 'solo'; })).toBe(true);
+        expect(w.g("currentOwnedItems.map(function (i) { return i.id; })")).toEqual(['d2']);
     });
 });
 

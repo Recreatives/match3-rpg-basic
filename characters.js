@@ -18,7 +18,7 @@ const CHAR_CLASS_KEYS = ['warrior', 'paladin', 'berserker', 'rogue', 'archer', '
 // Total xp to reach a level - the same curve as schema.sql's xp_total_for.
 function xpTotalFor(level) {
     let sum = 0;
-    for (let i = 1; i < Math.max(1, level); i++) sum += Math.round(60 * Math.pow(i, 1.5));
+    for (let i = 1; i < Math.max(1, level); i++) sum += Math.round(80 * Math.pow(i, 1.6));
     return sum;
 }
 // Where a character is inside its current level: { level, into, need, pct }.
