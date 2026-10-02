@@ -3460,7 +3460,14 @@ as $$
         'skin', greatest(0, least(4, coalesce((p->>'skin')::integer, 1))),
         'hair', case when p->>'hair' in ('short', 'long', 'topknot', 'shaved', 'braid', 'bun', 'bob') then p->>'hair' else 'short' end,
         'hairColor', greatest(0, least(5, coalesce((p->>'hairColor')::integer, 1))),
-        'beard', case when p->>'beard' in ('none', 'stubble', 'full', 'braided') then p->>'beard' else 'none' end);
+        'beard', case when p->>'beard' in ('none', 'stubble', 'full', 'braided') then p->>'beard' else 'none' end,
+        -- (v1.40) body build and face details
+        'build', case when p->>'build' in ('lean', 'average', 'broad') then p->>'build' else 'average' end,
+        'face', case when p->>'face' in ('oval', 'square', 'angular') then p->>'face' else 'oval' end,
+        'nose', case when p->>'nose' in ('straight', 'hooked', 'broad') then p->>'nose' else 'straight' end,
+        'brows', case when p->>'brows' in ('stern', 'thick', 'arched') then p->>'brows' else 'stern' end,
+        'eyes', greatest(0, least(4, coalesce((p->>'eyes')::integer, 0))),
+        'marks', case when p->>'marks' in ('none', 'scar', 'paint', 'tattoo', 'freckles') then p->>'marks' else 'none' end);
 $$;
 
 create or replace function public.create_character(p_name text, p_class text, p_gender text, p_appearance jsonb)
@@ -4504,3 +4511,26 @@ begin
 end;
 $$;
 grant execute on function public.get_my_listings() to authenticated;
+
+-- =====================================================================================
+-- 34. CHANGING A CHARACTER'S LOOK (v1.40)
+-- =====================================================================================
+-- Body build, face, hair, skin... can be changed any time (class and name
+-- can't). Same whitelist as character creation.
+create or replace function public.update_character_look(p_id uuid, p_gender text, p_appearance jsonb)
+returns public.characters
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_row public.characters;
+begin
+    update public.characters set gender = case when p_gender = 'f' then 'f' else 'm' end,
+            appearance = public.character_appearance_clean(p_appearance), updated_at = now()
+        where id = p_id and player_id = auth.uid() and not needs_setup
+        returning * into v_row;
+    if not found then raise exception 'update_character_look: character not found'; end if;
+    return v_row;
+end;
+$$;
+grant execute on function public.update_character_look(uuid, text, jsonb) to authenticated;

@@ -126,6 +126,51 @@ describe('Characters: death penalty and banked experience', function () {
     });
 });
 
+describe('Characters: looks', { world: false }, function () {
+    it('the creator offers build, face, nose, brows, eye color and marks, and saves them', async function () {
+        var w = await createWorld({ pixi: false, noCharacter: true });
+        try {
+            var rows = w.$('character-creator').querySelectorAll('.char-row-label');
+            var labels = Array.prototype.map.call(rows, function (r) { return r.textContent; });
+            ['Yapı', 'Yüz', 'Burun', 'Kaş', 'Göz rengi', 'İz / Boya'].forEach(function (l) { expect(labels).toContain(l.toLocaleUpperCase('tr') === l ? l : l); });
+            w.g("charDraft.build = 'broad'; charDraft.face = 'angular'; charDraft.marks = 'scar'; charDraft.eyes = 3; renderCharacterCreator()");
+            w.$('char-name-input').value = 'Varg'; w.$('char-name-input').oninput();
+            w.$('char-create-btn').click();
+            await w.settle(1500);
+            var call = w.stub.calls.filter(function (c) { return c.fn === 'create_character'; })[0];
+            expect(call.args.p_appearance.build + '/' + call.args.p_appearance.face + '/' + call.args.p_appearance.marks + '/' + call.args.p_appearance.eyes).toBe('broad/angular/scar/3');
+            // and they reach the painted hero
+            expect(w.g("myAvatarSpec().build + '/' + myAvatarSpec().face")).toBe('broad/angular');
+        } finally { w.destroy(); }
+    });
+
+    it('an existing hero can change its look (not its class or name)', async function () {
+        var w = await createWorld({ pixi: false });
+        try {
+            w.$('char-list').querySelector('.char-edit').click();
+            expect(w.$('character-modal').style.display).toBe('flex');
+            expect(w.$('char-name-input')).toBe(null);
+            w.g("charDraft.face = 'square'; charDraft.nose = 'hooked'");
+            w.$('char-create-btn').click();
+            await w.settle(1000);
+            var call = w.stub.calls.filter(function (c) { return c.fn === 'update_character_look'; })[0];
+            expect(call && call.args.p_appearance.face + '/' + call.args.p_appearance.nose).toBe('square/hooked');
+            expect(w.stub.calls.some(function (c) { return c.fn === 'create_character'; })).toBe(false);
+        } finally { w.destroy(); }
+    });
+});
+
+describe('Characters: features', function () {
+    it("another player's look keeps only known values; monsters differ floor to floor", function (ctx) {
+        var w = ctx.world;
+        var r = w.g("heroRemoteSpec({ cls: 'rogue', gear: {}, build: 'giant', face: 'square', marks: '<img>', eyes: 99 })");
+        expect(r.build + '/' + r.face + '/' + r.marks + '/' + r.eyes).toBe('average/square/none/4');
+        var looks = w.g("[1,2,3,4,5,6].map(function (L) { var s = avMonsterSpec('normal', L); return [s.build, s.face, s.nose, s.marks, s.skinTone[0]].join(','); })");
+        var distinct = looks.filter(function (x, i) { return looks.indexOf(x) === i; }).length;
+        expect(distinct).toBeGreaterThan(3);
+    });
+});
+
 describe('Characters: growth', function () {
     it('a character grows along its class lines, and solo HP with its level', async function (ctx) {
         var w = ctx.world;

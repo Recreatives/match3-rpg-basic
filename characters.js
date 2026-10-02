@@ -254,7 +254,8 @@ function characterMaxHpBonus() {
 
 function charLookOf(c) {
     const a = (c && c.appearance) || {};
-    return { gender: c && c.gender === 'f' ? 'f' : 'm', skin: a.skin | 0, hair: a.hair || 'short', hairColor: a.hairColor | 0, beard: a.beard || 'none' };
+    return Object.assign({ gender: c && c.gender === 'f' ? 'f' : 'm', skin: a.skin | 0, hair: a.hair || 'short', hairColor: a.hairColor | 0, beard: a.beard || 'none' },
+        typeof heroFeatures === 'function' ? heroFeatures(a) : {});
 }
 const CHAR_PORTRAIT_CACHE = new Map();
 // A standalone <img> of a hero (its own document, so painter ids never clash).
@@ -322,6 +323,14 @@ function renderCharacterSelect() {
         bar.appendChild(fill);
         info.append(name, sub, bar);
         card.appendChild(info);
+        if (!c.needs_setup) {
+            const ed = document.createElement('span');
+            ed.className = 'char-edit';
+            ed.title = t('Görünüşü değiştir');
+            ed.textContent = '✎';
+            ed.onclick = ev => { ev.stopPropagation(); openCharacterCreator(c, true); };
+            card.appendChild(ed);
+        }
         const del = document.createElement('span');
         del.className = 'char-delete';
         del.title = t('Karakteri sil');
@@ -364,13 +373,17 @@ async function charConfirmDelete(c) {
 
 let charDraft = null;
 
-function openCharacterCreator(setupOf) {
-    const cls = 'warrior';
+function openCharacterCreator(setupOf, editLook) {
+    const cls = editLook && setupOf ? setupOf.class_key : 'warrior';
+    const cur = editLook && setupOf ? charLookOf(setupOf) : null;
     charDraft = {
-        setupId: setupOf ? setupOf.id : null,
+        editId: editLook && setupOf ? setupOf.id : null,
+        setupId: setupOf && !editLook ? setupOf.id : null,
         name: setupOf ? setupOf.name : '',
-        cls, gender: 'm', skin: 1, hair: 'short', hairColor: 1, beard: 'full'
+        cls, gender: 'm', skin: 1, hair: 'short', hairColor: 1, beard: 'full',
+        build: 'average', face: 'oval', nose: 'straight', brows: 'stern', eyes: 0, marks: 'none'
     };
+    if (cur) Object.assign(charDraft, cur);
     renderCharacterCreator();
     const m = document.getElementById('character-modal');
     if (!m) return;
@@ -404,6 +417,11 @@ function charOptionRow(label, options, current, onPick, render) {
 
 const CHAR_HAIR_LABELS = { short: 'Kısa', long: 'Uzun', topknot: 'Topuz', shaved: 'Kazınmış', braid: 'Örgü', bun: 'Topuz', bob: 'Kaküllü' };
 const CHAR_BEARD_LABELS = { none: 'Yok', stubble: 'Kirli sakal', full: 'Gür', braided: 'Örgülü' };
+const CHAR_BUILD_LABELS = { lean: 'İnce', average: 'Orta', broad: 'İri' };
+const CHAR_FACE_LABELS = { oval: 'Oval', square: 'Köşeli', angular: 'Sivri' };
+const CHAR_NOSE_LABELS = { straight: 'Düz', hooked: 'Kemerli', broad: 'Geniş' };
+const CHAR_BROW_LABELS = { stern: 'Sert', thick: 'Kalın', arched: 'Kavisli' };
+const CHAR_MARK_LABELS = { none: 'Yok', scar: 'Yara izi', paint: 'Savaş boyası', tattoo: 'Dövme', freckles: 'Çil' };
 
 function renderCharacterCreator() {
     const box = document.getElementById('character-creator');
@@ -415,7 +433,7 @@ function renderCharacterCreator() {
     box.innerHTML = '';
 
     const title = document.getElementById('character-modal-title');
-    if (title) title.textContent = d.setupId ? t('KAHRAMANINI TAMAMLA') : t('YENİ KAHRAMAN');
+    if (title) title.textContent = d.editId ? t('GÖRÜNÜŞÜ DEĞİŞTİR') : d.setupId ? t('KAHRAMANINI TAMAMLA') : t('YENİ KAHRAMAN');
 
     const preview = document.createElement('div');
     preview.id = 'char-preview';
@@ -430,7 +448,7 @@ function renderCharacterCreator() {
 
     const form = document.createElement('div');
     form.className = 'char-form';
-    form.appendChild(charOptionRow(t('Sınıf'), CHAR_CLASS_KEYS, d.cls, v => { d.cls = v; }, (b, v) => {
+    if (!d.editId) form.appendChild(charOptionRow(t('Sınıf'), CHAR_CLASS_KEYS, d.cls, v => { d.cls = v; }, (b, v) => {
         const c = classDefFor(v);
         b.textContent = c ? c.emoji + ' ' + c.name : v;
     }));
@@ -449,6 +467,16 @@ function renderCharacterCreator() {
     if (d.gender === 'm') {
         form.appendChild(charOptionRow(t('Sakal'), ['none', 'stubble', 'full', 'braided'], d.beard, v => { d.beard = v; }, (b, v) => { b.textContent = t(CHAR_BEARD_LABELS[v] || v); }));
     }
+    form.appendChild(charOptionRow(t('Yapı'), ['lean', 'average', 'broad'], d.build, v => { d.build = v; }, (b, v) => { b.textContent = t(CHAR_BUILD_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Yüz'), ['oval', 'square', 'angular'], d.face, v => { d.face = v; }, (b, v) => { b.textContent = t(CHAR_FACE_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Burun'), ['straight', 'hooked', 'broad'], d.nose, v => { d.nose = v; }, (b, v) => { b.textContent = t(CHAR_NOSE_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Kaş'), ['stern', 'thick', 'arched'], d.brows, v => { d.brows = v; }, (b, v) => { b.textContent = t(CHAR_BROW_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Göz rengi'), [0, 1, 2, 3, 4], d.eyes, v => { d.eyes = v; }, (b, v) => {
+        b.classList.add('swatch');
+        b.style.background = typeof AV_EYE_COLORS !== 'undefined' ? AV_EYE_COLORS[v] : '#3a2a1c';
+        b.setAttribute('aria-label', t('Göz rengi') + ' ' + (v + 1));
+    }));
+    form.appendChild(charOptionRow(t('İz / Boya'), ['none', 'scar', 'paint', 'tattoo', 'freckles'], d.marks, v => { d.marks = v; }, (b, v) => { b.textContent = t(CHAR_MARK_LABELS[v]); }));
 
     const nameRow = document.createElement('div');
     nameRow.className = 'char-row';
@@ -462,7 +490,7 @@ function renderCharacterCreator() {
     name.value = d.name;
     name.oninput = () => { d.name = name.value; };
     nameRow.append(nameLab, name);
-    form.appendChild(nameRow);
+    if (!d.editId) form.appendChild(nameRow);
 
     const msg = document.createElement('div');
     msg.id = 'char-create-msg';
@@ -472,7 +500,7 @@ function renderCharacterCreator() {
     const go = document.createElement('button');
     go.id = 'char-create-btn';
     go.className = 'reward-btn rarity-legendary';
-    go.textContent = d.setupId ? t('Kaydet ve oyna') : t('Yarat ve oyna');
+    go.textContent = d.editId ? t('Kaydet') : d.setupId ? t('Kaydet ve oyna') : t('Yarat ve oyna');
     go.onclick = () => charSubmit();
     form.appendChild(go);
     box.appendChild(form);
@@ -482,10 +510,20 @@ async function charSubmit() {
     const d = charDraft;
     const msg = document.getElementById('char-create-msg');
     const name = (d.name || '').trim();
-    if (name.length < 2 || name.length > 16) { if (msg) msg.textContent = t('Ad 2-16 karakter olmalı.'); return; }
-    const look = { skin: d.skin, hair: d.hair, hairColor: d.hairColor, beard: d.beard };
+    if (!d.editId && (name.length < 2 || name.length > 16)) { if (msg) msg.textContent = t('Ad 2-16 karakter olmalı.'); return; }
+    const look = { skin: d.skin, hair: d.hair, hairColor: d.hairColor, beard: d.beard, build: d.build, face: d.face, nose: d.nose, brows: d.brows, eyes: d.eyes, marks: d.marks };
     const btn = document.getElementById('char-create-btn');
     if (btn) btn.disabled = true;
+    if (d.editId) {
+        const { data, error } = await sb.rpc('update_character_look', { p_id: d.editId, p_gender: d.gender, p_appearance: look });
+        if (btn) btn.disabled = false;
+        if (error) { if (msg) msg.textContent = t('Karakter kaydedilemedi.'); return; }
+        charactersUpsertLocal(data);
+        if (activeCharacter && activeCharacter.id === d.editId && typeof refreshMyAvatar === 'function') refreshMyAvatar(true);
+        closeCharacterCreator();
+        renderCharacterSelect();
+        return;
+    }
     const r = d.setupId ? await setupCharacter(d.setupId, name, d.cls, d.gender, look) : await createCharacter(name, d.cls, d.gender, look);
     if (btn) btn.disabled = false;
     if (r.error) {

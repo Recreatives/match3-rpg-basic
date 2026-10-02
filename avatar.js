@@ -117,8 +117,13 @@ const AV_IDLE = {
     necromancer: { bob: 1.2, hz: 0.24, sway: 0.04, torso: 0.045, head: 0.05 },
 };
 
-function avGeom(bodyKey, cls) {
+// Body builds on top of the class's body: lean / average / broad (shoulders,
+// waist, hips and limb thickness - the height and the rig stay the same).
+const AV_BUILDS = { lean: { sw: 0.86, ww: 0.8, hipw: 0.9, k: 0.9 }, average: { sw: 1, ww: 1, hipw: 1, k: 1 }, broad: { sw: 1.16, ww: 1.22, hipw: 1.1, k: 1.12 } };
+function avGeom(bodyKey, cls, build) {
     const P = Object.assign({}, AV_BASE, AV_BODIES[bodyKey] || {});
+    const B = AV_BUILDS[build] || AV_BUILDS.average;
+    ['sw', 'ww', 'hipw', 'k'].forEach(key => { P[key] *= B[key]; });
     const st = AV_STANCES[cls] || AV_STANCES.warrior;
     P.stance = st;
     const k = P.k;
@@ -270,15 +275,27 @@ function avAcross(A, t, w) { // a line across the limb at t
 }
 
 // --- head: a 3/4 face turned toward the enemy -------------------------------------
+// Face shapes (look.face: oval / square / angular) and noses (look.nose:
+// straight / hooked / broad) change the profile; the female defaults are a
+// little finer.
+const AV_FACES = ['oval', 'square', 'angular'];
+const AV_NOSES = ['straight', 'hooked', 'broad'];
 function avHeadPath(P, grow) {
     const g = grow || 0, hx = P.headX, hy = P.hy, r = P.hr + g, f = P.female;
-    return `M${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Q${avN(hx - r * 1.0)} ${avN(hy - r * 1.05)} ${avN(hx + r * 0.05)} ${avN(hy - r * 1.1)} ` +
-        `Q${avN(hx + r * 0.95)} ${avN(hy - r * 1.02)} ${avN(hx + r * 0.95)} ${avN(hy - r * 0.2)} ` +              // forehead
-        `L${avN(hx + r * (f ? 1.02 : 1.08))} ${avN(hy + r * 0.34)} L${avN(hx + r * 0.9)} ${avN(hy + r * 0.44)} ` +   // nose
-        `Q${avN(hx + r * 0.95)} ${avN(hy + r * 0.62)} ${avN(hx + r * 0.84)} ${avN(hy + r * 0.72)} ` +              // lips
-        `Q${avN(hx + r * (f ? 0.82 : 0.9))} ${avN(hy + r * 0.98)} ${avN(hx + r * (f ? 0.58 : 0.66))} ${avN(hy + r * (f ? 1.0 : 1.04))} ` + // chin
-        `Q${avN(hx + r * 0.05)} ${avN(hy + r * (f ? 0.95 : 1.02))} ${avN(hx - r * 0.38)} ${avN(hy + r * 0.62)} ` +  // jaw
-        `Q${avN(hx - r * 0.7)} ${avN(hy + r * 0.55)} ${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Z`;
+    const X = v => avN(hx + r * v), Y = v => avN(hy + r * v);
+    const nose = P.nose === 'hooked' ? `L${X(f ? 1.04 : 1.1)} ${Y(0.12)} L${X(f ? 1.08 : 1.16)} ${Y(0.36)} L${X(0.9)} ${Y(0.46)} `
+        : P.nose === 'broad' ? `L${X(f ? 1.0 : 1.05)} ${Y(0.34)} Q${X(f ? 1.06 : 1.12)} ${Y(0.47)} ${X(0.88)} ${Y(0.5)} `
+        : `L${X(f ? 1.02 : 1.08)} ${Y(0.34)} L${X(0.9)} ${Y(0.44)} `;
+    const fc = P.face === 'square' ? { cx: f ? 0.88 : 0.95, cy: 1.0, chx: f ? 0.64 : 0.74, chy: f ? 1.02 : 1.08, jx: 0.12, jy: f ? 1.0 : 1.08, ex: -0.42, ey: 0.7 }
+        : P.face === 'angular' ? { cx: f ? 0.84 : 0.9, cy: 1.02, chx: f ? 0.56 : 0.64, chy: f ? 1.06 : 1.14, jx: 0.15, jy: 0.92, ex: -0.34, ey: 0.56 }
+        : { cx: f ? 0.82 : 0.9, cy: 0.98, chx: f ? 0.58 : 0.66, chy: f ? 1.0 : 1.04, jx: 0.05, jy: f ? 0.95 : 1.02, ex: -0.38, ey: 0.62 };
+    return `M${X(-0.95)} ${Y(-0.1)} Q${X(-1.0)} ${Y(-1.05)} ${X(0.05)} ${Y(-1.1)} ` +
+        `Q${X(0.95)} ${Y(-1.02)} ${X(0.95)} ${Y(-0.2)} ` +              // forehead
+        nose +
+        `Q${X(0.95)} ${Y(0.62)} ${X(0.84)} ${Y(0.72)} ` +              // lips
+        `Q${X(fc.cx)} ${Y(fc.cy)} ${X(fc.chx)} ${Y(fc.chy)} ` +      // chin
+        `Q${X(fc.jx)} ${Y(fc.jy)} ${X(fc.ex)} ${Y(fc.ey)} ` +         // jaw
+        `Q${X(-0.7)} ${Y(0.55)} ${X(-0.95)} ${Y(-0.1)} Z`;
 }
 function avFace(S, look) {
     const P = S.P, hx = P.headX, hy = P.hy, r = P.hr, f = P.female;
@@ -288,22 +305,42 @@ function avFace(S, look) {
     // ear on the back half of the head
     s += S.path(`M${avN(hx - r * 0.34)} ${avN(hy - r * 0.02)} Q${avN(hx - r * 0.62)} ${avN(hy - r * 0.12)} ${avN(hx - r * 0.6)} ${avN(hy + r * 0.24)} Q${avN(hx - r * 0.55)} ${avN(hy + r * 0.48)} ${avN(hx - r * 0.3)} ${avN(hy + r * 0.44)}`, S.skin(skin), P.ol * 0.6);
     // eyes: the near one full, the far one narrow by the nose; stern brows
-    const ey = hy + r * 0.08, iris = look.eyeColor || '#3a2a1c';
+    const ey = hy + r * 0.08, iris = AV_EYE_COLORS[look.eyes | 0] || look.eyeColor || '#3a2a1c';
+    const thick = look.brows === 'thick' ? 1.7 : 1, arched = look.brows === 'arched';
     const brow = AV_HAIR_COLORS[look.hairColor || 0] === '#e6e2da' ? '#8a8578' : AV_INK;
     [[0.34, 0.2, 1], [0.8, 0.11, 0.7]].forEach(([o, w0, sc]) => {
         const x = hx + r * o, w = r * w0;
         s += S.path(`M${avN(x - w)} ${avN(ey)} Q${avN(x)} ${avN(ey - r * 0.12 * sc)} ${avN(x + w)} ${avN(ey + r * 0.01)} Q${avN(x)} ${avN(ey + r * 0.09 * sc)} ${avN(x - w)} ${avN(ey)} Z`, '#f4efe6', P.ol * 0.42);
         s += S.circle(x + w * 0.35, ey, r * 0.07 * (sc > 0.8 ? 1 : 0.85), iris, 0);
         if (f) s += S.line(`M${avN(x + w)} ${avN(ey)} l${avN(r * 0.07)} ${avN(-r * 0.07)}`, AV_INK, P.ol * 0.45);
-        s += S.line(f ? `M${avN(x - w)} ${avN(ey - r * 0.18)} Q${avN(x)} ${avN(ey - r * 0.27)} ${avN(x + w * 1.1)} ${avN(ey - r * 0.2)}`
-                      : `M${avN(x - w * 1.2)} ${avN(ey - r * 0.27)} L${avN(x + w * 1.1)} ${avN(ey - r * 0.18)}`, brow, f ? P.ol * 0.5 : P.ol * 0.9);
+        s += S.line(f || arched ? `M${avN(x - w)} ${avN(ey - r * 0.18)} Q${avN(x)} ${avN(ey - r * (arched ? 0.36 : 0.27))} ${avN(x + w * 1.1)} ${avN(ey - r * 0.2)}`
+                      : `M${avN(x - w * 1.2)} ${avN(ey - r * 0.27)} L${avN(x + w * 1.1)} ${avN(ey - r * 0.18)}`, brow, (f ? P.ol * 0.5 : P.ol * 0.9) * thick);
     });
+    s += avMarks(S, look, skin);
     s += avRaceFace(S, look, skin);
     // cheekbone, mouth
     s += S.line(`M${avN(hx + r * 0.2)} ${avN(hy + r * 0.42)} Q${avN(hx + r * 0.4)} ${avN(hy + r * 0.5)} ${avN(hx + r * 0.55)} ${avN(hy + r * 0.42)}`, avDark(skin[1], 0.2), P.ol * 0.35, 0.6);
     s += f ? S.path(`M${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.61)} ${avN(hx + r * 0.85)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.76)} ${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Z`, '#a85a52', P.ol * 0.3)
         : S.line(`M${avN(hx + r * 0.55)} ${avN(hy + r * 0.68)} Q${avN(hx + r * 0.7)} ${avN(hy + r * 0.66)} ${avN(hx + r * 0.84)} ${avN(hy + r * 0.7)}`, avDark(skin[1], 0.45), P.ol * 0.55);
     return s;
+}
+
+const AV_EYE_COLORS = ['#3a2a1c', '#2e5a2e', '#2a4a7a', '#5a5a62', '#8a5a1a'];
+const AV_BROWS = ['stern', 'thick', 'arched'];
+const AV_MARKS = ['none', 'scar', 'paint', 'tattoo', 'freckles'];
+// Scars, war paint, rune tattoos, freckles.
+function avMarks(S, look, skin) {
+    const m = look.marks;
+    if (!m || m === 'none') return '';
+    const P = S.P, hx = P.headX, hy = P.hy, r = P.hr;
+    if (m === 'scar') return S.line(`M${avN(hx + r * 0.22)} ${avN(hy - r * 0.42)} L${avN(hx + r * 0.62)} ${avN(hy + r * 0.5)}`, avLight(skin[0], 0.35), 1.6, 0.9)
+        + [0.2, 0.5, 0.78].map(t0 => { const x = hx + r * (0.22 + 0.4 * t0), y = hy + r * (-0.42 + 0.92 * t0); return S.line(`M${avN(x - r * 0.08)} ${avN(y + r * 0.03)} L${avN(x + r * 0.08)} ${avN(y - r * 0.03)}`, avDark(skin[1], 0.2), 0.8, 0.8); }).join('');
+    if (m === 'paint') { const c = look.paint || '#2a4a8a'; return [0, 1].map(i => S.path(`M${avN(hx + r * (0.2 + i * 0.32))} ${avN(hy + r * 0.2)} L${avN(hx + r * (0.42 + i * 0.32))} ${avN(hy + r * 0.2)} L${avN(hx + r * (0.36 + i * 0.3))} ${avN(hy + r * 0.62)} Z`, c, 0)).join('')
+        + S.path(`M${avN(hx - r * 0.1)} ${avN(hy - r * 0.55)} L${avN(hx + r * 0.95)} ${avN(hy - r * 0.48)} L${avN(hx + r * 0.95)} ${avN(hy - r * 0.38)} L${avN(hx - r * 0.1)} ${avN(hy - r * 0.42)} Z`, c, 0); }
+    if (m === 'tattoo') { const c = '#2a5a5a'; return S.line(`M${avN(hx - r * 0.2)} ${avN(hy + r * 0.1)} L${avN(hx - r * 0.05)} ${avN(hy + r * 0.45)} L${avN(hx + r * 0.15)} ${avN(hy + r * 0.25)} M${avN(hx - r * 0.12)} ${avN(hy - r * 0.15)} L${avN(hx + r * 0.1)} ${avN(hy - r * 0.05)}`, c, 1.4, 0.85)
+        + S.circle(hx - r * 0.02, hy + r * 0.62, r * 0.06, c, 0); }
+    if (m === 'freckles') { let s = ''; [[0.32, 0.3], [0.44, 0.36], [0.56, 0.32], [0.68, 0.38], [0.5, 0.26], [0.8, 0.3]].forEach(([dx, dy]) => { s += S.circle(hx + r * dx, hy + r * dy, r * 0.035, avDark(skin[1], 0.15), 0); }); return s; }
+    return '';
 }
 
 // Monster races (avMonsterSpec): what sets their faces apart - a long
@@ -349,6 +386,17 @@ const AV_MONSTER_THEMES = {
     abyss: { cloth: '#2a1a3a', metal: '#4a3a6a', trim: '#b05cff', glow: '#c07aff' },
 };
 function avMonsterSpec(type, level) {
+    const spec = avMonsterSpecBase(type, level);
+    // no two floors' monsters quite alike: build, face, scars / paint and a
+    // shade of the race's skin vary with the floor (deterministic)
+    const L = Math.max(1, level | 0), v = (L * 37 + type.length * 11 + 7) % 997;
+    const builds = type === 'swift' ? ['lean', 'lean', 'average'] : type === 'boss' ? ['broad', 'broad', 'average'] : ['lean', 'average', 'broad'];
+    Object.assign(spec, { build: builds[v % 3], face: AV_FACES[(v >> 2) % 3], nose: AV_NOSES[(v >> 3) % 3], brows: AV_BROWS[(v >> 4) % 3],
+        marks: ['none', 'scar', 'paint', 'tattoo', 'scar'][(v >> 5) % 5], paint: ['#8e1b1b', '#1a1a1a', '#2a4a8a'][(v >> 6) % 3] });
+    if (spec.skinTone) { const k = ((v >> 7) % 3 - 1) * 0.12; spec.skinTone = [k >= 0 ? avLight(spec.skinTone[0], k) : avDark(spec.skinTone[0], -k), k >= 0 ? avLight(spec.skinTone[1], k) : avDark(spec.skinTone[1], -k)]; }
+    return spec;
+}
+function avMonsterSpecBase(type, level) {
     const L = Math.max(1, level | 0);
     const themes = ['crypt', 'moss', 'ember', 'abyss'];
     const T = AV_MONSTER_THEMES[themes[Math.floor((L - 1) / 5) % themes.length]];
@@ -1033,7 +1081,8 @@ function avItemIcon(item, opts) {
 function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heavy') + '_' + (spec.gender === 'f' ? 'f' : 'm'); }
 
 function avPaint(spec) {
-    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls), S = avSession(P), k = P.k;
+    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls, spec.build), S = avSession(P), k = P.k;
+    P.face = spec.face; P.nose = spec.nose;
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
     const skin = S.skin(look.skinTone || AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};

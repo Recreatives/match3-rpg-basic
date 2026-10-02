@@ -215,6 +215,12 @@
             }
             return { data: out, error: null };
         },
+        update_character_look: function (a) {
+            var c = table('characters').find(function (x) { return x.id === a.p_id; });
+            if (!c) return { data: null, error: { message: 'update_character_look: character not found' } };
+            c.gender = a.p_gender === 'f' ? 'f' : 'm'; c.appearance = clone(a.p_appearance || {});
+            return { data: clone(c), error: null };
+        },
         // auction hall (schema.sql section 33)
         list_item: function (a) {
             var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });

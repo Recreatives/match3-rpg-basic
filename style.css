@@ -1506,3 +1506,7 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 .auc-sell { display: flex; flex-direction: column; gap: 8px; }
 .auc-price { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #fff; }
 .auc-price input { flex: 1; min-width: 0; padding: 8px; font-size: 16px; font-family: inherit; color: #fff; background: #1b2029; border: 2px solid #4a5566; border-radius: 6px; }
+
+.char-edit { position: absolute; top: 4px; right: 32px; width: 24px; height: 24px; line-height: 24px; text-align: center; color: #95a5a6; border-radius: 50%; font-size: 0.85rem; }
+.char-edit:hover { color: var(--accent); background: rgba(232, 195, 90, 0.15); }
+.char-card { padding-right: 60px; }
