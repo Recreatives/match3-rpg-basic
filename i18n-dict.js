@@ -675,4 +675,11 @@ const EN_DICT = {
     'Savaş boyası': 'War paint',
     'Dövme': 'Tattoo',
     'Çil': 'Freckles',
+    'süresi doluyor': 'expiring',
+    '{h} sa {m} dk kaldı': '{h}h {m}m left',
+    '{m} dk kaldı': '{m}m left',
+    'Satıcı: {name}': 'Seller: {name}',
+    'Bu yuvada şu an bir şey takılı değil.': 'Nothing is worn in this slot right now.',
+    'Yetersiz altın ({price})': 'Not enough gold ({price})',
+    '{name} ({rarity}, Sv. {lvl}) - satıcı {seller} - {price} altına satın alınsın mı?': 'Buy {name} ({rarity}, Lv. {lvl}) from {seller} for {price} gold?',
 };

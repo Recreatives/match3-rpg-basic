@@ -95,10 +95,21 @@ describe('Auction hall', { world: false }, function () {
             var rows = w.$('auction-list').querySelectorAll('.auc-row');
             expect(rows.length).toBe(2);
             expect(rows[0].textContent).toContain('40');
-            // 100 gold: the 40 one is buyable, the 900 one isn't
-            var btns = w.$('auction-list').querySelectorAll('button');
-            expect(btns[0].disabled).toBe(false);
-            expect(btns[1].disabled).toBe(true);
+            // every row says who sells it
+            expect(rows[0].textContent).toContain('Satıcı: Kara');
+            // tapping a listing opens its full detail, with the buy button inside
+            rows[0].click();
+            await w.settle(300);
+            var d = w.$('auction-detail');
+            expect(d).toBeTruthy();
+            expect(d.textContent).toContain('Gereken seviye 3');
+            expect(d.textContent).toContain('Satıcı: Kara');
+            expect(d.querySelectorAll('.inv-stat').length).toBeGreaterThan(1);
+            expect(d.querySelector('button').disabled).toBe(false);   // 40 of 100 gold
+            // the 900 one: not affordable
+            w.$('auction-list').querySelectorAll('.auc-row')[1].click();
+            await w.settle(300);
+            expect(w.$('auction-detail').querySelector('button').disabled).toBe(true);
         } finally { w.destroy(); }
     });
 

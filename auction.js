@@ -10,6 +10,7 @@ let auctionTab = 'browse';                 // 'browse' | 'sell' | 'mine'
 let auctionFilter = { slot: '', rarity: '', usable: false, sort: 'price' };
 let auctionRows = [];
 let auctionSellPick = null;                // item id chosen on the sell tab
+let auctionOpenId = null;                  // the listing whose detail is open
 
 async function auctionFetch() {
     const f = auctionFilter;
@@ -45,6 +46,47 @@ function auctionItemRow(it, extra) {
     row.append(icon, txt);
     if (extra) row.appendChild(extra);
     return row;
+}
+
+// The full picture of a listing before buying it: what it is, who may
+// wear it, every stat against what's worn in that slot, its passive / set
+// bonus, who sells it and for how long.
+function auctionTimeLeft(r) {
+    if (!r.expires_at) return '';
+    const ms = new Date(r.expires_at).getTime() - Date.now();
+    if (!(ms > 0)) return t('süresi doluyor');
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+    return h > 0 ? tf('{h} sa {m} dk kaldı', { h, m }) : tf('{m} dk kaldı', { m });
+}
+function auctionDetail(r, buyBtn) {
+    const box = document.createElement('div');
+    box.className = 'auc-detail';
+    box.id = 'auction-detail';
+    const rarity = RARITY_DEFS[r.rarity] || RARITY_DEFS.white;
+    const info = itemDisplayInfo(r);
+    const cls = typeof itemClasses === 'function' ? itemClasses(r) : null;
+    const usable = typeof invUsable === 'function' ? invUsable(r) : true;
+    const target = typeof invCompareTarget === 'function' ? invCompareTarget(r) : null;
+    const mine = r.rolled_stats || {}, theirs = (target && target.rolled_stats) || {};
+    const keys = Object.keys(typeof INV_STATS !== 'undefined' ? INV_STATS : {}).filter(k => mine[k] || theirs[k]);
+    const lvl = typeof invLevel === 'function' ? invLevel() : undefined;
+    const classNames = cls && cls.length < 7 ? cls.map(k => { const d = typeof classDefFor === 'function' ? classDefFor(k) : null; return d ? d.emoji + ' ' + d.name : k; }).join(', ') : t('Bütün sınıflar');
+    box.style.setProperty('--rc', rarity.color);
+    box.innerHTML = `<div class="inv-detail-head"><div class="inv-detail-fig">${typeof invFigureImg === 'function' && usable ? '' : (typeof invIconHtml === 'function' ? '<div class="inv-detail-icon">' + invIconHtml(r, true) + '</div>' : '')}</div>
+        <div class="inv-detail-txt"><b class="inv-name">${info.name}</b>
+        <div class="inv-sub">${rarity.mark} ${t(rarity.label)} · ${t(SLOT_LABELS[itemSlotOf(r)])} · ${tf('Eşya seviyesi {n}', { n: r.item_level || 1 })}</div>
+        <div class="inv-sub${lvl !== undefined && (r.req_level || 1) > lvl ? ' bad' : ''}">${tf('Gereken seviye {n}', { n: r.req_level || 1 })}</div>
+        <div class="inv-sub${usable ? '' : ' bad'}">${classNames}</div>
+        <div class="inv-sub">${tf('Satıcı: {name}', { name: r.seller_name || '?' })} · ${auctionTimeLeft(r)}</div></div></div>
+        <div class="inv-detail-stats">${keys.map(k => typeof invStatLine === 'function' ? invStatLine(k, mine[k] || 0, (mine[k] || 0) - (theirs[k] || 0)) : '').join('')}
+        <div class="inv-stat power"><span>💎 ${t('Güç')}</span><b>${itemPower(r)}${target ? ` <i>(${itemPower(r) - itemPower(target) >= 0 ? '+' : ''}${itemPower(r) - itemPower(target)})</i>` : ''}</b></div>
+        ${info.passiveDesc ? `<div class="inv-passive">✨ ${info.passiveDesc}</div>` : ''}
+        ${r.set_key && typeof ITEM_SETS !== 'undefined' && ITEM_SETS[r.set_key] ? `<div class="inv-passive set">⬡ ${t(ITEM_SETS[r.set_key].name)} - ${t(ITEM_SETS[r.set_key].bonusDesc)}</div>` : ''}
+        <div class="inv-muted">${target ? tf('Karşılaştırma: {name}', { name: itemDisplayInfo(target).name }) : t('Bu yuvada şu an bir şey takılı değil.')}</div></div>`;
+    // the try-on figure (the hero wearing it) when it's wearable
+    if (usable && typeof invFigureImg === 'function') box.querySelector('.inv-detail-fig').appendChild(invFigureImg(r, 'inv-tryon-img'));
+    if (buyBtn) { const acts = document.createElement('div'); acts.className = 'inv-actions'; acts.appendChild(buyBtn); box.appendChild(acts); }
+    return box;
 }
 
 async function renderAuction() {
@@ -92,14 +134,21 @@ async function renderAuctionBrowse(box) {
         btn.disabled = r.price > gold || r.seller_player === myId;
         if (r.seller_player === myId) btn.textContent = t('Senin ilanın');
         btn.onclick = async () => {
-            if (!confirm(tf('{name} - {price} altına satın alınsın mı?', { name: itemDisplayInfo(r).name, price: r.price }))) return;
+            if (!confirm(tf('{name} ({rarity}, Sv. {lvl}) - satıcı {seller} - {price} altına satın alınsın mı?', { name: itemDisplayInfo(r).name, rarity: t((RARITY_DEFS[r.rarity] || {}).label || ''), lvl: r.req_level || 1, seller: r.seller_name || '?', price: r.price }))) return;
             btn.disabled = true;
             const ok = await auctionBuy(r.id);
             if (ok) renderAuction(); else btn.disabled = false;
         };
-        const who = document.createElement('small'); who.className = 'auc-seller'; who.textContent = r.seller_name || '';
-        buy.append(price, who, btn);
-        wrap.appendChild(auctionItemRow(r, buy));
+        const who = document.createElement('small'); who.className = 'auc-seller'; who.textContent = tf('Satıcı: {name}', { name: r.seller_name || '?' });
+        buy.append(price, who);
+        const row = auctionItemRow(r, buy);
+        row.classList.add('clickable'); row.tabIndex = 0; row.setAttribute('role', 'button');
+        row.dataset.listingId = r.id;
+        if (auctionOpenId === r.id) row.classList.add('open');
+        row.onclick = () => { auctionOpenId = auctionOpenId === r.id ? null : r.id; renderAuctionBrowse(box); };
+        row.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); row.onclick(); } };
+        wrap.appendChild(row);
+        if (auctionOpenId === r.id) { btn.classList.add('primary'); btn.textContent = btn.disabled && r.seller_player !== myId ? tf('Yetersiz altın ({price})', { price: r.price }) : btn.textContent + ` · 🪙 ${r.price}`; wrap.appendChild(auctionDetail(r, btn)); }
     });
     box.appendChild(wrap);
 }

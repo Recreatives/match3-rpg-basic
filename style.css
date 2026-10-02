@@ -1510,3 +1510,8 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 .char-edit { position: absolute; top: 4px; right: 32px; width: 24px; height: 24px; line-height: 24px; text-align: center; color: #95a5a6; border-radius: 50%; font-size: 0.85rem; }
 .char-edit:hover { color: var(--accent); background: rgba(232, 195, 90, 0.15); }
 .char-card { padding-right: 60px; }
+
+.auc-row.clickable { cursor: pointer; }
+.auc-row.clickable:hover, .auc-row.open { background: #232b3d; }
+.auc-row.open { outline: 1px solid var(--rc); }
+.auc-detail { padding: 10px; margin: -2px 0 4px; border-radius: 0 0 10px 10px; background: #1d2330; border: 1px solid #333c4c; border-top: 3px solid var(--rc, #4a5566); }
