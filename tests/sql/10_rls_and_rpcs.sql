@@ -113,10 +113,10 @@ select tst.expect_error($q$insert into public.player_items (player_id, base_id, 
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'blade', 'weapon', 'grey', '{"sword": 2, "heart": 2}')$q$, 'exceeds bound');
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'uniq_nights_lament', 'weapon', 'orange', '{"sword": 80, "lifeSteal": 6}')$q$, 'mismatch');
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'uniq_fake', 'weapon', 'red', '{"sword": 1}')$q$, 'unknown fixed item');
--- item level: at most the character's level + 5; stats scale with it
-select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level) values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 7)$q$, 'item level');
-insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level)
-    values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 6);
+-- item level: never above the character's own level (every drop is wearable)
+select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level) values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 2)$q$, 'item level');
+-- nor a set piece / unique the character is too young for (level 20+)
+select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'bloodied_gauntlet', 'gloves', 'green', '{"sword": 3}')$q$, 'above the character');
 -- a character can't be given someone else's character's items
 select tst.expect_error($q$insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), current_setting('tst.ayla')::uuid, 'blade', 'weapon', 'white', '{"sword": 3}')$q$, 'not your character');
 -- and can't be planted in someone else's inventory
@@ -159,7 +159,6 @@ begin
     select * into r2 from public.equip_item(r2.id, null);
     if r1.equipped_slot <> 'ring1' or r2.equipped_slot <> 'ring2' then raise exception 'FAIL: rings -> % / %', r1.equipped_slot, r2.equipped_slot; end if;
 end $$;
-select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and item_level = 6 limit 1), null)$q$, 'requires level');
 -- (no character_id = straight into the shared stash; this one goes in the bag)
 insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), public.my_active_character(), 'bow', 'weapon', 'white', '{"energy": 3}');
 select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and base_id = 'bow' limit 1), null)$q$, 'class cannot');

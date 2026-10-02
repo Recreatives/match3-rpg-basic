@@ -111,6 +111,8 @@ function getEnemyStatsForLevel(lvl, isBoss) {
 
 // Fraction of missing HP restored when moving on to the next level.
 const LEVEL_CLEAR_HEAL_PERCENT = 0.5;
+// Chance a non-boss floor drops an item (bosses always do).
+const LOOT_FLOOR_CHANCE = 0.5;
 
 // --- SPEED BONUS (TIME MULTIPLIER) ---
 // Only applies to the player's own moves. The faster you swap after
@@ -547,8 +549,9 @@ function goldRewardForKill(lvl, isBoss) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
-    // loot rolls at the character's level, a little higher on deeper floors
-    if (typeof awardLootDrop === 'function') awardLootDrop(typeof characterLevel === 'function' ? characterLevel() + Math.floor((level - 1) / 5) : undefined);
+    // loot: a boss always drops, other floors half the time (LOOT_FLOOR_CHANCE);
+    // always at the character's own level, depth only nudges the rarity
+    if (typeof awardLootDrop === 'function' && (level % 5 === 0 || Math.random() < LOOT_FLOOR_CHANCE)) awardLootDrop({ floor: level, boss: level % 5 === 0 });
     if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 

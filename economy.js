@@ -745,13 +745,14 @@ async function upgradeItem(itemId) {
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.
-// dropLevel: the item level to roll at (default: the character's level).
-// Deeper floors roll up to 5 levels above the character (the server's
-// insert guard allows exactly that much).
-async function awardLootDrop(dropLevel) {
+// A post-battle drop for the active character: always at its own level (so
+// it can always wear what it finds - since v1.39), the floor's depth and a
+// boss only nudge the rarity odds. opts: { floor, boss }.
+async function awardLootDrop(opts) {
+    opts = opts || {};
     const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
-    if (dropLevel) dropLevel = Math.min(lvl + 5, dropLevel);
-    let item = rollLootDrop(currentOwnedItems, { level: Math.max(1, Math.min(50, dropLevel || lvl)), cls: selectedClass ? selectedClass.name.toLowerCase() : null });
+    const cls = selectedClass ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : null);
+    let item = rollLootDrop(currentOwnedItems, { level: lvl, cls, floor: opts.floor || 1, boss: !!opts.boss });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 

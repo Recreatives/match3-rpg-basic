@@ -114,7 +114,7 @@ for key, fam in ARMOR.items():
             if slot == 'shoulder' and extra.get('feathers'): vis['feathers'] = True
             if 'glow' in extra: vis['glow'] = extra['glow']
             add(f'{key}_{slot}_{b + 1}', slot, f'{prefix} {fam["names"][slot]}', fam['stats'][slot], WEIGHT[weight], BANDS[b],
-                2 if slot in ('chest', 'legs') else 1, vis, en=f'{fam["en"][b]} {fam["en_names"][slot]}')
+                2 if slot in ('chest', 'legs') else 1, vis, legacy=True, en=f'{fam["en"][b]} {fam["en_names"][slot]}')
 
 # ---------------------------------------------------------------- weapons ----
 WEAPONS = {
@@ -173,7 +173,7 @@ for wtype, (style, classes, stat, size, names, colors, extra) in WEAPONS.items()
         if wtype == 'scythe': vis['glow'] = [None, '#7dff7a', '#7dff7a', '#3dff8a', '#3dff8a'][b]
         if wtype == 'wand': vis['glow'] = ['#8ab0ff', '#b05cff', '#5fd8ff', '#ffe08a', '#c890ff'][b]
         vis = {k: v for k, v in vis.items() if v is not None}
-        add(f'{wtype}_{b + 1}', 'weapon', names[b], stat, classes, BANDS[b], size, vis, en=WEAPONS_EN[wtype][b])
+        add(f'{wtype}_{b + 1}', 'weapon', names[b], stat, classes, BANDS[b], size, vis, legacy=True, en=WEAPONS_EN[wtype][b])
 
 OFFHANDS = {
     'kite': ('kite', ['warrior', 'paladin'], 'shield', ['Tahta Kalkan', 'Demir Kalkan', 'Armalı Kalkan', 'Muhafız Kalkanı', 'Ejder Pulu Kalkan'],
@@ -198,21 +198,300 @@ for otype, (style, classes, stat, names, colors) in OFFHANDS.items():
         if glow: vis['glow'] = glow
         elif b >= 4: vis['glow'] = '#ff5a2a'
         if otype == 'kite': vis['emblem'] = ['#8a8f96', '#e8c35a', '#e8c35a', '#e8c35a', '#ff8a2a'][b]
-        add(f'{otype}_{b + 1}', 'offhand', names[b], stat, classes, BANDS[b], 2 if otype in ('tower',) else 1, vis, en=OFFHANDS_EN[otype][b])
+        add(f'{otype}_{b + 1}', 'offhand', names[b], stat, classes, BANDS[b], 2 if otype in ('tower',) else 1, vis, legacy=True, en=OFFHANDS_EN[otype][b])
 
 # ---------------------------------------------------------------- jewelry / belts
 BELTS = ['Basit', 'Sağlam', 'Rünlü', 'Soylu', 'Ejder']
 BELTS_EN = ['Plain', 'Sturdy', 'Runed', 'Noble', 'Dragon']
 for b in range(5):
-    add(f'belt_{b + 1}', 'belt', f'{BELTS[b]} Kemer', 'heart', ALL, BANDS[b], 1, en=f'{BELTS_EN[b]} Belt', vis={'slot': 'belt', 'style': 'leather', 'color': ['#6b4a30', '#5a3a22', '#4a3020', '#3a2616', '#2a1a10'][b], 'trim': ['#8a8f96', '#b08a4a', '#c9a24a', '#ffd24a', '#d4a84a'][b]})
-    add(f'sash_{b + 1}', 'belt', f'{BELTS[b]} Kuşak', 'energy', ALL, BANDS[b], 1, en=f'{BELTS_EN[b]} Sash', vis={'slot': 'belt', 'style': 'sash', 'color': ['#6a4a2a', '#6a2a2a', '#2a3a6a', '#4a2a6a', '#3a0a0a'][b], 'trim': '#d4a84a', 'pouch': b >= 2})
+    add(f'belt_{b + 1}', 'belt', f'{BELTS[b]} Kemer', 'heart', ALL, BANDS[b], 1, legacy=True, en=f'{BELTS_EN[b]} Belt', vis={'slot': 'belt', 'style': 'leather', 'color': ['#6b4a30', '#5a3a22', '#4a3020', '#3a2616', '#2a1a10'][b], 'trim': ['#8a8f96', '#b08a4a', '#c9a24a', '#ffd24a', '#d4a84a'][b]})
+    add(f'sash_{b + 1}', 'belt', f'{BELTS[b]} Kuşak', 'energy', ALL, BANDS[b], 1, legacy=True, en=f'{BELTS_EN[b]} Sash', vis={'slot': 'belt', 'style': 'sash', 'color': ['#6a4a2a', '#6a2a2a', '#2a3a6a', '#4a2a6a', '#3a0a0a'][b], 'trim': '#d4a84a', 'pouch': b >= 2})
 AMULETS = ['Kemik Kolye', 'Gümüş Muska', 'Rün Kolye', 'Soylu Madalyon', 'Ejder Gözü']
 RINGS = ['Bakır Yüzük', 'Gümüş Yüzük', 'Rün Yüzüğü', 'Soylu Mühür', 'Ejder Halkası']
 AMULETS_EN = ['Bone Necklace', 'Silver Charm', 'Rune Necklace', 'Noble Medallion', 'Dragon Eye']
 RINGS_EN = ['Copper Ring', 'Silver Ring', 'Rune Ring', 'Noble Signet', 'Dragon Band']
 for b in range(5):
-    add(f'amulet_{b + 1}', 'amulet', AMULETS[b], 'ult_dmg', ALL, BANDS[b], 1, en=AMULETS_EN[b], vis={'slot': 'amulet', 'style': 'pendant', 'color': '#d4a84a', 'glow': ['#eae0c8', '#c9d2dc', '#5fd8ff', '#ffd24a', '#ff5a2a'][b]})
-    add(f'ring_{b + 1}', 'ring', RINGS[b], 'lifeSteal' if b % 2 == 0 else 'teamHeal', ALL, BANDS[b], 1, None, en=RINGS_EN[b])
+    add(f'amulet_{b + 1}', 'amulet', AMULETS[b], 'ult_dmg', ALL, BANDS[b], 1, legacy=True, en=AMULETS_EN[b], vis={'slot': 'amulet', 'style': 'pendant', 'color': '#d4a84a', 'glow': ['#eae0c8', '#c9d2dc', '#5fd8ff', '#ffd24a', '#ff5a2a'][b]})
+    add(f'ring_{b + 1}', 'ring', RINGS[b], 'lifeSteal' if b % 2 == 0 else 'teamHeal', ALL, BANDS[b], 1, None, legacy=True, en=RINGS_EN[b])
+
+
+# ============================================================================
+# THE 10-TIER CATALOG (v1.39). Every 5 levels brings new bases: 10 tiers per
+# family / weapon type, each with its own name, colors and - often - its own
+# silhouette (the painter's newer styles: kettle and winged helms, pelts,
+# bone masks, brigandine, fur, bone pauldrons, bucklers, skull talismans,
+# sabers, flails). The 5-band bases above are kept (legacy) so every item a
+# player owns still looks and validates the same; they're never rolled again.
+# ============================================================================
+BANDS10 = [(1, 5), (6, 10), (11, 15), (16, 20), (21, 25), (26, 30), (31, 35), (36, 40), (41, 45), (46, 50)]
+
+ARMOR10 = {
+    'plate': {
+        'weight': 'plate',
+        'names': {'helmet': 'Miğfer', 'shoulder': 'Omuzluk', 'chest': 'Göğüslük', 'gloves': 'Kolçak', 'legs': 'Dizlik', 'boots': 'Demir Çizme'},
+        'en_names': {'helmet': 'Helm', 'shoulder': 'Pauldrons', 'chest': 'Breastplate', 'gloves': 'Vambraces', 'legs': 'Greaves', 'boots': 'Sabatons'},
+        'tr': ['Paslı', 'Demir', 'Dövme', 'Çelik', 'Şövalye', 'Muhafız', 'Aslan', 'Kral', 'Ejder', 'Titan'],
+        'en': ['Rusty', 'Iron', 'Forged', 'Steel', "Knight's", 'Guardian', 'Lion', "King's", 'Dragon', 'Titan'],
+        'stats': {'helmet': 'shield', 'shoulder': 'shield', 'chest': 'heart', 'gloves': 'sword', 'legs': 'heart', 'boots': 'shield'},
+        'color': ['#7a7068', '#8a939c', '#7f8a94', '#aab4c0', '#b8c0cc', '#c8ccd4', '#c9a85a', '#d8c890', '#4a4e5a', '#5a5068'],
+        'trim': ['#6a5a4a', '#b08a4a', '#9a7a4a', '#d4a84a', '#c9a24a', '#ffd24a', '#ffd24a', '#fff2a8', '#d4a84a', '#ff8a2a'],
+        'cloth': ['#5a3a2a', '#7a1a1a', '#3a4a2a', '#1a3a7a', '#5a1a5a', '#e8e4d8', '#8e1b1b', '#1a2a6a', '#3a0a0a', '#2a0a3a'],
+        'glow': [None, None, None, None, None, '#ffe08a', '#ffb02a', '#ffe08a', '#ff5a2a', '#c07aff'],
+        'styles': {'helmet': ['nasal', 'kettle', 'nasal', 'greathelm', 'winged', 'greathelm', 'kettle', 'winged', 'horned', 'horned'],
+                   'shoulder': ['plate', 'plate', 'plate', 'spiked', 'plate', 'spiked', 'plate', 'spiked', 'spiked', 'spiked'],
+                   'chest': ['mail', 'brigandine', 'mail', 'plate', 'plate', 'plate', 'brigandine', 'plate', 'plate', 'plate'],
+                   'gloves': ['gauntlet'] * 10, 'legs': ['plate'] * 10, 'boots': ['plate'] * 10},
+    },
+    'mail': {
+        'weight': 'plate',
+        'names': {'helmet': 'Tolga', 'shoulder': 'Zırh Omuzluk', 'chest': 'Zırh Gömlek', 'gloves': 'Zırh Eldiven', 'legs': 'Zırh Tozluk', 'boots': 'Zırh Çizme'},
+        'en_names': {'helmet': 'Coif', 'shoulder': 'Mail Pauldrons', 'chest': 'Hauberk', 'gloves': 'Mail Gloves', 'legs': 'Mail Chausses', 'boots': 'Mail Boots'},
+        'tr': ['Kaba', 'Örme', 'Pullu', 'Akıncı', 'Sipahi', 'Bozkır', 'Yıldırım', 'Kurt Başı', 'Gök', 'Hakan'],
+        'en': ['Crude', 'Knitted', 'Scaled', "Raider's", "Cavalier's", 'Steppe', 'Lightning', 'Wolfhead', 'Sky', "Khan's"],
+        'stats': {'helmet': 'shield', 'shoulder': 'sword', 'chest': 'shield', 'gloves': 'sword', 'legs': 'heart', 'boots': 'energy'},
+        'color': ['#6a6a6a', '#7a828a', '#6a7a6a', '#8a8a96', '#9aa0aa', '#7a6a5a', '#a0a8b8', '#6a6a7a', '#8ab0d0', '#c8b070'],
+        'trim': ['#5a4a3a', '#8a7a5a', '#9a8a5a', '#b08a4a', '#c9a24a', '#b08a4a', '#ffd24a', '#c9a24a', '#e8f8ff', '#ffd24a'],
+        'cloth': ['#4a3a2a', '#3a4a5a', '#2a4a3a', '#7a2a1a', '#2a3a6a', '#6a4a2a', '#1a2a5a', '#3a2a2a', '#2a5a8a', '#6a1a1a'],
+        'glow': [None, None, None, None, None, None, '#8adfff', None, '#8adfff', '#ffd24a'],
+        'styles': {'helmet': ['nasal', 'kettle', 'nasal', 'kettle', 'winged', 'nasal', 'winged', 'kettle', 'winged', 'greathelm'],
+                   'shoulder': ['plate'] * 10,
+                   'chest': ['mail', 'mail', 'brigandine', 'mail', 'brigandine', 'mail', 'brigandine', 'mail', 'brigandine', 'mail'],
+                   'gloves': ['gauntlet', 'leather', 'gauntlet', 'leather', 'gauntlet', 'leather', 'gauntlet', 'leather', 'gauntlet', 'gauntlet'],
+                   'legs': ['plate'] * 10, 'boots': ['leather', 'plate', 'leather', 'plate', 'leather', 'plate', 'leather', 'plate', 'leather', 'plate']},
+    },
+    'leather': {
+        'weight': 'leather',
+        'names': {'helmet': 'Başlık', 'shoulder': 'Omuz Pedi', 'chest': 'Deri Zırh', 'gloves': 'Deri Eldiven', 'legs': 'Deri Pantolon', 'boots': 'Deri Çizme'},
+        'en_names': {'helmet': 'Cowl', 'shoulder': 'Shoulder Pads', 'chest': 'Leather Armor', 'gloves': 'Leather Gloves', 'legs': 'Leather Pants', 'boots': 'Leather Boots'},
+        'tr': ['Yıpranmış', 'Gezgin', 'Haydut', 'Gölge', 'İzci', 'Avcı', 'Suikastçı', 'Kuzgun', 'Gece Kuzgunu', 'Hayalet'],
+        'en': ['Worn', 'Wanderer', 'Bandit', 'Shadow', 'Scout', 'Hunter', 'Assassin', 'Raven', 'Nightraven', 'Phantom'],
+        'stats': {'helmet': 'energy', 'shoulder': 'energy', 'chest': 'sword', 'gloves': 'lifeSteal', 'legs': 'sword', 'boots': 'energy'},
+        'color': ['#6b4a30', '#4a5a3a', '#5a3a2a', '#3a2a4a', '#3a4a2a', '#2e4a2a', '#2a2430', '#22222e', '#1c1c26', '#2a3a3a'],
+        'trim': ['#8a6a4a', '#c9a24a', '#8a6a4a', '#c9a24a', '#b08a4a', '#d4a84a', '#9aa0a8', '#c9a24a', '#3fe0c0', '#8adfff'],
+        'cloth': [None, None, '#4a1a1a', '#2a1a3a', '#2a3a20', '#243a20', '#1a1a22', '#101018', '#101018', '#1a2a2a'],
+        'glow': [None, None, None, None, None, None, '#b05cff', None, '#3fe0c0', '#8adfff'],
+        'styles': {'helmet': ['cowl', 'hood', 'cowl', 'hood', 'cowl', 'hood', 'cowl', 'hood', 'cowl', 'hood'],
+                   'shoulder': ['leather'] * 10, 'chest': ['leather'] * 10, 'gloves': ['leather'] * 10, 'legs': ['leather'] * 10,
+                   'boots': ['leather', 'leather', 'fur', 'leather', 'leather', 'fur', 'leather', 'leather', 'fur', 'leather']},
+        'feathers_from': 5,
+    },
+    'hide': {
+        'weight': 'leather',
+        'names': {'helmet': 'Post Başlık', 'shoulder': 'Kürk Omuzluk', 'chest': 'Kürk Yelek', 'gloves': 'Post Eldiven', 'legs': 'Post Tozluk', 'boots': 'Kürk Çizme'},
+        'en_names': {'helmet': 'Pelt Hood', 'shoulder': 'Fur Mantle', 'chest': 'Fur Vest', 'gloves': 'Hide Gloves', 'legs': 'Hide Leggings', 'boots': 'Fur Boots'},
+        'tr': ['Çakal', 'Kurt', 'Ayı', 'Yaban', 'Kabile', 'Savaş Reisi', 'Mamut', 'Kan Ayısı', 'Boz Kurt', 'Kurt Kral'],
+        'en': ['Jackal', 'Wolf', 'Bear', 'Wild', 'Tribal', "Warchief's", 'Mammoth', 'Blood Bear', 'Grey Wolf', 'Wolf King'],
+        'stats': {'helmet': 'skull_dmg', 'shoulder': 'sword', 'chest': 'heart', 'gloves': 'sword', 'legs': 'heart', 'boots': 'energy'},
+        'color': ['#7a6a4a', '#6a6a6a', '#5a3a22', '#6a5a3a', '#7a5a3a', '#4a3020', '#8a7a64', '#5a2a1a', '#9a9a9a', '#e8e4d8'],
+        'trim': ['#8a6a4a', '#9a9a9a', '#8a6a4a', '#b08a4a', '#c9a24a', '#d4a84a', '#c9b48a', '#ff8a2a', '#e8f8ff', '#ffd24a'],
+        'cloth': ['#9a8a6a', '#8a8a8a', '#6a4a2a', '#8a7a5a', '#a08060', '#6a4a30', '#c9b48a', '#7a3a2a', '#c8c8c8', '#ffffff'],
+        'glow': [None, None, None, None, None, '#ff8a2a', None, '#ff3a2a', '#8adfff', '#ffd24a'],
+        'styles': {'helmet': ['pelt'] * 10,
+                   'shoulder': ['fur', 'fur', 'fur', 'bone', 'fur', 'bone', 'fur', 'bone', 'fur', 'bone'],
+                   'chest': ['fur'] * 10, 'gloves': ['leather'] * 10, 'legs': ['leather'] * 10, 'boots': ['fur'] * 10},
+    },
+    'cloth': {
+        'weight': 'cloth',
+        'names': {'helmet': 'Kukuleta', 'shoulder': 'Omuz Şalı', 'chest': 'Cübbe', 'gloves': 'Sargı', 'legs': 'Şalvar', 'boots': 'Sandalet'},
+        'en_names': {'helmet': 'Hood', 'shoulder': 'Mantle', 'chest': 'Robe', 'gloves': 'Wraps', 'legs': 'Trousers', 'boots': 'Sandals'},
+        'tr': ['Keten', 'Çırak', 'Bilge', 'Arkanist', 'Büyücü', 'Kadim', 'Başbüyücü', 'Yıldız', 'Ay', 'Kozmik'],
+        'en': ['Linen', 'Apprentice', 'Sage', 'Arcanist', 'Sorcerer', 'Ancient', 'Archmage', 'Star', 'Moon', 'Cosmic'],
+        'stats': {'helmet': 'ult_dmg', 'shoulder': 'ult_dmg', 'chest': 'heart', 'gloves': 'energy', 'legs': 'heart', 'boots': 'energy'},
+        'color': ['#6b5a44', '#4a4a7a', '#4a5a4a', '#2c3a8a', '#5a2a6a', '#4a2a6a', '#2a2a5a', '#3a1a6a', '#2a3a5a', '#1a1a3a'],
+        'trim': ['#8a7a5a', '#c9a24a', '#c9a24a', '#d4a84a', '#d4a84a', '#d4a84a', '#ffd24a', '#e8c35a', '#e8f8ff', '#c890ff'],
+        'cloth': [None] * 10,
+        'glow': [None, '#8ab0ff', '#8ad08a', '#5fd8ff', '#b05cff', '#b05cff', '#5fd8ff', '#c890ff', '#bff4ff', '#c890ff'],
+        'styles': {'helmet': ['hood', 'hood', 'cowl', 'hood', 'circlet', 'hood', 'cowl', 'circlet', 'hood', 'circlet'],
+                   'shoulder': ['mantle'] * 10, 'chest': ['robe'] * 10, 'gloves': ['leather'] * 10, 'legs': ['cloth'] * 10, 'boots': ['cloth'] * 10},
+    },
+    'silk': {
+        'weight': 'cloth',
+        'names': {'helmet': 'Taç', 'shoulder': 'Şal', 'chest': 'Kaftan', 'gloves': 'İpek Eldiven', 'legs': 'İpek Şalvar', 'boots': 'Terlik'},
+        'en_names': {'helmet': 'Circlet', 'shoulder': 'Shawl', 'chest': 'Kaftan', 'gloves': 'Silk Gloves', 'legs': 'Silk Trousers', 'boots': 'Slippers'},
+        'tr': ['Pamuk', 'İpek', 'Saray', 'Zümrüt', 'Yakut', 'Safir', 'Mehtap', 'Güneş', 'Simurg', 'Anka'],
+        'en': ['Cotton', 'Silk', 'Palace', 'Emerald', 'Ruby', 'Sapphire', 'Moonlit', 'Sun', 'Simurgh', 'Phoenix'],
+        'stats': {'helmet': 'energy', 'shoulder': 'ult_dmg', 'chest': 'heart', 'gloves': 'ult_dmg', 'legs': 'energy', 'boots': 'energy'},
+        'color': ['#8a7a6a', '#a08aa0', '#7a2a3a', '#1a6a4a', '#8a1a2a', '#1a3a8a', '#3a4a6a', '#b07a1a', '#1a5a6a', '#a03a1a'],
+        'trim': ['#c9b48a', '#e8e4d8', '#ffd24a', '#ffd24a', '#ffd24a', '#e8f8ff', '#e8f8ff', '#fff2a8', '#3fe0c0', '#ffb02a'],
+        'cloth': [None] * 10,
+        'glow': [None, None, '#ffd24a', '#3dff8a', '#ff3a5a', '#5fa8ff', '#bff4ff', '#ffd24a', '#3fe0c0', '#ff8a2a'],
+        'styles': {'helmet': ['circlet', 'cowl', 'circlet', 'cowl', 'circlet', 'cowl', 'circlet', 'circlet', 'cowl', 'circlet'],
+                   'shoulder': ['mantle'] * 10, 'chest': ['robe'] * 10, 'gloves': ['leather'] * 10, 'legs': ['cloth'] * 10, 'boots': ['cloth'] * 10},
+    },
+    'shroud': {
+        'weight': 'cloth',
+        'names': {'helmet': 'Kefen Başlık', 'shoulder': 'Kefen Şalı', 'chest': 'Kefen', 'gloves': 'Kefen Sargı', 'legs': 'Kefen Şalvar', 'boots': 'Kefen Sandalet'},
+        'en_names': {'helmet': 'Shroud Hood', 'shoulder': 'Shroud Mantle', 'chest': 'Shroud', 'gloves': 'Shroud Wraps', 'legs': 'Shroud Trousers', 'boots': 'Shroud Sandals'},
+        'tr': ['Toprak', 'Mezar', 'Kemik', 'Ruh', 'Hortlak', 'Lanet', 'Kabus', 'Ölüm', 'Ebedi', 'Kıyamet'],
+        'en': ['Earthen', 'Grave', 'Bone', 'Soul', 'Ghoul', 'Cursed', 'Nightmare', 'Death', 'Eternal', 'Doom'],
+        'stats': {'helmet': 'skull_dmg', 'shoulder': 'lifeSteal', 'chest': 'heart', 'gloves': 'skull_dmg', 'legs': 'heart', 'boots': 'energy'},
+        'color': ['#4a4a3a', '#2e3428', '#3a3a2e', '#1e2a1e', '#2a2a22', '#2a1a2a', '#1a1a2a', '#141a14', '#101810', '#1a0a0a'],
+        'trim': ['#6a6a5a', '#8ab08a', '#eae0c8', '#8ab08a', '#9a9a7a', '#b05cff', '#7a5aff', '#9aff9a', '#3dff8a', '#ff5a2a'],
+        'cloth': [None] * 10,
+        'glow': [None, '#7dff7a', '#b8ff9a', '#7dff7a', '#9aff6a', '#b05cff', '#7a5aff', '#3dff8a', '#3dff8a', '#ff3a2a'],
+        'styles': {'helmet': ['hood', 'bonemask', 'hood', 'bonemask', 'hood', 'bonemask', 'cowl', 'bonemask', 'hood', 'bonemask'],
+                   'shoulder': ['mantle', 'bone', 'mantle', 'bone', 'mantle', 'bone', 'mantle', 'bone', 'mantle', 'bone'],
+                   'chest': ['robe'] * 10, 'gloves': ['leather'] * 10, 'legs': ['cloth'] * 10, 'boots': ['cloth'] * 10},
+    },
+}
+for key, fam in ARMOR10.items():
+    for t in range(10):
+        for slot in ARMOR_SLOTS:
+            style = fam['styles'][slot][t]
+            av_slot = 'shoulders' if slot == 'shoulder' else slot
+            vis = {'slot': av_slot, 'style': style, 'color': fam['color'][t], 'trim': fam['trim'][t]}
+            cl = fam['cloth'][t]
+            if slot == 'chest' and cl:
+                if style in ('plate', 'mail', 'brigandine'): vis['tabard'] = cl
+                if t >= 4: vis['cape'] = avcape = cl
+                if style == 'fur': vis['fur'] = cl
+            if slot == 'helmet' and style in ('greathelm', 'winged') and cl: vis['plume'] = cl
+            if slot == 'boots' and style == 'fur': vis['fur'] = fam['cloth'][t] if key == 'hide' else '#8a7a64'
+            if slot == 'shoulder' and style == 'leather' and t >= fam.get('feathers_from', 99): vis['feathers'] = True
+            if fam['glow'][t]: vis['glow'] = fam['glow'][t]
+            add(f'{key}_{slot}_t{t + 1}', slot, f'{fam["tr"][t]} {fam["names"][slot]}', fam['stats'][slot], WEIGHT[fam['weight']], BANDS10[t],
+                2 if slot in ('chest', 'legs') else 1, vis, en=f'{fam["en"][t]} {fam["en_names"][slot]}')
+
+WEAPONS10 = {
+    # type: (style, classes, stat, size, extra vis, glow, tr names, en names, colors)
+    'sword': ('sword', ['warrior', 'paladin'], 'sword', 2, {}, '#8adfff',
+              ['Paslı Kılıç', 'Demir Kılıç', 'Asker Kılıcı', 'Çelik Uzun Kılıç', 'Şövalye Kılıcı', 'Muhafız Kılıcı', 'Aslan Pençesi', 'Kral Kılıcı', 'Ejderdiş', 'Titan Kılıcı'],
+              ['Rusty Sword', 'Iron Sword', "Soldier's Sword", 'Steel Longsword', "Knight's Sword", 'Guardian Blade', "Lion's Claw", "King's Blade", 'Dragonfang', 'Titan Blade'],
+              ['#8a8078', '#a9b4c0', '#b0b8c2', '#c9d2dc', '#d8dde4', '#e8ecf0', '#e8d8a0', '#fff2c0', '#6a7080', '#9a8ab0']),
+    'saber': ('saber', ['warrior', 'rogue'], 'sword', 1, {}, '#ffd24a',
+              ['Eğri Kılıç', 'Pala', 'Akıncı Palası', 'Bozkır Kılıcı', 'Yatağan', 'Hilal Pala', 'Kurt Dişi Pala', 'Yıldırım Pala', 'Gök Pala', 'Han Kılıcı'],
+              ['Curved Sword', 'Saber', "Raider's Saber", 'Steppe Sword', 'Yataghan', 'Crescent Saber', 'Wolftooth Saber', 'Lightning Saber', 'Sky Saber', "Khan's Blade"],
+              ['#8a8078', '#a9b4c0', '#b8c0c8', '#c9d2dc', '#d8dde2', '#e8ecf0', '#c9c0b0', '#bff4ff', '#8ab0d0', '#ffd24a']),
+    'axe': ('axe', ['warrior', 'berserker'], 'skull_dmg', 1, {}, '#ff8a2a',
+            ['Oduncu Baltası', 'El Baltası', 'Demir Balta', 'Savaş Baltası', 'Sakallı Balta', 'Yarıcı', 'Kurt Baltası', 'Kanlı Hilal', 'Fırtına Baltası', 'Kıyamet Hilali'],
+            ["Woodcutter's Axe", 'Hatchet', 'Iron Axe', 'Battle Axe', 'Bearded Axe', 'Cleaver', 'Wolf Axe', 'Blood Crescent', 'Storm Axe', 'Doom Crescent'],
+            ['#8a8078', '#9a9a9a', '#a9b4c0', '#b8c0c8', '#c0c8d0', '#d8dde2', '#a0a8b0', '#8a3a3a', '#8ab0d0', '#5a1a1a']),
+    'greataxe': ('axe', ['berserker'], 'skull_dmg', 2, {'double': True}, '#ff3a2a',
+                 ['Ağır Balta', 'Çift Ağızlı Balta', 'Kasap Baltası', 'Cellat Baltası', 'Barbar Baltası', 'Titan Baltası', 'Kan Baltası', 'Mamut Baltası', 'Kıyamet Baltası', 'Dünya Yarıcı'],
+                 ['Heavy Axe', 'Double-Bit Axe', "Butcher's Axe", "Headsman's Axe", 'Barbarian Axe', 'Titan Axe', 'Blood Axe', 'Mammoth Axe', 'Doom Axe', 'World Splitter'],
+                 ['#8a8078', '#a9b4c0', '#b8c0c8', '#9a9a9a', '#c0c8d0', '#d8dde2', '#7a2a2a', '#c9b48a', '#5a1a1a', '#3a3a4a']),
+    'mace': ('mace', ['warrior', 'paladin'], 'sword', 1, {}, '#ffe08a',
+             ['Sopa', 'Demir Gürz', 'Çivili Gürz', 'Topuz', 'Yıldız Gürz', 'Muhafız Topuzu', 'Rahip Gürzü', 'Yıkım Gürzü', 'Kutsal Topuz', 'Hükümdar Topuzu'],
+             ['Cudgel', 'Iron Mace', 'Spiked Mace', 'Club', 'Morning Star', "Guardian's Mace", "Priest's Mace", 'Ruin Mace', 'Holy Mace', "Sovereign's Mace"],
+             ['#7a6a5a', '#8a939c', '#a9b4c0', '#9a8a6a', '#d4a84a', '#c8ccd4', '#e8e4d8', '#5a5f6e', '#fff2c0', '#ffd24a']),
+    'flail': ('flail', ['paladin', 'berserker'], 'skull_dmg', 1, {}, '#ff5a2a',
+              ['Harman Döveni', 'Zincirli Gürz', 'Demir Döven', 'Çivili Döven', 'Savaş Döveni', 'Kanlı Döven', 'Ruh Döveni', 'Kıyamet Döveni', 'Fırtına Döveni', 'Yargı Döveni'],
+              ['Thresher', 'Chain Mace', 'Iron Flail', 'Spiked Flail', 'War Flail', 'Bloody Flail', 'Soul Flail', 'Doom Flail', 'Storm Flail', 'Flail of Judgement'],
+              ['#7a6a5a', '#8a939c', '#a9b4c0', '#b8c0c8', '#c8ccd4', '#8a3a3a', '#7a8a9a', '#3a3a4a', '#8ab0d0', '#fff2c0']),
+    'hammer': ('hammer', ['paladin'], 'heart', 2, {}, '#fff2a8',
+               ['Taş Çekiç', 'Demirci Çekici', 'Savaş Çekici', 'Kutsal Çekiç', 'Tapınak Çekici', 'Işık Çekici', 'Şafak Çekici', 'Melek Çekici', 'Yargı Çekici', 'Cennet Çekici'],
+               ['Stone Hammer', "Smith's Hammer", 'War Hammer', 'Holy Hammer', 'Temple Hammer', 'Hammer of Light', 'Dawn Hammer', 'Angel Hammer', 'Hammer of Judgement', "Heaven's Hammer"],
+               ['#8a8a80', '#7a7a7a', '#a9b4c0', '#d4a84a', '#c9b48a', '#fff2c0', '#ffd8a0', '#ffffff', '#fff8e0', '#ffe08a']),
+    'spear': ('spear', ['warrior'], 'skull_dmg', 2, {}, '#8adfff',
+              ['Mızrak', 'Demir Mızrak', 'Kargı', 'Uzun Mızrak', 'Süvari Mızrağı', 'Muhafız Mızrağı', 'Gök Mızrak', 'Ejder Mızrağı', 'Yıldırım Kargı', 'Titan Mızrağı'],
+              ['Spear', 'Iron Spear', 'Pike', 'Long Spear', 'Lance', "Guardian's Spear", 'Sky Spear', 'Dragon Spear', 'Lightning Pike', 'Titan Spear'],
+              ['#8a8078', '#a9b4c0', '#9a9a9a', '#c9d2dc', '#d8dde2', '#e8ecf0', '#8ab0d0', '#6a7080', '#bff4ff', '#9a8ab0']),
+    'dagger': ('dagger', ['rogue'], 'lifeSteal', 1, {}, '#b05cff',
+               ['Paslı Hançer', 'Keskin Hançer', 'Haydut Bıçağı', 'Gölge Hançeri', 'Zehirli Diş', 'Suikast Hançeri', 'Kuzgun Gagası', 'Gece Pençesi', 'Hayalet Bıçak', 'Ölüm Fısıltısı'],
+               ['Rusty Dagger', 'Keen Dagger', 'Bandit Knife', 'Shadow Dagger', 'Venom Fang', "Assassin's Dagger", 'Raven Beak', 'Night Claw', 'Ghost Blade', 'Death Whisper'],
+               ['#8a8078', '#c9d2dc', '#a9a090', '#9a8ab0', '#8ad08a', '#c9d2dc', '#4a4a5a', '#3a3a4a', '#bff4ff', '#2a2a3a']),
+    'bow': ('bow', ['archer'], 'energy', 2, {}, '#9aff6a',
+            ['Av Yayı', 'Kısa Yay', 'Uzun Yay', 'Kompozit Yay', 'İzci Yayı', 'Avcı Yayı', 'Rüzgar Yayı', 'Şahin Yayı', 'Fırtına Yayı', 'Yıldız Yayı'],
+            ['Hunting Bow', 'Short Bow', 'Longbow', 'Composite Bow', "Scout's Bow", "Hunter's Bow", 'Wind Bow', 'Falcon Bow', 'Storm Bow', 'Star Bow'],
+            ['#7a5230', '#6a4a2a', '#8a6038', '#5a3a2a', '#4a5a3a', '#3a4a2a', '#3a4a5a', '#5a4a3a', '#2a2a3a', '#3a2a5a']),
+    'staff': ('staff', ['mage', 'necromancer'], 'ult_dmg', 2, {}, None,
+              ['Budak Asa', 'Çırak Asası', 'Meşe Asa', 'Kristal Asa', 'Büyücü Asası', 'Kadim Asa', 'Başbüyücü Asası', 'Ay Asası', 'Yıldız Asası', 'Kozmik Asa'],
+              ['Gnarled Staff', "Apprentice's Staff", 'Oak Staff', 'Crystal Staff', "Sorcerer's Staff", 'Ancient Staff', "Archmage's Staff", 'Moon Staff', 'Star Staff', 'Cosmic Staff'],
+              ['#7a5230', '#6a4a2a', '#5a4a2a', '#5a3a4a', '#4a2a4a', '#3a2a4a', '#2a2a4a', '#3a3a5a', '#2a1a3a', '#1a1a2a']),
+    'wand': ('wand', ['mage'], 'energy', 1, {}, None,
+             ['Dal Değnek', 'Kemik Değnek', 'Rün Değneği', 'Ateş Değneği', 'Buz Değneği', 'Işık Değneği', 'Fırtına Değneği', 'Boşluk Değneği', 'Yıldız Değneği', 'Kader Değneği'],
+             ['Twig Wand', 'Bone Wand', 'Rune Wand', 'Fire Wand', 'Frost Wand', 'Wand of Light', 'Storm Wand', 'Void Wand', 'Star Wand', 'Wand of Fate'],
+             ['#6a4a2a', '#b8b0a0', '#4a4a6a', '#6a2a1a', '#4a6a8a', '#d4a84a', '#3a4a5a', '#2a1a3a', '#3a2a5a', '#1a1a2a']),
+    'scythe': ('scythe', ['necromancer'], 'skull_dmg', 2, {}, None,
+               ['Orak', 'Kemik Tırpan', 'Mezar Tırpanı', 'Ruh Tırpanı', 'Hortlak Tırpanı', 'Lanet Tırpanı', 'Kabus Tırpanı', 'Ölüm Tırpanı', 'Ebedi Tırpan', 'Kıyamet Tırpanı'],
+               ['Sickle', 'Bone Scythe', 'Grave Scythe', 'Soul Scythe', 'Ghoul Scythe', 'Cursed Scythe', 'Nightmare Scythe', 'Death Scythe', 'Eternal Scythe', 'Doom Scythe'],
+               ['#8a8078', '#b8b0a0', '#9aa0a0', '#9ab0a0', '#8a9a8a', '#8a7a9a', '#7a7a9a', '#b8c0c8', '#c8d8c8', '#5a1a1a']),
+}
+MAGIC_GLOW = {'staff': ['#8ab0ff', '#5fd8ff', '#8ad08a', '#5fd8ff', '#b05cff', '#b05cff', '#5fd8ff', '#bff4ff', '#c890ff', '#c890ff'],
+              'wand': ['#8ab0ff', '#b05cff', '#5fd8ff', '#ff8a2a', '#8adfff', '#ffe08a', '#8adfff', '#b05cff', '#c890ff', '#ffd24a'],
+              'scythe': [None, '#7dff7a', '#7dff7a', '#3dff8a', '#9aff6a', '#b05cff', '#7a5aff', '#3dff8a', '#3dff8a', '#ff3a2a']}
+for wtype, (style, classes, stat, size, extra, glow, tr, en, colors) in WEAPONS10.items():
+    for t in range(10):
+        vis = dict({'slot': 'weapon', 'style': style, 'color': colors[t], 'trim': ['#8a8f96', '#b08a4a', '#b08a4a', '#c9a24a', '#c9a24a', '#d4a84a', '#ffd24a', '#ffd24a', '#fff2a8', '#ffd24a'][t]}, **extra)
+        g = MAGIC_GLOW[wtype][t] if wtype in MAGIC_GLOW else (glow if t >= 5 else None)
+        if g: vis['glow'] = g
+        add(f'{wtype}_t{t + 1}', 'weapon', tr[t], stat, classes, BANDS10[t], size, vis, en=en[t])
+
+OFFHANDS10 = {
+    'kite': ('kite', ['warrior', 'paladin'], 'shield', 1,
+             ['Tahta Kalkan', 'Demir Kalkan', 'Armalı Kalkan', 'Asker Kalkanı', 'Şövalye Kalkanı', 'Muhafız Kalkanı', 'Aslan Kalkanı', 'Kral Kalkanı', 'Ejder Pulu Kalkan', 'Titan Kalkanı'],
+             ['Wooden Shield', 'Iron Shield', 'Heraldic Shield', "Soldier's Shield", "Knight's Shield", "Guardian's Shield", 'Lion Shield', "King's Shield", 'Dragonscale Shield', 'Titan Shield'],
+             ['#6b4a30', '#7a1a1a', '#1a3a7a', '#3a4a2a', '#5a1a5a', '#e8e4d8', '#8e1b1b', '#1a2a6a', '#3a0a0a', '#2a0a3a']),
+    'tower': ('tower', ['warrior', 'paladin'], 'heart', 2,
+              ['Kapı Kalkanı', 'Kule Kalkanı', 'Kale Kalkanı', 'Sur Kalkanı', 'Burç Kalkanı', 'Muhafız Duvarı', 'Aslan Duvarı', 'Kral Duvarı', 'Dağ Kalkanı', 'Titan Duvarı'],
+              ['Door Shield', 'Tower Shield', 'Castle Shield', 'Rampart Shield', 'Bastion Shield', 'Guardian Wall', 'Lion Wall', "King's Wall", 'Mountain Shield', 'Titan Wall'],
+              ['#5a4a3a', '#4a5a6a', '#3a4a6a', '#5a5a5a', '#6a5a4a', '#d8d2c0', '#8a6a2a', '#2a3a6a', '#4a4e5a', '#2a2e3a']),
+    'buckler': ('buckler', ['warrior', 'paladin', 'berserker'], 'energy', 1,
+                ['Tahta Kalkancık', 'Demir Kalkancık', 'Kalkancık', 'Çivili Kalkancık', 'Akıncı Kalkanı', 'Bozkır Kalkanı', 'Kurt Kalkancık', 'Yıldırım Kalkancık', 'Gök Kalkancık', 'Han Kalkanı'],
+                ['Wooden Buckler', 'Iron Buckler', 'Buckler', 'Spiked Buckler', "Raider's Shield", 'Steppe Shield', 'Wolf Buckler', 'Lightning Buckler', 'Sky Buckler', "Khan's Shield"],
+                ['#7a5230', '#8a939c', '#6a4a2a', '#5a5f66', '#7a2a1a', '#8a6a3a', '#6a6a6a', '#2a3a6a', '#8ab0d0', '#c8b070']),
+    'orb': ('orb', ['mage'], 'ult_dmg', 1,
+            ['Cam Küre', 'Buz Küresi', 'Ateş Küresi', 'Arkan Küre', 'Kristal Küre', 'Fırtına Küresi', 'Ay Küresi', 'Yıldız Küresi', 'Boşluk Küresi', 'Kozmik Küre'],
+            ['Glass Orb', 'Frost Orb', 'Fire Orb', 'Arcane Orb', 'Crystal Orb', 'Storm Orb', 'Moon Orb', 'Star Orb', 'Void Orb', 'Cosmic Orb'],
+            ['#8ab0c0', '#8adfff', '#ff8a2a', '#5fd8ff', '#bff4ff', '#8ab0ff', '#e8e4ff', '#ffd24a', '#b05cff', '#c890ff']),
+    'tome': ('tome', ['mage', 'necromancer'], 'energy', 1,
+             ['Eski Defter', 'Büyü Kitabı', 'Rün Kitabı', 'Bilge Kitabı', 'Kadim Tomar', 'Ay Kitabı', 'Lanet Kitabı', 'Kara Kitap', 'Yıldız Atlası', 'Kader Kitabı'],
+             ['Old Notebook', 'Spellbook', 'Rune Book', "Sage's Book", 'Ancient Scroll', 'Moon Book', 'Book of Curses', 'Black Book', 'Star Atlas', 'Book of Fate'],
+             ['#6b4a30', '#2c3a8a', '#4a2a6a', '#2a5a3a', '#6a4a1a', '#2a3a5a', '#4a1a2a', '#1a1a22', '#1a2a4a', '#3a1a3a']),
+    'lantern': ('lantern', ['necromancer'], 'lifeSteal', 1,
+                ['Kandil', 'Mezar Feneri', 'Kemik Feneri', 'Ruh Feneri', 'Hortlak Feneri', 'Hayalet Feneri', 'Lanet Feneri', 'Ölüm Feneri', 'Ebedi Fener', 'Kıyamet Feneri'],
+                ['Oil Lamp', 'Grave Lantern', 'Bone Lantern', 'Soul Lantern', 'Ghoul Lantern', 'Ghost Lantern', 'Cursed Lantern', 'Death Lantern', 'Eternal Lantern', 'Doom Lantern'],
+                ['#6a5f56', '#5a5f66', '#8a8070', '#4a5a4a', '#5a5a4a', '#3a4a5a', '#4a3a4a', '#2a2a2a', '#3a4a3a', '#3a1a1a']),
+    'skull': ('skull', ['necromancer'], 'skull_dmg', 1,
+              ['Kuru Kafa', 'Mezar Kafatası', 'Hortlak Kafası', 'Ruh Kafatası', 'Lanetli Kafa', 'Kabus Kafatası', 'Ölü Kral Kafası', 'Ölüm Kafatası', 'Ebedi Kafatası', 'Kıyamet Kafatası'],
+              ['Dry Skull', 'Grave Skull', 'Ghoul Head', 'Soul Skull', 'Cursed Skull', 'Nightmare Skull', "Dead King's Skull", 'Death Skull', 'Eternal Skull', 'Doom Skull'],
+              ['#eae0c8'] * 10),
+    'quiver': ('quiver', ['archer'], 'energy', 1,
+               ['Deri Sadak', 'Av Sadağı', 'İzci Sadağı', 'Uzun Sadak', 'Avcı Sadağı', 'Rüzgar Sadağı', 'Şahin Sadağı', 'Fırtına Sadağı', 'Yıldırım Sadağı', 'Yıldız Sadağı'],
+               ['Leather Quiver', "Hunter's Quiver", "Scout's Quiver", 'Long Quiver', "Huntsman's Quiver", 'Wind Quiver', 'Falcon Quiver', 'Storm Quiver', 'Lightning Quiver', 'Star Quiver'],
+               ['#6b4a30', '#5a3a22', '#4a5a3a', '#4a3a2a', '#3a4a2a', '#3a4a5a', '#5a4a3a', '#2a2a3a', '#2a3a5a', '#3a2a5a']),
+    'offdagger': ('dagger', ['rogue'], 'sword', 1,
+                  ['Sol El Hançeri', 'Paraçol', 'Haydut Bıçağı', 'Gölge Bıçağı', 'Zehir Dişi', 'Suikast Bıçağı', 'Kuzgun Pençesi', 'Gece Dişi', 'Hayalet Diş', 'Ölüm Dişi'],
+                  ['Parrying Dagger', 'Main-Gauche', 'Bandit Blade', 'Shadow Blade', 'Venom Tooth', "Assassin's Blade", 'Raven Claw', 'Night Tooth', 'Ghost Fang', 'Death Fang'],
+                  ['#8a8078', '#c9d2dc', '#a9a090', '#9a8ab0', '#8ad08a', '#c9d2dc', '#4a4a5a', '#3a3a4a', '#bff4ff', '#2a2a3a']),
+}
+OFF_GLOW = {'orb': None, 'tome': '#b05cff', 'lantern': '#7dff7a', 'skull': ['#9a9a7a', '#7dff7a', '#9aff6a', '#7dff7a', '#b05cff', '#7a5aff', '#3dff8a', '#3dff8a', '#3fe0c0', '#ff3a2a']}
+for otype, (style, classes, stat, size, tr, en, colors) in OFFHANDS10.items():
+    for t in range(10):
+        vis = {'slot': 'offhand', 'style': style, 'color': colors[t], 'trim': ['#8a8f96', '#b08a4a', '#b08a4a', '#c9a24a', '#c9a24a', '#ffd24a', '#ffd24a', '#fff2a8', '#d4a84a', '#ffd24a'][t]}
+        g = OFF_GLOW.get(otype, 'x')
+        if otype == 'orb': vis['glow'] = colors[t]
+        elif isinstance(g, list): vis['glow'] = g[t]
+        elif g and g != 'x': vis['glow'] = g
+        elif t >= 6: vis['glow'] = ['#ffe08a', '#ffb02a', '#8adfff', '#ff5a2a'][t - 6]
+        if otype == 'kite': vis['emblem'] = ['#8a8f96', '#e8c35a', '#e8c35a', '#e8e4d8', '#e8c35a', '#ff8a2a', '#ffd24a', '#ffd24a', '#ff8a2a', '#c890ff'][t]
+        add(f'{otype}_t{t + 1}', 'offhand', tr[t], stat, classes, BANDS10[t], size, vis, en=en[t])
+
+TIER_TR = ['Basit', 'Sağlam', 'Perçinli', 'Rünlü', 'Asker', 'Soylu', 'Muhafız', 'Kral', 'Ejder', 'Titan']
+TIER_EN = ['Plain', 'Sturdy', 'Riveted', 'Runed', "Soldier's", 'Noble', "Guardian's", "King's", 'Dragon', 'Titan']
+TRIMS10 = ['#8a8f96', '#b08a4a', '#9a7a4a', '#c9a24a', '#b08a4a', '#d4a84a', '#ffd24a', '#fff2a8', '#d4a84a', '#ff8a2a']
+for t in range(10):
+    add(f'belt_t{t + 1}', 'belt', f'{TIER_TR[t]} Kemer', 'heart', ALL, BANDS10[t], 1, en=f'{TIER_EN[t]} Belt',
+        vis={'slot': 'belt', 'style': 'leather', 'color': ['#6b4a30', '#5a3a22', '#4a3020', '#5a2a1a', '#3a2616', '#4a3a2a', '#2a1a10', '#3a1a10', '#2a1a1a', '#1a1010'][t], 'trim': TRIMS10[t], 'pouch': t % 3 == 1})
+    add(f'sash_t{t + 1}', 'belt', f'{TIER_TR[t]} Kuşak', 'energy', ALL, BANDS10[t], 1, en=f'{TIER_EN[t]} Sash',
+        vis={'slot': 'belt', 'style': 'sash', 'color': ['#6a4a2a', '#6a2a2a', '#2a3a6a', '#4a2a6a', '#2a5a3a', '#7a1a2a', '#1a3a7a', '#5a1a5a', '#3a0a0a', '#1a1a3a'][t], 'trim': TRIMS10[t], 'pouch': t >= 3})
+    add(f'chainbelt_t{t + 1}', 'belt', f'{TIER_TR[t]} Zincir Kemer', 'shield', ALL, BANDS10[t], 1, en=f'{TIER_EN[t]} Chain Belt',
+        vis={'slot': 'belt', 'style': 'chain', 'color': ['#7a7068', '#8a939c', '#7f8a94', '#aab4c0', '#9aa0aa', '#c8ccd4', '#c9a85a', '#d8c890', '#4a4e5a', '#ffd24a'][t], 'trim': TRIMS10[t]})
+AMULETS10 = ['Kemik Kolye', 'Diş Kolye', 'Gümüş Muska', 'Rün Kolye', 'Nazar Boncuğu', 'Soylu Madalyon', 'Ay Tılsımı', 'Güneş Madalyonu', 'Ejder Gözü', 'Yıldız Kalbi']
+AMULETS10_EN = ['Bone Necklace', 'Fang Necklace', 'Silver Charm', 'Rune Necklace', 'Evil Eye Bead', 'Noble Medallion', 'Moon Talisman', 'Sun Medallion', 'Dragon Eye', 'Star Heart']
+AMULET_GLOW = ['#eae0c8', '#e8e4d8', '#c9d2dc', '#5fd8ff', '#3a7ae8', '#ffd24a', '#bff4ff', '#ffb02a', '#ff5a2a', '#c890ff']
+RINGS_A = ['Bakır Yüzük', 'Demir Halka', 'Gümüş Yüzük', 'Rün Yüzüğü', 'Kan Yüzüğü', 'Soylu Mühür', 'Ay Halkası', 'Ejder Halkası', 'Yıldız Halkası', 'Kader Mührü']
+RINGS_A_EN = ['Copper Ring', 'Iron Band', 'Silver Ring', 'Rune Ring', 'Blood Ring', 'Noble Signet', 'Moon Band', 'Dragon Band', 'Star Band', 'Signet of Fate']
+RINGS_B = ['Örgü Halka', 'Dost Yüzüğü', 'Şifa Halkası', 'Bilge Yüzüğü', 'Rahip Mührü', 'Kutsal Halka', 'Melek Yüzüğü', 'Işık Halkası', 'Cennet Mührü', 'Birlik Halkası']
+RINGS_B_EN = ['Braided Band', 'Friendship Ring', 'Band of Healing', "Sage's Ring", "Priest's Signet", 'Holy Band', 'Angel Ring', 'Band of Light', "Heaven's Signet", 'Band of Unity']
+RING_GLOW_A = ['#c97a4a', '#9a9a9a', '#c9d2dc', '#5fd8ff', '#ff3a3a', '#ffd24a', '#bff4ff', '#ff5a2a', '#ffe08a', '#c890ff']
+RING_GLOW_B = ['#8ad08a', '#3dff8a', '#7dff9a', '#5fd8ff', '#ffe08a', '#fff2a8', '#ffffff', '#ffe08a', '#bff4ff', '#3fe0c0']
+for t in range(10):
+    add(f'amulet_t{t + 1}', 'amulet', AMULETS10[t], 'ult_dmg' if t % 2 == 0 else 'teamHeal', ALL, BANDS10[t], 1, en=AMULETS10_EN[t],
+        vis={'slot': 'amulet', 'style': 'pendant', 'color': '#d4a84a', 'glow': AMULET_GLOW[t]})
+    # rings aren't painted on the hero (too small) - the vis only colors their icon
+    add(f'ring_t{t + 1}', 'ring', RINGS_A[t], 'lifeSteal', ALL, BANDS10[t], 1, en=RINGS_A_EN[t], vis={'slot': 'ring', 'style': 'band', 'color': '#d4a84a', 'trim': TRIMS10[t], 'glow': RING_GLOW_A[t]})
+    add(f'healring_t{t + 1}', 'ring', RINGS_B[t], 'teamHeal', ALL, BANDS10[t], 1, en=RINGS_B_EN[t], vis={'slot': 'ring', 'style': 'band', 'color': '#c9d2dc', 'trim': TRIMS10[t], 'glow': RING_GLOW_B[t]})
 
 # ---------------------------------------------------------------- legacy -----
 # The 32 bases items were rolled from before this catalog. Kept valid (band
@@ -313,7 +592,7 @@ def write_js():
            '// The item catalog: every base (slot, level band, who may wear it, bag size,\n'
            '// how it looks worn) and every fixed item (sets and uniques). The same data\n'
            "// is written into supabase/schema.sql's reference tables.\n"
-           f'const CATALOG_BANDS = {json.dumps(BANDS)};\n'
+           f'const CATALOG_BANDS = {json.dumps(BANDS10)};\n'
            f'const CATALOG_BASES = {json.dumps(bases, ensure_ascii=False, separators=(",", ":"))};\n'
            f'const CATALOG_FIXED = {json.dumps(fixed, ensure_ascii=False, separators=(",", ":"))};\n'
            f'const CATALOG_LEGACY_SLOT = {json.dumps(LEGACY_SLOT)};\n'

@@ -50,7 +50,7 @@ function catalogFixed(baseId) { return typeof CATALOG_FIXED !== 'undefined' ? CA
 const MAX_CHARACTER_LEVEL = 50;
 function levelBand(level) {
     const L = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level | 0));
-    return (CATALOG_BANDS.find(b => L >= b[0] && L < b[1]) || CATALOG_BANDS[CATALOG_BANDS.length - 1]);
+    return (CATALOG_BANDS.find(b => L >= b[0] && L <= b[1]) || CATALOG_BANDS[CATALOG_BANDS.length - 1]);
 }
 // Stats grow with item level (3% per level: an item level 50 roll is ~2.5x
 // a level 1 roll). supabase/schema.sql's insert guard uses the same curve.
@@ -99,14 +99,14 @@ const STAT_POOL = ['sword', 'heart', 'shield', 'energy', 'skull_dmg', 'ult_dmg',
 // to an aggressive triangle), so the badge alone hints at rarity even with
 // color perception removed entirely.
 const RARITY_DEFS = {
-    grey: { key: 'grey', name: 'Grey', label: 'Adi', color: '#9d9d9d', mark: '●', affixCount: 1, statMult: 0.5, costMult: 0.4, dropWeight: 38, shopAvailable: true },
-    white: { key: 'white', name: 'White', label: 'Normal', color: '#e8e8e8', mark: '◐', affixCount: 1, statMult: 1.0, costMult: 1, dropWeight: 30, shopAvailable: true },
-    blue: { key: 'blue', name: 'Blue', label: 'Sihirli', color: '#3b82f6', mark: '◆', affixCount: 2, statMult: 1.6, costMult: 2.5, dropWeight: 16, shopAvailable: true },
-    yellow: { key: 'yellow', name: 'Yellow', label: 'Nadir', color: '#eab308', mark: '★', affixCount: 4, statMult: 2.4, costMult: 6, dropWeight: 9, shopAvailable: false },
-    green: { key: 'green', name: 'Green', label: 'Set', color: '#22c55e', mark: '⬡', affixCount: 0, statMult: 1, costMult: 4, dropWeight: 4, shopAvailable: false, isSet: true },
-    orange: { key: 'orange', name: 'Orange', label: 'Efsanevi', color: '#f97316', mark: '✦', affixCount: 2, statMult: 3.2, costMult: 0, dropWeight: 2, shopAvailable: false, isUnique: true },
-    red: { key: 'red', name: 'Red', label: 'İlksel Efsanevi', color: '#ef4444', mark: '▲', affixCount: 3, statMult: 4.0, costMult: 0, dropWeight: 0.4, shopAvailable: false, isUnique: true },
-    teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.2, shopAvailable: false, classLocked: true, isUnique: true }
+    grey: { key: 'grey', name: 'Grey', label: 'Adi', color: '#9d9d9d', mark: '●', affixCount: 1, statMult: 0.55, costMult: 0.4, dropWeight: 46, shopAvailable: true },
+    white: { key: 'white', name: 'White', label: 'Normal', color: '#e8e8e8', mark: '◐', affixCount: 1, statMult: 1.0, costMult: 1, dropWeight: 32, shopAvailable: true },
+    blue: { key: 'blue', name: 'Blue', label: 'Sihirli', color: '#3b82f6', mark: '◆', affixCount: 2, statMult: 1.3, costMult: 2.5, dropWeight: 15, shopAvailable: true },
+    yellow: { key: 'yellow', name: 'Yellow', label: 'Nadir', color: '#eab308', mark: '★', affixCount: 3, statMult: 1.7, costMult: 6, dropWeight: 5, shopAvailable: false },
+    green: { key: 'green', name: 'Green', label: 'Set', color: '#22c55e', mark: '⬡', affixCount: 0, statMult: 1, costMult: 4, dropWeight: 1.2, shopAvailable: false, isSet: true },
+    orange: { key: 'orange', name: 'Orange', label: 'Efsanevi', color: '#f97316', mark: '✦', affixCount: 2, statMult: 3.2, costMult: 0, dropWeight: 0.5, shopAvailable: false, isUnique: true },
+    red: { key: 'red', name: 'Red', label: 'İlksel Efsanevi', color: '#ef4444', mark: '▲', affixCount: 3, statMult: 4.0, costMult: 0, dropWeight: 0.08, shopAvailable: false, isUnique: true },
+    teal: { key: 'teal', name: 'Teal', label: 'Ethereal', color: '#14b8a6', mark: '✧', affixCount: 2, statMult: 3.6, costMult: 0, dropWeight: 0.04, shopAvailable: false, classLocked: true, isUnique: true }
 };
 
 // How an item looks on the painted hero (hero.js / avatar.js): the avatar
@@ -547,40 +547,81 @@ function generateItem(slot, rarityKey, opts) {
     };
 }
 
-// Weighted-random rarity + slot pick for a post-battle drop. Only rarities
-// with dropWeight > 0 can ever drop (grey through teal, all of them really -
-// see RARITY_DEFS). Green (Set) picks a random still-incomplete piece from a
-// random set if the player has one, otherwise a random piece from any set.
-// opts.level: the dropping level (the character's level, a little higher
-// deeper in the dungeon); opts.cls: most drops suit that class, some don't
-// (they're worth something to another character through the stash).
+// Weighted-random rarity + slot pick for a post-battle drop.
+// Since v1.39 every drop is wearable by the character that found it: rolled
+// items are made at exactly its level (never above), and set pieces /
+// uniques only drop once its level reaches theirs. Strong items are rare
+// (RARITY_DEFS.dropWeight: ~5% yellow, ~1.2% set, ~0.6% unique); a deeper
+// floor (up to +50%) and a boss (x1.3) only nudge those odds up a little, so a character grows
+// in many small steps instead of one lucky drop.
+// opts: level (the character's), cls (most drops suit that class, some
+// don't - they're worth something to another character through the
+// stash), floor (dungeon depth), boss.
+const LOOT_DEPTH_BONUS = 0.1;    // rare-and-up weight per 5 floors of depth...
+const LOOT_DEPTH_CAP = 1.5;      // ...capped at +50%
+const LOOT_BOSS_BONUS = 1.3;     // a boss's rare-and-up weight multiplier (and white instead of grey)
+function lootRarityWeights(opts) {
+    opts = opts || {};
+    const depth = Math.min(LOOT_DEPTH_CAP, 1 + LOOT_DEPTH_BONUS * Math.floor(Math.max(0, (opts.floor || 1) - 1) / 5));
+    const w = {};
+    Object.keys(RARITY_DEFS).forEach(k => {
+        let x = RARITY_DEFS[k].dropWeight;
+        const rare = ['yellow', 'green', 'orange', 'red', 'teal'].indexOf(k) !== -1;
+        if (rare) x *= depth * (opts.boss ? LOOT_BOSS_BONUS : 1);
+        w[k] = x;
+    });
+    if (opts.boss) { w.white += w.grey; w.grey = 0; }
+    return w;
+}
+function fixedReqLevel(baseId) { const f = catalogFixed(baseId); return f ? f.req : 1; }
 function rollLootDrop(ownedItems, opts) {
     opts = opts || {};
-    let totalWeight = Object.values(RARITY_DEFS).reduce((sum, r) => sum + r.dropWeight, 0);
+    const level = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, opts.level || 1));
+    const weights = lootRarityWeights(opts);
+    let totalWeight = Object.values(weights).reduce((sum, x) => sum + x, 0);
     let roll = Math.random() * totalWeight;
     let rarityKey = 'grey';
-    for (let key in RARITY_DEFS) {
-        roll -= RARITY_DEFS[key].dropWeight;
+    for (let key in weights) {
+        roll -= weights[key];
         if (roll <= 0) { rarityKey = key; break; }
     }
-    // uniques and set pieces only drop once a character could wear them soon
-    const level = opts.level || 1;
-    if (RARITY_DEFS[rarityKey].isUnique && level < 25) rarityKey = 'yellow';
-    if (RARITY_DEFS[rarityKey].isSet && level < 15) rarityKey = 'blue';
 
+    // a unique of that rarity the character can already wear - else a rare
+    if (RARITY_DEFS[rarityKey].isUnique) {
+        const wearable = Object.entries(UNIQUE_LEGENDARIES[rarityKey] || {}).filter(([, u]) => fixedReqLevel(u.id) <= level);
+        if (!wearable.length) rarityKey = 'yellow';
+        else {
+            const [slot] = wearable[Math.floor(Math.random() * wearable.length)];
+            return generateItem(slot, rarityKey, {});
+        }
+    }
     if (RARITY_DEFS[rarityKey].isSet) {
-        let setKeys = Object.keys(ITEM_SETS);
-        let setKey = setKeys[Math.floor(Math.random() * setKeys.length)];
-        let pieceIds = Object.keys(ITEM_SETS[setKey].pieces);
-        let ownedBaseIds = new Set((ownedItems || []).map(it => it.base_id));
-        let missing = pieceIds.filter(id => !ownedBaseIds.has(id));
-        let pieceId = (missing.length > 0 ? missing : pieceIds)[Math.floor(Math.random() * (missing.length > 0 ? missing.length : pieceIds.length))];
-        return generateItem(ITEM_SETS[setKey].pieces[pieceId].slot, rarityKey, { setKey, pieceId });
+        let setKeys = Object.keys(ITEM_SETS).filter(k => Object.keys(ITEM_SETS[k].pieces).every(id => fixedReqLevel(id) <= level));
+        if (!setKeys.length) rarityKey = 'blue';
+        else {
+            let setKey = setKeys[Math.floor(Math.random() * setKeys.length)];
+            let pieceIds = Object.keys(ITEM_SETS[setKey].pieces);
+            let ownedBaseIds = new Set((ownedItems || []).map(it => it.base_id));
+            let missing = pieceIds.filter(id => !ownedBaseIds.has(id));
+            let pool = missing.length > 0 ? missing : pieceIds;
+            let pieceId = pool[Math.floor(Math.random() * pool.length)];
+            return generateItem(ITEM_SETS[setKey].pieces[pieceId].slot, rarityKey, { setKey, pieceId });
+        }
     }
 
     let slot = ITEM_SLOTS[Math.floor(Math.random() * ITEM_SLOTS.length)];
     const forMe = opts.cls && Math.random() < 0.7;
     return generateItem(slot, rarityKey, { level, cls: forMe ? opts.cls : null });
+}
+
+// Rare (yellow) items carry a name of their own, Diablo-style: two words
+// picked from the item's own content (stable - the same item always shows
+// the same name), e.g. "Kan Çığlığı".
+const RARE_NAME_A = ['Kan', 'Gece', 'Ölüm', 'Fırtına', 'Ejder', 'Kurt', 'Kemik', 'Ateş', 'Buz', 'Yıldız', 'Kuzgun', 'Kader', 'Gölge', 'Demir', 'Ruh', 'Şafak'];
+const RARE_NAME_B = ['Çığlığı', 'Dişi', 'Laneti', 'Fısıltısı', 'Öfkesi', 'Pençesi', 'Yarası', 'Gölgesi', 'Yemini', 'Hasadı', 'Yankısı', 'Mührü', 'Kalbi', 'Şarkısı'];
+function rareItemName(item) {
+    const seed = stableItemSeed(item);
+    return `${t(RARE_NAME_A[seed % RARE_NAME_A.length])} ${t(RARE_NAME_B[Math.floor(seed / 7) % RARE_NAME_B.length])}`;
 }
 
 // DB rows only ever store base_id/slot/rarity/rolled_stats/set_key (see
@@ -599,6 +640,7 @@ function itemDisplayInfo(item) {
     const cb = catalogBase(item.base_id);
     let base = cb && ITEM_BASES[cb.slot] && ITEM_BASES[cb.slot].find(b => b.id === item.base_id);
     if (!base) return { name: item.base_id, emoji: '❓' };
+    if (item.rarity === 'yellow') return { name: `${rareItemName(item)} · ${t(base.name)}`, emoji: base.emoji };
     let prefixPool = ITEM_PREFIXES[base.primaryStat];
     let prefix = prefixPool ? prefixPool[stableItemSeed(item) % prefixPool.length] : null;
     return { name: prefix ? `${t(prefix)} ${t(base.name)}` : t(base.name), emoji: base.emoji };

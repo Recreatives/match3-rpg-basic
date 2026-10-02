@@ -122,7 +122,8 @@ describe('schema.sql <-> items.js catalog sync', { world: { pixi: false } }, fun
 
     it('purchase_item prices/affixes/multipliers match RARITY_DEFS', function (ctx) {
         var R = ctx.world.g('RARITY_DEFS');
-        var fn = sql.slice(sql.indexOf('function public.purchase_item'));
+        // the LAST definition is the one that wins when the file runs
+        var fn = sql.slice(sql.lastIndexOf('function public.purchase_item'));
         fn = fn.slice(0, fn.indexOf('$$;'));
         function caseValue(varName, rarity) {
             var line = fn.split('\n').find(function (l) { return l.indexOf(varName + ' :=') !== -1; });
