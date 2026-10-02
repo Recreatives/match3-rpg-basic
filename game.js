@@ -375,7 +375,9 @@ function pickClass(c) {
     document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
     updateUI();
     document.getElementById('class-selection').style.display = 'none';
-    renderModeButtons();
+    // the town is the hub between adventures (town.js); the old mode picker
+    // is the fallback when it isn't there
+    if (typeof showTown === 'function') showTown(); else renderModeButtons();
 }
 
 // Shown right after a class is picked, before anything actually starts -
@@ -425,9 +427,12 @@ function handleOverlayClick() {
 // straight to mode-selection, never back to square one at class-selection.
 function restoreMainMenuOverlay() {
     if (currentState !== STATE.START) return;
+    if (selectedClass && typeof showTown === 'function') { showTown(); return; }
     overlay.classList.add('visible');
     document.getElementById('class-selection').style.display = 'none';
-    renderModeButtons();
+    // the town is the hub between adventures (town.js); the old mode picker
+    // is the fallback when it isn't there
+    if (typeof showTown === 'function') showTown(); else renderModeButtons();
 }
 
 function resetGame() {
@@ -666,9 +671,10 @@ function returnToMainMenu() {
     // leaving right after a boss: the run's experience is paid in full
     if (typeof runEnd === 'function') runEnd('exit');
     currentState = STATE.START;
+    log(t('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.'), 'log-turn');
+    if (typeof showTown === 'function') { showTown(); return; }
     overlay.classList.add('visible');
     renderModeButtons(); // selectedClass is already set - straight to Solo/Co-op/PvP
-    log(t('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.'), 'log-turn');
 }
 
 // Turkish label for each REWARD_POOL tier key - used anywhere a tier is
@@ -807,11 +813,18 @@ function gameOver() {
     if (typeof runEnd === 'function') runEnd('death');
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = t("OYUN BİTTİ");
-    overlayBtn.innerText = t("TEKRAR DENE");
-    overlayBtn.style.display = 'block';
-    overlayBtn.onclick = handleOverlayClick;
     rewardArea.style.display = 'none';
     overlay.classList.add('visible');
+    overlayBtn.style.display = 'block';
+    // with a character the hero lives on - back to town; without one, the
+    // old "pick a class and try again"
+    if (typeof showTown === 'function' && typeof activeCharacter !== 'undefined' && activeCharacter) {
+        overlayBtn.innerText = t('KASABAYA DÖN');
+        overlayBtn.onclick = () => { overlayBtn.style.display = 'none'; overlay.classList.remove('visible'); showTown(); };
+        return;
+    }
+    overlayBtn.innerText = t("TEKRAR DENE");
+    overlayBtn.onclick = handleOverlayClick;
     selectedClass = null;
 }
 
@@ -1678,6 +1691,11 @@ function toggleModal(modalId) {
             restoreMainMenuOverlay();
         }
     } else {
+        // gear / gold / progress windows only open in town, never mid-fight (town.js)
+        if (typeof townModalAllowed === 'function' && !townModalAllowed(modalId)) {
+            log(t('Bunu sadece kasabadayken yapabilirsin.'), 'log-turn');
+            return;
+        }
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
         // thing - you're supposed to be too busy surviving to shop while
         // STATE.PLAYING (fighting) or STATE.REWARD (mid reward-pick / at

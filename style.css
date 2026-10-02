@@ -1452,3 +1452,32 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 @media (prefers-reduced-motion: reduce) { .inv-figure.flourish::after { animation: none; opacity: 0; } }
 
 .inv-death-note { grid-column: 1 / -1; color: #e8a0a0; }
+
+/* --- Town (town.js): the hub between adventures ------------------------------ */
+.town-screen {
+    position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
+    background: radial-gradient(ellipse at 50% 30%, #1d2436, #090c12 75%); overflow-y: auto; overflow-x: hidden;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(10px, env(safe-area-inset-bottom)); box-sizing: border-box;
+}
+.town-head { width: 100%; max-width: 560px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #e8eef4; }
+.town-who { display: flex; flex-direction: column; min-width: 0; }
+.town-who b { font-family: var(--font-display, Georgia, serif); color: var(--accent, #e8c35a); font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.town-who span { font-size: 0.8rem; color: #cfd8e0; }
+.town-xp { width: 140px; height: 4px; background: #222; border-radius: 2px; overflow: hidden; margin-top: 3px; }
+.town-xp i { display: block; height: 100%; background: linear-gradient(90deg, #6a5acd, #9b8cff); }
+.town-tools { display: flex; gap: 4px; flex-shrink: 0; }
+.town-scene { width: 100%; max-width: 560px; flex: 1 1 auto; display: flex; align-items: flex-start; justify-content: center; margin-top: 6px; }
+#town-svg { width: 100%; height: auto; max-height: calc(100dvh - 110px); border-radius: 12px; box-shadow: 0 0 0 1px rgba(255,220,150,.14), 0 10px 30px rgba(0,0,0,.5); font-family: inherit; }
+.town-bldg { cursor: pointer; transition: filter .15s; outline: none; }
+.town-bldg:hover, .town-bldg:focus-visible { filter: brightness(1.25) drop-shadow(0 0 6px rgba(255, 210, 120, .55)); }
+.town-bldg:active { filter: brightness(1.4); }
+.town-glow { animation: town-pulse 2.8s ease-in-out infinite; }
+.town-flame { animation: town-flicker .35s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+.town-smoke { animation: town-smoke 4s ease-in-out infinite; }
+@keyframes town-pulse { 0%, 100% { opacity: .18; } 50% { opacity: .38; } }
+@keyframes town-flicker { from { transform: scaleY(.9); } to { transform: scaleY(1.12); } }
+@keyframes town-smoke { 0%, 100% { transform: translateY(0); opacity: .45; } 50% { transform: translateY(-6px); opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .town-glow, .town-flame, .town-smoke { animation: none; } }
+.town-hint { color: #8a96a3; font-size: 0.75rem; text-align: center; margin: 6px 0 0; max-width: 560px; }
+/* the town replaces the old top-bar shortcuts (shop, PvP, co-op, profile, daily) */
+.top-bar-buttons .loot-btn { display: none; }

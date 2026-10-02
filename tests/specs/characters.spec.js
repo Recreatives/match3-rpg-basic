@@ -14,7 +14,9 @@ describe('Characters', { world: false }, function () {
             list.children[0].click();
             await w.settle(1000);
             expect(w.g('selectedClass && selectedClass.name')).toBe('Warrior');
-            expect(w.$('mode-selection').style.display).toBe('flex');
+            // the hero goes to town (town.js)
+            expect(w.$('town-screen').style.display).toBe('flex');
+            expect(w.$('mode-selection').style.display).not.toBe('flex');
             expect(w.$('player-class-label').textContent).toContain('TESTER · Sv. 1');
         } finally { w.destroy(); }
     });
