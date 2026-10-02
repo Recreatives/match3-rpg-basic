@@ -136,8 +136,93 @@ function charUpdateHudLabel() {
     const el = document.getElementById('player-class-label');
     if (!el || typeof selectedClass === 'undefined' || !selectedClass) return;
     el.style.color = 'var(--accent)';
-    if (activeCharacter) el.textContent = `${selectedClass.emoji} ${activeCharacter.name.toUpperCase()} · ${tf('Sv. {n}', { n: activeCharacter.level })}`;
+    if (activeCharacter) el.textContent = `${selectedClass.emoji} ${activeCharacter.name.toUpperCase()} · ${tf('Sv. {n}', { n: activeCharacter.level })}`
+        + (typeof dungeonRun !== 'undefined' && dungeonRun && dungeonRun.pending ? ` · ✨${dungeonRun.pending}` : '');
     else el.textContent = `${selectedClass.emoji} ${selectedClass.name.toUpperCase()}`;
+}
+
+// --- dungeon runs (schema.sql section 32) -------------------------------------------
+// A solo run banks its experience floor by floor; it's paid out when the
+// run ends - all of it when leaving right after a boss, half on death
+// (which also costs 10% of the gold and one worn item). A run left open
+// counts as a death when the next one starts.
+let dungeonRun = null; // { id, floor, pending }
+// run calls go out one after another (a floor must land before the run ends)
+let runQueue = Promise.resolve();
+function runQueued(fn) { const p = runQueue.then(fn, fn); runQueue = p.catch(() => {}); return p; }
+
+function runStart() { return runQueued(runStartNow); }
+async function runStartNow() {
+    dungeonRun = null;
+    if (!activeCharacter || typeof sb === 'undefined') return null;
+    const { data, error } = await sb.rpc('start_run');
+    if (error || !data) { if (error) console.warn('start_run:', error.message); return null; }
+    dungeonRun = { id: data.run_id, floor: 0, pending: 0 };
+    if (data.abandoned) runShowResult(data.abandoned, true);
+    charUpdateHudLabel();
+    return dungeonRun;
+}
+
+// A cleared floor: banks its experience (falls back to paying it at once
+// when there's no run - offline, or the run couldn't start).
+function runRecordFloor(floor, kills) { return runQueued(() => runRecordFloorNow(floor, kills)); }
+async function runRecordFloorNow(floor, kills) {
+    if (!dungeonRun) return typeof awardRunXp === 'function' ? awardRunXp(floor, kills) : null;
+    const { data, error } = await sb.rpc('record_floor', { p_run: dungeonRun.id, p_floor: floor, p_kills: kills });
+    if (error || !data || !data[0]) { if (error) console.warn('record_floor:', error.message); return null; }
+    dungeonRun.floor = data[0].floor; dungeonRun.pending = data[0].pending_xp;
+    if (typeof log === 'function') log(tf('✨ +{xp} tecrübe birikti (koşuda toplam {total})', { xp: data[0].gain, total: data[0].pending_xp }), 'log-heal');
+    charUpdateHudLabel();
+    return data[0];
+}
+
+// Ends the run: 'exit' (after a boss) or 'death'.
+function runEnd(outcome) { return runQueued(() => runEndNow(outcome)); }
+async function runEndNow(outcome) {
+    const run = dungeonRun;
+    dungeonRun = null;
+    charUpdateHudLabel();
+    if (!run || typeof sb === 'undefined') return null;
+    const { data, error } = await sb.rpc('end_run', { p_run: run.id, p_outcome: outcome });
+    if (error || !data) { if (error) console.warn('end_run:', error.message); return null; }
+    runShowResult(data, false);
+    return data;
+}
+
+// Applies an ended run's result locally and tells the player what it cost.
+function runShowResult(r, wasAbandoned) {
+    if (activeCharacter && r.level) {
+        const oldLevel = activeCharacter.level;
+        Object.assign(activeCharacter, { level: r.level, xp: r.xp, mastery: r.mastery || 0 });
+        charactersUpsertLocal(activeCharacter);
+        if (r.level > oldLevel) charLevelUpToast(r.level);
+    }
+    const lines = [];
+    if (wasAbandoned) lines.push(t('Yarıda bırakılan önceki koşu ölüm sayıldı.'));
+    if (r.outcome === 'exit') lines.push(tf('🏆 Zindandan sağ çıktın: {xp} tecrübenin tamamını aldın.', { xp: r.xp_granted }));
+    else lines.push(tf('💀 Ölümün bedeli: biriken {banked} tecrübenin yarısını ({xp}) aldın.', { banked: r.banked_xp, xp: r.xp_granted }));
+    if (r.lost_gold) lines.push(tf('🪙 Yanındaki altının %10\'u ({gold}) kayboldu.', { gold: r.lost_gold }));
+    if (r.lost_item && typeof currentOwnedItems !== 'undefined') {
+        const lost = currentOwnedItems.find(it => it.id === r.lost_item.id) || r.lost_item;
+        currentOwnedItems = currentOwnedItems.filter(it => it.id !== r.lost_item.id);
+        const info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(lost) : { name: lost.base_id, emoji: '' };
+        lines.push(tf('💀 {emoji} {name} kayboldu.', { emoji: info.emoji, name: info.name }));
+        if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+        if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    }
+    if (typeof log === 'function') lines.forEach(l => log(l, r.outcome === 'exit' ? 'log-heal' : 'log-hit'));
+    if (typeof fetchWallet === 'function') fetchWallet();
+    if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
+    charUpdateHudLabel();
+    const el = document.createElement('div');
+    el.className = 'achievement-toast';
+    const b = document.createElement('b');
+    b.textContent = r.outcome === 'exit' ? t('🏆 KOŞU TAMAMLANDI') : t('💀 KOŞU BİTTİ');
+    el.appendChild(b);
+    lines.forEach(l => { el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(l)); });
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), 10);
+    setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 5500);
 }
 
 // --- growth -----------------------------------------------------------------------------

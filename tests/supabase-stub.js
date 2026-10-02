@@ -190,6 +190,31 @@
             it.character_id = a.p_to === 'stash' ? null : table('players')[0].active_character_id;
             return { data: clone(it), error: null };
         },
+        // dungeon runs (schema.sql section 32)
+        start_run: function () { var r = { id: 'run-' + (nextRowId++), floor: 0, pending_xp: 0 }; table('dungeon_runs').push(r); return { data: { run_id: r.id, abandoned: null }, error: null }; },
+        record_floor: function (a) {
+            var r = table('dungeon_runs').find(function (x) { return x.id === a.p_run; });
+            if (!r || a.p_floor !== r.floor + 1) return { data: null, error: { message: 'record_floor: floors must come in order' } };
+            var gain = Math.min(30 + a.p_floor * 9 + Math.min(a.p_kills, 10) * 3, 600);
+            r.floor = a.p_floor; r.pending_xp += gain;
+            return { data: [{ floor: r.floor, pending_xp: r.pending_xp, gain: gain }], error: null };
+        },
+        end_run: function (a) {
+            var r = table('dungeon_runs').find(function (x) { return x.id === a.p_run; });
+            if (!r || r.ended) return { data: null, error: { message: 'end_run: no such open run' } };
+            r.ended = true;
+            var paid = a.p_outcome === 'exit' ? r.pending_xp : Math.floor(r.pending_xp / 2);
+            var p = table('players')[0], c = table('characters').find(function (x) { return x.id === p.active_character_id; });
+            var total = function (L) { var s = 0; for (var i = 1; i < L; i++) s += Math.round(80 * Math.pow(i, 1.6)); return s; };
+            if (c) { c.xp += paid; while (c.level < 50 && c.xp >= total(c.level + 1)) c.level++; }
+            var out = { outcome: a.p_outcome, floor: r.floor, banked_xp: r.pending_xp, xp_granted: paid, level: c ? c.level : 1, xp: c ? c.xp : 0, mastery: 0, leveled_up: false, lost_gold: 0, lost_item: null };
+            if (a.p_outcome !== 'exit') {
+                var w = table('wallets')[0]; if (w) { out.lost_gold = Math.floor(w.gold * 0.1); w.gold -= out.lost_gold; }
+                var worn = table('player_items').filter(function (x) { return x.equipped_slot; });
+                if (worn.length) { out.lost_item = clone(worn[0]); db.player_items = table('player_items').filter(function (x) { return x !== worn[0]; }); }
+            }
+            return { data: out, error: null };
+        },
         lose_item_on_death: function () {
             var charId = table('players')[0].active_character_id;
             var worn = table('player_items').filter(function (r) { return r.equipped_slot && (!r.character_id || r.character_id === charId); });

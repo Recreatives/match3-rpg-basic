@@ -581,4 +581,13 @@ const EN_DICT = {
     'Mührü': 'Seal',
     'Kalbi': 'Heart',
     'Şarkısı': 'Song',
+    // dungeon runs (characters.js)
+    '✨ +{xp} tecrübe birikti (koşuda toplam {total})': '✨ +{xp} experience banked (run total {total})',
+    'Yarıda bırakılan önceki koşu ölüm sayıldı.': 'Your previous unfinished run counted as a death.',
+    '🏆 Zindandan sağ çıktın: {xp} tecrübenin tamamını aldın.': '🏆 You made it out alive: all {xp} experience is yours.',
+    '💀 Ölümün bedeli: biriken {banked} tecrübenin yarısını ({xp}) aldın.': '💀 The price of death: you keep half ({xp}) of the {banked} banked experience.',
+    '🪙 Yanındaki altının %10\'u ({gold}) kayboldu.': '🪙 10% of the gold you carried ({gold}) is lost.',
+    '💀 {emoji} {name} kayboldu.': '💀 {emoji} {name} is lost.',
+    '🏆 KOŞU TAMAMLANDI': '🏆 RUN COMPLETE',
+    '💀 KOŞU BİTTİ': '💀 RUN OVER',
 };

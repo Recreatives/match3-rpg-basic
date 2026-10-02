@@ -4163,3 +4163,170 @@ begin
 end;
 $$;
 grant execute on function public.lose_item_on_death(text) to authenticated;
+
+-- =====================================================================================
+-- 32. DUNGEON RUNS (v1.40): experience is banked during a solo run
+-- =====================================================================================
+-- A solo run's experience builds up floor by floor and is only paid out
+-- when the run ends: leaving by choice (only right after a boss, every 5th
+-- floor) pays all of it; dying pays half and costs 10% of the character's
+-- gold and one worn item. A run left open (the game closed mid-dungeon)
+-- counts as a death the next time a run starts. Floors must come in order
+-- and not faster than a real fight, and each floor's gain is bounded, so a
+-- client can't bank more than real play would.
+create table if not exists public.dungeon_runs (
+    id            uuid primary key default gen_random_uuid(),
+    character_id  uuid not null references public.characters(id) on delete cascade,
+    started_at    timestamptz not null default now(),
+    floor         integer not null default 0,
+    pending_xp    integer not null default 0,
+    last_floor_at timestamptz,
+    ended_at      timestamptz,
+    outcome       text check (outcome in ('exit', 'death', 'abandoned'))
+);
+create index if not exists dungeon_runs_open_idx on public.dungeon_runs (character_id) where ended_at is null;
+alter table public.dungeon_runs enable row level security;
+drop policy if exists "read own runs" on public.dungeon_runs;
+create policy "read own runs" on public.dungeon_runs
+    for select using (exists (select 1 from public.characters c where c.id = character_id and c.player_id = auth.uid()));
+
+-- Internal helpers (not callable by clients).
+create or replace function public.grant_character_xp(p_char uuid, p_gain integer)
+returns table(level integer, xp integer, mastery integer, leveled_up boolean)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_char public.characters;
+    v_level integer;
+    v_xp integer;
+begin
+    select * into v_char from public.characters c where c.id = p_char for update;
+    if not found then return; end if;
+    v_xp := v_char.xp + greatest(0, p_gain);
+    v_level := v_char.level;
+    while v_level < 50 and v_xp >= public.xp_total_for(v_level + 1) loop
+        v_level := v_level + 1;
+    end loop;
+    update public.characters c
+        set xp = v_xp, level = v_level, updated_at = now(),
+            mastery = case when v_level >= 50 then greatest(0, (v_xp - public.xp_total_for(50)) / 8000) else 0 end
+        where c.id = p_char;
+    return query select c.level, c.xp, c.mastery, (c.level > v_char.level) from public.characters c where c.id = p_char;
+end;
+$$;
+revoke execute on function public.grant_character_xp(uuid, integer) from public, anon, authenticated;
+
+-- Dying in the dungeon: 10% of the purse and one random worn item.
+create or replace function public.apply_death_penalty(p_char uuid)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_lost integer;
+    v_item public.player_items;
+begin
+    select floor(c.gold * 0.1)::integer into v_lost from public.characters c where c.id = p_char for update;
+    update public.characters c set gold = c.gold - coalesce(v_lost, 0), updated_at = now() where c.id = p_char;
+    select * into v_item from public.player_items where character_id = p_char and equipped_slot is not null order by random() limit 1;
+    if v_item.id is not null then delete from public.player_items where id = v_item.id; end if;
+    return jsonb_build_object('lost_gold', coalesce(v_lost, 0),
+        'lost_item', case when v_item.id is null then null else jsonb_build_object('id', v_item.id, 'base_id', v_item.base_id, 'slot', v_item.slot,
+            'rarity', v_item.rarity, 'set_key', v_item.set_key, 'item_level', v_item.item_level, 'rolled_stats', v_item.rolled_stats) end);
+end;
+$$;
+revoke execute on function public.apply_death_penalty(uuid) from public, anon, authenticated;
+
+-- Closes a run: 'exit' pays all its experience, 'death' / 'abandoned' half
+-- plus the death penalty.
+create or replace function public.close_run(p_run public.dungeon_runs, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_paid integer;
+    v_xp record;
+    v_pen jsonb := '{}'::jsonb;
+begin
+    v_paid := case when p_outcome = 'exit' then p_run.pending_xp else p_run.pending_xp / 2 end;
+    update public.dungeon_runs set ended_at = now(), outcome = p_outcome where id = p_run.id;
+    select * into v_xp from public.grant_character_xp(p_run.character_id, v_paid);
+    if p_outcome <> 'exit' then v_pen := public.apply_death_penalty(p_run.character_id); end if;
+    return jsonb_build_object('outcome', p_outcome, 'floor', p_run.floor, 'banked_xp', p_run.pending_xp, 'xp_granted', v_paid,
+        'level', v_xp.level, 'xp', v_xp.xp, 'mastery', v_xp.mastery, 'leveled_up', coalesce(v_xp.leveled_up, false)) || v_pen;
+end;
+$$;
+revoke execute on function public.close_run(public.dungeon_runs, text) from public, anon, authenticated;
+
+-- Starts a solo run for the active character. Returns the run id, and the
+-- result of closing a run that was left open (or null).
+create or replace function public.start_run()
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_char uuid := public.my_active_character();
+    v_old public.dungeon_runs;
+    v_closed jsonb := null;
+    v_id uuid;
+begin
+    if v_char is null then raise exception 'no active character'; end if;
+    select * into v_old from public.dungeon_runs where character_id = v_char and ended_at is null order by started_at desc limit 1 for update;
+    if v_old.id is not null then
+        -- a run with no floor cleared costs nothing (a misclick, a reload at the door)
+        if v_old.floor = 0 then update public.dungeon_runs set ended_at = now(), outcome = 'abandoned' where id = v_old.id;
+        else v_closed := public.close_run(v_old, 'abandoned'); end if;
+    end if;
+    update public.dungeon_runs set ended_at = now(), outcome = 'abandoned' where character_id = v_char and ended_at is null;
+    insert into public.dungeon_runs (character_id) values (v_char) returning id into v_id;
+    return jsonb_build_object('run_id', v_id, 'abandoned', v_closed);
+end;
+$$;
+grant execute on function public.start_run() to authenticated;
+
+-- One cleared floor: in order, not faster than a fight, bounded gain.
+create or replace function public.record_floor(p_run uuid, p_floor integer, p_kills integer default 1)
+returns table(floor integer, pending_xp integer, gain integer)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_run public.dungeon_runs;
+    v_gain integer;
+begin
+    select * into v_run from public.dungeon_runs r where r.id = p_run and r.ended_at is null
+        and r.character_id = public.my_active_character() for update;
+    if not found then raise exception 'record_floor: no such open run'; end if;
+    if p_floor <> v_run.floor + 1 then raise exception 'record_floor: floors must come in order'; end if;
+    if p_kills < 0 or p_kills > 50 then raise exception 'record_floor: out of bounds'; end if;
+    if v_run.last_floor_at is not null and v_run.last_floor_at > now() - interval '3 seconds' then raise exception 'record_floor: too soon'; end if;
+    v_gain := least(30 + p_floor * 9 + least(p_kills, 10) * 3, 600);
+    update public.dungeon_runs r set floor = p_floor, pending_xp = r.pending_xp + v_gain, last_floor_at = now() where r.id = p_run;
+    return query select r.floor, r.pending_xp, v_gain from public.dungeon_runs r where r.id = p_run;
+end;
+$$;
+grant execute on function public.record_floor(uuid, integer, integer) to authenticated;
+
+-- Ends a run: 'exit' (only right after a boss) or 'death'.
+create or replace function public.end_run(p_run uuid, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_run public.dungeon_runs;
+begin
+    if p_outcome not in ('exit', 'death') then raise exception 'end_run: unknown outcome'; end if;
+    select * into v_run from public.dungeon_runs r where r.id = p_run and r.ended_at is null
+        and r.character_id = public.my_active_character() for update;
+    if not found then raise exception 'end_run: no such open run'; end if;
+    if p_outcome = 'exit' and (v_run.floor = 0 or v_run.floor % 5 <> 0) then
+        raise exception 'end_run: you can only leave right after a boss';
+    end if;
+    return public.close_run(v_run, p_outcome);
+end;
+$$;
+grant execute on function public.end_run(uuid, text) to authenticated;

@@ -94,15 +94,33 @@ describe('Characters: level curve', function () {
     });
 });
 
-describe('Characters: death penalty', function () {
-    it('dying in a solo run costs one worn item, through the server function', async function (ctx) {
+describe('Characters: death penalty and banked experience', function () {
+    it('dying in a solo run ends it through end_run: half the experience, 10% gold, one worn item', async function (ctx) {
         var w = ctx.world;
         await startSolo(w, 'WARRIOR');
+        await awaitInWorld(w, w.g('runStart()'));
         w.g("currentOwnedItems = [{ id: 'd1', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: 'weapon', character_id: 'char-1' }, { id: 'd2', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: null, character_id: 'char-1' }]; __stub.db.player_items = JSON.parse(JSON.stringify(currentOwnedItems));");
+        await awaitInWorld(w, w.g('runRecordFloor(1, 1)'));
+        expect(w.g('dungeonRun.pending')).toBe(42);
+        expect(w.g('activeCharacter.xp')).toBe(0); // banked, not paid yet
         w.g('gameOver()');
         await w.settle(1000);
-        expect(w.stub.calls.some(function (c) { return c.fn === 'lose_item_on_death' && c.args.p_mode === 'solo'; })).toBe(true);
+        var end = w.stub.calls.filter(function (c) { return c.fn === 'end_run'; })[0];
+        expect(end && end.args.p_outcome).toBe('death');
+        expect(w.g('activeCharacter.xp')).toBe(21);
         expect(w.g("currentOwnedItems.map(function (i) { return i.id; })")).toEqual(['d2']);
+    });
+
+    it('leaving after a boss pays the whole banked run', async function (ctx) {
+        var w = ctx.world;
+        w.g('activeCharacter.xp = 0; activeCharacter.level = 1; __stub.table("characters")[0].xp = 0; __stub.table("characters")[0].level = 1;');
+        await startSolo(w, 'WARRIOR');
+        await awaitInWorld(w, w.g('runStart()'));
+        for (var f = 1; f <= 5; f++) await awaitInWorld(w, w.g('runRecordFloor(' + f + ', 1)'));
+        var banked = w.g('dungeonRun.pending');
+        await awaitInWorld(w, w.g("runEnd('exit')"));
+        expect(w.g('activeCharacter.xp')).toBe(banked);
+        expect(w.g('dungeonRun')).toBe(null);
     });
 });
 

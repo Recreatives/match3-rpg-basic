@@ -213,6 +213,45 @@ end $$;
 select tst.expect_error($q$select public.lose_item_on_death('pvp')$q$, 'too soon');
 select tst.expect_error($q$select public.lose_item_on_death('coop')$q$, 'unknown mode');
 
+-- dungeon runs: banked experience, in-order floors, exit only after a boss
+select set_config('tst.run', public.start_run()->>'run_id', false);
+do $$ declare r record; begin
+    select * into r from public.record_floor(current_setting('tst.run')::uuid, 1, 1);
+    if r.floor <> 1 or r.pending_xp <> 42 then raise exception 'FAIL: record_floor(1) -> %', row_to_json(r); end if;
+end $$;
+select tst.expect_error($q$select * from public.record_floor(current_setting('tst.run')::uuid, 3, 1)$q$, 'in order');
+select tst.expect_error($q$select * from public.record_floor(current_setting('tst.run')::uuid, 2, 1)$q$, 'too soon');
+select tst.expect_error($q$select public.end_run(current_setting('tst.run')::uuid, 'exit')$q$, 'right after a boss');
+-- (the test runner skips the waiting between floors 2..5)
+reset role;
+do $$ begin
+    for i in 2..5 loop
+        update public.dungeon_runs set last_floor_at = now() - interval '1 minute' where id = current_setting('tst.run')::uuid;
+        perform * from public.record_floor(current_setting('tst.run')::uuid, i, 1);
+    end loop;
+end $$;
+set local role authenticated;
+do $$ declare x0 integer; res jsonb; banked integer; begin
+    select c.xp into x0 from public.characters c where c.id = public.my_active_character();
+    select pending_xp into banked from public.dungeon_runs where id = current_setting('tst.run')::uuid;
+    res := public.end_run(current_setting('tst.run')::uuid, 'exit');
+    if (res->>'xp_granted')::integer <> banked or (select c.xp from public.characters c where c.id = public.my_active_character()) <> x0 + banked then
+        raise exception 'FAIL: exit should pay all % banked xp: %', banked, res; end if;
+end $$;
+-- dying: half the experience, 10% of the gold
+select set_config('tst.run2', public.start_run()->>'run_id', false);
+do $$ declare g0 integer; x0 integer; res jsonb; begin
+    perform * from public.record_floor(current_setting('tst.run2')::uuid, 1, 1);
+    select c.gold, c.xp into g0, x0 from public.characters c where c.id = public.my_active_character();
+    res := public.end_run(current_setting('tst.run2')::uuid, 'death');
+    if (res->>'xp_granted')::integer <> 21 then raise exception 'FAIL: death should pay half (21): %', res; end if;
+    if (select c.gold from public.characters c where c.id = public.my_active_character()) <> g0 - floor(g0 * 0.1)::integer then
+        raise exception 'FAIL: death should cost 10%% of % gold: %', g0, res; end if;
+end $$;
+select tst.expect_error($q$select public.end_run(current_setting('tst.run2')::uuid, 'death')$q$, 'no such open run');
+-- the helpers are not client-callable
+select tst.expect_error($q$select public.apply_death_penalty(public.my_active_character())$q$, 'permission denied');
+
 -- a second character has its own (empty) purse
 do $$
 declare c public.characters; first_id uuid;

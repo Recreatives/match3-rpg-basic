@@ -390,7 +390,7 @@ function renderModeButtons() {
     overlayTitle.innerText = t('NASIL OYNAMAK İSTİYORSUN?');
 
     const modes = [
-        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); } },
+        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); if (typeof runStart === 'function') runStart(); } },
         { emoji: '🤝', label: 'Co-op', desc: 'Bir arkadaşınla aynı zindanda, paylaşımlı tahtada savaş.', action: () => { overlay.classList.remove('visible'); toggleModal('coop-modal'); } },
         { emoji: '🗡️', label: 'PvP', desc: 'Gerçek zamanlı 1v1 düello.', action: () => { overlay.classList.remove('visible'); toggleModal('pvp-modal'); } }
     ];
@@ -552,7 +552,8 @@ function winLevel() {
     // loot: a boss always drops, other floors half the time (LOOT_FLOOR_CHANCE);
     // always at the character's own level, depth only nudges the rarity
     if (typeof awardLootDrop === 'function' && (level % 5 === 0 || Math.random() < LOOT_FLOOR_CHANCE)) awardLootDrop({ floor: level, boss: level % 5 === 0 });
-    if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
+    // experience is banked in the run (characters.js), paid out when it ends
+    if (typeof runRecordFloor === 'function') runRecordFloor(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
@@ -662,6 +663,8 @@ function showBossCheckpoint() {
 
 function returnToMainMenu() {
     document.getElementById('boss-checkpoint').style.display = 'none';
+    // leaving right after a boss: the run's experience is paid in full
+    if (typeof runEnd === 'function') runEnd('exit');
     currentState = STATE.START;
     overlay.classList.add('visible');
     renderModeButtons(); // selectedClass is already set - straight to Solo/Co-op/PvP
@@ -799,8 +802,9 @@ function generateRewards() {
 function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof trackEvent === 'function') trackEvent('solo_run_ended', { level, class: selectedClass ? selectedClass.name : null });
-    // the death penalty: one worn item is lost (economy.js loseItemOnDeath)
-    if (typeof loseItemOnDeath === 'function') loseItemOnDeath('solo', msg => log(msg, 'log-hit'));
+    // the run ends in death: half the banked experience, 10% of the gold
+    // and one worn item (characters.js runEnd -> schema.sql end_run)
+    if (typeof runEnd === 'function') runEnd('death');
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = t("OYUN BİTTİ");
     overlayBtn.innerText = t("TEKRAR DENE");
