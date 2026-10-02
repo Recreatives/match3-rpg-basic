@@ -231,6 +231,8 @@ create table if not exists public.player_items (
     acquired_at   timestamptz not null default now()
 );
 
+-- (v1.40) an item put up in the auction hall: frozen until sold / taken back
+alter table public.player_items add column if not exists listed boolean not null default false;
 alter table public.player_items enable row level security;
 
 drop policy if exists "read own items" on public.player_items;
@@ -2721,7 +2723,7 @@ begin
     end if;
 
     if p_offer_item_id is not null and not exists (
-        select 1 from public.player_items where id = p_offer_item_id and player_id = v_me
+        select 1 from public.player_items where id = p_offer_item_id and player_id = v_me and not listed
     ) then
         raise exception 'you do not own that item';
     end if;
@@ -3623,7 +3625,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'equip_item: item not found or not yours'; end if;
     v_classes := public.item_classes_of(v_item.base_id);
     if v_classes is not null and not (v_char.class_key = any(v_classes)) then
@@ -3678,18 +3680,18 @@ declare
 begin
     if v_char is null then raise exception 'no active character'; end if;
     if p_to = 'stash' then
-        if (select count(*) from public.player_items where player_id = auth.uid() and character_id is null) >= 120 then
+        if (select count(*) from public.player_items where player_id = auth.uid() and character_id is null and not listed) >= 120 then
             raise exception 'move_item: the stash is full';
         end if;
         update public.player_items set character_id = null
-            where id = p_item_id and player_id = auth.uid() and character_id = v_char and equipped_slot is null
+            where id = p_item_id and player_id = auth.uid() and character_id = v_char and equipped_slot is null and not listed
             returning * into v_row;
     elsif p_to = 'bag' then
         if (select count(*) from public.player_items where character_id = v_char and equipped_slot is null) >= 60 then
             raise exception 'move_item: the bag is full';
         end if;
         update public.player_items set character_id = v_char
-            where id = p_item_id and player_id = auth.uid() and character_id is null
+            where id = p_item_id and player_id = auth.uid() and character_id is null and not listed
             returning * into v_row;
     else
         raise exception 'move_item: unknown destination';
@@ -3710,7 +3712,7 @@ declare
     v_row public.player_items;
 begin
     update public.player_items set locked = coalesce(p_locked, false)
-        where id = p_item_id and player_id = auth.uid() returning * into v_row;
+        where id = p_item_id and player_id = auth.uid() and not listed returning * into v_row;
     if not found then raise exception 'lock_item: item not found'; end if;
     return v_row;
 end;
@@ -3831,7 +3833,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'scrap_item: item not found or not yours'; end if;
     if v_item.equipped_slot is not null then raise exception 'scrap_item: unequip it first'; end if;
     if v_item.locked then raise exception 'scrap_item: the item is locked'; end if;
@@ -3857,7 +3859,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'sell_item: item not found or not yours'; end if;
     if v_item.equipped_slot is not null then raise exception 'sell_item: unequip it first'; end if;
     if v_item.locked then raise exception 'sell_item: the item is locked'; end if;
@@ -3893,7 +3895,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'upgrade_item: item not found or not yours'; end if;
     if v_item.req_level > v_char.level then raise exception 'upgrade_item: requires level %', v_item.req_level; end if;
     select * into v_cost from public.item_upgrade_costs where from_rarity = v_item.rarity;
@@ -4048,10 +4050,10 @@ begin
         where id = p_offer_id and to_player = v_me and status = 'pending' returning * into v_offer;
     if not found then raise exception 'offer not found or already resolved'; end if;
     if v_offer.offer_item_id is not null and not exists (
-        select 1 from public.player_items where id = v_offer.offer_item_id and player_id = v_offer.from_player and not locked
+        select 1 from public.player_items where id = v_offer.offer_item_id and player_id = v_offer.from_player and not locked and not listed
     ) then raise exception 'offered item no longer available'; end if;
     if v_offer.request_item_id is not null and not exists (
-        select 1 from public.player_items where id = v_offer.request_item_id and player_id = v_me and not locked
+        select 1 from public.player_items where id = v_offer.request_item_id and player_id = v_me and not locked and not listed
     ) then raise exception 'requested item no longer available'; end if;
     if v_offer.offer_gold > 0 and not exists (
         select 1 from public.wallets where player_id = v_offer.from_player and gold >= v_offer.offer_gold
@@ -4330,3 +4332,175 @@ begin
 end;
 $$;
 grant execute on function public.end_run(uuid, text) to authenticated;
+
+-- =====================================================================================
+-- 33. AUCTION HALL (v1.40): players sell items to each other for gold
+-- =====================================================================================
+-- Fixed price, first buyer gets it. 5% of every sale is burned (a gold sink
+-- that keeps prices honest). A listing runs 48 hours; unsold, the item goes
+-- back to its seller's shared stash. While listed, an item can't be worn,
+-- moved, sold, scrapped, upgraded, locked or traded (player_items.listed).
+-- Bought items land in the buyer's shared stash. Everyone may browse;
+-- every change goes through the functions below.
+create table if not exists public.auction_listings (
+    id               uuid primary key default gen_random_uuid(),
+    item_id          uuid references public.player_items(id) on delete set null,
+    seller_player    uuid not null references public.players(id) on delete cascade,
+    seller_character uuid references public.characters(id) on delete set null,
+    seller_name      text,
+    base_id          text not null,
+    slot             text not null,
+    rarity           text not null,
+    rolled_stats     jsonb not null default '{}'::jsonb,
+    set_key          text,
+    item_level       integer not null default 1,
+    req_level        integer not null default 1,
+    price            integer not null check (price between 1 and 1000000),
+    status           text not null default 'active' check (status in ('active', 'sold', 'cancelled', 'expired')),
+    buyer_player     uuid references public.players(id) on delete set null,
+    created_at       timestamptz not null default now(),
+    expires_at       timestamptz not null default now() + interval '48 hours',
+    closed_at        timestamptz
+);
+create index if not exists auction_active_idx on public.auction_listings (status, slot, rarity, price);
+create index if not exists auction_seller_idx on public.auction_listings (seller_player, created_at desc);
+alter table public.auction_listings enable row level security;
+drop policy if exists "browse auction" on public.auction_listings;
+create policy "browse auction" on public.auction_listings for select using (auth.uid() is not null);
+
+-- Unsold listings past their 48 hours go back to the stash (run lazily by
+-- every auction call - no scheduler needed).
+create or replace function public.auction_expire()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    with gone as (
+        update public.auction_listings set status = 'expired', closed_at = now()
+            where status = 'active' and expires_at <= now()
+            returning item_id
+    )
+    update public.player_items set listed = false, character_id = null where id in (select item_id from gone where item_id is not null);
+end;
+$$;
+revoke execute on function public.auction_expire() from public, anon, authenticated;
+
+create or replace function public.list_item(p_item_id uuid, p_price integer)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_char public.characters;
+    v_item public.player_items;
+    v_row public.auction_listings;
+begin
+    perform public.auction_expire();
+    select * into v_char from public.characters c where c.id = public.my_active_character();
+    if not found then raise exception 'no active character'; end if;
+    if p_price is null or p_price < 1 or p_price > 1000000 then raise exception 'list_item: price out of bounds'; end if;
+    select * into v_item from public.player_items where id = p_item_id and player_id = v_me
+        and (character_id = v_char.id or character_id is null) for update;
+    if not found then raise exception 'list_item: item not found or not yours'; end if;
+    if v_item.equipped_slot is not null then raise exception 'list_item: unequip it first'; end if;
+    if v_item.locked then raise exception 'list_item: the item is locked'; end if;
+    if v_item.listed then raise exception 'list_item: already listed'; end if;
+    if (select count(*) from public.auction_listings where seller_player = v_me and status = 'active') >= 20 then
+        raise exception 'list_item: at most 20 active listings';
+    end if;
+    update public.player_items set listed = true, character_id = null where id = v_item.id;
+    insert into public.auction_listings (item_id, seller_player, seller_character, seller_name, base_id, slot, rarity, rolled_stats, set_key, item_level, req_level, price)
+        values (v_item.id, v_me, v_char.id, v_char.name, v_item.base_id, v_item.slot, v_item.rarity, v_item.rolled_stats, v_item.set_key, v_item.item_level, v_item.req_level, p_price)
+        returning * into v_row;
+    return v_row;
+end;
+$$;
+grant execute on function public.list_item(uuid, integer) to authenticated;
+
+create or replace function public.buy_listing(p_listing_id uuid)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_buyer uuid := public.my_active_character();
+    v_l public.auction_listings;
+    v_payee uuid;
+    v_row public.auction_listings;
+begin
+    perform public.auction_expire();
+    if v_buyer is null then raise exception 'no active character'; end if;
+    select * into v_l from public.auction_listings where id = p_listing_id for update;
+    if not found or v_l.status <> 'active' then raise exception 'buy_listing: no longer for sale'; end if;
+    if v_l.seller_player = v_me then raise exception 'buy_listing: that is your own listing'; end if;
+    if v_l.item_id is null then raise exception 'buy_listing: no longer for sale'; end if;
+    update public.characters set gold = gold - v_l.price, updated_at = now() where id = v_buyer and gold >= v_l.price;
+    if not found then raise exception 'buy_listing: insufficient gold'; end if;
+    -- the seller is paid on the character that listed it (or, if deleted, their active one); 5% is burned
+    v_payee := coalesce((select id from public.characters where id = v_l.seller_character),
+                        (select active_character_id from public.players where id = v_l.seller_player));
+    if v_payee is not null then
+        update public.characters set gold = gold + (v_l.price - floor(v_l.price * 0.05)::integer), updated_at = now() where id = v_payee;
+    end if;
+    update public.player_items set player_id = v_me, character_id = null, listed = false, locked = false, equipped_slot = null where id = v_l.item_id;
+    update public.auction_listings set status = 'sold', buyer_player = v_me, closed_at = now() where id = v_l.id returning * into v_row;
+    return v_row;
+end;
+$$;
+grant execute on function public.buy_listing(uuid) to authenticated;
+
+create or replace function public.cancel_listing(p_listing_id uuid)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_l public.auction_listings;
+begin
+    perform public.auction_expire();
+    update public.auction_listings set status = 'cancelled', closed_at = now()
+        where id = p_listing_id and seller_player = auth.uid() and status = 'active' returning * into v_l;
+    if not found then raise exception 'cancel_listing: not your active listing'; end if;
+    update public.player_items set listed = false, character_id = null where id = v_l.item_id;
+    return v_l;
+end;
+$$;
+grant execute on function public.cancel_listing(uuid) to authenticated;
+
+-- Browsing: active listings, filtered and sorted ('price', 'price_desc', 'new', 'level').
+create or replace function public.get_auction_listings(p_slot text default null, p_rarity text default null, p_min_level integer default 1,
+    p_max_level integer default 50, p_sort text default 'price', p_limit integer default 60, p_offset integer default 0)
+returns setof public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    perform public.auction_expire();
+    return query
+        select * from public.auction_listings l
+        where l.status = 'active' and l.expires_at > now()
+          and (p_slot is null or l.slot = p_slot) and (p_rarity is null or l.rarity = p_rarity)
+          and l.req_level between greatest(1, coalesce(p_min_level, 1)) and least(50, coalesce(p_max_level, 50))
+        order by case when p_sort = 'price' then l.price end asc,
+                 case when p_sort = 'price_desc' then l.price end desc,
+                 case when p_sort = 'level' then l.req_level end desc,
+                 l.created_at desc
+        limit least(greatest(coalesce(p_limit, 60), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+end;
+$$;
+grant execute on function public.get_auction_listings(text, text, integer, integer, text, integer, integer) to authenticated;
+
+create or replace function public.get_my_listings()
+returns setof public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    perform public.auction_expire();
+    return query select * from public.auction_listings where seller_player = auth.uid() order by created_at desc limit 50;
+end;
+$$;
+grant execute on function public.get_my_listings() to authenticated;

@@ -252,6 +252,44 @@ select tst.expect_error($q$select public.end_run(current_setting('tst.run2')::uu
 -- the helpers are not client-callable
 select tst.expect_error($q$select public.apply_death_penalty(public.my_active_character())$q$, 'permission denied');
 
+-- auction hall: list (frozen), can't buy your own, the buyer pays, the seller gets 95%
+do $$ declare it public.player_items; l public.auction_listings; begin
+    insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), public.my_active_character(), 'blade', 'weapon', 'white', '{"sword": 2}') returning * into it;
+    l := public.list_item(it.id, 50);
+    perform set_config('tst.listing', l.id::text, false);
+    if not (select listed from public.player_items where id = it.id) then raise exception 'FAIL: listed item not frozen'; end if;
+    begin perform public.sell_item(it.id); raise exception 'FAIL: sold a listed item'; exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    begin perform public.equip_item(it.id, null); raise exception 'FAIL: equipped a listed item'; exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+end $$;
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'your own listing');
+select tst.expect_error($q$select public.list_item((select id from public.player_items where player_id = auth.uid() and equipped_slot is null and not listed limit 1), 0)$q$, 'price out of bounds');
+commit;
+-- player 2 (Ayla, a mage with no gold) can't afford it; give her 100 gold, then she buys it
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'insufficient gold');
+select public.earn_currency(100, 0);
+do $$ declare l public.auction_listings; it_owner uuid; seller_gold0 integer; begin
+    reset role;
+    select c.gold into seller_gold0 from public.characters c join public.players p on p.active_character_id = c.id where p.id = '11111111-1111-1111-1111-111111111111';
+    set local role authenticated;
+    l := public.buy_listing(current_setting('tst.listing')::uuid);
+    if l.status <> 'sold' then raise exception 'FAIL: listing not sold: %', row_to_json(l); end if;
+    if (select gold from public.wallets where player_id = auth.uid()) <> 50 then raise exception 'FAIL: buyer should have 50 left'; end if;
+    reset role;
+    select player_id into it_owner from public.player_items where id = l.item_id;
+    if it_owner <> '22222222-2222-2222-2222-222222222222' then raise exception 'FAIL: item did not move to the buyer'; end if;
+    if (select c.gold from public.characters c join public.players p on p.active_character_id = c.id where p.id = '11111111-1111-1111-1111-111111111111') <> seller_gold0 + 48 then
+        raise exception 'FAIL: seller should get 95%% (48)'; end if;
+    set local role authenticated;
+end $$;
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'no longer for sale');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
 -- a second character has its own (empty) purse
 do $$
 declare c public.characters; first_id uuid;
@@ -272,9 +310,9 @@ end $$;
 
 commit;
 
--- player 2 still has exactly what they started with
+-- player 2 has exactly what their own actions left them: 100 earned, 50 spent at auction
 do $$ begin
-    if (select gold from public.wallets where player_id = '22222222-2222-2222-2222-222222222222') <> 0 then
+    if (select gold from public.wallets where player_id = '22222222-2222-2222-2222-222222222222') <> 50 then
         raise exception 'FAIL: player 2''s wallet changed';
     end if;
 end $$;
