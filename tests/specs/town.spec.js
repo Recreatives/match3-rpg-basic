@@ -76,3 +76,59 @@ describe('Town', { world: false }, function () {
         });
     });
 });
+
+describe('Auction hall', { world: false }, function () {
+    function seed(w) {
+        w.g("__stub.table('player_items').push({ id: 'a1', player_id: 'test-user', character_id: 'char-1', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: null, item_level: 1, req_level: 1, locked: false, listed: false });"
+            + "__stub.table('auction_listings').push({ id: 'L9', item_id: 'x9', seller_player: 'someone-else', seller_name: 'Kara', base_id: 'sword_t1', slot: 'weapon', rarity: 'blue', rolled_stats: { sword: 4, energy: 2 }, item_level: 3, req_level: 3, price: 40, status: 'active' });"
+            + "__stub.table('auction_listings').push({ id: 'L8', item_id: 'x8', seller_player: 'someone-else', seller_name: 'Kara', base_id: 'plate_chest_t2', slot: 'chest', rarity: 'yellow', rolled_stats: { heart: 6, sword: 2, shield: 2 }, item_level: 8, req_level: 8, price: 900, status: 'active' });");
+        return awaitInWorld(w, w.g('fetchOwnedItems()'));
+    }
+
+    it('the auction hall opens from the town and lists what is for sale, cheapest first', async function () {
+        var w = await townWorld();
+        try {
+            await seed(w);
+            w.$('town-b-auction').dispatchEvent(new w.win.MouseEvent('click', { bubbles: true }));
+            await w.settle(500);
+            expect(w.$('auction-modal').classList.contains('visible')).toBe(true);
+            var rows = w.$('auction-list').querySelectorAll('.auc-row');
+            expect(rows.length).toBe(2);
+            expect(rows[0].textContent).toContain('40');
+            // 100 gold: the 40 one is buyable, the 900 one isn't
+            var btns = w.$('auction-list').querySelectorAll('button');
+            expect(btns[0].disabled).toBe(false);
+            expect(btns[1].disabled).toBe(true);
+        } finally { w.destroy(); }
+    });
+
+    it('buying puts the item in the shared stash; listing freezes an item; withdrawing returns it', async function () {
+        var w = await townWorld();
+        try {
+            await seed(w);
+            w.g("toggleModal('auction-modal')");
+            await w.settle(300);
+            await awaitInWorld(w, w.g("auctionBuy('L9')"));
+            expect(w.g("__stub.table('wallets')[0].gold")).toBe(60);
+            expect(w.g("currentOwnedItems.some(function (i) { return i.base_id === 'sword_t1' && i.character_id === null; })")).toBe(true);
+            await awaitInWorld(w, w.g("auctionList('a1', 25)"));
+            expect(w.g("currentOwnedItems.find(function (i) { return i.id === 'a1'; }).listed")).toBe(true);
+            // a listed item is gone from the bag grid
+            w.g('renderInventory()');
+            expect(w.g("invBagItems().some(function (i) { return i.id === 'a1'; })")).toBe(false);
+            var mine = w.stub.table('auction_listings').filter(function (l) { return l.seller_player === 'test-user'; });
+            await awaitInWorld(w, w.g("auctionCancel('" + mine[0].id + "')"));
+            expect(w.g("currentOwnedItems.find(function (i) { return i.id === 'a1'; }).listed")).toBe(false);
+        } finally { w.destroy(); }
+    });
+
+    it('the auction hall is shut during a dungeon run', async function () {
+        var w = await townWorld();
+        try {
+            w.$('town-b-gate').dispatchEvent(new w.win.MouseEvent('click', { bubbles: true }));
+            await w.settle(1000);
+            w.g("toggleModal('auction-modal')");
+            expect(w.$('auction-modal').classList.contains('visible')).toBe(false);
+        } finally { w.destroy(); }
+    });
+});

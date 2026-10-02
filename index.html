@@ -644,6 +644,25 @@
         </div>
     </div>
 
+    <!-- Auction hall (auction.js): reached from the town only. -->
+    <div id="auction-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 480px;">
+            <span class="close-modal" onclick="toggleModal('auction-modal')">×</span>
+            <h2 class="modal-title" data-i18n-en="📜 AUCTION HALL">📜 MÜZAYEDE SALONU</h2>
+            <p style="font-size:0.78rem; color:#bdc3c7; margin:0 0 8px;" data-i18n-en="Fixed price, the first buyer gets it. 5% of every sale is burned. A listing runs 48 hours; unsold items go back to your shared stash. Bought items arrive in your shared stash.">Sabit fiyat, ilk alan alır. Her satışın %5'i komisyon olarak yakılır. İlan 48 saat kalır; satılmayan eşya ortak depona döner. Satın aldıkların ortak depona gelir.</p>
+            <div class="auc-head">
+                <span>🪙 <b id="auction-gold">–</b></span>
+                <div class="inv-tabs">
+                    <button id="auction-tab-browse" class="inv-tab on" onclick="switchAuctionTab('browse')" data-i18n-en="Browse">Göz At</button>
+                    <button id="auction-tab-sell" class="inv-tab" onclick="switchAuctionTab('sell')" data-i18n-en="Sell">Sat</button>
+                    <button id="auction-tab-mine" class="inv-tab" onclick="switchAuctionTab('mine')" data-i18n-en="My listings">İlanlarım</button>
+                </div>
+            </div>
+            <p id="auction-status" style="font-size:0.8rem; color:#f1c40f; min-height:1.2em; margin:6px 0;"></p>
+            <div id="auction-body"></div>
+        </div>
+    </div>
+
     <div id="daily-login-modal" class="modal-overlay">
         <div class="modal-content" style="max-width: 380px; text-align:center;">
             <span class="close-modal" onclick="toggleModal('daily-login-modal')">×</span>
@@ -1030,6 +1049,7 @@
     <script src="characters.js?v=1.39"></script>
     <script src="inventory.js?v=1.39"></script>
     <script src="town.js?v=1.39"></script>
+    <script src="auction.js?v=1.39"></script>
     <script src="achievements.js?v=1.39"></script>
     <script src="sharedboard.js?v=1.39"></script>
     <script src="game.js?v=1.39"></script>

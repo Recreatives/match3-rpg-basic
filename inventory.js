@@ -39,11 +39,11 @@ function invItems() { return (typeof currentOwnedItems !== 'undefined' && Array.
 // the player's items with no character.
 function invBagItems() {
     const id = invActiveId();
-    return invItems().filter(it => !it.equipped_slot && (!id || !('character_id' in it) || it.character_id === id));
+    return invItems().filter(it => !it.equipped_slot && !it.listed && (!id || !('character_id' in it) || it.character_id === id));
 }
 function invStashItems() {
     if (!invActiveId()) return [];
-    return invItems().filter(it => !it.equipped_slot && 'character_id' in it && it.character_id === null);
+    return invItems().filter(it => !it.equipped_slot && !it.listed && 'character_id' in it && it.character_id === null);
 }
 function invWornIn(slot) { return activeEquippedItems().find(it => it.equipped_slot === slot) || null; }
 

@@ -1481,3 +1481,28 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 .town-hint { color: #8a96a3; font-size: 0.75rem; text-align: center; margin: 6px 0 0; max-width: 560px; }
 /* the town replaces the old top-bar shortcuts (shop, PvP, co-op, profile, daily) */
 .top-bar-buttons .loot-btn { display: none; }
+
+/* --- Auction hall (auction.js) ------------------------------------------------ */
+.auc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.auc-head .inv-tabs { flex: 1 1 220px; }
+.auc-tools { margin-bottom: 6px; flex-wrap: wrap; }
+.auc-tools select { flex: 1 1 110px; }
+.auc-check { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #cfd8e0; margin-bottom: 8px; }
+.auc-list { display: flex; flex-direction: column; gap: 6px; }
+.auc-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px; background: #1b2130; border: 1px solid #333c4c; border-left: 3px solid var(--rc, #4a5566); }
+.auc-icon { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 6px; background: #151922; display: flex; align-items: center; justify-content: center; }
+.auc-icon .inv-icon { width: 44px; height: 44px; }
+.auc-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.auc-txt b { color: var(--rc); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auc-txt small { font-size: 0.7rem; color: #a9b4c0; }
+.auc-stats { color: #d0d6dc !important; }
+.auc-bad { color: #f87171; }
+.auc-buy { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.auc-buy b { color: #ffd24a; font-size: 0.85rem; white-space: nowrap; }
+.auc-seller, .auc-state { font-size: 0.65rem; color: #8a96a3; }
+.auc-state.sold { color: #4ade80; } .auc-state.active { color: #ffd24a; }
+.auc-act { width: auto !important; margin: 0 !important; min-height: 30px; padding: 4px 10px; font-size: 0.75rem; }
+.auc-grid { margin-bottom: 8px; }
+.auc-sell { display: flex; flex-direction: column; gap: 8px; }
+.auc-price { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #fff; }
+.auc-price input { flex: 1; min-width: 0; padding: 8px; font-size: 16px; font-family: inherit; color: #fff; background: #1b2029; border: 2px solid #4a5566; border-radius: 6px; }

@@ -215,6 +215,42 @@
             }
             return { data: out, error: null };
         },
+        // auction hall (schema.sql section 33)
+        list_item: function (a) {
+            var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
+            if (!it || it.equipped_slot || it.locked || it.listed) return { data: null, error: { message: 'list_item: item not found or not yours' } };
+            if (!(a.p_price >= 1 && a.p_price <= 1000000)) return { data: null, error: { message: 'list_item: price out of bounds' } };
+            it.listed = true; it.character_id = null;
+            var c = table('characters').find(function (x) { return x.id === table('players')[0].active_character_id; });
+            var l = { id: 'lst-' + (nextRowId++), item_id: it.id, seller_player: userId, seller_character: c ? c.id : null, seller_name: c ? c.name : '', base_id: it.base_id, slot: it.slot, rarity: it.rarity,
+                rolled_stats: clone(it.rolled_stats), set_key: it.set_key || null, item_level: it.item_level || 1, req_level: it.req_level || 1, price: a.p_price, status: 'active' };
+            table('auction_listings').push(l);
+            return { data: clone(l), error: null };
+        },
+        get_auction_listings: function (a) {
+            var rows = table('auction_listings').filter(function (l) { return l.status === 'active' && (!a.p_slot || l.slot === a.p_slot) && (!a.p_rarity || l.rarity === a.p_rarity); });
+            rows.sort(function (x, y) { return a.p_sort === 'price_desc' ? y.price - x.price : x.price - y.price; });
+            return { data: clone(rows), error: null };
+        },
+        get_my_listings: function () { return { data: clone(table('auction_listings').filter(function (l) { return l.seller_player === userId; })), error: null }; },
+        buy_listing: function (a) {
+            var l = table('auction_listings').find(function (x) { return x.id === a.p_listing_id; });
+            if (!l || l.status !== 'active') return { data: null, error: { message: 'buy_listing: no longer for sale' } };
+            if (l.seller_player === userId) return { data: null, error: { message: 'buy_listing: that is your own listing' } };
+            var w = table('wallets')[0];
+            if (!w || w.gold < l.price) return { data: null, error: { message: 'buy_listing: insufficient gold' } };
+            w.gold -= l.price; l.status = 'sold'; l.buyer_player = userId;
+            table('player_items').push({ id: l.item_id || ('row-' + (nextRowId++)), player_id: userId, character_id: null, base_id: l.base_id, slot: l.slot, rarity: l.rarity, rolled_stats: clone(l.rolled_stats), set_key: l.set_key, item_level: l.item_level, req_level: l.req_level, equipped_slot: null, listed: false, locked: false });
+            return { data: clone(l), error: null };
+        },
+        cancel_listing: function (a) {
+            var l = table('auction_listings').find(function (x) { return x.id === a.p_listing_id && x.seller_player === userId && x.status === 'active'; });
+            if (!l) return { data: null, error: { message: 'cancel_listing: not your active listing' } };
+            l.status = 'cancelled';
+            var it = table('player_items').find(function (r) { return r.id === l.item_id; });
+            if (it) { it.listed = false; it.character_id = null; }
+            return { data: clone(l), error: null };
+        },
         lose_item_on_death: function () {
             var charId = table('players')[0].active_character_id;
             var worn = table('player_items').filter(function (r) { return r.equipped_slot && (!r.character_id || r.character_id === charId); });

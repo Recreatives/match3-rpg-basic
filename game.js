@@ -1717,6 +1717,7 @@ function toggleModal(modalId) {
             if (typeof renderShop === 'function') renderShop();
             if (typeof renderInventory === 'function') renderInventory();
         }
+        if (modalId === 'auction-modal' && typeof auctionOpen === 'function') auctionOpen();
         if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
             renderAchievements();
         }
