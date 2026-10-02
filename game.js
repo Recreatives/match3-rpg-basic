@@ -796,6 +796,8 @@ function generateRewards() {
 function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof trackEvent === 'function') trackEvent('solo_run_ended', { level, class: selectedClass ? selectedClass.name : null });
+    // the death penalty: one worn item is lost (economy.js loseItemOnDeath)
+    if (typeof loseItemOnDeath === 'function') loseItemOnDeath('solo', msg => log(msg, 'log-hit'));
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = t("OYUN BİTTİ");
     overlayBtn.innerText = t("TEKRAR DENE");

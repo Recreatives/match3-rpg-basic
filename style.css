@@ -1450,3 +1450,5 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 }
 @keyframes inv-flourish { 0% { opacity: 0; transform: scale(0.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
 @media (prefers-reduced-motion: reduce) { .inv-figure.flourish::after { animation: none; opacity: 0; } }
+
+.inv-death-note { grid-column: 1 / -1; color: #e8a0a0; }

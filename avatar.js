@@ -98,7 +98,7 @@ const AV_STANCES = {
     // full draw: the bow arm straight out at shoulder height, the string hand at the cheek
     archer: { front: 20, back: -30, crouch: 4, lean: 3, head: [1, 0], R: { to: [34, -4] }, L: { to: [58, -2] }, wAng: 6 },
     // upright and calm, feet close: staff planted at the side, the lead hand raised with its magic
-    mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: { to: [-6, 44] }, L: { to: [36, -8] }, wAng: -8 },
+    mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: { to: [10, 58] }, L: { to: [36, -8] }, wAng: -17 },
     // hunched, head low: scythe held diagonally, lantern hanging out front
     necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: { to: [18, 36] }, L: { to: [34, 44] }, wAng: -30 },
 };
@@ -149,7 +149,10 @@ function avIK(a, c, l, bendSign, bendAxis) {
     const dx = c[0] - a[0], dy = c[1] - a[1], d = Math.min(Math.hypot(dx, dy), 2 * l - 0.01);
     const mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2, h = Math.sqrt(Math.max(0, l * l - (d / 2) * (d / 2)));
     let px = dy / (d || 1), py = -dx / (d || 1);
-    const pick = bendAxis === 'y' ? py : px;
+    // 'bd': the elbow goes back-and-down (a natural elbow for every held
+    // arm; plain 'y' flipped a near-vertical arm forward - the mage's
+    // staff arm bent backwards)
+    const pick = bendAxis === 'bd' ? py - px : bendAxis === 'y' ? py : px;
     if (Math.sign(pick) !== bendSign) { px = -px; py = -py; }
     return [mx + px * h, my + py * h];
 }
@@ -212,7 +215,7 @@ function avArm(P, side) {
         const target = [ax + pose.to[0] * P.k, ay + pose.to[1] * P.k];
         const d = Math.hypot(target[0] - ax, target[1] - ay);
         if (d > 2 * len - 0.05) { const sc = (2 * len - 0.05) / d; target[0] = ax + (target[0] - ax) * sc; target[1] = ay + (target[1] - ay) * sc; }
-        [ex, ey] = pose.bend === 'back' ? avIK([ax, ay], target, len, -1, 'x') : avIK([ax, ay], target, len, 1, 'y');
+        [ex, ey] = pose.bend === 'back' ? avIK([ax, ay], target, len, -1, 'x') : avIK([ax, ay], target, len, 1, 'bd');
         [hx, hy] = target;
     } else if (pose === 'nock') {
         // the drawing hand rests on the string at the bow's grip, elbow down

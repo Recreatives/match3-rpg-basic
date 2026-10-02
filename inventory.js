@@ -148,6 +148,10 @@ function renderInventory() {
         d.textContent = `${p.isActive ? '✅' : '⏳'} ${t(p.name)} (${p.equippedCount}/${p.totalCount}) - ${t(p.bonusDesc)}`;
         stats.appendChild(d);
     });
+    const warn = document.createElement('p');
+    warn.className = 'inv-muted inv-death-note';
+    warn.textContent = t('⚠️ Solo koşuda ölür ya da PvP maçı kaybedersen kuşandığın eşyalardan biri rastgele kaybolur.');
+    stats.appendChild(warn);
     wrap.appendChild(stats);
 
     // --- bag / stash tabs, sort and filter

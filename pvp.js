@@ -683,6 +683,9 @@ function pvpOnDefeat() {
         setTimeout(() => fetchMyPvpRating().then(r => { if (r) pvpLog(tf('Derecen: {rating} ({wins}G/{losses}K)', { rating: r.rating, wins: r.wins, losses: r.losses })); }), 1200);
     }
     pvpLogBetrayalLossIfNeeded();
+    // the death penalty (a betrayal duel's loser already loses a worn item
+    // to the winner - resolve_betrayal - so that one isn't doubled)
+    if (!pvpBetrayalMode && typeof loseItemOnDeath === 'function') loseItemOnDeath('pvp', msg => pvpLog(msg));
 }
 
 function pvpLogBetrayalLossIfNeeded() {

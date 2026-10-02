@@ -192,13 +192,27 @@ do $$
 declare r record;
 begin
     select * into r from public.award_run_xp(1, 2);
-    if r.xp <> 60 or r.level <> 2 or not r.leveled_up then raise exception 'FAIL: award_run_xp(1,2) -> %', row_to_json(r); end if;
+    -- 30 + 9 per floor + 3 per kill; level 2 needs 80
+    if r.xp <> 45 or r.level <> 1 or r.leveled_up then raise exception 'FAIL: award_run_xp(1,2) -> %', row_to_json(r); end if;
 end $$;
 select tst.expect_error('select public.award_run_xp(1, 1)', 'too soon');
 select tst.expect_error('select public.award_run_xp(0, 1)', 'out of bounds');
 do $$ begin
-    if public.xp_total_for(2) <> 60 or public.xp_total_for(1) <> 0 then raise exception 'FAIL: xp curve'; end if;
+    if public.xp_total_for(2) <> 80 or public.xp_total_for(1) <> 0 then raise exception 'FAIL: xp curve'; end if;
 end $$;
+
+-- dying costs exactly one worn item, once per death
+do $$
+declare lost jsonb; before integer; after integer;
+begin
+    select count(*) into before from public.player_items where character_id = public.my_active_character() and equipped_slot is not null;
+    if before = 0 then raise exception 'FAIL: test needs a worn item'; end if;
+    lost := public.lose_item_on_death('solo');
+    select count(*) into after from public.player_items where character_id = public.my_active_character() and equipped_slot is not null;
+    if lost is null or after <> before - 1 then raise exception 'FAIL: death loss % -> % (%)', before, after, lost; end if;
+end $$;
+select tst.expect_error($q$select public.lose_item_on_death('pvp')$q$, 'too soon');
+select tst.expect_error($q$select public.lose_item_on_death('coop')$q$, 'unknown mode');
 
 -- a second character has its own (empty) purse
 do $$

@@ -657,6 +657,36 @@ async function lockItem(itemId, locked) {
     return true;
 }
 
+// Death penalty (v1.38, lose_item_on_death): dying in a solo run or losing
+// a PvP match destroys one random worn item. `mode` is 'solo' | 'pvp';
+// `logFn` writes the line into that mode's log. Returns the lost row.
+async function loseItemOnDeath(mode, logFn) {
+    if (typeof activeCharacter === 'undefined' || !activeCharacter) return null;
+    const { data, error } = await sb.rpc('lose_item_on_death', { p_mode: mode });
+    if (error) { console.warn('lose_item_on_death:', error.message); return null; }
+    if (!data) { if (logFn) logFn(t('💀 Öldün ama üzerinde kaybedecek eşya yoktu.')); return null; }
+    const lost = currentOwnedItems.find(it => it.id === data.id) || data;
+    currentOwnedItems = currentOwnedItems.filter(it => it.id !== data.id);
+    const info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(lost) : { name: lost.base_id, emoji: '' };
+    const rarity = typeof RARITY_DEFS !== 'undefined' ? RARITY_DEFS[lost.rarity] : null;
+    const msg = tf('💀 Ölümün bedeli: {emoji} {name} kayboldu.', { emoji: info.emoji, name: info.name });
+    if (logFn) logFn(msg);
+    const el = document.createElement('div');
+    el.className = 'achievement-toast';
+    if (rarity) el.style.borderColor = rarity.color;
+    const b = document.createElement('b');
+    b.textContent = t('💀 EŞYA KAYBEDİLDİ');
+    if (rarity) b.style.color = rarity.color;
+    el.append(b, document.createElement('br'), document.createTextNode(`${info.name}${rarity ? ' (' + t(rarity.label) + ')' : ''}`));
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), 10);
+    setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 4000);
+    if (typeof renderInventory === 'function') renderInventory();
+    if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+    return lost;
+}
+
 // --- SCRAP & UPGRADE ---------------------------------------------------------
 // Materials had no real source or sink before this - scrapping an unwanted,
 // unequipped item is now the main way to earn them (scrap_item, security

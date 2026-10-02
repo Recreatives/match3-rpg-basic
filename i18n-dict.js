@@ -548,4 +548,9 @@ const EN_DICT = {
     '🔒 Kilitle': '🔒 Lock',
     '🔓 Kilidi aç': '🔓 Unlock',
     'Kullanılabilir Puan: {n} (bu karakterin her 5 seviyesinde 1 puan, 50. seviyeden sonra her ustalık puanında 1 puan)': 'Available points: {n} (1 point every 5 levels of this character, 1 per mastery point after level 50)',
+    // death penalty (economy.js loseItemOnDeath)
+    '💀 Öldün ama üzerinde kaybedecek eşya yoktu.': '💀 You died, but had nothing on you to lose.',
+    '💀 Ölümün bedeli: {emoji} {name} kayboldu.': '💀 The price of death: {emoji} {name} is lost.',
+    '💀 EŞYA KAYBEDİLDİ': '💀 ITEM LOST',
+    '⚠️ Solo koşuda ölür ya da PvP maçı kaybedersen kuşandığın eşyalardan biri rastgele kaybolur.': '⚠️ If you die in a solo run or lose a PvP match, one of your worn items is lost at random.',
 };

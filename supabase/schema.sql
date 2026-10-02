@@ -2737,14 +2737,15 @@ $$;
 
 -- 30.5 levels --------------------------------------------------------------------------
 -- Total xp needed to reach a level (the client mirrors this curve in
--- characters.js): level 2 at 60 xp, level 10 at ~6.7k, level 50 at ~400k.
+-- characters.js): level 2 at 80 xp, level 10 at ~10.7k, level 50 at ~783k
+-- (made steeper in v1.38 - the first curve levelled too fast).
 -- Past 50, every 8000 xp is a mastery point.
 create or replace function public.xp_total_for(p_level integer)
 returns integer
 language sql
 immutable
 as $$
-    select coalesce(sum(round(60 * power(i, 1.5))), 0)::integer from generate_series(1, greatest(p_level, 1) - 1) as i;
+    select coalesce(sum(round(80 * power(i, 1.6))), 0)::integer from generate_series(1, greatest(p_level, 1) - 1) as i;
 $$;
 
 -- 30.6 character management ------------------------------------------------------------
@@ -2869,7 +2870,7 @@ begin
     if v_char.xp_awarded_at is not null and v_char.xp_awarded_at > now() - interval '3 seconds' then
         raise exception 'award_run_xp: too soon';
     end if;
-    v_gain := least(40 + p_floor * 12 + least(p_kills, 10) * 4, 800);
+    v_gain := least(30 + p_floor * 9 + least(p_kills, 10) * 3, 600);
     v_xp := v_char.xp + v_gain;
     v_level := v_char.level;
     while v_level < 50 and v_xp >= public.xp_total_for(v_level + 1) loop
@@ -3419,3 +3420,41 @@ as $$
     limit least(greatest(limit_count, 1), 100);
 $$;
 grant execute on function public.get_character_leaderboard(integer) to authenticated, anon;
+
+-- =====================================================================================
+-- 31. DEATH PENALTY (v1.38): dying costs one worn item
+-- =====================================================================================
+-- When the active character dies in a solo run or loses a PvP match, one
+-- of the items it is WEARING (chosen at random) is destroyed. Locked items
+-- are not safe - a lock only guards against selling / scrapping by
+-- accident. A betrayal duel doesn't call this: its loser already loses a
+-- worn item to the winner (resolve_betrayal). Rate-limited so one death
+-- can only ever cost one item.
+alter table public.characters add column if not exists death_loss_at timestamptz;
+
+create or replace function public.lose_item_on_death(p_mode text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_char public.characters;
+    v_item public.player_items;
+begin
+    if p_mode not in ('solo', 'pvp') then raise exception 'lose_item_on_death: unknown mode'; end if;
+    select * into v_char from public.characters c where c.id = public.my_active_character() for update;
+    if not found then raise exception 'no active character'; end if;
+    if v_char.death_loss_at is not null and v_char.death_loss_at > now() - interval '20 seconds' then
+        raise exception 'lose_item_on_death: too soon';
+    end if;
+    update public.characters set death_loss_at = now() where id = v_char.id;
+    select * into v_item from public.player_items
+        where character_id = v_char.id and equipped_slot is not null
+        order by random() limit 1;
+    if v_item.id is null then return null; end if;
+    delete from public.player_items where id = v_item.id;
+    return jsonb_build_object('id', v_item.id, 'base_id', v_item.base_id, 'slot', v_item.slot, 'rarity', v_item.rarity,
+        'set_key', v_item.set_key, 'item_level', v_item.item_level, 'equipped_slot', v_item.equipped_slot);
+end;
+$$;
+grant execute on function public.lose_item_on_death(text) to authenticated;
