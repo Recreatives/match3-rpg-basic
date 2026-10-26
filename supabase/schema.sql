@@ -101,9 +101,9 @@ drop policy if exists "read own player row" on public.players;
 create policy "read own player row" on public.players
     for select using (auth.uid() = id);
 
+-- (no update policy: every players column changes through a function -
+-- set_handle, set_equipped_title, select_character, ... - see section 35)
 drop policy if exists "update own player row" on public.players;
-create policy "update own player row" on public.players
-    for update using (auth.uid() = id);
 
 do $$
 begin
@@ -4534,3 +4534,1032 @@ begin
 end;
 $$;
 grant execute on function public.update_character_look(uuid, text, jsonb) to authenticated;
+
+-- =====================================================================================
+-- 35. HANDLES (v1.41): Name#1234
+-- =====================================================================================
+-- Every account has one handle: a name (3-16 letters, digits, _ ; Turkish
+-- letters too) and a 4-digit tag the server picks, e.g. "Hakan#4821". Many
+-- players can share a name; name + tag is unique. players.display_name
+-- carries the full "Name#1234" so every existing screen (leaderboards,
+-- friends, trades) shows it. The first name is free; after that one free
+-- change every 30 days, or pay 5,000 gold to change sooner.
+--
+-- Also closes a hole: the old "update own player row" policy let a client
+-- rewrite ANY column of its own players row (e.g. prestige_level). Every
+-- players column now changes through a function only.
+alter table public.players add column if not exists handle_name text;
+alter table public.players add column if not exists handle_tag integer;
+alter table public.players add column if not exists handle_changed_at timestamptz;
+alter table public.players add column if not exists msg_privacy text not null default 'friends_clan';
+alter table public.players drop constraint if exists players_msg_privacy_check;
+alter table public.players add constraint players_msg_privacy_check check (msg_privacy in ('friends', 'friends_clan', 'nobody'));
+create unique index if not exists players_handle_idx on public.players (lower(handle_name), handle_tag) where handle_name is not null;
+drop policy if exists "update own player row" on public.players;
+
+create or replace function public.handle_is_valid(p text)
+returns boolean
+language sql
+immutable
+as $$
+    select coalesce(p ~ '^[A-Za-z0-9_ÇĞİÖŞÜçğıöşü]{3,16}$', false)
+       and lower(p) not in ('admin', 'administrator', 'moderator', 'moderatör', 'mod', 'gm', 'gamemaster', 'system', 'sistem', 'support', 'destek', 'pixeldungeon', 'mub', 'yetkili', 'yonetici', 'yönetici')
+       and not public.contains_banned_word(p);
+$$;
+
+-- A free tag for a name (internal).
+create or replace function public.pick_handle_tag(p_name text)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v integer;
+begin
+    for i in 1..60 loop
+        v := 1000 + floor(random() * 9000)::integer;
+        if not exists (select 1 from public.players where lower(handle_name) = lower(p_name) and handle_tag = v) then return v; end if;
+    end loop;
+    select t into v from generate_series(1000, 9999) t
+        where not exists (select 1 from public.players where lower(handle_name) = lower(p_name) and handle_tag = t) limit 1;
+    if v is null then raise exception 'handle: that name is full, pick another'; end if;
+    return v;
+end;
+$$;
+revoke execute on function public.pick_handle_tag(text) from public, anon, authenticated;
+
+-- Sets / changes my handle. Returns "Name#1234".
+create or replace function public.set_handle(p_name text, p_pay boolean default false)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_name text := trim(coalesce(p_name, ''));
+    v_p public.players;
+    v_tag integer;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if not public.handle_is_valid(v_name) then raise exception 'handle: invalid name'; end if;
+    select * into v_p from public.players where id = v_me for update;
+    if v_p.handle_name is not null and v_p.handle_name = v_name then return v_p.handle_name || '#' || v_p.handle_tag; end if;
+    if v_p.handle_changed_at is not null and v_p.handle_changed_at > now() - interval '30 days' then
+        if not coalesce(p_pay, false) then
+            raise exception 'handle: next free change on %', to_char(v_p.handle_changed_at + interval '30 days', 'YYYY-MM-DD');
+        end if;
+        update public.characters set gold = gold - 5000, updated_at = now() where id = public.my_active_character() and gold >= 5000;
+        if not found then raise exception 'handle: insufficient gold'; end if;
+    end if;
+    v_tag := public.pick_handle_tag(v_name);
+    update public.players set handle_name = v_name, handle_tag = v_tag, handle_changed_at = now(), display_name = v_name || '#' || v_tag where id = v_me;
+    return v_name || '#' || v_tag;
+end;
+$$;
+grant execute on function public.set_handle(text, boolean) to authenticated;
+
+-- Everyone who already had a nickname keeps it, with a tag (and a free change).
+do $$
+declare
+    r record;
+    v_name text;
+begin
+    for r in select id, display_name from public.players where handle_name is null and display_name is not null and display_name !~ '#[0-9]{4}$' loop
+        v_name := left(regexp_replace(r.display_name, '[^A-Za-z0-9_ÇĞİÖŞÜçğıöşü]', '', 'g'), 16);
+        if not public.handle_is_valid(v_name) then v_name := 'Kahraman'; end if;
+        update public.players set handle_name = v_name, handle_tag = public.pick_handle_tag(v_name), handle_changed_at = null where id = r.id;
+        update public.players set display_name = handle_name || '#' || handle_tag where id = r.id;
+    end loop;
+end $$;
+
+-- "Name#1234" -> player id (internal; case-insensitive).
+create or replace function public.find_handle(p_handle text)
+returns uuid
+language sql
+stable
+security definer set search_path = public
+as $$
+    select id from public.players
+    where handle_name is not null and lower(handle_name || '#' || handle_tag) = lower(trim(coalesce(p_handle, '')))
+    limit 1;
+$$;
+revoke execute on function public.find_handle(text) from public, anon, authenticated;
+
+-- =====================================================================================
+-- 36. FRIENDS 2.0 (v1.41): blocks, removal, presence
+-- =====================================================================================
+create table if not exists public.player_blocks (
+    blocker_id uuid not null references public.players(id) on delete cascade,
+    blocked_id uuid not null references public.players(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    primary key (blocker_id, blocked_id),
+    check (blocker_id <> blocked_id)
+);
+alter table public.player_blocks enable row level security;
+drop policy if exists "read own blocks" on public.player_blocks;
+create policy "read own blocks" on public.player_blocks for select using (auth.uid() = blocker_id);
+
+create or replace function public.is_blocked_between(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.player_blocks where (blocker_id = a and blocked_id = b) or (blocker_id = b and blocked_id = a));
+$$;
+revoke execute on function public.is_blocked_between(uuid, uuid) from public, anon, authenticated;
+
+-- Where my friends are: refreshed by the client about once a minute.
+create table if not exists public.player_presence (
+    player_id  uuid primary key references public.players(id) on delete cascade,
+    last_seen  timestamptz not null default now(),
+    activity   text not null default 'town',
+    char_name  text,
+    char_class text,
+    char_level integer
+);
+alter table public.player_presence enable row level security;
+drop policy if exists "read own presence" on public.player_presence;
+create policy "read own presence" on public.player_presence for select using (auth.uid() = player_id);
+
+create or replace function public.touch_presence(p_activity text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.characters;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if p_activity !~ '^(town|dungeon(:[0-9]{1,3})?|pvp|coop)$' then raise exception 'touch_presence: unknown activity'; end if;
+    select * into v_c from public.characters c where c.id = public.my_active_character();
+    insert into public.player_presence (player_id, last_seen, activity, char_name, char_class, char_level)
+        values (v_me, now(), p_activity, v_c.name, v_c.class_key, v_c.level)
+    on conflict (player_id) do update set last_seen = now(), activity = excluded.activity, char_name = excluded.char_name,
+        char_class = excluded.char_class, char_level = excluded.char_level
+        where public.player_presence.last_seen < now() - interval '10 seconds' or public.player_presence.activity <> excluded.activity;
+end;
+$$;
+grant execute on function public.touch_presence(text) to authenticated;
+
+-- Friend requests now go by "Name#1234". Returns 'sent' / 'accepted' (they
+-- had already asked me) / 'already_exists' / 'not_found' / 'full' / 'self'.
+-- A block in either direction looks like 'not_found'.
+create or replace function public.send_friend_request(p_display_name text)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_target uuid;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    v_target := public.find_handle(p_display_name);
+    if v_target is null then
+        select id into v_target from public.players where lower(display_name) = lower(trim(coalesce(p_display_name, ''))) limit 1;
+    end if;
+    if v_target is null or public.is_blocked_between(v_me, v_target) then return 'not_found'; end if;
+    if v_target = v_me then return 'self'; end if;
+    if exists (select 1 from public.friendships where requester_id = v_target and addressee_id = v_me and status = 'pending') then
+        update public.friendships set status = 'accepted' where requester_id = v_target and addressee_id = v_me;
+        return 'accepted';
+    end if;
+    if exists (select 1 from public.friendships f where (f.requester_id = v_me and f.addressee_id = v_target) or (f.requester_id = v_target and f.addressee_id = v_me)) then
+        return 'already_exists';
+    end if;
+    if (select count(*) from public.friendships f where (f.requester_id = v_me or f.addressee_id = v_me) and f.status = 'accepted') >= 100 then return 'full'; end if;
+    insert into public.friendships (requester_id, addressee_id, status) values (v_me, v_target, 'pending');
+    return 'sent';
+end;
+$$;
+grant execute on function public.send_friend_request(text) to authenticated;
+
+create or replace function public.remove_friend(p_friend_id uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    delete from public.friendships
+    where (requester_id = auth.uid() and addressee_id = p_friend_id) or (requester_id = p_friend_id and addressee_id = auth.uid());
+$$;
+grant execute on function public.remove_friend(uuid) to authenticated;
+
+create or replace function public.block_player(p_target uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if auth.uid() is null or p_target is null or p_target = auth.uid() then raise exception 'block_player: invalid'; end if;
+    insert into public.player_blocks (blocker_id, blocked_id) values (auth.uid(), p_target) on conflict do nothing;
+    delete from public.friendships where (requester_id = auth.uid() and addressee_id = p_target) or (requester_id = p_target and addressee_id = auth.uid());
+end;
+$$;
+grant execute on function public.block_player(uuid) to authenticated;
+
+create or replace function public.unblock_player(p_target uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    delete from public.player_blocks where blocker_id = auth.uid() and blocked_id = p_target;
+$$;
+grant execute on function public.unblock_player(uuid) to authenticated;
+
+create or replace function public.get_blocked_list()
+returns table(player_id uuid, handle text, blocked_at timestamptz)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select b.blocked_id, coalesce(p.display_name, '?'), b.created_at
+    from public.player_blocks b join public.players p on p.id = b.blocked_id
+    where b.blocker_id = auth.uid() order by b.created_at desc;
+$$;
+grant execute on function public.get_blocked_list() to authenticated;
+
+-- =====================================================================================
+-- 37. MESSAGING 2.0 (v1.41)
+-- =====================================================================================
+alter table public.direct_messages add column if not exists read_at timestamptz;
+create index if not exists dm_pair_idx on public.direct_messages (least(sender_id, receiver_id), greatest(sender_id, receiver_id), created_at desc);
+create index if not exists dm_unread_idx on public.direct_messages (receiver_id) where read_at is null;
+
+-- (created in section 38; declared here so the messaging rules can see clan mates)
+create table if not exists public.clans (
+    id         uuid primary key default gen_random_uuid(),
+    name       text not null,
+    tag        text not null,
+    leader_id  uuid references public.players(id) on delete set null,
+    motd       text not null default '',
+    join_mode  text not null default 'apply' check (join_mode in ('open', 'apply', 'invite')),
+    xp         integer not null default 0,
+    crest      jsonb not null default '{"c1": "#8e1b1b", "c2": "#d4a84a", "sym": "lion"}'::jsonb,
+    created_at timestamptz not null default now()
+);
+create unique index if not exists clans_name_idx on public.clans (lower(name));
+create unique index if not exists clans_tag_idx on public.clans (upper(tag));
+create table if not exists public.clan_members (
+    player_id uuid primary key references public.players(id) on delete cascade,
+    clan_id   uuid not null references public.clans(id) on delete cascade,
+    rank      text not null default 'recruit' check (rank in ('leader', 'officer', 'member', 'recruit')),
+    joined_at timestamptz not null default now(),
+    xp_day    date,
+    xp_today  integer not null default 0
+);
+create index if not exists clan_members_clan_idx on public.clan_members (clan_id);
+
+create or replace function public.same_clan(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.clan_members x join public.clan_members y on y.clan_id = x.clan_id where x.player_id = a and y.player_id = b);
+$$;
+revoke execute on function public.same_clan(uuid, uuid) from public, anon, authenticated;
+
+create or replace function public.are_friends(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.friendships f where f.status = 'accepted'
+        and ((f.requester_id = a and f.addressee_id = b) or (f.requester_id = b and f.addressee_id = a)));
+$$;
+revoke execute on function public.are_friends(uuid, uuid) from public, anon, authenticated;
+
+-- May `a` write to `b`? Not blocked, and b's privacy setting allows it.
+create or replace function public.can_message(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select a <> b and not public.is_blocked_between(a, b)
+       and case (select msg_privacy from public.players where id = b)
+           when 'nobody' then false
+           when 'friends' then public.are_friends(a, b)
+           else public.are_friends(a, b) or public.same_clan(a, b) end;
+$$;
+revoke execute on function public.can_message(uuid, uuid) from public, anon, authenticated;
+
+create or replace function public.set_message_privacy(p_mode text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if p_mode not in ('friends', 'friends_clan', 'nobody') then raise exception 'set_message_privacy: unknown mode'; end if;
+    update public.players set msg_privacy = p_mode where id = auth.uid();
+end;
+$$;
+grant execute on function public.set_message_privacy(text) to authenticated;
+
+create or replace function public.send_direct_message(p_receiver_id uuid, p_body text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_body text := trim(coalesce(p_body, ''));
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if v_body = '' or char_length(v_body) > 500 then raise exception 'invalid message'; end if;
+    if v_me = p_receiver_id then raise exception 'cannot message yourself'; end if;
+    if not public.can_message(v_me, p_receiver_id) then raise exception 'not allowed to message this player'; end if;
+    if (select count(*) from public.direct_messages where sender_id = v_me and created_at > now() - interval '10 seconds') >= 8 then
+        raise exception 'slow down';
+    end if;
+    if public.contains_banned_word(v_body) then raise exception 'message not allowed'; end if;
+    insert into public.direct_messages (sender_id, receiver_id, body) values (v_me, p_receiver_id, v_body);
+    -- keep the newest 200 of a conversation
+    delete from public.direct_messages d where d.id in (
+        select id from public.direct_messages
+        where least(sender_id, receiver_id) = least(v_me, p_receiver_id) and greatest(sender_id, receiver_id) = greatest(v_me, p_receiver_id)
+        order by created_at desc offset 200);
+end;
+$$;
+grant execute on function public.send_direct_message(uuid, text) to authenticated;
+
+-- My conversations: partner, last message, unread count.
+create or replace function public.get_conversations()
+returns table(partner_id uuid, handle text, last_body text, last_at timestamptz, last_from_me boolean, unread integer)
+language sql
+stable
+security definer set search_path = public
+as $$
+    with mine as (
+        select case when d.sender_id = auth.uid() then d.receiver_id else d.sender_id end as partner, d.*
+        from public.direct_messages d where d.sender_id = auth.uid() or d.receiver_id = auth.uid()
+    ), last as (
+        select distinct on (partner) partner, body, created_at, (sender_id = auth.uid()) as from_me from mine order by partner, created_at desc
+    )
+    select l.partner, coalesce(p.display_name, '?'), l.body, l.created_at, l.from_me,
+        (select count(*)::integer from mine m where m.partner = l.partner and m.receiver_id = auth.uid() and m.read_at is null)
+    from last l join public.players p on p.id = l.partner
+    order by l.created_at desc limit 50;
+$$;
+grant execute on function public.get_conversations() to authenticated;
+
+create or replace function public.mark_conversation_read(p_partner uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    update public.direct_messages set read_at = now() where receiver_id = auth.uid() and sender_id = p_partner and read_at is null;
+$$;
+grant execute on function public.mark_conversation_read(uuid) to authenticated;
+
+-- Live delivery: Supabase Realtime streams new rows to their receiver (RLS
+-- decides who sees what). Only when the publication exists (not on plain
+-- Postgres in CI).
+do $$
+begin
+    if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        begin alter publication supabase_realtime add table public.direct_messages; exception when duplicate_object then null; end;
+    end if;
+end $$;
+
+-- =====================================================================================
+-- 38. CLANS (v1.41), replacing guilds
+-- =====================================================================================
+-- Founding a clan takes a level 20 character and 5,000 gold. A clan has a
+-- name, a 2-4 letter tag shown as [TAG] next to its members, a join mode
+-- (open / apply / invite), ranks (leader, officer, member, recruit - a
+-- recruit becomes a member after 3 days), a message of the day, a chat, a
+-- log, a crest (shown on capes, tabards and shields) and a level that its
+-- members' dungeon runs raise. Members: 20, plus 4 per clan level (max 50).
+alter table public.clans enable row level security;
+drop policy if exists "browse clans" on public.clans;
+create policy "browse clans" on public.clans for select using (auth.uid() is not null);
+alter table public.clan_members enable row level security;
+drop policy if exists "read own clan members" on public.clan_members;
+create policy "read own clan members" on public.clan_members for select using (public.same_clan(auth.uid(), player_id));
+
+create table if not exists public.clan_applications (
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    player_id  uuid not null references public.players(id) on delete cascade,
+    message    text not null default '',
+    created_at timestamptz not null default now(),
+    primary key (clan_id, player_id)
+);
+create table if not exists public.clan_invites (
+    clan_id     uuid not null references public.clans(id) on delete cascade,
+    player_id   uuid not null references public.players(id) on delete cascade,
+    from_player uuid references public.players(id) on delete set null,
+    created_at  timestamptz not null default now(),
+    primary key (clan_id, player_id)
+);
+create table if not exists public.clan_log (
+    id         bigserial primary key,
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    text       text not null
+);
+create table if not exists public.clan_messages (
+    id         uuid primary key default gen_random_uuid(),
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    sender_id  uuid references public.players(id) on delete set null,
+    sender     text,
+    body       text not null check (char_length(body) between 1 and 300),
+    created_at timestamptz not null default now()
+);
+create index if not exists clan_messages_idx on public.clan_messages (clan_id, created_at desc);
+alter table public.clan_applications enable row level security;
+alter table public.clan_invites enable row level security;
+alter table public.clan_log enable row level security;
+alter table public.clan_messages enable row level security;
+drop policy if exists "read own clan chat" on public.clan_messages;
+create policy "read own clan chat" on public.clan_messages for select
+    using (exists (select 1 from public.clan_members m where m.player_id = auth.uid() and m.clan_id = clan_messages.clan_id));
+do $$
+begin
+    if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        begin alter publication supabase_realtime add table public.clan_messages; exception when duplicate_object then null; end;
+    end if;
+end $$;
+
+create or replace function public.clan_rank_value(p text)
+returns integer
+language sql
+immutable
+as $$ select case p when 'leader' then 4 when 'officer' then 3 when 'member' then 2 when 'recruit' then 1 else 0 end; $$;
+
+create or replace function public.clan_level_of(p_xp integer)
+returns integer
+language sql
+immutable
+as $$ select least(10, 1 + floor(sqrt(greatest(p_xp, 0) / 1000.0))::integer); $$;
+
+create or replace function public.clan_cap_of(p_xp integer)
+returns integer
+language sql
+immutable
+as $$ select least(50, 20 + (public.clan_level_of(p_xp) - 1) * 4); $$;
+
+create or replace function public.clan_log_add(p_clan uuid, p_text text)
+returns void
+language sql
+security definer set search_path = public
+as $$ insert into public.clan_log (clan_id, text) values (p_clan, left(p_text, 200)); $$;
+revoke execute on function public.clan_log_add(uuid, text) from public, anon, authenticated;
+
+-- My clan membership (internal).
+create or replace function public.my_clan_member()
+returns public.clan_members
+language sql
+stable
+security definer set search_path = public
+as $$ select * from public.clan_members where player_id = auth.uid(); $$;
+revoke execute on function public.my_clan_member() from public, anon, authenticated;
+
+create or replace function public.create_clan(p_name text, p_tag text)
+returns public.clans
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_name text := trim(coalesce(p_name, ''));
+    v_tag text := upper(trim(coalesce(p_tag, '')));
+    v_char public.characters;
+    v_row public.clans;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'create_clan: already in a clan'; end if;
+    if v_name !~ '^[A-Za-z0-9ÇĞİÖŞÜçğıöşü ]{3,24}$' or public.contains_banned_word(v_name) then raise exception 'create_clan: invalid name'; end if;
+    if v_tag !~ '^[A-Z0-9]{2,4}$' or public.contains_banned_word(v_tag) then raise exception 'create_clan: invalid tag'; end if;
+    if exists (select 1 from public.clans where lower(name) = lower(v_name)) then raise exception 'create_clan: name taken'; end if;
+    if exists (select 1 from public.clans where upper(tag) = v_tag) then raise exception 'create_clan: tag taken'; end if;
+    select * into v_char from public.characters c where c.id = public.my_active_character() for update;
+    if not found then raise exception 'no active character'; end if;
+    if v_char.level < 20 then raise exception 'create_clan: requires a level 20 character'; end if;
+    update public.characters set gold = gold - 5000, updated_at = now() where id = v_char.id and gold >= 5000;
+    if not found then raise exception 'create_clan: insufficient gold'; end if;
+    insert into public.clans (name, tag, leader_id) values (v_name, v_tag, v_me) returning * into v_row;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_row.id, 'leader');
+    delete from public.clan_applications where player_id = v_me;
+    delete from public.clan_invites where player_id = v_me;
+    perform public.clan_log_add(v_row.id, 'kuruldu');
+    return v_row;
+end;
+$$;
+grant execute on function public.create_clan(text, text) to authenticated;
+
+create or replace function public.get_clan_list(p_search text default null)
+returns table(id uuid, name text, tag text, level integer, members integer, cap integer, join_mode text, crest jsonb, motd text)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select c.id, c.name, c.tag, public.clan_level_of(c.xp), (select count(*)::integer from public.clan_members m where m.clan_id = c.id),
+        public.clan_cap_of(c.xp), c.join_mode, c.crest, c.motd
+    from public.clans c
+    where p_search is null or p_search = '' or c.name ilike '%' || p_search || '%' or c.tag ilike p_search
+    order by c.xp desc, c.created_at limit 50;
+$$;
+grant execute on function public.get_clan_list(text) to authenticated;
+
+-- Everything about my clan in one call (recruits past 3 days become members).
+create or replace function public.get_my_clan()
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members;
+    v_c public.clans;
+begin
+    select * into v_m from public.clan_members where player_id = auth.uid();
+    if not found then return null; end if;
+    update public.clan_members set rank = 'member' where clan_id = v_m.clan_id and rank = 'recruit' and joined_at < now() - interval '3 days';
+    select * into v_c from public.clans where id = v_m.clan_id;
+    select * into v_m from public.clan_members where player_id = auth.uid();
+    return jsonb_build_object(
+        'clan', jsonb_build_object('id', v_c.id, 'name', v_c.name, 'tag', v_c.tag, 'motd', v_c.motd, 'join_mode', v_c.join_mode, 'crest', v_c.crest,
+            'xp', v_c.xp, 'level', public.clan_level_of(v_c.xp), 'cap', public.clan_cap_of(v_c.xp),
+            'next_level_xp', case when public.clan_level_of(v_c.xp) >= 10 then null else 1000 * public.clan_level_of(v_c.xp) * public.clan_level_of(v_c.xp) end),
+        'me', jsonb_build_object('rank', v_m.rank),
+        'members', coalesce((select jsonb_agg(jsonb_build_object('player_id', m.player_id, 'handle', p.display_name, 'rank', m.rank, 'joined_at', m.joined_at,
+                'last_seen', pr.last_seen, 'activity', pr.activity, 'char_name', pr.char_name, 'char_class', pr.char_class, 'char_level', pr.char_level)
+                order by public.clan_rank_value(m.rank) desc, m.joined_at)
+            from public.clan_members m join public.players p on p.id = m.player_id left join public.player_presence pr on pr.player_id = m.player_id
+            where m.clan_id = v_c.id), '[]'::jsonb),
+        'applications', case when public.clan_rank_value(v_m.rank) >= 3 then coalesce((select jsonb_agg(jsonb_build_object('player_id', a.player_id, 'handle', p.display_name, 'message', a.message, 'at', a.created_at) order by a.created_at)
+            from public.clan_applications a join public.players p on p.id = a.player_id where a.clan_id = v_c.id), '[]'::jsonb) else '[]'::jsonb end,
+        'log', coalesce((select jsonb_agg(jsonb_build_object('at', l.created_at, 'text', l.text) order by l.created_at desc)
+            from (select * from public.clan_log where clan_id = v_c.id order by created_at desc limit 30) l), '[]'::jsonb));
+end;
+$$;
+grant execute on function public.get_my_clan() to authenticated;
+
+-- Join an open clan, or apply to one that reviews applications.
+create or replace function public.join_clan(p_clan_id uuid, p_message text default '')
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.clans;
+begin
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'join_clan: already in a clan'; end if;
+    select * into v_c from public.clans where id = p_clan_id for update;
+    if not found then raise exception 'join_clan: no such clan'; end if;
+    if v_c.join_mode = 'invite' then raise exception 'join_clan: invite only'; end if;
+    if v_c.join_mode = 'apply' then
+        insert into public.clan_applications (clan_id, player_id, message) values (v_c.id, v_me, left(coalesce(p_message, ''), 200))
+            on conflict (clan_id, player_id) do update set message = excluded.message, created_at = now();
+        return 'applied';
+    end if;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'join_clan: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = v_me;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = v_me) || ' katıldı');
+    return 'joined';
+end;
+$$;
+grant execute on function public.join_clan(uuid, text) to authenticated;
+
+create or replace function public.invite_to_clan(p_player uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 2 then raise exception 'invite_to_clan: not allowed'; end if;
+    if p_player is null or public.is_blocked_between(auth.uid(), p_player) then raise exception 'invite_to_clan: not allowed'; end if;
+    if exists (select 1 from public.clan_members where player_id = p_player) then raise exception 'invite_to_clan: already in a clan'; end if;
+    insert into public.clan_invites (clan_id, player_id, from_player) values (v_m.clan_id, p_player, auth.uid())
+        on conflict (clan_id, player_id) do update set created_at = now(), from_player = excluded.from_player;
+end;
+$$;
+grant execute on function public.invite_to_clan(uuid) to authenticated;
+
+create or replace function public.respond_clan_invite(p_clan_id uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.clans;
+begin
+    delete from public.clan_invites where clan_id = p_clan_id and player_id = v_me;
+    if not found then raise exception 'respond_clan_invite: no such invite'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'respond_clan_invite: already in a clan'; end if;
+    select * into v_c from public.clans where id = p_clan_id for update;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'respond_clan_invite: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = v_me;
+    delete from public.clan_invites where player_id = v_me;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = v_me) || ' katıldı (davetle)');
+end;
+$$;
+grant execute on function public.respond_clan_invite(uuid, boolean) to authenticated;
+
+-- Officers and the leader accept / turn down applications.
+create or replace function public.review_clan_application(p_player uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_c public.clans;
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 3 then raise exception 'review_clan_application: not allowed'; end if;
+    delete from public.clan_applications where clan_id = v_m.clan_id and player_id = p_player;
+    if not found then raise exception 'review_clan_application: no such application'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if exists (select 1 from public.clan_members where player_id = p_player) then raise exception 'review_clan_application: already in a clan'; end if;
+    select * into v_c from public.clans where id = v_m.clan_id for update;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'review_clan_application: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (p_player, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = p_player;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = p_player) || ' katıldı (başvuru)');
+end;
+$$;
+grant execute on function public.review_clan_application(uuid, boolean) to authenticated;
+
+-- Officers remove recruits / members; the leader anyone.
+create or replace function public.kick_clan_member(p_player uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_t public.clan_members;
+begin
+    select * into v_t from public.clan_members where player_id = p_player;
+    if v_m.player_id is null or v_t.player_id is null or v_t.clan_id <> v_m.clan_id or p_player = auth.uid() then raise exception 'kick_clan_member: not allowed'; end if;
+    if not (v_m.rank = 'leader' or (v_m.rank = 'officer' and v_t.rank in ('member', 'recruit'))) then raise exception 'kick_clan_member: not allowed'; end if;
+    delete from public.clan_members where player_id = p_player;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = p_player) || ' çıkarıldı');
+end;
+$$;
+grant execute on function public.kick_clan_member(uuid) to authenticated;
+
+-- The leader sets ranks; making someone leader hands the clan over.
+create or replace function public.set_clan_rank(p_player uuid, p_rank text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or v_m.rank <> 'leader' or p_player = auth.uid() then raise exception 'set_clan_rank: not allowed'; end if;
+    if p_rank not in ('leader', 'officer', 'member', 'recruit') then raise exception 'set_clan_rank: unknown rank'; end if;
+    update public.clan_members set rank = p_rank where player_id = p_player and clan_id = v_m.clan_id;
+    if not found then raise exception 'set_clan_rank: not a member'; end if;
+    if p_rank = 'leader' then
+        update public.clan_members set rank = 'officer' where player_id = auth.uid();
+        update public.clans set leader_id = p_player where id = v_m.clan_id;
+    end if;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = p_player) || ' → ' || p_rank);
+end;
+$$;
+grant execute on function public.set_clan_rank(uuid, text) to authenticated;
+
+-- Leaving: a leaving leader hands over to the highest-ranked, longest member;
+-- the last one out closes the clan.
+create or replace function public.leave_clan()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_next uuid;
+begin
+    if v_m.player_id is null then raise exception 'leave_clan: not in a clan'; end if;
+    delete from public.clan_members where player_id = auth.uid();
+    if v_m.rank = 'leader' then
+        select player_id into v_next from public.clan_members where clan_id = v_m.clan_id order by public.clan_rank_value(rank) desc, joined_at limit 1;
+        if v_next is null then delete from public.clans where id = v_m.clan_id; return; end if;
+        update public.clan_members set rank = 'leader' where player_id = v_next;
+        update public.clans set leader_id = v_next where id = v_m.clan_id;
+    end if;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = auth.uid()) || ' ayrıldı');
+end;
+$$;
+grant execute on function public.leave_clan() to authenticated;
+
+-- Officers set the message of the day; the leader also the join mode and crest.
+create or replace function public.set_clan_settings(p_motd text default null, p_join_mode text default null, p_crest jsonb default null)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 3 then raise exception 'set_clan_settings: not allowed'; end if;
+    if p_motd is not null then
+        if public.contains_banned_word(p_motd) then raise exception 'set_clan_settings: not allowed text'; end if;
+        update public.clans set motd = left(trim(p_motd), 200) where id = v_m.clan_id;
+    end if;
+    if p_join_mode is not null or p_crest is not null then
+        if v_m.rank <> 'leader' then raise exception 'set_clan_settings: leader only'; end if;
+        if p_join_mode is not null then
+            if p_join_mode not in ('open', 'apply', 'invite') then raise exception 'set_clan_settings: unknown join mode'; end if;
+            update public.clans set join_mode = p_join_mode where id = v_m.clan_id;
+        end if;
+        if p_crest is not null then
+            update public.clans set crest = jsonb_build_object(
+                'c1', case when p_crest->>'c1' ~ '^#[0-9a-fA-F]{6}$' then p_crest->>'c1' else '#8e1b1b' end,
+                'c2', case when p_crest->>'c2' ~ '^#[0-9a-fA-F]{6}$' then p_crest->>'c2' else '#d4a84a' end,
+                'sym', case when p_crest->>'sym' in ('lion', 'wolf', 'skull', 'star', 'tower', 'axe', 'eagle', 'moon') then p_crest->>'sym' else 'lion' end)
+                where id = v_m.clan_id;
+        end if;
+    end if;
+end;
+$$;
+grant execute on function public.set_clan_settings(text, text, jsonb) to authenticated;
+
+create or replace function public.send_clan_message(p_body text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_body text := trim(coalesce(p_body, ''));
+begin
+    if v_m.player_id is null then raise exception 'send_clan_message: not in a clan'; end if;
+    if v_body = '' or char_length(v_body) > 300 then raise exception 'invalid message'; end if;
+    if public.contains_banned_word(v_body) then raise exception 'message not allowed'; end if;
+    if (select count(*) from public.clan_messages where sender_id = auth.uid() and created_at > now() - interval '10 seconds') >= 6 then raise exception 'slow down'; end if;
+    insert into public.clan_messages (clan_id, sender_id, sender, body)
+        values (v_m.clan_id, auth.uid(), (select display_name from public.players where id = auth.uid()), v_body);
+    delete from public.clan_messages where id in (select id from public.clan_messages where clan_id = v_m.clan_id order by created_at desc offset 300);
+end;
+$$;
+grant execute on function public.send_clan_message(text) to authenticated;
+
+create or replace function public.get_clan_messages(p_limit integer default 60)
+returns table(sender text, sender_id uuid, body text, created_at timestamptz)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select * from (
+        select m.sender, m.sender_id, m.body, m.created_at from public.clan_messages m
+        where m.clan_id = (select clan_id from public.clan_members where player_id = auth.uid())
+        order by m.created_at desc limit least(greatest(coalesce(p_limit, 60), 1), 200)) x
+    order by created_at;
+$$;
+grant execute on function public.get_clan_messages(integer) to authenticated;
+
+-- Clan experience: a member's dungeon run adds its floors x 10 to the clan,
+-- at most 300 per member per day (internal).
+create or replace function public.add_clan_xp(p_player uuid, p_amount integer)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members;
+    v_add integer;
+begin
+    select * into v_m from public.clan_members where player_id = p_player for update;
+    if not found or p_amount <= 0 then return; end if;
+    if v_m.xp_day is distinct from current_date then v_m.xp_today := 0; end if;
+    v_add := least(p_amount, greatest(0, 300 - v_m.xp_today));
+    if v_add <= 0 then return; end if;
+    update public.clan_members set xp_day = current_date, xp_today = v_m.xp_today + v_add where player_id = p_player;
+    update public.clans set xp = xp + v_add where id = v_m.clan_id;
+end;
+$$;
+revoke execute on function public.add_clan_xp(uuid, integer) from public, anon, authenticated;
+
+-- close_run (section 32) again, now also feeding the clan.
+create or replace function public.close_run(p_run public.dungeon_runs, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_paid integer;
+    v_xp record;
+    v_pen jsonb := '{}'::jsonb;
+begin
+    v_paid := case when p_outcome = 'exit' then p_run.pending_xp else p_run.pending_xp / 2 end;
+    update public.dungeon_runs set ended_at = now(), outcome = p_outcome where id = p_run.id;
+    select * into v_xp from public.grant_character_xp(p_run.character_id, v_paid);
+    if p_outcome <> 'exit' then v_pen := public.apply_death_penalty(p_run.character_id); end if;
+    perform public.add_clan_xp((select player_id from public.characters where id = p_run.character_id), p_run.floor * 10);
+    return jsonb_build_object('outcome', p_outcome, 'floor', p_run.floor, 'banked_xp', p_run.pending_xp, 'xp_granted', v_paid,
+        'level', v_xp.level, 'xp', v_xp.xp, 'mastery', v_xp.mastery, 'leveled_up', coalesce(v_xp.leveled_up, false)) || v_pen;
+end;
+$$;
+revoke execute on function public.close_run(public.dungeon_runs, text) from public, anon, authenticated;
+
+-- Guilds become clans (once): owner -> leader, tag from the name.
+do $$
+declare
+    g record;
+    v_tag text;
+    v_id uuid;
+    i integer;
+begin
+    if (select count(*) from public.clans) > 0 or to_regclass('public.guilds') is null then return; end if;
+    for g in select * from public.guilds loop
+        v_tag := left(upper(regexp_replace(g.name, '[^A-Za-z0-9]', '', 'g')), 3);
+        if char_length(v_tag) < 2 then v_tag := 'KL'; end if;
+        i := 1;
+        while exists (select 1 from public.clans where upper(tag) = v_tag) loop v_tag := left(v_tag, 3) || i; i := i + 1; end loop;
+        insert into public.clans (name, tag, leader_id) values (left(g.name, 24), v_tag, g.owner_id) returning id into v_id;
+        insert into public.clan_members (player_id, clan_id, rank, joined_at)
+            select gm.player_id, v_id, case when gm.player_id = g.owner_id then 'leader' else 'member' end, gm.joined_at
+            from public.guild_members gm where gm.guild_id = g.id
+            on conflict (player_id) do nothing;
+    end loop;
+end $$;
+
+-- =====================================================================================
+-- 39. PARTY (v1.41): two players, straight into co-op together
+-- =====================================================================================
+create table if not exists public.parties (
+    id         uuid primary key default gen_random_uuid(),
+    leader_id  uuid not null references public.players(id) on delete cascade,
+    coop_code  text,
+    created_at timestamptz not null default now()
+);
+create table if not exists public.party_members (
+    player_id uuid primary key references public.players(id) on delete cascade,
+    party_id  uuid not null references public.parties(id) on delete cascade,
+    joined_at timestamptz not null default now()
+);
+create table if not exists public.party_invites (
+    id          uuid primary key default gen_random_uuid(),
+    party_id    uuid not null references public.parties(id) on delete cascade,
+    from_player uuid not null references public.players(id) on delete cascade,
+    to_player   uuid not null references public.players(id) on delete cascade,
+    created_at  timestamptz not null default now()
+);
+alter table public.parties enable row level security;
+alter table public.party_members enable row level security;
+alter table public.party_invites enable row level security;
+
+create or replace function public.leave_party()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_pm public.party_members;
+    v_next uuid;
+begin
+    select * into v_pm from public.party_members where player_id = auth.uid();
+    if not found then return; end if;
+    delete from public.party_members where player_id = auth.uid();
+    select player_id into v_next from public.party_members where party_id = v_pm.party_id order by joined_at limit 1;
+    if v_next is null then delete from public.parties where id = v_pm.party_id;
+    else update public.parties set leader_id = v_next, coop_code = null where id = v_pm.party_id; end if;
+end;
+$$;
+grant execute on function public.leave_party() to authenticated;
+
+-- Invite a friend or clan mate (2 per party; the invite lasts 2 minutes).
+create or replace function public.invite_to_party(p_player uuid)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_party uuid;
+    v_id uuid;
+begin
+    if v_me is null or p_player is null or p_player = v_me then raise exception 'invite_to_party: invalid'; end if;
+    if public.is_blocked_between(v_me, p_player) or not (public.are_friends(v_me, p_player) or public.same_clan(v_me, p_player)) then
+        raise exception 'invite_to_party: friends and clan mates only';
+    end if;
+    select party_id into v_party from public.party_members where player_id = v_me;
+    if v_party is null then
+        insert into public.parties (leader_id) values (v_me) returning id into v_party;
+        insert into public.party_members (player_id, party_id) values (v_me, v_party);
+    end if;
+    if (select count(*) from public.party_members where party_id = v_party) >= 2 then raise exception 'invite_to_party: party is full'; end if;
+    delete from public.party_invites where party_id = v_party and to_player = p_player;
+    insert into public.party_invites (party_id, from_player, to_player) values (v_party, v_me, p_player) returning id into v_id;
+    return v_id;
+end;
+$$;
+grant execute on function public.invite_to_party(uuid) to authenticated;
+
+create or replace function public.respond_party_invite(p_invite uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_inv public.party_invites;
+begin
+    delete from public.party_invites where id = p_invite and to_player = auth.uid() returning * into v_inv;
+    if v_inv.id is null then raise exception 'respond_party_invite: no such invite'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if v_inv.created_at < now() - interval '2 minutes' then raise exception 'respond_party_invite: the invite expired'; end if;
+    if not exists (select 1 from public.parties where id = v_inv.party_id) then raise exception 'respond_party_invite: the party is gone'; end if;
+    if (select count(*) from public.party_members where party_id = v_inv.party_id) >= 2 then raise exception 'respond_party_invite: party is full'; end if;
+    perform public.leave_party();
+    insert into public.party_members (player_id, party_id) values (auth.uid(), v_inv.party_id);
+end;
+$$;
+grant execute on function public.respond_party_invite(uuid, boolean) to authenticated;
+
+create or replace function public.get_my_party()
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+    select case when pm.party_id is null then null else jsonb_build_object(
+        'party_id', p.id, 'leader_id', p.leader_id, 'coop_code', p.coop_code,
+        'members', (select jsonb_agg(jsonb_build_object('player_id', m.player_id, 'handle', pl.display_name, 'char_name', pr.char_name,
+                'char_class', pr.char_class, 'char_level', pr.char_level, 'last_seen', pr.last_seen, 'activity', pr.activity) order by m.joined_at)
+            from public.party_members m join public.players pl on pl.id = m.player_id left join public.player_presence pr on pr.player_id = m.player_id
+            where m.party_id = p.id)) end
+    from (select auth.uid() as me) x
+    left join public.party_members pm on pm.player_id = x.me
+    left join public.parties p on p.id = pm.party_id;
+$$;
+grant execute on function public.get_my_party() to authenticated;
+
+-- The leader starts co-op: a fresh room code both clients join.
+create or replace function public.party_start_coop()
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_code text := 'P' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 5));
+begin
+    update public.parties set coop_code = v_code where leader_id = auth.uid();
+    if not found then raise exception 'party_start_coop: only the party leader'; end if;
+    return v_code;
+end;
+$$;
+grant execute on function public.party_start_coop() to authenticated;
+
+-- =====================================================================================
+-- 40. SOCIAL LISTS AND NOTIFICATIONS (v1.41)
+-- =====================================================================================
+-- My friends and requests with where they are, their clan tag and unread
+-- messages.
+create or replace function public.get_social_list()
+returns table(friend_id uuid, handle text, status text, incoming boolean, last_seen timestamptz, activity text,
+    char_name text, char_class text, char_level integer, clan_tag text, unread integer)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select o.other, coalesce(p.display_name, '?'), f.status, (f.status = 'pending' and f.addressee_id = auth.uid()),
+        pr.last_seen, pr.activity, pr.char_name, pr.char_class, pr.char_level, c.tag,
+        (select count(*)::integer from public.direct_messages d where d.receiver_id = auth.uid() and d.sender_id = o.other and d.read_at is null)
+    from public.friendships f
+    cross join lateral (select case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end as other) o
+    join public.players p on p.id = o.other
+    left join public.player_presence pr on pr.player_id = o.other
+    left join public.clan_members cm on cm.player_id = o.other
+    left join public.clans c on c.id = cm.clan_id
+    where f.requester_id = auth.uid() or f.addressee_id = auth.uid()
+    order by (f.status = 'pending') desc, pr.last_seen desc nulls last;
+$$;
+grant execute on function public.get_social_list() to authenticated;
+
+-- Everything waiting for me, for the town's bell.
+create or replace function public.get_notifications(p_since timestamptz default null)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+    select jsonb_build_object(
+        'friend_requests', (select count(*) from public.friendships where addressee_id = auth.uid() and status = 'pending'),
+        'unread_messages', (select count(*) from public.direct_messages where receiver_id = auth.uid() and read_at is null),
+        'party_invites', coalesce((select jsonb_agg(jsonb_build_object('id', i.id, 'from', p.display_name, 'at', i.created_at) order by i.created_at desc)
+            from public.party_invites i join public.players p on p.id = i.from_player
+            where i.to_player = auth.uid() and i.created_at > now() - interval '2 minutes'), '[]'::jsonb),
+        'clan_invites', coalesce((select jsonb_agg(jsonb_build_object('clan_id', c.id, 'name', c.name, 'tag', c.tag, 'from', p.display_name))
+            from public.clan_invites ci join public.clans c on c.id = ci.clan_id left join public.players p on p.id = ci.from_player
+            where ci.player_id = auth.uid()), '[]'::jsonb),
+        'clan_applications', (select count(*) from public.clan_applications a join public.clan_members m on m.clan_id = a.clan_id
+            where m.player_id = auth.uid() and m.rank in ('leader', 'officer')),
+        'sold', coalesce((select jsonb_agg(jsonb_build_object('base_id', l.base_id, 'rarity', l.rarity, 'price', l.price, 'at', l.closed_at))
+            from public.auction_listings l where l.seller_player = auth.uid() and l.status = 'sold' and l.closed_at > coalesce(p_since, now() - interval '1 day')), '[]'::jsonb),
+        'clan_tag', (select c.tag from public.clan_members m join public.clans c on c.id = m.clan_id where m.player_id = auth.uid()),
+        'clan_crest', (select c.crest from public.clan_members m join public.clans c on c.id = m.clan_id where m.player_id = auth.uid()));
+$$;
+grant execute on function public.get_notifications(timestamptz) to authenticated;
