@@ -786,26 +786,21 @@ async function fetchLeaderboard(limit) {
     return data;
 }
 
-// players.display_name is nullable and defaults to null (shown as
-// "İsimsiz Kahraman" on the leaderboard) - RLS's existing "update own player
-// row" policy already covers this, no new policy or RPC needed. Now unique
-// (schema.sql, added alongside the friends list - a friend request looks
-// someone up BY this name, so two players can no longer share one) - a
-// duplicate attempt comes back as Postgres error code 23505, surfaced here
-// as 'taken' instead of the generic 'error' so the UI can say why it failed.
+// The nickname is the account's handle now ("Name#1234", schema.sql
+// section 35): set_handle picks the tag and keeps display_name in step.
+// There is no client UPDATE policy on players any more.
 async function setDisplayName(name) {
-    const trimmed = (name || '').trim().slice(0, 24);
+    const trimmed = (name || '').trim().replace(/#\d{0,4}$/, '').slice(0, 16);
     if (!trimmed) return 'empty';
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return 'error';
-
-    const { error } = await sb.from('players').update({ display_name: trimmed }).eq('id', user.id);
+    const { error } = await sb.rpc('set_handle', { p_name: trimmed, p_pay: false });
     if (error) {
-        console.error('Display name update failed:', error.message);
-        if (error.code === '23505') return 'taken';
-        if (error.message.includes('inappropriate')) return 'inappropriate';
+        console.error('set_handle failed:', error.message);
+        if (/invalid/.test(error.message)) return 'inappropriate';
+        if (/full/.test(error.message)) return 'taken';
+        if (/next free/.test(error.message)) return 'cooldown';
         return 'error';
     }
+    if (typeof socialFetchMe === 'function') await socialFetchMe();
     return 'ok';
 }
 
@@ -1282,7 +1277,7 @@ async function submitDisplayName() {
     if (!input) return;
     let result = await setDisplayName(input.value);
     let status = document.getElementById('leaderboard-name-status');
-    const messages = { ok: t('Kaydedildi!'), taken: t('Bu isim zaten alınmış, başka bir isim dene.'), empty: t('Önce bir isim yaz.'), inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'), error: t('Kaydedilemedi.') };
+    const messages = { ok: t('Kaydedildi!'), taken: t('Bu isim zaten alınmış, başka bir isim dene.'), empty: t('Önce bir isim yaz.'), inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'), cooldown: t('Adını 30 günde bir ücretsiz değiştirebilirsin (Posta Kulesi\'nden altınla da olur).'), error: t('Kaydedilemedi.') };
     if (status) status.innerText = t(messages[result] || messages.error);
     if (result === 'ok') renderLeaderboard();
 }
@@ -1487,6 +1482,7 @@ async function initEconomy() {
     await fetchDailyLoginStatus();
     await fetchDailyQuestStatus();
     if (typeof fetchAchievements === 'function') await fetchAchievements();
+    if (typeof socialInit === 'function') socialInit();
 }
 
 // Item trading (friends only) - see supabase/schema.sql's trade_offers

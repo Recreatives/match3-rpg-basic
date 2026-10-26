@@ -154,7 +154,7 @@ describe('schema.sql <-> items.js catalog sync', { world: { pixi: false } }, fun
 });
 
 describe('i18n completeness', { world: { pixi: false } }, function () {
-    var FILES = ['game.js', 'pvp.js', 'coop.js', 'economy.js', 'items.js', 'achievements.js', 'sharedboard.js', 'graphics.js', 'i18n.js', 'arena.js', 'moves.js', 'avatar.js', 'hero.js', 'characters.js', 'inventory.js'];
+    var FILES = ['game.js', 'pvp.js', 'coop.js', 'economy.js', 'items.js', 'achievements.js', 'sharedboard.js', 'graphics.js', 'i18n.js', 'arena.js', 'moves.js', 'avatar.js', 'hero.js', 'characters.js', 'inventory.js', 'social.js'];
     var sources = {};
     beforeAll(async function () {
         for (var i = 0; i < FILES.length; i++) sources[FILES[i]] = await readSource(FILES[i]);

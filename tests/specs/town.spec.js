@@ -14,7 +14,7 @@ describe('Town', { world: false }, function () {
         var w = await townWorld();
         try {
             expect(w.g('townIsOpen()')).toBe(true);
-            ['tower', 'auction', 'arena', 'smithy', 'tavern', 'store', 'fame', 'chest', 'gate'].forEach(function (id) {
+            ['tower', 'auction', 'arena', 'smithy', 'tavern', 'store', 'post', 'clan', 'gate'].forEach(function (id) {
                 expect(!!w.$('town-b-' + id), id).toBe(true);
             });
             expect(w.$('town-name').textContent).toBe('Tester');

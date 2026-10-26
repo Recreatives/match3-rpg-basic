@@ -3,8 +3,9 @@
 // active hero standing in the middle and a building for everything that
 // isn't fighting - the smithy (shop), the storehouse (bag / stash), the
 // auction hall, the tavern (co-op), the arena (PvP), the sage's tower
-// (talents), the hall of fame (profile), a treasure chest (daily reward)
-// and the dungeon gate (a solo run).
+// (talents), the post tower (friends / messages / party), the clan hall
+// and the dungeon gate (a solo run). Profile, daily reward and the
+// notifications bell sit in the header.
 //
 // Everything that changes gear, gold or progress is only reachable here:
 // while a dungeon run or a PvP / co-op match is on, those windows stay
@@ -12,7 +13,7 @@
 // trading in the middle of a fight.
 
 const TOWN_ONLY_MODALS = ['shop-modal', 'daily-login-modal', 'profile-modal', 'leaderboard-modal', 'friends-modal', 'trade-modal',
-    'guild-modal', 'titles-modal', 'talents-modal', 'achievements-modal', 'history-modal', 'auction-modal', 'account-modal'];
+    'guild-modal', 'clan-modal', 'titles-modal', 'talents-modal', 'achievements-modal', 'history-modal', 'auction-modal', 'account-modal'];
 
 // The town's buildings: where they stand in the 400 x 620 scene (x, y),
 // their tap area (w, h), where the sign hangs (lx, ly) and what they open.
@@ -23,8 +24,8 @@ const TOWN_BUILDINGS = [
     { id: 'smithy', label: 'Demirci', sub: 'Dükkan', x: 6, y: 268, w: 128, h: 160, lx: 62, ly: 136, open: () => { toggleModal('shop-modal'); if (typeof switchShopTab === 'function') switchShopTab('shop'); } },
     { id: 'tavern', label: 'Meyhane', sub: 'Co-op', x: 248, y: 268, w: 140, h: 160, lx: 65, ly: 136, open: () => townEnterMatch('coop-modal') },
     { id: 'store', label: 'Ambar', sub: 'Çanta & Depo', x: 8, y: 470, w: 122, h: 136, lx: 58, ly: 112, open: () => { toggleModal('shop-modal'); if (typeof switchShopTab === 'function') switchShopTab('inventory'); } },
-    { id: 'fame', label: 'Şöhret Panosu', sub: 'Profil', x: 128, y: 500, w: 74, h: 100, lx: 36, ly: 84, open: () => toggleModal('profile-modal') },
-    { id: 'chest', label: 'Hazine', sub: 'Günlük Ödül', x: 214, y: 530, w: 64, h: 70, lx: 31, ly: 56, open: () => toggleModal('daily-login-modal') },
+    { id: 'post', label: 'Posta Kulesi', sub: 'Arkadaşlar', x: 130, y: 486, w: 70, h: 114, lx: 35, ly: 98, open: () => toggleModal('friends-modal') },
+    { id: 'clan', label: 'Klan Salonu', sub: 'Klan', x: 206, y: 492, w: 62, h: 108, lx: 31, ly: 92, open: () => toggleModal('clan-modal') },
     { id: 'gate', label: 'Zindan Kapısı', sub: 'Solo', x: 266, y: 456, w: 134, h: 150, lx: 66, ly: 124, open: () => townEnterDungeon() },
 ];
 
@@ -59,17 +60,29 @@ const TOWN_ART = {
     store: () => tPath('M4 128 L4 50 L112 50 L112 128 Z', 'url(#tg-wood)') + tPath('M-6 54 L58 14 L122 54 Z', 'url(#tg-roof-brown)')
         + tPath('M34 128 L34 74 L82 74 L82 128 Z', '#3a2616') + `<path d="M34 74 L82 128 M82 74 L34 128" stroke="#7a5230" stroke-width="3"/>`
         + [[10, 104], [92, 108]].map(([x, y]) => tPath(`M${x} ${y} L${x + 18} ${y} L${x + 18} ${y + 20} L${x} ${y + 20} Z`, '#8a6038', 1.5)).join(''),
-    fame: () => tPath('M10 92 L10 30 L60 30 L60 92', 'none', 4) + tPath('M4 24 L66 24 L66 66 L4 66 Z', '#5a3a22')
-        + [[10, 30], [32, 32], [16, 46], [40, 48]].map(([x, y], i) => `<rect x="${x}" y="${y}" width="${18 - (i % 2) * 4}" height="13" fill="#eae0c8" stroke="${TINK}" stroke-width="1" transform="rotate(${(i % 2 ? 4 : -5)} ${x} ${y})"/>`).join('')
-        + `<circle cx="35" cy="22" r="7" fill="#ffd24a" stroke="${TINK}" stroke-width="1.5"/>`,
-    chest: () => tPath('M6 58 L6 34 L56 34 L56 58 Z', '#7a4a20') + tPath('M6 34 Q31 14 56 34 Z', '#8a5a2a') + `<path d="M6 40 L56 40 M31 18 L31 58" stroke="#d4a84a" stroke-width="3"/>`
-        + `<rect x="27" y="36" width="8" height="10" fill="#ffd24a" stroke="${TINK}" stroke-width="1.2"/><circle cx="31" cy="30" r="22" fill="#ffd24a" opacity=".18" class="town-glow"/>`,
+    post: () => tPath('M18 104 L20 30 L50 30 L52 104 Z', 'url(#tg-stone)') + tPath('M12 34 L35 0 L58 34 Z', 'url(#tg-roof-red)')
+        + tWin(29, 44, 12, 16) + tPath('M28 104 L28 84 Q35 76 42 84 L42 104 Z', '#3a2616')
+        + `<rect x="24" y="64" width="22" height="13" rx="1.5" fill="#eae0c8" stroke="${TINK}" stroke-width="1.2"/><path d="M24 64 L35 72 L46 64" fill="none" stroke="${TINK}" stroke-width="1.2"/>`
+        + `<path d="M52 12 q5 -6 10 0 q5 -6 10 0" fill="none" stroke="#eae0c8" stroke-width="2" class="town-smoke"/>`
+        + townBadge('post', 54, 26),
+    clan: () => tPath('M0 108 L0 44 L62 44 L62 108 Z', 'url(#tg-stone)') + tPath('M-6 48 L31 12 L68 48 Z', 'url(#tg-roof-blue)')
+        + tPath('M22 108 L22 80 Q31 70 40 80 L40 108 Z', '#3a2616')
+        + `<line x1="31" y1="12" x2="31" y2="-14" stroke="${TINK}" stroke-width="2"/><path d="M31 -14 L50 -9 L31 -3 Z" fill="#c9a24a" stroke="${TINK}" stroke-width="1.2"/>`
+        + `<path d="M6 52 L6 78 L13 73 L20 78 L20 52 Z" fill="#8e1b1b" stroke="${TINK}" stroke-width="1.2"/><path d="M42 52 L42 78 L49 73 L56 78 L56 52 Z" fill="#8e1b1b" stroke="${TINK}" stroke-width="1.2"/>`
+        + `<path d="M24 52 L38 52 L38 62 Q31 70 24 62 Z" fill="#d4a84a" stroke="${TINK}" stroke-width="1.2"/>`
+        + townBadge('clan', 58, 34),
     gate: () => tPath('M0 140 L0 60 Q66 -10 132 60 L132 140 Z', 'url(#tg-rock)') + tPath('M26 140 L26 82 Q66 34 106 82 L106 140 Z', '#07080c')
         + [38, 54, 70, 86].map(x => `<line x1="${x + 6}" y1="74" x2="${x + 6}" y2="140" stroke="#3a3a44" stroke-width="3"/>`).join('')
         + `<path d="M30 92 L102 92" stroke="#3a3a44" stroke-width="3"/>`
         + [[8, 80], [114, 80]].map(([x, y]) => `<rect x="${x + 2}" y="${y}" width="6" height="18" fill="#3a2616" stroke="${TINK}" stroke-width="1"/><path d="M${x + 5} ${y - 16} Q${x - 2} ${y - 4} ${x + 5} ${y} Q${x + 12} ${y - 4} ${x + 5} ${y - 16} Z" fill="#ffb04a" class="town-flame"/><circle cx="${x + 5}" cy="${y - 6}" r="16" fill="#ff8a2a" opacity=".25" class="town-glow"/>`).join('')
         + `<g transform="translate(52,40)"><circle cx="14" cy="10" r="11" fill="#eae0c8" stroke="${TINK}" stroke-width="1.5"/><circle cx="10" cy="9" r="3" fill="${TINK}"/><circle cx="18" cy="9" r="3" fill="${TINK}"/></g>`,
 };
+
+// A red count bubble over a building (social.js fills it in).
+function townBadge(id, x, y) {
+    return `<g id="town-badge-${id}" style="display:none" pointer-events="none"><circle cx="${x}" cy="${y}" r="9" fill="#e53935" stroke="${TINK}" stroke-width="1.5"/>`
+        + `<text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">0</text></g>`;
+}
 
 function townDefs() {
     const lin = (id, a, b, vert) => `<linearGradient id="${id}" x1="0" y1="0" x2="${vert === false ? 1 : 0}" y2="${vert === false ? 0 : 1}"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
@@ -128,9 +141,13 @@ function renderTown() {
     const prog = c && typeof characterLevelProgress === 'function' ? characterLevelProgress(c) : null;
     const gold = typeof currentWallet !== 'undefined' && currentWallet ? currentWallet.gold : 0;
     root.innerHTML = `<div class="town-head">
-            <div class="town-who"><b id="town-name">${c ? c.name : t('Kahraman')}</b><span>${c ? tf('Sv. {n}', { n: c.level }) : ''} · 🪙 <span id="town-gold">${gold}</span></span>
+            <div class="town-who"><b id="town-name">${townClanTag()}${c ? c.name : t('Kahraman')}</b>
+                ${typeof socialMe !== 'undefined' && socialMe.handle ? `<small id="town-handle" class="town-handle" title="${t('Kopyala')}">${socialEsc(socialMe.handle)} 📋</small>` : ''}<span>${c ? tf('Sv. {n}', { n: c.level }) : ''} · 🪙 <span id="town-gold">${gold}</span></span>
                 ${prog ? `<div class="town-xp"><i style="width:${prog.pct}%"></i></div>` : ''}</div>
             <div class="town-tools">
+                <button class="help-btn town-bell" id="town-bell-btn" title="${t('Bildirimler')}" aria-label="${t('Bildirimler')}">🔔<span id="town-bell-count" class="town-bell-count" style="display:none">0</span></button>
+                <button class="help-btn" id="town-profile-btn" title="${t('Profil')}" aria-label="${t('Profil')}">🏅</button>
+                <button class="help-btn" id="town-daily-btn" title="${t('Günlük Ödül')}" aria-label="${t('Günlük Ödül')}">🎁</button>
                 <button class="help-btn" id="town-chars-btn" title="${t('Karakterler')}">👥</button>
                 <button class="help-btn" onclick="toggleSoundMute()" title="${t('Ses')}">🔊</button>
                 <button class="help-btn" onclick="toggleLanguage()">🌐</button>
@@ -148,6 +165,16 @@ function renderTown() {
     });
     const cb = document.getElementById('town-chars-btn');
     if (cb) cb.onclick = () => townToCharacters();
+    document.getElementById('town-bell-btn').onclick = () => { if (typeof openNotifications === 'function') openNotifications(); };
+    document.getElementById('town-profile-btn').onclick = () => toggleModal('profile-modal');
+    document.getElementById('town-daily-btn').onclick = () => toggleModal('daily-login-modal');
+    const hb = document.getElementById('town-handle');
+    if (hb) hb.onclick = () => socialCopyHandle();
+    if (typeof socialUpdateBadges === 'function') socialUpdateBadges();
+}
+function townClanTag() {
+    const tag = typeof socialNotes !== 'undefined' && socialNotes && socialNotes.clan_tag;
+    return tag ? `<span class="soc-tag">[${String(tag).replace(/[^A-Z0-9]/g, '')}]</span> ` : '';
 }
 
 function showTown() {
@@ -157,6 +184,7 @@ function showTown() {
     renderTown();
     root.style.display = 'flex';
     document.body.classList.add('in-town');
+    if (typeof socialTouch === 'function') socialTouch('town');
 }
 function hideTown() {
     const root = document.getElementById('town-screen');
@@ -179,6 +207,7 @@ function townEnterDungeon() {
 // comes back when it closes - toggleModal).
 function townEnterMatch(modalId) {
     hideTown();
+    if (typeof socialTouch === 'function') socialTouch(modalId === 'pvp-modal' ? 'pvp' : 'coop');
     toggleModal(modalId);
 }
 

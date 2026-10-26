@@ -458,6 +458,7 @@ function resetGame() {
 
 function startLevel() {
     currentState = STATE.PLAYING;
+    if (typeof socialTouch === 'function') socialTouch('dungeon:' + Math.min(999, level));
     overlay.classList.remove('visible');
     rewardArea.style.display = 'none';
     gridDisplay.classList.remove('locked');
@@ -1725,9 +1726,10 @@ function toggleModal(modalId) {
             renderLeaderboard();
             if (typeof renderPvpLeaderboard === 'function') renderPvpLeaderboard();
         }
-        if (modalId === 'friends-modal' && typeof renderFriendsList === 'function') {
-            renderFriendsList();
+        if (modalId === 'friends-modal') {
+            if (typeof renderSocial === 'function') renderSocial(); else if (typeof renderFriendsList === 'function') renderFriendsList();
         }
+        if (modalId === 'clan-modal' && typeof renderClan === 'function') renderClan();
         if (modalId === 'guild-modal' && typeof renderGuildPanel === 'function') {
             renderGuildPanel();
         }

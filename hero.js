@@ -98,6 +98,8 @@ function myAvatarSpec() {
     const spec = heroSpecFor(cls, heroCurrentLook(), worn);
     // every piece of a set worn: the set aura (graphics.js cgGearFxFrom)
     if (typeof getSetProgress === 'function' && Object.values(getSetProgress(worn)).some(p => p.isActive)) spec.setAura = '#22c55e';
+    // my clan's crest on the tabard and the shield (social.js)
+    if (typeof socialClanCrestCache !== 'undefined' && socialClanCrestCache && typeof avCrestClean === 'function') spec.crest = avCrestClean(socialClanCrestCache);
     return spec;
 }
 
@@ -131,7 +133,7 @@ function heroRemoteSpec(payload, clsFallback) {
                 fx: ['blood', 'ember', 'stars', 'void', 'spark'].indexOf(g.fx) !== -1 ? g.fx : undefined };
         });
         return Object.assign({ cls, gender: payload.gender === 'f' ? 'f' : 'm', skin: Math.max(0, Math.min(4, payload.skin | 0)), hair: String(payload.hair || 'short'), hairColor: Math.max(0, Math.min(5, payload.hairColor | 0)), beard: String(payload.beard || 'none'), gear,
-            setAura: payload.setAura ? '#22c55e' : undefined }, heroFeatures(payload));
+            setAura: payload.setAura ? '#22c55e' : undefined, crest: payload.crest && typeof avCrestClean === 'function' ? avCrestClean(payload.crest) : undefined }, heroFeatures(payload));
     }
     return heroSpecFor(cls, heroLookDefault(), []);
 }

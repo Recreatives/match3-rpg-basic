@@ -29,7 +29,7 @@
         // the wallet row stands for the active character's purse (a view on
         // the real server - schema.sql section 30)
         wallets: [{ player_id: userId, gold: 100, materials: 0 }],
-        players: [{ id: userId, display_name: 'Tester', prestige_level: 0, active_character_id: cfg.noCharacter ? null : 'char-1' }],
+        players: [{ id: userId, display_name: cfg.noHandle ? 'Tester' : 'Tester#1234', handle_name: cfg.noHandle ? null : 'Tester', handle_tag: cfg.noHandle ? null : 1234, handle_changed_at: null, msg_privacy: 'friends_clan', prestige_level: 0, active_character_id: cfg.noCharacter ? null : 'char-1' }],
         characters: cfg.noCharacter ? [] : [{ id: 'char-1', player_id: userId, name: 'Tester', class_key: 'warrior', gender: 'm', appearance: {}, level: 1, xp: 0, mastery: 0, gold: 100, materials: 0, needs_setup: false, last_played_at: '2026-01-01T00:00:00Z' }],
         player_items: [],
         player_achievements: [],
@@ -134,6 +134,55 @@
         get_available_titles: function () { return { data: [], error: null }; },
         get_my_trade_offers: function () { return { data: [], error: null }; },
         get_guild_list: function () { return { data: [], error: null }; },
+        // social (schema.sql sections 35-40) - the shapes, plus just enough
+        // state (a handle, one clan, a list tests can fill) to drive the UI
+        set_handle: function (a) {
+            var p = table('players')[0], name = String(a.p_name || '').trim();
+            if (!/^[A-Za-z0-9_ÇĞİÖŞÜçğıöşü]{3,16}$/.test(name)) return { data: null, error: { message: 'handle: invalid name' } };
+            if (p.handle_changed_at && !a.p_pay) return { data: null, error: { message: 'handle: next free change on 2026-12-01' } };
+            p.handle_name = name; p.handle_tag = 4821; p.handle_changed_at = new Date().toISOString(); p.display_name = name + '#4821';
+            return { data: p.display_name, error: null };
+        },
+        touch_presence: function () { return { data: null, error: null }; },
+        get_social_list: function () { return { data: clone(table('social_list')), error: null }; },
+        send_friend_request: function (a) {
+            if (a.p_display_name === table('players')[0].display_name) return { data: 'self', error: null };
+            var hit = table('known_players').find(function (r) { return r.handle === a.p_display_name; });
+            if (!hit) return { data: 'not_found', error: null };
+            table('social_list').push({ friend_id: hit.id, handle: hit.handle, status: 'pending', incoming: false, last_seen: null, activity: null, char_name: null, char_class: null, char_level: null, clan_tag: null, unread: 0 });
+            return { data: 'sent', error: null };
+        },
+        get_conversations: function () { return { data: [], error: null }; },
+        get_blocked_list: function () { return { data: [], error: null }; },
+        get_my_party: function () { return { data: db.party || null, error: null }; },
+        get_clan_list: function () { return { data: clone(table('clan_list')), error: null }; },
+        get_clan_messages: function () { return { data: clone(table('clan_messages')), error: null }; },
+        create_clan: function (a) {
+            var c = table('characters').find(function (x) { return x.id === table('players')[0].active_character_id; });
+            if (!c || c.level < 20) return { data: null, error: { message: 'create_clan: requires a level 20 character' } };
+            if (c.gold < 5000) return { data: null, error: { message: 'create_clan: insufficient gold' } };
+            c.gold -= 5000;
+            var w = table('wallets')[0]; if (w) w.gold = c.gold;
+            db.clan = { clan: { id: 'clan-1', name: a.p_name, tag: a.p_tag, motd: '', join_mode: 'apply', crest: { c1: '#8e1b1b', c2: '#d4a84a', sym: 'lion' }, xp: 0, level: 1, cap: 20, next_level_xp: 1000 },
+                me: { rank: 'leader' }, members: [{ player_id: userId, handle: table('players')[0].display_name, rank: 'leader', last_seen: new Date().toISOString(), activity: 'town' }], applications: [], log: [{ at: new Date().toISOString(), text: 'Klan kuruldu' }] };
+            return { data: { id: 'clan-1' }, error: null };
+        },
+        get_my_clan: function () { return { data: clone(db.clan || null), error: null }; },
+        set_clan_settings: function (a) {
+            if (!db.clan) return { data: null, error: { message: 'set_clan_settings: not allowed' } };
+            if (a.p_motd !== null && a.p_motd !== undefined) db.clan.clan.motd = a.p_motd;
+            if (a.p_join_mode) db.clan.clan.join_mode = a.p_join_mode;
+            if (a.p_crest) db.clan.clan.crest = clone(a.p_crest);
+            return { data: null, error: null };
+        },
+        leave_clan: function () { db.clan = null; return { data: null, error: null }; },
+        send_clan_message: function (a) { table('clan_messages').push({ sender: table('players')[0].display_name, sender_id: userId, body: a.p_body, created_at: new Date().toISOString() }); return { data: null, error: null }; },
+        get_notifications: function () {
+            var list = table('social_list');
+            return { data: { friend_requests: list.filter(function (r) { return r.status === 'pending' && r.incoming; }).length, unread_messages: list.reduce(function (n, r) { return n + (r.unread || 0); }, 0),
+                party_invites: clone(table('party_invites')), clan_invites: clone(table('clan_invites')), clan_applications: 0, sold: [],
+                clan_tag: db.clan ? db.clan.clan.tag : null, clan_crest: db.clan ? clone(db.clan.clan.crest) : null }, error: null };
+        },
         // characters (schema.sql section 30) - same shapes, no rules beyond
         // what the client relies on
         create_character: function (a) {

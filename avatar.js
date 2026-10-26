@@ -601,8 +601,9 @@ const AV_PAINT = {
         if (it.style === 'plate' || it.style === 'mail') {
             const body = it.style === 'mail' ? S.lin(avLight(it.color, 0.3), avDark(it.color, 0.4)) : S.metal(it.color);
             // cloth tabard hanging from the belt, behind the plate skirt
-            const tab = it.tabard || '#8e1b1b', tx = fx - 3;
+            const cr = P.crest, tab = cr ? cr.c1 : (it.tabard || '#8e1b1b'), tx = fx - 3;
             let s = S.path(`M${avN(tx - ww * 0.75)} ${wy + 4} L${avN(tx + ww * 0.75)} ${wy + 4} L${avN(tx + ww * 0.62 + 4 * k)} ${avN(hy + 48 * k)} L${avN(tx + 3 * k)} ${avN(hy + 55 * k)} L${avN(tx - ww * 0.62)} ${avN(hy + 46 * k)} Z`, S.cloth(tab));
+            if (cr) s += avCrestCharge(cr.sym, tx + 1.5 * k, hy + 30 * k, 8 * k, cr.c2, tab);
             s += avTrimLine(S, `M${avN(tx - ww * 0.62)} ${avN(hy + 44 * k)} L${avN(tx + 3 * k)} ${avN(hy + 52 * k)} L${avN(tx + ww * 0.62 + 4 * k)} ${avN(hy + 46 * k)}`, it, 1.6 * k);
             s += S.path(avTorsoPath(P, 1.2), body) + avTorsoShade(S, P, 1.2);
             if (it.style === 'mail') for (let y = sy + 6; y < wy; y += 5 * k) s += S.line(`M${avN(100 - P.sw * 0.55 + P.lean)} ${avN(y)} Q${avN(fx)} ${avN(y + 3)} ${avN(100 + P.sw * 0.85)} ${avN(y - 1)}`, avDark(it.color, 0.5), 0.8, 0.5);
@@ -825,9 +826,9 @@ const AV_PAINT = {
             s += S.path(d, S.lin(avLight(it.color, 0.15), avDark(it.color, 0.55), true));
             s += S.path(d, 'none', P.ol * 1.6, it.trim || '#c9a24a');
             const em = it.emblem || '#e8c35a';
-            s += it.tier >= 2 ? S.line(`M${avN(x - w * 0.6)} ${avN(y + h * 0.05)} L${avN(x)} ${avN(y - h * 0.3)} L${avN(x + w * 0.6)} ${avN(y + h * 0.05)}`, em, 3 * k) : S.line(`M${avN(x)} ${avN(y - h * 0.4)} L${avN(x + w * 0.05)} ${avN(y + h * 0.6)}`, em, 2.4 * k);
-            s += S.circle(x, y + h * 0.3, 4 * k, S.metal(em), 1.2);
-            s += avGem(S, x, y - h * 0.05, 3 * k, it);
+            if (P.crest) s += avCrestShield(P.crest, x + w * 0.02, y + h * 0.05, w * 0.6);
+            else s += it.tier >= 2 ? S.line(`M${avN(x - w * 0.6)} ${avN(y + h * 0.05)} L${avN(x)} ${avN(y - h * 0.3)} L${avN(x + w * 0.6)} ${avN(y + h * 0.05)}`, em, 3 * k) : S.line(`M${avN(x)} ${avN(y - h * 0.4)} L${avN(x + w * 0.05)} ${avN(y + h * 0.6)}`, em, 2.4 * k);
+            if (!P.crest) s += S.circle(x, y + h * 0.3, 4 * k, S.metal(em), 1.2) + avGem(S, x, y - h * 0.05, 3 * k, it);
             s += S.flat(`M${avN(x - w * 0.8)} ${avN(y - h * 0.5)} Q${avN(x - w * 0.3)} ${avN(y - h * 0.62)} ${avN(x)} ${avN(y - h * 0.62)} L${avN(x - w * 0.6)} ${avN(y + h * 0.3)} Z`, '#fff', 0.16);
             return { held: s };
         }
@@ -880,6 +881,53 @@ const AV_PAINT = {
         return {};
     },
 };
+
+// --- clan crests ---------------------------------------------------------------------------
+// A clan's arms: a field colour (c1), a charge colour (c2) and one of eight
+// charges, drawn in a -1..1 box. Painted on a tabard, a kite / tower shield
+// and in the clan windows (avCrestSvg). Values come from other players too,
+// so avCrestClean keeps them to known ones.
+const AV_CREST_SYMS = ['lion', 'wolf', 'skull', 'star', 'tower', 'axe', 'eagle', 'moon'];
+function avCrestClean(c) {
+    if (!c || typeof c !== 'object') return null;
+    const col = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null);
+    return { c1: col(c.c1) || '#8e1b1b', c2: col(c.c2) || '#d4a84a', sym: AV_CREST_SYMS.indexOf(c.sym) !== -1 ? c.sym : 'lion' };
+}
+function avCrestCharge(sym, cx, cy, r, fill, field) {
+    const P = pts => 'M' + pts.map(q => avN(cx + q[0] * r) + ' ' + avN(cy + q[1] * r)).join(' L') + ' Z';
+    const ink = `stroke="${AV_INK}" stroke-width="${avN(Math.max(0.6, r * 0.08))}" stroke-linejoin="round"`;
+    const path = (d, f) => `<path d="${d}" fill="${f || fill}" ${ink}/>`;
+    if (sym === 'star') { const q = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 0.42 : 1; q.push([Math.cos(a) * rr, Math.sin(a) * rr]); } return path(P(q)); }
+    if (sym === 'moon') return path(`M${avN(cx + 0.2 * r)} ${avN(cy - 0.95 * r)} A${avN(r * 0.95)} ${avN(r * 0.95)} 0 1 0 ${avN(cx + 0.2 * r)} ${avN(cy + 0.95 * r)} A${avN(r * 0.7)} ${avN(r * 0.7)} 0 1 1 ${avN(cx + 0.2 * r)} ${avN(cy - 0.95 * r)} Z`);
+    if (sym === 'tower') return path(P([[-0.6, 0.9], [-0.6, -0.5], [-0.75, -0.5], [-0.75, -0.9], [-0.42, -0.9], [-0.42, -0.68], [-0.15, -0.68], [-0.15, -0.9], [0.15, -0.9], [0.15, -0.68], [0.42, -0.68], [0.42, -0.9], [0.75, -0.9], [0.75, -0.5], [0.6, -0.5], [0.6, 0.9]]))
+        + path(P([[-0.2, 0.9], [-0.2, 0.45], [0, 0.3], [0.2, 0.45], [0.2, 0.9]]), field);
+    if (sym === 'axe') return path(P([[-0.08, -0.95], [0.08, -0.95], [0.08, 0.95], [-0.08, 0.95]])) + path(`M${avN(cx + 0.08 * r)} ${avN(cy - 0.7 * r)} Q${avN(cx + 0.95 * r)} ${avN(cy - 0.75 * r)} ${avN(cx + 0.85 * r)} ${avN(cy + 0.1 * r)} Q${avN(cx + 0.5 * r)} ${avN(cy - 0.15 * r)} ${avN(cx + 0.08 * r)} ${avN(cy - 0.05 * r)} Z`);
+    if (sym === 'skull') return path(`M${avN(cx - 0.75 * r)} ${avN(cy - 0.1 * r)} A${avN(0.75 * r)} ${avN(0.75 * r)} 0 1 1 ${avN(cx + 0.75 * r)} ${avN(cy - 0.1 * r)} L${avN(cx + 0.45 * r)} ${avN(cy + 0.35 * r)} L${avN(cx + 0.4 * r)} ${avN(cy + 0.85 * r)} L${avN(cx - 0.4 * r)} ${avN(cy + 0.85 * r)} L${avN(cx - 0.45 * r)} ${avN(cy + 0.35 * r)} Z`)
+        + `<circle cx="${avN(cx - 0.3 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.2 * r)}" fill="${field}"/><circle cx="${avN(cx + 0.3 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.2 * r)}" fill="${field}"/>`;
+    if (sym === 'wolf') return path(P([[-0.75, -0.95], [-0.35, -0.45], [0.35, -0.45], [0.75, -0.95], [0.7, 0.05], [0.2, 0.9], [-0.2, 0.9], [-0.7, 0.05]]))
+        + path(P([[-0.4, -0.05], [-0.15, 0.05], [-0.4, 0.12]]), field) + path(P([[0.4, -0.05], [0.15, 0.05], [0.4, 0.12]]), field);
+    if (sym === 'eagle') return path(P([[0, -0.55], [0.18, -0.35], [0.95, -0.75], [0.7, 0.05], [0.25, 0.1], [0.3, 0.85], [0, 0.6], [-0.3, 0.85], [-0.25, 0.1], [-0.7, 0.05], [-0.95, -0.75], [-0.18, -0.35]]))
+        + `<circle cx="${avN(cx)}" cy="${avN(cy - 0.7 * r)}" r="${avN(0.2 * r)}" fill="${fill}" ${ink}/>`;
+    // lion: a maned head
+    const q = []; for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, rr = i % 2 ? 0.72 : 0.98; q.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+    return path(P(q)) + `<circle cx="${avN(cx)}" cy="${avN(cy)}" r="${avN(0.5 * r)}" fill="${avLight(fill, 0.25)}" ${ink}/>`
+        + `<circle cx="${avN(cx - 0.18 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.07 * r)}" fill="${AV_INK}"/><circle cx="${avN(cx + 0.18 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.07 * r)}" fill="${AV_INK}"/>`
+        + `<path d="M${avN(cx - 0.12 * r)} ${avN(cy + 0.16 * r)} L${avN(cx + 0.12 * r)} ${avN(cy + 0.16 * r)} L${avN(cx)} ${avN(cy + 0.3 * r)} Z" fill="${AV_INK}"/>`;
+}
+// The crest as a heater shield, centred on (cx, cy), r = half its width.
+function avCrestShield(crest, cx, cy, r) {
+    const c = avCrestClean(crest);
+    if (!c) return '';
+    const d = `M${avN(cx - r)} ${avN(cy - r * 1.05)} L${avN(cx + r)} ${avN(cy - r * 1.05)} L${avN(cx + r)} ${avN(cy + r * 0.1)} Q${avN(cx + r * 0.9)} ${avN(cy + r * 0.95)} ${avN(cx)} ${avN(cy + r * 1.3)} Q${avN(cx - r * 0.9)} ${avN(cy + r * 0.95)} ${avN(cx - r)} ${avN(cy + r * 0.1)} Z`;
+    return `<path d="${d}" fill="${c.c1}" stroke="${AV_INK}" stroke-width="${avN(Math.max(0.8, r * 0.12))}" stroke-linejoin="round"/>`
+        + avCrestCharge(c.sym, cx, cy, r * 0.62, c.c2, c.c1)
+        + `<path d="M${avN(cx - r * 0.8)} ${avN(cy - r * 0.85)} L${avN(cx - r * 0.1)} ${avN(cy - r * 0.85)} L${avN(cx - r * 0.75)} ${avN(cy + r * 0.2)} Z" fill="#fff" fill-opacity=".14"/>`;
+}
+// A stand-alone crest badge for the UI.
+function avCrestSvg(crest, size) {
+    const s = size || 40;
+    return `<svg class="crest-badge" width="${s}" height="${s}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${avCrestShield(crest || {}, 20, 17, 15)}</svg>`;
+}
 
 function avCape(S, color, it) {
     const P = S.P, sy = P.sy, fy = P.fy, k = P.k;
@@ -1082,7 +1130,7 @@ function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heav
 
 function avPaint(spec) {
     const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls, spec.build), S = avSession(P), k = P.k;
-    P.face = spec.face; P.nose = spec.nose;
+    P.face = spec.face; P.nose = spec.nose; P.crest = spec.crest ? avCrestClean(spec.crest) : null;
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
     const skin = S.skin(look.skinTone || AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};

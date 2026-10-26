@@ -1517,3 +1517,65 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 .auc-detail { padding: 10px; margin: -2px 0 4px; border-radius: 0 0 10px 10px; background: #1d2330; border: 1px solid #333c4c; border-top: 3px solid var(--rc, #4a5566); }
 
 .server-down { color: #e8eef4; font-size: 0.9rem; text-align: center; max-width: 320px; margin: 0 auto 10px; line-height: 1.4; }
+
+/* --- social (social.js): the Post Tower, the Clan Hall, notifications --- */
+.soc-me { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.85rem; color: #cfd8e0; margin-bottom: 8px; }
+.soc-me b { color: var(--accent, #e8c35a); word-break: break-all; }
+.soc-add { display: flex; gap: 6px; margin: 6px 0; }
+.soc-add input, .clan-create input, .clan-field textarea, .clan-field select, .soc-privacy select, .clan-rank-sel, #handle-input {
+    flex: 1; min-width: 0; box-sizing: border-box; padding: 8px; border-radius: 6px; border: 1px solid #555; background: rgba(0,0,0,0.3); color: #fff; font: inherit; font-size: 0.85rem; }
+#handle-input { width: 100%; margin: 6px 0; }
+.soc-add .action-btn, .soc-me .action-btn { width: auto; margin: 0; }
+.soc-status { font-size: 0.75rem; color: #f1c40f; min-height: 1.1em; margin: 2px 0 6px; }
+.soc-tabs { margin: 4px 0 8px; flex-wrap: wrap; }
+.soc-list { display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }
+#clan-tab-body { display: flex; flex-direction: column; gap: 4px; max-height: 42vh; overflow-y: auto; }
+.soc-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; background: #1d2330; border: 1px solid #2c3444; min-height: 44px; box-sizing: border-box; }
+.soc-row.clickable { cursor: pointer; }
+.soc-row.clickable:hover { background: #232b3d; }
+.soc-who { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.soc-who b { font-size: 0.85rem; color: #e8eef4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.soc-who small { font-size: 0.72rem; color: #8a96a3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.soc-time { font-size: 0.68rem; color: #6a7686; flex-shrink: 0; }
+.soc-acts { display: flex; gap: 4px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.soc-mini { min-width: 34px; min-height: 34px; padding: 0 6px; border-radius: 8px; border: 1px solid #3a4456; background: #2a3243; color: #fff; font-size: 0.95rem; cursor: pointer; }
+.soc-mini:hover { background: #34405a; }
+.soc-mini.ok { background: #1f5f3a; border-color: #2e8a55; }
+.soc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: #555; }
+.soc-dot.on { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+.soc-dot.busy { background: #f39c12; }
+.soc-badge { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 8px; background: #e53935; color: #fff; font-size: 0.68rem; text-align: center; }
+.soc-tag { color: #9ad0ff; font-weight: 700; }
+.soc-menu { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 8px; background: #161b25; border: 1px solid #2c3444; }
+.soc-menu-btn { margin: 0; width: 100%; text-align: left; font-size: 0.82rem; }
+.soc-menu-btn.danger, .action-btn.danger { background: #7f2020; color: #fff; }
+.soc-privacy { font-size: 0.78rem; color: #cfd8e0; margin-bottom: 6px; }
+.soc-privacy label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.soc-party-box { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: #20283a; border: 1px solid #c9a24a66; margin-bottom: 8px; font-size: 0.8rem; color: #e8eef4; }
+.soc-party-box .soc-acts { justify-content: flex-start; }
+.soc-party-box .action-btn { width: auto; margin: 0; font-size: 0.78rem; }
+.soc-party-m { color: #cfd8e0; }
+.handle-now { font-size: 0.85rem; color: #cfd8e0; }
+.town-handle { font-size: 0.72rem; color: #9ad0ff; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.town-bell { position: relative; }
+.town-bell-count { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; line-height: 16px; padding: 0 3px; border-radius: 8px; background: #e53935; color: #fff; font-size: 0.65rem; font-weight: 700; box-sizing: border-box; }
+.clan-head { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.clan-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.clan-name { font-family: var(--font-display, Georgia, serif); color: var(--accent, #e8c35a); font-size: 1.05rem; }
+.clan-head small { font-size: 0.75rem; color: #8a96a3; }
+.clan-motd { font-size: 0.8rem; color: #e8eef4; background: #1d2330; border-radius: 8px; padding: 6px 8px; margin: 4px 0 8px; word-break: break-word; }
+.clan-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: #cfd8e0; margin-bottom: 8px; }
+.clan-crest-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.clan-crest-edit input[type=color] { width: 36px; height: 30px; padding: 0; border: none; background: none; vertical-align: middle; }
+.clan-crest-edit select { flex: 0 1 auto; }
+.clan-create { display: flex; gap: 6px; margin-bottom: 6px; }
+.clan-create input:last-child { flex: 0 0 90px; }
+.clan-chat { height: 34vh; max-height: 260px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px; font-size: 0.82rem; }
+.chat-line { margin-bottom: 4px; color: #e8eef4; word-break: break-word; }
+.chat-line b { color: #9ad0ff; }
+.chat-line.me b { color: var(--accent, #e8c35a); }
+.clan-log { font-size: 0.75rem; color: #cfd8e0; padding: 3px 0; border-bottom: 1px solid #222a36; }
+.clan-log small { color: #6a7686; }
+.crest-badge { flex-shrink: 0; }
+#clan-leave { margin-top: 10px; }
+.town-tools { flex-wrap: wrap; justify-content: flex-end; max-width: 62%; }
