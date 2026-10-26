@@ -87,6 +87,17 @@ describe('Characters', { world: false }, function () {
 
 });
 
+describe('Characters: server down', { world: false }, function () {
+    it('an unreachable server says so with a retry, instead of an empty hero list', async function () {
+        var w = await createWorld({ pixi: false, serverDown: true });
+        try {
+            expect(w.$('overlay-title').textContent).toBe('SUNUCUYA BAĞLANILAMIYOR');
+            expect(w.$('server-retry-btn')).toBeTruthy();
+            expect(w.$('char-list')).toBe(null);
+        } finally { w.destroy(); }
+    });
+});
+
 describe('Characters: level curve', function () {
     it('the level curve matches schema.sql (level 2 at 80 xp)', function (ctx) {
         var w = ctx.world;

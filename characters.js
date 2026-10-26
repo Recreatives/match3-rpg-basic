@@ -32,6 +32,30 @@ function characterLevelProgress(c) {
 
 function classDefFor(key) { return (typeof CLASSES !== 'undefined' && key) ? CLASSES[String(key).toUpperCase()] : null; }
 
+// The game server can't be reached (offline, or the Supabase project is
+// paused / down): say so on the start screen with a retry, instead of
+// leaving an empty hero list that looks like a hang.
+function charShowServerDown() {
+    const sel = document.getElementById('class-selection');
+    const title = document.getElementById('overlay-title');
+    const ov = document.getElementById('game-overlay');
+    if (!sel || !title) return;
+    if (ov) ov.classList.add('visible');
+    title.innerText = t('SUNUCUYA BAĞLANILAMIYOR');
+    sel.innerHTML = '';
+    sel.style.display = 'flex';
+    const p = document.createElement('p');
+    p.id = 'server-down-msg';
+    p.className = 'server-down';
+    p.textContent = t('Oyun sunucusuna şu an ulaşılamıyor. İnternet bağlantını kontrol et ve biraz sonra tekrar dene. Karakterlerin ve eşyaların güvende.');
+    const b = document.createElement('button');
+    b.id = 'server-retry-btn';
+    b.className = 'reward-btn rarity-rare';
+    b.textContent = t('Tekrar dene');
+    b.onclick = () => location.reload();
+    sel.append(p, b);
+}
+
 async function fetchCharacters() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -541,7 +565,7 @@ async function charSubmit() {
 // creator.
 async function initCharacters() {
     const list = await fetchCharacters();
-    if (!list) return;
+    if (!list) { charShowServerDown(); return; }
     if (typeof selectedClass !== 'undefined' && selectedClass && activeCharacter && selectedClass.name.toLowerCase() === activeCharacter.class_key) {
         charUpdateHudLabel();
         if (typeof refreshMyAvatar === 'function') refreshMyAvatar(true);

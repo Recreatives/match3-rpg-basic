@@ -1479,7 +1479,7 @@ async function initEconomy() {
         window.__pendingClientErrors = [];
         pending.forEach(entry => sb.from('client_errors').insert(entry).then(() => {}, () => {}));
     }
-    if (!session) return;
+    if (!session) { if (typeof charShowServerDown === 'function') charShowServerDown(); return; }
     // characters first: the wallet, items and talents are the active one's
     if (typeof initCharacters === 'function') await initCharacters();
     await fetchWallet();

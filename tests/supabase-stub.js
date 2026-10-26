@@ -50,6 +50,7 @@
         function matches(row) { return q.filters.every(function (f) { return f(row); }); }
         function exec() {
             calls.push({ type: 'from', table: tableName, op: q.op, payload: clone(q.payload) });
+            if (cfg.serverDown) return { data: null, error: { message: 'TypeError: Failed to fetch' } };
             var rows = table(tableName), result;
             if (q.op === 'insert' || q.op === 'upsert') {
                 var list = Array.isArray(q.payload) ? q.payload : [q.payload];

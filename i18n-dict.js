@@ -682,4 +682,7 @@ const EN_DICT = {
     'Bu yuvada şu an bir şey takılı değil.': 'Nothing is worn in this slot right now.',
     'Yetersiz altın ({price})': 'Not enough gold ({price})',
     '{name} ({rarity}, Sv. {lvl}) - satıcı {seller} - {price} altına satın alınsın mı?': 'Buy {name} ({rarity}, Lv. {lvl}) from {seller} for {price} gold?',
+    'SUNUCUYA BAĞLANILAMIYOR': 'CAN\'T REACH THE SERVER',
+    'Oyun sunucusuna şu an ulaşılamıyor. İnternet bağlantını kontrol et ve biraz sonra tekrar dene. Karakterlerin ve eşyaların güvende.': 'The game server can\'t be reached right now. Check your connection and try again in a bit. Your characters and items are safe.',
+    'Tekrar dene': 'Try again',
 };

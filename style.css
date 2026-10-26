@@ -1515,3 +1515,5 @@ html.low-graphics-mode *, html.low-graphics-mode *::before, html.low-graphics-mo
 .auc-row.clickable:hover, .auc-row.open { background: #232b3d; }
 .auc-row.open { outline: 1px solid var(--rc); }
 .auc-detail { padding: 10px; margin: -2px 0 4px; border-radius: 0 0 10px 10px; background: #1d2330; border: 1px solid #333c4c; border-top: 3px solid var(--rc, #4a5566); }
+
+.server-down { color: #e8eef4; font-size: 0.9rem; text-align: center; max-width: 320px; margin: 0 auto 10px; line-height: 1.4; }
