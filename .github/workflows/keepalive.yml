@@ -1,0 +1,35 @@
+name: Supabase keep-alive
+
+# A free-tier Supabase project is paused after about a week without any
+# activity (that is what took the live game down in Nov 2026; the weekly
+# backup alone was not frequent enough). This runs a tiny read-only query
+# twice a week, which counts as activity.
+#
+# Uses the SUPABASE_DB_URL secret backup.yml already has (Session Pooler
+# URI). The repo and its Actions logs are public, so the query's result
+# is thrown away, never printed.
+#
+# Scheduled runs only happen from the default branch (main); the push
+# trigger below just makes it run once whenever this file changes, on any
+# branch, so a change can be checked before merging.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Monday 06:00 UTC
+    - cron: '0 6 * * 4' # Thursday 06:00 UTC
+  workflow_dispatch: {}
+  push:
+    paths: ['.github/workflows/keepalive.yml']
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query the database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -A -t -o /dev/null \
+            -c 'select count(*) from public.players'
+          echo "Supabase answered."
