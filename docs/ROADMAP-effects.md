@@ -40,6 +40,7 @@ Efektlerin kendisi için üç görünüm seçeneği var. Hangisinin güzel durdu
 | **A. Ham piksel** | Efekt keskin piksellerle, tam sayı katında büyütülmüş. | pixelfx'in tam havası. | Pürüzsüz stil C karakterin yanında "yamalı" durabilir. |
 | **B. Yumuşatılmış + ışık** | Renk katmanı hafif yumuşatılır, ışık katmanı toplanarak parlatılır (bloom). | Piksel detayı kalır ama boyalı sahneye kaynaşır. | Biraz daha fazla işlem gücü (düşük kalitede kapatılır). |
 | **C. Keskin piksel + parlama** | Pikseller keskin kalır, ışık katmanı yumuşak bir parlama (bloom) olarak eklenir. | pixelfx'in keskinliği + boyalı sahneye uyan sıcak ışık. | B kadar işlem gücü. |
+| **D. Yüksek çözünürlük** | Dama deseni yerine gerçek saydamlık + akıllı 4x büyütme (Scale2x iki kez) + parlama. | Basamaklar ve noktalı desen kaybolur; boyalı sahneye en iyi uyan görünüm. | Oyunda GPU filtresi gerekir (bkz. 7b-5). |
 
 Benim tahminim B'nin en iyi sonucu vereceği, ama karar senin gözünle verilmeli.
 
@@ -123,7 +124,11 @@ Deneme sayfası: `tools/pixelfx-study.html` (pixelfx kodu `tools/vendor/pixelfx/
 1. **Işık katmanı ve şeffaf arena.** Arenanın arka planı WebGL sahnesinde değil, arkadaki CSS katmanında; canvas şeffaf. Işığı düz "toplama" ile çizmek şeffaf zeminde koyu, opak lekeler bırakıyordu. Çözüm (pixelfx'in kendi yöntemi): ışığın şeffaflığı en parlak renk kanalı olur, sonra toplanarak çizilir. Oyunda da aynısı gerekli.
 2. **Kukla yerine kendi karakterimiz.** Vücuda sarılan efektler (iyileşme, aura, buz, vuruş) pixelfx kuklasının siluetini kullanıyor ve bazıları kuklanın renklerini karakterin üstüne boyuyor (kahramanın yerine gri kukla görünüyordu). Çözüm: savaşçımızın ekrandaki görüntüsünden piksel ölçeğinde siluet çıkarıp efekte o veriliyor. Renk dizisi tamamen şeffaf bırakılıyor; böylece efekt karakteri boyamıyor, sadece etrafına sarılıyor ve kahraman pürüzsüz kalıyor. Durum efektleri (donma, zehir) karakteri boyamaya dayandığı için Faz 6'da ayrıca ele alınmalı.
 3. **Performans.** Canlı çizim, güçlü bir masaüstünde: tek vuruş kıvılcımı 0,1 ms/kare, buz novası 2,2 ms, üç ağır efekt birden (buz novası + kutsal sütun + büyük patlama) 14 ms (sınır 16,7 ms). Telefonda bu birkaç kat yavaş olur. **Oyunda efektler önceden pişirilmiş sprite sayfası olarak oynatılmalı** (bölüm 4'teki plan doğrulandı).
-4. **Boyut.** Arenada karakterler telefonda ~120, masaüstünde ~150 piksel boyunda; pixelfx'in kuklası 38 piksel. Efektlerin karakterle orantılı durması için ~2,5-3x piksel büyütme gerekiyor. Deneme sayfasında 1,5x-4x arası seçilebiliyor.
+5. **Daha kaliteli görünüm (D).** Kullanıcı geri bildirimi: efektler hâlâ "piksel piksel" görünüyor. İki kaynağı var:
+   - **Desenli saydamlık:** pixelfx yarı saydam her şeyi (duman, solma, kenarlar) 4x4 dama deseniyle çiziyor. D'de bunun yerine çizim motorunun kendi gerçek saydamlık fonksiyonu kullanılıyor; duman ve parıltılar yumuşak bulutlara dönüşüyor.
+   - **Basamaklı kenarlar:** Scale2x (EPX) algoritması iki kez uygulanıyor (4x). Çapraz kenarlar ve eğriler bulanıklaşmadan pürüzsüzleşiyor.
+   - Canlı maliyeti C'nin ~2 katı (tek efekt 2 ms, üç ağır efekt 18 ms). 4x pişirilmiş sayfalar 16 kat büyük olacağı için oyunda şöyle yapılmalı: efektler **1x, desensiz** pişirilir, 4x büyütme Pixi'de bir **GPU filtresiyle** (Scale2x/xBR gölgelendiricisi) yapılır. İndirme boyutu ve telefon yükü küçük kalır.
+6. **Boyut.** Arenada karakterler telefonda ~120, masaüstünde ~150 piksel boyunda; pixelfx'in kuklası 38 piksel. Efektlerin karakterle orantılı durması için ~2,5-3x piksel büyütme gerekiyor. Deneme sayfasında 1,5x-4x arası seçilebiliyor.
 
 ## 8. Fazlar
 

@@ -74,7 +74,7 @@
 <script src="items.js"></script>
 <script src="hero.js"></script>
 <script type="module">
-import { createFrame, clearFrame, createFx, stockActor } from "./tools/vendor/pixelfx/src/core/index.js";
+import { createFrame, clearFrame, createFx, stockActor, Painter } from "./tools/vendor/pixelfx/src/core/index.js";
 import { effects } from "./tools/vendor/pixelfx/src/fx/index.js";
 
 const $ = id => document.getElementById(id);
@@ -82,10 +82,11 @@ const LOOKS = [
   { key: 'A', name: 'A. Ham piksel', desc: 'keskin pikseller, parlama yok' },
   { key: 'B', name: 'B. Yumuşak + parlama', desc: 'pikseller yumuşatılmış, ışık parlıyor' },
   { key: 'C', name: 'C. Keskin piksel + parlama', desc: 'pikseller keskin, ışık parlıyor' },
+  { key: 'D', name: 'D. Yüksek çözünürlük', desc: 'akıllı 4x büyütme: basamaklar pürüzsüz kenara dönüşür' },
 ];
 const SCALES = [1.5, 2, 2.5, 3, 4];
 const WIDTHS = [{ name: 'Telefon', w: 360, ph: 90 }, { name: 'Büyük telefon', w: 430, ph: 104 }, { name: 'Masaüstü', w: 620, ph: 115 }];
-const state = { look: 'B', k: 2.5, width: 0, showOld: false, place: 'foe' };
+const state = { look: 'D', k: 2.5, width: 0, showOld: false, place: 'foe' };
 try { Object.assign(state, JSON.parse(localStorage.getItem('pfxStudy') || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem('pfxStudy', JSON.stringify(state)); } catch (e) {} };
 
@@ -119,28 +120,89 @@ arena.fxLayer.addChild(frontC);
 const live = [];
 let lastNow = cgNow(), cpuMs = 0;
 
+// Look D, part 1: no dithering. pixelfx draws anything translucent (smoke,
+// fades, soft edges) as a 4x4 checker pattern - right for pixel art, but
+// at high resolution it is what reads as "dotty". In D those writes go to
+// the painter's own true-alpha blend instead (only in this page; the
+// vendored files are untouched).
+const ditherPut = Painter.prototype.put;
+Painter.prototype.put = function (sx, sy, c, a = 1) {
+  if (state.look === 'D' && a * this.fade < 1) { if (c) this.blendPx(sx, sy, c, a); return; }
+  return ditherPut.call(this, sx, sy, c, a);
+};
+
+// Look D, part 2: a pixel-art upscaler instead of plain magnifying. Scale2x (EPX,
+// public domain) doubles a picture and turns staircase diagonals into
+// smooth edges without blurring; twice gives Scale4x. Then linear filtering
+// and the glow on top. Only the effect's bounding box is processed. In the
+// game this would run once, when the sprite sheets are baked.
+function scale2x(src, w, h, dst) {
+  const W2 = w * 2;
+  for (let y = 0; y < h; y++) {
+    const yu = y > 0 ? y - 1 : 0, yd = y < h - 1 ? y + 1 : h - 1;
+    for (let x = 0; x < w; x++) {
+      const P = src[y * w + x], A = src[yu * w + x], D = src[yd * w + x];
+      const C = src[y * w + (x > 0 ? x - 1 : 0)], B = src[y * w + (x < w - 1 ? x + 1 : w - 1)];
+      let p1 = P, p2 = P, p3 = P, p4 = P;
+      if (C === A && C !== D && A !== B) p1 = A;
+      if (A === B && A !== C && B !== D) p2 = B;
+      if (D === C && D !== B && C !== A) p3 = C;
+      if (B === D && B !== A && D !== C) p4 = D;
+      const o = y * 2 * W2 + x * 2;
+      dst[o] = p1; dst[o + 1] = p2; dst[o + W2] = p3; dst[o + W2 + 1] = p4;
+    }
+  }
+  return dst;
+}
+// the box of non-empty pixels, 1px margin; null when empty
+function bboxOf(buf, w, h) {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) { const r = y * w; for (let x = 0; x < w; x++) if (buf[r + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; } }
+  if (x1 < 0) return null;
+  return [Math.max(0, x0 - 1), Math.max(0, y0 - 1), Math.min(w - 1, x1 + 1), Math.min(h - 1, y1 + 1)];
+}
+function upscale4(buf, w, h, ctx, scratch) {
+  ctx.clearRect(0, 0, w * 4, h * 4);
+  const bb = bboxOf(buf, w, h);
+  if (!bb) return false;
+  const [x0, y0, x1, y1] = bb, bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  const src = scratch.a.length >= bw * bh ? scratch.a : (scratch.a = new Uint32Array(bw * bh));
+  for (let y = 0; y < bh; y++) src.set(buf.subarray((y0 + y) * w + x0, (y0 + y) * w + x0 + bw), y * bw);
+  const m2 = scratch.b.length >= bw * bh * 4 ? scratch.b : (scratch.b = new Uint32Array(bw * bh * 4));
+  const m4 = new Uint32Array(bw * bh * 16);
+  scale2x(src, bw, bh, m2);
+  scale2x(m2, bw * 2, bh * 2, m4);
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(m4.buffer), bw * 4, bh * 4), x0 * 4, y0 * 4);
+  return true;
+}
+
 function makeLayer(W, H, ox, oy, parent) {
   const frame = createFrame(W, H, -ox, -oy);
-  const cc = document.createElement('canvas'), cl = document.createElement('canvas');
-  cc.width = cl.width = W; cc.height = cl.height = H;
-  const texC = PIXI.Texture.from(cc), texL = PIXI.Texture.from(cl);
-  const box = new PIXI.Container();
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const cc = mk(W, H), cl = mk(W, H), cc4 = mk(W * 4, H * 4), cl4 = mk(W * 4, H * 4);
+  const texC = PIXI.Texture.from(cc), texL = PIXI.Texture.from(cl), texC4 = PIXI.Texture.from(cc4), texL4 = PIXI.Texture.from(cl4);
+  texC4.source.scaleMode = texL4.source.scaleMode = 'linear';
+  const box = new PIXI.Container(), g1 = new PIXI.Container(), g4 = new PIXI.Container();
   const sC = new PIXI.Sprite(texC), sL = new PIXI.Sprite(texL), sG = new PIXI.Sprite(texL);
-  sL.blendMode = 'add'; sG.blendMode = 'add';
+  const s4C = new PIXI.Sprite(texC4), s4L = new PIXI.Sprite(texL4), s4G = new PIXI.Sprite(texL4);
+  sL.blendMode = sG.blendMode = s4L.blendMode = s4G.blendMode = 'add';
   [sC, sL, sG].forEach(s => s.position.set(-ox, -oy));
-  box.addChild(sG, sC, sL);
+  [s4C, s4L, s4G].forEach(s => s.position.set(-ox * 4, -oy * 4));
+  g1.addChild(sG, sC, sL); g4.addChild(s4G, s4C, s4L); g4.scale.set(0.25);
+  box.addChild(g1, g4);
   parent.addChild(box);
-  return { frame, cc, cl, xc: cc.getContext('2d'), xl: cl.getContext('2d'), texC, texL, box, sC, sL, sG,
-    lightBuf: new Uint32Array(W * H), W, H };
+  return { frame, cc, cl, xc: cc.getContext('2d'), xl: cl.getContext('2d'), xc4: cc4.getContext('2d'), xl4: cl4.getContext('2d'),
+    texC, texL, texC4, texL4, box, g1, g4, sC, sL, sG, s4C, s4L, s4G,
+    lightBuf: new Uint32Array(W * H), W, H, scratch: { a: new Uint32Array(0), b: new Uint32Array(0) } };
 }
 function styleLayer(L) {
-  const smooth = state.look === 'B', glow = state.look !== 'A';
+  const hi = state.look === 'D', smooth = state.look === 'B', glow = state.look !== 'A';
+  L.g1.visible = !hi; L.g4.visible = hi;
   L.texC.source.scaleMode = smooth ? 'linear' : 'nearest';
   L.texL.source.scaleMode = smooth ? 'linear' : 'nearest';
-  L.sG.visible = glow;
-  if (glow) {
-    if (!L.sG.filters || !L.sG.filters.length) L.sG.filters = [new PIXI.BlurFilter({ strength: 3, quality: 3 })];
-    L.sG.alpha = 0.9;
+  for (const s of [L.sG, L.s4G]) {
+    if (!s.filters || !s.filters.length) s.filters = [new PIXI.BlurFilter({ strength: 3, quality: 3 })];
+    s.alpha = 0.9;
   }
 }
 function drawLayer(L, fx, layer) {
@@ -163,6 +225,12 @@ function drawLayer(L, fx, layer) {
     out[i] = ((m << 24) | (Math.min(255, Math.round(b * k)) << 16) | (Math.min(255, Math.round(g * k)) << 8) | Math.min(255, Math.round(r * k))) >>> 0;
   }
   L.box.visible = any || anyL;
+  if (state.look === 'D') {
+    if (any) { upscale4(C, L.W, L.H, L.xc4, L.scratch); L.texC4.source.update(); }
+    if (anyL) { upscale4(out, L.W, L.H, L.xl4, L.scratch); L.texL4.source.update(); }
+    L.s4C.visible = any; L.s4L.visible = L.s4G.visible = anyL;
+    return;
+  }
   if (any) { L.xc.putImageData(new ImageData(new Uint8ClampedArray(C.buffer.slice(0)), L.W, L.H), 0, 0); L.texC.source.update(); }
   if (anyL) { L.xl.putImageData(new ImageData(new Uint8ClampedArray(out.buffer.slice(0)), L.W, L.H), 0, 0); L.texL.source.update(); }
   L.sC.visible = any; L.sL.visible = anyL; L.sG.visible = anyL && state.look !== 'A';
