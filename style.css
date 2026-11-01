@@ -1049,13 +1049,14 @@ body {
    stretch the arena into a strip; the pair sits in the middle. */
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 601px) {
     :root {
-        --board-size: clamp(300px, min(100dvh - 40px, 46vw), 640px);
+        /* the top bar now takes a row of its own over both columns */
+        --board-size: clamp(300px, min(100dvh - 96px, 46vw), 640px);
         --arena-extra: 0px;
         --ui-width: 100%;
+        /* what the left column holds besides the arena: the battle header,
+           the log line and the ULT button, with their gaps */
+        --wide-left-chrome: 114px;
     }
-    /* the big arena is the solo screen's only (the PvP / co-op windows keep
-       their own narrow column) */
-    #solo-hud { height: calc(clamp(115px, calc((100dvh - 310px) / 1.3), 230px) * 1.3 + var(--arena-hud-h)); }
     #app {
         display: grid;
         grid-template-columns: minmax(0, 860px) auto;
@@ -1066,7 +1067,18 @@ body {
         padding: 10px 16px;
     }
     #app > * { grid-column: 1; }
-    #app > #grid { grid-column: 2; grid-row: 1 / span 20; align-self: center; }
+    /* a header row across both columns: version left, buttons right */
+    #app > .top-bar {
+        grid-column: 1 / -1; grid-row: 1;
+        display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+        width: 100%; max-width: none; margin-bottom: 8px;
+    }
+    #app > .top-bar .top-bar-buttons { justify-content: flex-end; }
+    #app > #grid { grid-column: 2; grid-row: 2 / span 20; align-self: start; }
+    /* the big arena is the solo screen's only (the PvP / co-op windows keep
+       their own narrow column); it takes every pixel the board's height
+       leaves, so both columns end on the same line */
+    #solo-hud { height: max(260px, calc(var(--board-size) - var(--wide-left-chrome))); }
 }
 
 /* INFO MODAL */
