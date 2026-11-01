@@ -368,6 +368,9 @@ if (typeof CG_SHOTS !== 'undefined') {
     pfxShot('pfxfireball', { ball: 'fire-fireball', blast: 'explosions-small-explosion', fallback: 'fireball', ballScale: 0.75, blastScale: 0.65, shake: 5 });
     pfxShot('pfxarrow', { ball: 'projectiles-arrow', blast: 'impacts-hit-spark', fallback: 'arrow', arc: 14, blastAt: 'hit', ballScale: 0.9, blastScale: 0.8 });
     pfxShot('pfxshard', { ball: 'ice-ice-lance', blast: 'ice-ice-shatter', fallback: 'shard', arc: 0, blastAt: 'hit', ballScale: 0.7, blastScale: 0.6 });
+    pfxShot('pfxball', { ball: 'lightning-ball-lightning', blast: 'lightning-zap-hit', fallback: 'bolt', arc: 10, turn: false, ballDy: 46, ballScale: 0.5, blastAt: 'hit', blastScale: 0.8 });
+    pfxShot('pfxbomb', { ball: 'pickups-potion', blast: 'explosions-small-explosion', fallback: 'fireball', arc: 40, turn: false, ballDy: 34, ballScale: 0.6, blastScale: 0.55, shake: 4 });
+    pfxShot('pfxacid', { ball: 'pickups-potion-acid', blast: 'nature-acid-splash', fallback: 'orb', arc: 40, turn: false, ballDy: 34, ballScale: 0.6, blastScale: 0.8 });
     pfxShot('pfxshadow', { ball: 'shadow-void-orb', blast: 'shadow-dark-explosion', fallback: 'orb', arc: 16, turn: false, ballDy: 78, ballScale: 0.4, blastScale: 0.5, shake: 3 });
 }
 

@@ -1075,8 +1075,8 @@ function coopUseUltimate() {
         if (stage) stage.playUlt(selectedClass.name.toLowerCase());
     }
     let ultCtx = makeCoopCombatContext();
+    coopUltCharge = 0; // before the effect: an ult may refill part of itself (stormcaller)
     selectedClass.ultEffect(ultCtx);
-    coopUltCharge = 0;
 
     if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 

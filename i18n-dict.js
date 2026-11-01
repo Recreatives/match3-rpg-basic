@@ -866,4 +866,9 @@ const EN_DICT = {
     '<b>Doğa:</b> +4 İyileşme, +2 Zırh. Ult hasar verir, iyileştirir ve düşmanı <b>ZEHİRLER</b>.': '<b>Nature:</b> +4 Healing, +2 Armor. Ult deals damage, heals and <b>POISONS</b> the enemy.',
     'ULT: Wrath of Nature {dmg} hasar verdi, {heal} iyileştirdi!': 'ULT: Wrath of Nature dealt {dmg} damage and healed {heal}!',
     '💫 Sersemledin, bu turu kaçırdın!': "💫 You're stunned and lose this turn!",
+    // === the stormcaller and the alchemist (v1.52) ===
+    "<b>Fırtına:</b> +8 Enerji, +2 Kılıç. Ult hasar verir, ultun <b>%30'unu geri doldurur</b> ve düşmanı sersemletir.": '<b>Storm:</b> +8 Energy, +2 Sword. Ult deals damage, <b>refills 30% of the ult</b> and stuns the enemy.',
+    'ULT: Tempest {dmg} hasar verdi, ult %30 doldu!': 'ULT: Tempest dealt {dmg} damage, the ult refilled 30%!',
+    '<b>Simya:</b> +10 Kafatası Hasarı, +2 İyileşme. Ult hasar verir, biraz iyileştirir, düşmanı <b>ZEHİRLER</b> ve <b>ZAYIFLATIR</b>.': '<b>Alchemy:</b> +10 Skull Damage, +2 Healing. Ult deals damage, heals a little, <b>POISONS</b> and <b>WEAKENS</b> the enemy.',
+    'ULT: Grand Concoction {dmg} hasar verdi, {heal} iyileştirdi!': 'ULT: Grand Concoction dealt {dmg} damage and healed {heal}!',
 };

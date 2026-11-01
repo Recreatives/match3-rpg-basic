@@ -872,8 +872,8 @@ function pvpUseUltimate() {
         if (stage) stage.playUlt(selectedClass.name.toLowerCase());
     }
     let ultCtx = makePvpCombatContext();
+    pvpUltCharge = 0; // before the effect: an ult may refill part of itself (stormcaller)
     selectedClass.ultEffect(ultCtx);
-    pvpUltCharge = 0;
 
     if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 

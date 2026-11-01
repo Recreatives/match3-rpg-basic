@@ -89,6 +89,15 @@
     {"id": "nature/leaf-storm", "fps": 20, "loopSec": 1.2, "noBody": true},
     {"id": "nature/tornado", "fps": 20, "loopSec": 1.2},
     {"id": "own/rune-awaken", "src": "tools/fx-own/rune-awaken.js", "fps": 24},
+    {"id": "lightning/chain-lightning", "maxSec": 1.2, "fadeSec": 0.4, "fps": 24},
+    {"id": "lightning/thunderclap", "maxSec": 1.3, "fadeSec": 0.5, "fps": 20},
+    {"id": "lightning/ball-lightning", "fps": 20, "loopSec": 0.8},
+    {"id": "lightning/storm-cloud", "fps": 20, "loopSec": 1.2},
+    {"id": "explosions/barrel-explosion", "maxSec": 2.2, "fadeSec": 0.7, "fps": 20, "hit": 0.8},
+    {"id": "nature/toxic-puddle", "fps": 20, "loopSec": 1.2},
+    {"id": "nature/poison-cloud", "fps": 20, "loopSec": 1.2},
+    {"id": "pickups/potion", "fps": 20, "loopSec": 0.8},
+    {"id": "pickups/potion", "as": "pickups/potion-acid", "fps": 20, "loopSec": 0.8, "opts": {"palette": ["#0a2006", "#1a4a0e", "#2e7a16", "#4aaa22", "#7ad83a", "#b4ff8a", "#e6ffd0", "#ffffff"]}},
     {"id": "holy/divine-shield", "as": "holy/divine-shield-bark", "fps": 20, "opts": {"palette": ["#0e1a06", "#1e3a0e", "#2e5a16", "#4a8a22", "#7ac43a", "#b4e88a", "#e6ffd0", "#ffffff"]}}
   ]
 }

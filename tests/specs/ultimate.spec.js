@@ -5,7 +5,7 @@
 // state, which is where a real "ULT is 100% but I can't press it" bug hid
 // (the enemy turn handed control back without re-enabling the button).
 
-var ULT_CLASSES = ['WARRIOR', 'BERSERKER', 'ROGUE', 'ARCHER', 'MAGE', 'NECROMANCER', 'PALADIN', 'DRUID'];
+var ULT_CLASSES = ['WARRIOR', 'BERSERKER', 'ROGUE', 'ARCHER', 'MAGE', 'NECROMANCER', 'PALADIN', 'DRUID', 'STORMCALLER', 'ALCHEMIST'];
 
 // A 3-in-a-row energy match (no extra turn) on the solo board: swap 2<->3.
 function soloEnergyMove(w) {
@@ -34,7 +34,7 @@ describe('Ultimate button (solo, real turn cycle)', { isolate: 'each' }, functio
             w.g('enemyArmor = 0'); // so every class's ult damage shows up in HP
             var before = w.g('enemyHP');
             btn.click();
-            expect(w.g('ultCharge'), 'ult consumed').toBe(0);
+            expect(w.g('ultCharge'), 'ult consumed').toBe(key === 'STORMCALLER' ? 30 : 0); // the stormcaller refills 30%
             expect(w.g('enemyHP'), 'ult hit the enemy').toBeLessThan(before);
             expect(btn.disabled, 'disabled right after use').toBe(true);
             await w.settle(30000);
@@ -67,8 +67,17 @@ describe('Ultimate button (PvP and co-op, every class)', { world: false }, funct
     ULT_CLASSES.forEach(function (key) {
         it('PvP ' + key + ': usable when the turn comes back, hits and passes the turn', async function () {
             var bus = makeBus(), p = await joinPvp(bus, key, 'WARRIOR');
-            var A = p.A, B = p.B, M = A.g('pvpMyTurn') ? A : B, W = M === A ? B : A;
+            // M is always the class under test (A); if the warrior got the first
+            // move (presence order can flip on a slow machine), it passes once
+            var A = p.A, B = p.B, M = A, W = B;
             try {
+                if (!A.g('pvpMyTurn')) {
+                    var b0 = noMatchBoard(); b0[0] = b0[1] = 'shield'; b0[3] = 'shield'; b0[2] = 'heart';
+                    setSharedBoard([A, B], b0, 'pvpTiles');
+                    scriptRandom(B, CALM_REFILL);
+                    tap(B, 'pvpHandleTap', 'pvpTiles', 2); tap(B, 'pvpHandleTap', 'pvpTiles', 3);
+                    await settleAll([A, B], bus);
+                }
                 // M passes with a shield match, W moves, turn returns to M with a full ult
                 var b = noMatchBoard(); b[0] = b[1] = 'shield'; b[3] = 'shield'; b[2] = 'heart';
                 setSharedBoard([A, B], b, 'pvpTiles');
@@ -88,11 +97,11 @@ describe('Ultimate button (PvP and co-op, every class)', { world: false }, funct
                 var hpBefore = W.g('pvpMyHP');
                 btn.click();
                 await settleAll([A, B], bus);
-                expect(M.g('pvpUltCharge')).toBe(0);
+                expect(M.g('pvpUltCharge')).toBe(key === 'STORMCALLER' ? 30 : 0); // the stormcaller refills 30%
                 expect(W.g('pvpMyHP'), 'opponent hit').toBeLessThan(hpBefore);
                 if (key === 'ROGUE') expect(M.g('pvpMyTurn'), 'rogue keeps the turn').toBe(true);
                 // the warrior's ult stuns (status.js): the turn passes and comes straight back
-                else if (key === 'WARRIOR') { expect(M.g('pvpMyTurn'), 'stunned opponent - back to me').toBe(true); expect(W.g('pvpMyTurn')).toBe(false); }
+                else if (key === 'WARRIOR' || key === 'STORMCALLER') { expect(M.g('pvpMyTurn'), 'stunned opponent - back to me').toBe(true); expect(W.g('pvpMyTurn')).toBe(false); }
                 else expect(W.g('pvpMyTurn'), 'turn passed').toBe(true);
                 expect(M.g('pvpProcessing'), 'not stuck').toBe(false);
             } finally { A.destroy(); B.destroy(); }
@@ -122,7 +131,7 @@ describe('Ultimate button (PvP and co-op, every class)', { world: false }, funct
                 var hpBefore = H.g('coopEnemyHP');
                 btn.click();
                 await settleAll([H, G], bus);
-                expect(H.g('coopUltCharge')).toBe(0);
+                expect(H.g('coopUltCharge')).toBe(key === 'STORMCALLER' ? 30 : 0);
                 expect(H.g('coopEnemyHP'), 'enemy hit').toBeLessThan(hpBefore);
                 expect(G.g('coopEnemyHP'), 'guest sees it').toBe(H.g('coopEnemyHP'));
                 expect(H.g('coopProcessing'), 'not stuck').toBe(false);

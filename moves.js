@@ -333,6 +333,62 @@ const CG_MOVES = {
             cgSelf('d.commune', 'summon', CG_POSE.float(6), s => CG_VFX.rune(s, CGC.gold, { ms: 900 })),
         ],
     },
+    // Effects roadmap - the stormcaller: lightning at range, a charged ult
+    stormcaller: {
+        sword: [
+            cgRanged('st.zap', 'cast', 'bolt', CGC.cyan, s => CG_VFX.orbit(s, CGC.cyan, { n: 3 }), { pose: CG_POSE.float(5) }),
+            cgRanged('st.arc', 'cast', 'bolt', CGC.cyan, null, { pose: CG_POSE.float(6) }),
+            cgRanged('st.ball', 'push', 'pfxball', CGC.cyan, null, { pose: CG_POSE.float(5) }),
+            cgRanged('st.strike', 'summon', 'bolt', CGC.white, s => CG_VFX.flash(s, CGC.cyan, { ms: 400 }), { tier: 2, pose: CG_POSE.float(8) }),
+            cgRanged('st.tempest', 'summon', 'bolt', CGC.white, s => CG_VFX.rune(s, CGC.cyan, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
+        ],
+        skull: [
+            cgRanged('st.shock', 'cast', 'bolt', CGC.cyan, null, { pose: CG_POSE.float(6) }),
+            cgRanged('st.clap', 'push', 'bolt', CGC.white, s => CG_VFX.flash(s, CGC.white, { ms: 300 }), { pose: CG_POSE.float(4) }),
+            cgRanged('st.chain', 'cast', 'bolt', CGC.cyan, s => CG_VFX.orbit(s, CGC.cyan, { n: 5 }), { tier: 2, pose: CG_POSE.float(8) }),
+            cgRanged('st.storm', 'summon', 'bolt', CGC.white, s => CG_VFX.rune(s, CGC.blue, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
+        ],
+        shield: [
+            cgSelf('st.static', 'guard', CG_POSE.brace(0.06), s => CG_VFX.orbit(s, CGC.cyan, { n: 6 })),
+            cgSelf('st.ward', 'block', CG_POSE.brace(0.08), s => CG_VFX.dome(s, CGC.cyan, { ms: 900 })),
+        ],
+        heart: [
+            cgSelf('st.rain', 'heal', CG_POSE.float(6), s => CG_VFX.particles(s, CGC.cyan, { n: 10 })),
+            cgSelf('st.renew', 'pray', CG_POSE.float(5), s => CG_VFX.aura(s, CGC.blue)),
+        ],
+        energy: [
+            cgSelf('st.charge', 'power', CG_POSE.float(6), s => CG_VFX.orbit(s, CGC.white, { n: 6, inward: true })),
+            cgSelf('st.cloud', 'summon', CG_POSE.float(6), s => CG_VFX.rune(s, CGC.cyan, { ms: 900 })),
+        ],
+    },
+    // the alchemist: bombs, acid, smoke and tonics
+    alchemist: {
+        sword: [
+            cgRanged('al.bomb', 'throw', 'pfxbomb', CGC.orange, null),
+            cgRanged('al.flask', 'throw', 'pfxacid', CGC.green, null),
+            cgMelee('al.stab', 'stab', 'dash', CGC.steel, cgSlashAt(CGC.steel, { width: 3 })),
+            cgRanged('al.barrel', 'summon', 'dagger', CGC.orange, cgRingAt(CGC.orange, { r1: 0.9 }), { tier: 2 }),
+            cgRanged('al.inferno', 'throw', 'pfxbomb', CGC.orange, s => CG_VFX.aura(s, CGC.orange, { pulses: 2 }), { tier: 3 }),
+        ],
+        skull: [
+            cgRanged('al.acid', 'throw', 'pfxacid', CGC.green, null),
+            cgRanged('al.cloud', 'throw', 'dagger', CGC.green, s => CG_VFX.particles(s, CGC.green, { n: 8 })),
+            cgRanged('al.puddle', 'throw', 'dagger', CGC.green, null, { tier: 2 }),
+            cgRanged('al.cataclysm', 'summon', 'dagger', CGC.orange, s => CG_VFX.aura(s, CGC.green, { pulses: 3 }), { tier: 3 }),
+        ],
+        shield: [
+            cgSelf('al.smoke', 'dodge', CG_POSE.dodge(12), s => CG_VFX.afterimages(s, CGC.leaf)),
+            cgSelf('al.tonic', 'drink', CG_POSE.float(4), s => CG_VFX.dome(s, CGC.leaf, { ms: 900 })),
+        ],
+        heart: [
+            cgSelf('al.drink', 'drink', CG_POSE.float(3), cgPotionFx(0x7acf3a)),
+            cgSelf('al.elixir', 'heal', CG_POSE.float(6), s => CG_VFX.aura(s, CGC.green)),
+        ],
+        energy: [
+            cgSelf('al.brew', 'power', CG_POSE.float(6), s => CG_VFX.orbit(s, CGC.orange, { n: 5 })),
+            cgSelf('al.distill', 'summon', CG_POSE.float(6), s => CG_VFX.particles(s, CGC.green, { n: 10 })),
+        ],
+    },
     paladin: {
         sword: [
             cgMelee('p.hammer', 'slam', 'dash', CGC.gold, cgAll(cgRingAt(CGC.gold), cgSlashAt(CGC.holy, { width: 6 }))),
@@ -373,6 +429,8 @@ const CG_ULTS = {
     mage: cgRanged('m.ult', 'summon', 'meteor', CGC.orange, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1300, size: 0.75 }), s => CG_VFX.orbit(s, CGC.blue, { n: 6, ms: 1300, inward: true })), { tier: 3, ms: 1300, launchMs: 120, pose: CG_POSE.float(12) }),
     necromancer: cgRanged('n.ult', 'summon', 'graspers', CGC.purple, cgAll(s => CG_VFX.aura(s, CGC.shadow, { ms: 1300, pulses: 5 }), s => CG_VFX.rune(s, CGC.purple, { ms: 1300, size: 0.7 })), { tier: 3, ms: 1300, launchMs: 120, pose: CG_POSE.float(10), onImpact: (s, c) => { if (c.foe && c.arena) c.arena.shoot('drain', c.arena.handPoint(s), c.arena.bodyPoint(c.foe, 0.5), 300, CGC.green); } }),
     druid: cgRanged('d.ult', 'summon', 'wave', CGC.leaf, cgAll(s => CG_VFX.rune(s, CGC.leaf, { ms: 1300, size: 0.7 }), s => CG_VFX.pillar(s, CGC.green, { ms: 1300 })), { tier: 3, ms: 1300, launchMs: 150, pose: CG_POSE.float(12) }),
+    stormcaller: cgRanged('st.ult', 'summon', 'bolt', CGC.white, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1300, size: 0.7 }), s => CG_VFX.flash(s, CGC.cyan, { ms: 500 })), { tier: 3, ms: 1300, launchMs: 150, pose: CG_POSE.float(12) }),
+    alchemist: cgRanged('al.ult', 'throw', 'pfxbomb', CGC.orange, cgAll(s => CG_VFX.aura(s, CGC.green, { ms: 1300, pulses: 4 }), s => CG_VFX.ring(s, CGC.orange, { r1: 1.0, width: 6 })), { tier: 3, ms: 1300, launchMs: 200 }),
     paladin: cgRanged('p.ult', 'summon', 'smite', CGC.holy, cgAll(s => CG_VFX.pillar(s, CGC.gold, { ms: 1300 }), s => CG_VFX.flash(s, CGC.holy, { ms: 600 })), { tier: 3, ms: 1400, launchMs: 120, pose: CG_POSE.float(10), onImpact: cgGroundHit(CGC.gold, 14) }),
 };
 
@@ -568,6 +626,25 @@ const CG_PFX_MOVES = (() => {
         'd.bloom': [self('nature-healing-bloom', 0.8)], 'd.rain': [heal],
         'd.leaves': [self('nature-leaf-storm', 1, { ms: 1000 })], 'd.commune': [charge],
         'd.ult': [foe('nature-tornado', 0.8, { ms: 1200 }), foe('nature-earth-spike', 0.5), self('nature-healing-bloom', 0.8), NOSHOT],
+        // the stormcaller
+        'st.zap': [hit('lightning-zap-hit', 0.8)], 'st.arc': [self('lightning-chain-lightning', 0.8), NOSHOT],
+        'st.strike': [foe('lightning-lightning-strike', 0.55), NOSHOT],
+        'st.tempest': [foe('lightning-storm-cloud', 0.7, { ms: 1100 }), foe('lightning-lightning-strike', 0.6), NOSHOT],
+        'st.shock': [hit('lightning-zap-hit', 0.9)], 'st.clap': [self('lightning-thunderclap', 0.7), NOSHOT],
+        'st.chain': [self('lightning-chain-lightning', 0.9), hit('lightning-zap-hit', 0.8), NOSHOT],
+        'st.storm': [foe('lightning-storm-cloud', 0.7, { ms: 1100 }), foe('lightning-lightning-strike', 0.6), NOSHOT],
+        'st.static': [charge], 'st.ward': [shieldUp], 'st.rain': [heal], 'st.renew': [heal],
+        'st.charge': [charge], 'st.cloud': [self('lightning-storm-cloud', 0.6, { ms: 1000 })],
+        'st.ult': [self('lightning-charge-up', 0.8, { at: 'start' }), foe('lightning-storm-cloud', 0.8, { ms: 1200 }), foe('lightning-lightning-strike', 0.65), NOSHOT],
+        // the alchemist (bombs and flasks: CG_SHOTS.pfxbomb / pfxacid)
+        'al.stab': [thrust, spark], 'al.barrel': [foe('explosions-barrel-explosion', 0.5), NOSHOT],
+        'al.inferno': [foe('explosions-barrel-explosion', 0.5)],
+        'al.cloud': [foe('nature-poison-cloud', 0.6, { ms: 1100 }), NOSHOT], 'al.puddle': [foe('nature-toxic-puddle', 0.7, { ms: 1200 }), NOSHOT],
+        'al.cataclysm': [foe('explosions-barrel-explosion', 0.55), foe('nature-poison-cloud', 0.6, { ms: 1100 }), NOSHOT],
+        'al.smoke': [self('explosions-smoke-bomb', 0.6)], 'al.tonic': [shieldUp],
+        'al.drink': [heal], 'al.elixir': [self('nature-healing-bloom', 0.8)],
+        'al.brew': [charge], 'al.distill': [self('nature-spore-burst', 0.5)],
+        'al.ult': [foe('nature-poison-cloud', 0.7, { ms: 1200 }), heal],
         // Faz 5 - monsters (they stand on the right: pfx.js mirrors everything for them)
         'mn.club': [foe('melee-heavy-cleave'), blunt], 'mn.swipe': [foe('melee-claw-swipe')], 'mn.kick': [blunt],
         'mn.smash': [foe('melee-hammer-smash'), foe('impacts-ground-slam', 0.5)], 'mn.roar': [rage], 'mn.flex': [charge],

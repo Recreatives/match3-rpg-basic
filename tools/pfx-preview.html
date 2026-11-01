@@ -35,7 +35,7 @@ hero.setAvatar(heroSpecFor(cls, null, []));
 foe.setMonster('boss', 8);
 if (typeof cgEffectsEnabled === 'function' && !cgEffectsEnabled()) cgToggleLowGraphics();
 const bar = document.getElementById('buttons');
-bar.insertAdjacentHTML('beforeend', ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid'].map(c => `<a href="?cls=${c}" style="color:${c === cls ? '#ffe2a0' : '#9fb0c0'};margin-right:8px">${c}</a>`).join('') + '<br>');
+bar.insertAdjacentHTML('beforeend', ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid', 'stormcaller', 'alchemist'].map(c => `<a href="?cls=${c}" style="color:${c === cls ? '#ffe2a0' : '#9fb0c0'};margin-right:8px">${c}</a>`).join('') + '<br>');
 const all = [].concat(...Object.values(CG_MOVES[cls]), CG_ULTS[cls]);
 function play(m) { hero._perform(m); if (m.kind !== 'self') setTimeout(() => foe.playHit('skull', 0), cgImpactMs()); }
 all.forEach(m => {

@@ -1,4 +1,4 @@
-"""Generates the combat portraits: 8 hero classes + 5 monsters, as SVG.
+"""Generates the combat portraits: 10 hero classes + 5 monsters, as SVG.
 
 Stylized "chibi" vector characters (big head, bold outline, soft shading)
 built from one shared body template plus per-character parts: outfit colors,
@@ -304,6 +304,33 @@ def druid():
         'armR': staff(152, 172, 'orb', '#7ad84a') + arm('R', 'url(#robe)', 'url(#skin)'),
     })
 
+def stormcaller():
+    # a storm-grey robe and hood, a staff crowned with a crackling orb
+    d = grad('robe', '#4a6a9a', '#1a2440') + grad('hood', '#3a4e78', '#141c34')
+    head_ = (head('') + eyes('#3fb8ff') + mouth('grim', 112)
+             + P('M44 96 Q40 28 100 24 Q160 28 156 96 Q144 60 100 56 Q56 60 44 96 Z', 'url(#hood)')
+             + P('M92 6 L84 26 L96 26 L88 46', 'none', 3.5, 'stroke="#bff4ff"'))
+    return rig(d, SKIN_LIGHT, {
+        'torso': robe_torso('url(#robe)', '#9adfff'), 'head': head_,
+        'armL': arm('L', 'url(#robe)', 'url(#skin)') + P('M40 150 L52 164 L44 166 L56 182', 'none', 3, 'stroke="#bff4ff"'),
+        'armR': staff(152, 172, 'orb', '#5fd8ff') + arm('R', 'url(#robe)', 'url(#skin)'),
+    })
+
+def alchemist():
+    # a leather apron with vials, goggles up on the brow, a bubbling flask
+    d = grad('coat', '#8a6a3e', '#3e2c16') + grad('apron', '#6a5236', '#2e2214')
+    head_ = (head('') + eyes('#6a4a2a') + mouth('smile') + blush()
+             + P('M56 80 Q52 40 100 38 Q148 40 144 80 Q132 62 100 60 Q68 62 56 80 Z', '#5a3a22')
+             + C(82, 66, 10, '#9adfff', 3) + C(118, 66, 10, '#9adfff', 3) + R(90, 63, 20, 6, 2, '#4a3020', 2))
+    return rig(d, SKIN_TAN, {
+        'legL': leg('L', '#3a3020', '#2a1e12'), 'legR': leg('R', '#3a3020', '#2a1e12'),
+        'torso': torso('url(#coat)', '#6a4a20') + P('M80 126 L120 126 L116 192 L84 192 Z', 'url(#apron)', 3)
+                 + R(86, 134, 8, 14, 3, '#7acf3a', 2) + R(98, 134, 8, 14, 3, '#ff9a3a', 2) + R(110, 134, 8, 14, 3, '#5fc8ff', 2),
+        'head': head_,
+        'armL': arm('L', 'url(#coat)', 'url(#skin)', '#3a3020') + C(48, 172, 12, '#7acf3a', 3) + R(44, 152, 8, 10, 2, '#c8b89a', 2),
+        'armR': arm('R', 'url(#coat)', 'url(#skin)', '#3a3020') + dagger(146, 172),
+    })
+
 def paladin():
     d = grad('armor', '#fff6d6', '#c9a13f') + grad('tabard', '#ffffff', '#cfd6e2')
     head_ = ('<ellipse cx="100" cy="30" rx="36" ry="9" fill="none" stroke="#ffe46a" stroke-width="5" stroke-opacity=".9"/>'
@@ -386,7 +413,7 @@ def minotaur():
 
 CHARACTERS = {
     'warrior': warrior, 'berserker': berserker, 'rogue': rogue, 'archer': archer,
-    'mage': mage, 'necromancer': necromancer, 'paladin': paladin, 'druid': druid,
+    'mage': mage, 'necromancer': necromancer, 'paladin': paladin, 'druid': druid, 'stormcaller': stormcaller, 'alchemist': alchemist,
     'monster_normal': goblin, 'monster_armored': golem, 'monster_swift': imp,
     'monster_drain': wraith, 'monster_boss': minotaur,
 }

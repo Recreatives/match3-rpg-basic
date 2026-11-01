@@ -917,6 +917,8 @@ body {
 .combat-portrait.class-glow-mage { box-shadow: 0 0 10px 3px rgba(52, 152, 219, 0.65); border-radius: 50%; }
 .combat-portrait.class-glow-necromancer { box-shadow: 0 0 10px 3px rgba(142, 68, 173, 0.65); border-radius: 50%; }
 .combat-portrait.class-glow-druid { box-shadow: 0 0 10px 3px rgba(106, 191, 58, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-stormcaller { box-shadow: 0 0 10px 3px rgba(95, 200, 255, 0.65); border-radius: 50%; }
+.combat-portrait.class-glow-alchemist { box-shadow: 0 0 10px 3px rgba(154, 207, 58, 0.65); border-radius: 50%; }
 .combat-portrait.class-glow-paladin { box-shadow: 0 0 10px 3px rgba(241, 196, 15, 0.65); border-radius: 50%; }
 
 /* Faz 10 - cgSetLegendaryAura's persistent pulse (graphics.js) for an

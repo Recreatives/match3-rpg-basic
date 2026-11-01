@@ -70,6 +70,10 @@ declare c public.characters; borin uuid := (select active_character_id from publ
 begin
     select * into c from public.create_character('Sylva', 'druid', 'f', '{}');
     if c.class_key <> 'druid' then raise exception 'FAIL: druid not created %', row_to_json(c); end if;
+    select * into c from public.create_character('Volta', 'stormcaller', 'm', '{}');
+    if c.class_key <> 'stormcaller' then raise exception 'FAIL: stormcaller not created %', row_to_json(c); end if;
+    select * into c from public.create_character('Brewa', 'alchemist', 'f', '{}');
+    if c.class_key <> 'alchemist' then raise exception 'FAIL: alchemist not created %', row_to_json(c); end if;
     perform public.select_character(borin); -- the rest of this file plays Borin the warrior
 end $$;
 select tst.expect_error($q$select public.create_character('borin', 'rogue', 'm', '{}')$q$, 'already have');

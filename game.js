@@ -294,6 +294,37 @@ const CLASSES = {
             ctx.log(tf('ULT: Wrath of Nature {dmg} hasar verdi, {heal} iyileştirdi!', { dmg, heal }), "log-heal");
             if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('poison', 4);
         }
+    },
+    // the storm: fast energy, chained lightning, an ult that charges the next one
+    STORMCALLER: {
+        name: "Stormcaller", emoji: "⚡",
+        desc: "<b>Fırtına:</b> +8 Enerji, +2 Kılıç. Ult hasar verir, ultun <b>%30'unu geri doldurur</b> ve düşmanı sersemletir.",
+        passive: (stats) => { stats.energy += 8; stats.sword += 2; },
+        dodgeChance: 0.05, incomingDmgMult: 1.0,
+        ultName: "TEMPEST",
+        ultEffect: (ctx) => {
+            let dmg = TILE_STATS.ult_dmg;
+            ctx.dealDamageToOpponent(dmg);
+            ctx.addEnergy(30);
+            ctx.log(tf('ULT: Tempest {dmg} hasar verdi, ult %30 doldu!', { dmg }), "log-crit");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('stun', 1);
+        }
+    },
+    // bombs, acid and tonics: skull damage, a little healing, poison + weakness
+    ALCHEMIST: {
+        name: "Alchemist", emoji: "⚗️",
+        desc: "<b>Simya:</b> +10 Kafatası Hasarı, +2 İyileşme. Ult hasar verir, biraz iyileştirir, düşmanı <b>ZEHİRLER</b> ve <b>ZAYIFLATIR</b>.",
+        passive: (stats) => { stats.skull_dmg += 10; stats.heart += 2; },
+        dodgeChance: 0.05, incomingDmgMult: 1.0,
+        ultName: "GRAND CONCOCTION",
+        ultEffect: (ctx) => {
+            let dmg = TILE_STATS.ult_dmg;
+            let heal = Math.floor(TILE_STATS.heart * 1.5);
+            ctx.dealDamageToOpponent(dmg);
+            ctx.healSelf(heal);
+            ctx.log(tf('ULT: Grand Concoction {dmg} hasar verdi, {heal} iyileştirdi!', { dmg, heal }), "log-crit");
+            if (ctx.applyStatusToOpponent) { ctx.applyStatusToOpponent('poison', 3); ctx.applyStatusToOpponent('weaken', 2); }
+        }
     }
 };
 let selectedClass = null;
@@ -1634,8 +1665,9 @@ function useUltimate() {
 
         // 2. Apply Effect
         let ultCtx = makeSinglePlayerCombatContext();
-        selectedClass.ultEffect(ultCtx);
+        // emptied BEFORE the effect: an ult may refill part of itself (stormcaller)
         ultCharge = 0;
+        selectedClass.ultEffect(ultCtx);
 
         if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 

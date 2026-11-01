@@ -1,6 +1,6 @@
 # pixelfx efektleri: analiz ve yol haritası
 
-Durum: Faz 0-8 `feature/pixelfx-faz1` dalında yapıldı (v1.49), kullanıcı testi ve `main`'e birleştirme bekliyor. Açık kalanlar: Fırtına Çağırıcı ve Simyacı sınıfları (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
+Durum: Faz 0-8 `feature/pixelfx-faz1` dalında yapıldı (v1.49), kullanıcı testi ve `main`'e birleştirme bekliyor. Yol haritasında açık iş kalmadı (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
 
 ## 1. pixelfx nedir?
 
@@ -181,6 +181,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 - `schema.sql` değişikliği ve Supabase'de yeniden çalıştırma.
 
 **Faz 7 yapılanlar (v1.48): Druid.** Doğa sınıfı: +4 iyileşme, +2 zırh, %5 savuşturma; ult WRATH OF NATURE (ult hasarının %80'i + iyileşmenin 2 katı iyileştirme + 4 tur zehir). 15 hamle + ult, hepsi pixelfx (sarmaşık kırbacı, diken dalgası, kök tuzağı, toprak dikeni, kasırga, spor, asit, deprem, ağaç kabuğu kalkanı, şifa çiçeği, yaprak fırtınası) ve vektör yedekli. Stil C boyalı görünüm (yeşil cüppe, asa, kitap), eski tek parça portre (`tools/make_characters.py`), karakter oluşturma, seviye büyümesi, el kitabı satırı, çeviriler. Katalog: kumaş zırh, asa ve kitaplar Druid'e de açık (`tools/make_catalog.py`, 386 referans satırı). **Veritabanı:** `characters.class_key` kontrolü yeniden kuruluyor (tekrar çalıştırılabilir, satırlar korunuyor) - `schema.sql`'in Supabase'de yeniden çalıştırılması gerekiyor, o zamana kadar Druid karakteri sunucuda oluşturulamaz. Fırtına Çağırıcı ve Simyacı sonraki sürümler.
+
+**v1.52: Fırtına Çağırıcı ve Simyacı.** Fırtına Çağırıcı: +8 enerji, +2 kılıç; ult TEMPEST hasar verir, ultun %30'unu geri doldurur, 1 tur sersemletir. Hamleleri yıldırım: şimşek, zincir yıldırım, gök gürültüsü, yıldırım topu (yeni mermi), fırtına bulutu. Simyacı: +10 kafatası hasarı, +2 iyileşme; ult GRAND CONCOCTION hasar verir, iyileştirir, zehirler ve zayıflatır. Hamleleri: bomba ve asit şişesi (yeni mermiler, pixelfx iksiri paletle yeşil), patlayan fıçı, zehir bulutu, asit gölü, duman bombası. İkisi de stil C görünüm, portre, katalog (kumaş/asa/kitap ve deri/hançer), çeviri, el kitabı. Ult'lar artık dolumu etkiden önce sıfırlıyor (iade silinmesin diye). `schema.sql` sınıf kontrolü ikisini de içeriyor - Supabase'de yeniden çalıştırılmalı.
 
 ### Faz 8 (isteğe bağlı): Kendi efektlerimiz
 - pixelfx'in Claude Code becerisiyle temamıza özel yeni efektler: benzersiz eşyaların imza efektleri ve yeni sınıfların ult'ları.

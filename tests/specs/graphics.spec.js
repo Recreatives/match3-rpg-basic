@@ -422,7 +422,7 @@ describe('Combat feedback (numbers, sparkles, bar pulse)', { isolate: 'each', wo
 describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 'each' }, function () {
     var SLOTS = ['player-sprite', 'enemy-sprite', 'pvp-my-sprite', 'pvp-opp-sprite', 'coop-my-sprite', 'coop-ally-sprite', 'coop-enemy-sprite'];
     // the 7 slots below play the first 7; the move-library checks cover all of them
-    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid'];
+    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid', 'stormcaller', 'alchemist'];
     var ACTIONS = ['sword', 'skull', 'heart', 'shield', 'energy'];
     var JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
 
@@ -627,6 +627,9 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
     }
     async function mageReady(w) {
         onScreen(w);
+        // effects on, and kept on: a slow or hidden runner must not let
+        // auto-quality switch to low graphics mid-test
+        w.g("cgQualitySource = 'manual'; cgLowGraphics = false; cgApplyLowGraphicsState()");
         await startSolo(w, 'MAGE', { immortal: true });
         var me = w.g("cgGetStage('player-sprite')");
         await awaitInWorld(w, me.setPortrait(w.g('CHARACTER_SPRITES.mage')));
@@ -648,7 +651,7 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
                 expect(set[k].source.height, n + '-' + k + ' height').toBe(Math.ceil(d.frames / d.cols) * d.cell[1]);
             });
         }
-    }, { timeout: 20000 });
+    }, { timeout: 90000 }); // ~100 sheets
 
     it('CG_PFX_MOVES only names real moves and baked sheets; every pfx shot has a vector fallback', function (ctx) {
         var w = ctx.world, T = w.g('CG_PFX_MOVES'), D = w.g('PFX_DATA'), M = w.g('CG_MOVES'), U = w.g('CG_ULTS'), SHOTS = w.g('CG_SHOTS'), SHEETS = w.g('PFX_SHOT_SHEETS');

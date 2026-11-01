@@ -24,8 +24,8 @@ import json, os, re
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 BANDS = [(1, 10), (10, 20), (20, 30), (30, 40), (40, 50)]
-ALL = ['warrior', 'paladin', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'druid']
-WEIGHT = {'plate': ['warrior', 'paladin', 'berserker'], 'leather': ['rogue', 'archer', 'berserker'], 'cloth': ['mage', 'necromancer', 'druid']}
+ALL = ['warrior', 'paladin', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'druid', 'stormcaller', 'alchemist']
+WEIGHT = {'plate': ['warrior', 'paladin', 'berserker'], 'leather': ['rogue', 'archer', 'berserker', 'alchemist'], 'cloth': ['mage', 'necromancer', 'druid', 'stormcaller']}
 
 BASES = {}
 EN = {}  # Turkish name -> English (goes into EN_DICT at load)
@@ -131,11 +131,11 @@ WEAPONS = {
                ['#8a8a80', '#a9b4c0', '#d4a84a', '#fff2c0', '#fff8e0'], {}),
     'spear': ('spear', ['warrior'], 'skull_dmg', 2, ['Mızrak', 'Demir Mızrak', 'Uzun Mızrak', 'Muhafız Mızrağı', 'Ejder Mızrağı'],
               ['#8a8078', '#a9b4c0', '#c9d2dc', '#e8ecf0', '#6a7080'], {}),
-    'dagger': ('dagger', ['rogue'], 'lifeSteal', 1, ['Paslı Hançer', 'Keskin Hançer', 'Gölge Hançeri', 'Zehirli Diş', 'Gece Pençesi'],
+    'dagger': ('dagger', ['rogue', 'alchemist'], 'lifeSteal', 1, ['Paslı Hançer', 'Keskin Hançer', 'Gölge Hançeri', 'Zehirli Diş', 'Gece Pençesi'],
                ['#8a8078', '#c9d2dc', '#9a8ab0', '#8ad08a', '#3a3a4a'], {}),
     'bow': ('bow', ['archer'], 'energy', 2, ['Av Yayı', 'Uzun Yay', 'Kompozit Yay', 'Rüzgar Yayı', 'Fırtına Yayı'],
             ['#7a5230', '#8a6038', '#5a3a2a', '#3a4a5a', '#2a2a3a'], {}),
-    'staff': ('staff', ['mage', 'necromancer', 'druid'], 'ult_dmg', 2, ['Budak Asa', 'Çırak Asası', 'Kristal Asa', 'Kadim Asa', 'Yıldız Asası'],
+    'staff': ('staff', ['mage', 'necromancer', 'druid', 'stormcaller'], 'ult_dmg', 2, ['Budak Asa', 'Çırak Asası', 'Kristal Asa', 'Kadim Asa', 'Yıldız Asası'],
               ['#7a5230', '#6a4a2a', '#5a3a4a', '#3a2a4a', '#2a1a3a'], {}),
     'wand': ('wand', ['mage'], 'energy', 1, ['Dal Değnek', 'Kemik Değnek', 'Rün Değneği', 'Işık Değneği', 'Boşluk Değneği'],
              ['#6a4a2a', '#b8b0a0', '#4a4a6a', '#d4a84a', '#2a1a3a'], {}),
@@ -182,7 +182,7 @@ OFFHANDS = {
               ['#5a4a3a', '#4a5a6a', '#3a4a6a', '#d8d2c0', '#2a2e3a']),
     'orb': ('orb', ['mage'], 'ult_dmg', ['Cam Küre', 'Buz Küresi', 'Arkan Küre', 'Fırtına Küresi', 'Yıldız Küresi'],
             ['#8ab0c0', '#8adfff', '#5fd8ff', '#b05cff', '#c890ff']),
-    'tome': ('tome', ['mage', 'necromancer', 'druid'], 'energy', ['Eski Defter', 'Büyü Kitabı', 'Rün Kitabı', 'Kadim Tomar', 'Kara Kitap'],
+    'tome': ('tome', ['mage', 'necromancer', 'druid', 'stormcaller'], 'energy', ['Eski Defter', 'Büyü Kitabı', 'Rün Kitabı', 'Kadim Tomar', 'Kara Kitap'],
              ['#6b4a30', '#2c3a8a', '#4a2a6a', '#6a4a1a', '#1a1a22']),
     'lantern': ('lantern', ['necromancer'], 'lifeSteal', ['Kandil', 'Mezar Feneri', 'Ruh Feneri', 'Hayalet Feneri', 'Ölüm Feneri'],
                 ['#6a5f56', '#5a5f66', '#4a5a4a', '#3a4a5a', '#2a2a2a']),
@@ -386,7 +386,7 @@ WEAPONS10 = {
               ['Mızrak', 'Demir Mızrak', 'Kargı', 'Uzun Mızrak', 'Süvari Mızrağı', 'Muhafız Mızrağı', 'Gök Mızrak', 'Ejder Mızrağı', 'Yıldırım Kargı', 'Titan Mızrağı'],
               ['Spear', 'Iron Spear', 'Pike', 'Long Spear', 'Lance', "Guardian's Spear", 'Sky Spear', 'Dragon Spear', 'Lightning Pike', 'Titan Spear'],
               ['#8a8078', '#a9b4c0', '#9a9a9a', '#c9d2dc', '#d8dde2', '#e8ecf0', '#8ab0d0', '#6a7080', '#bff4ff', '#9a8ab0']),
-    'dagger': ('dagger', ['rogue'], 'lifeSteal', 1, {}, '#b05cff',
+    'dagger': ('dagger', ['rogue', 'alchemist'], 'lifeSteal', 1, {}, '#b05cff',
                ['Paslı Hançer', 'Keskin Hançer', 'Haydut Bıçağı', 'Gölge Hançeri', 'Zehirli Diş', 'Suikast Hançeri', 'Kuzgun Gagası', 'Gece Pençesi', 'Hayalet Bıçak', 'Ölüm Fısıltısı'],
                ['Rusty Dagger', 'Keen Dagger', 'Bandit Knife', 'Shadow Dagger', 'Venom Fang', "Assassin's Dagger", 'Raven Beak', 'Night Claw', 'Ghost Blade', 'Death Whisper'],
                ['#8a8078', '#c9d2dc', '#a9a090', '#9a8ab0', '#8ad08a', '#c9d2dc', '#4a4a5a', '#3a3a4a', '#bff4ff', '#2a2a3a']),
@@ -394,7 +394,7 @@ WEAPONS10 = {
             ['Av Yayı', 'Kısa Yay', 'Uzun Yay', 'Kompozit Yay', 'İzci Yayı', 'Avcı Yayı', 'Rüzgar Yayı', 'Şahin Yayı', 'Fırtına Yayı', 'Yıldız Yayı'],
             ['Hunting Bow', 'Short Bow', 'Longbow', 'Composite Bow', "Scout's Bow", "Hunter's Bow", 'Wind Bow', 'Falcon Bow', 'Storm Bow', 'Star Bow'],
             ['#7a5230', '#6a4a2a', '#8a6038', '#5a3a2a', '#4a5a3a', '#3a4a2a', '#3a4a5a', '#5a4a3a', '#2a2a3a', '#3a2a5a']),
-    'staff': ('staff', ['mage', 'necromancer', 'druid'], 'ult_dmg', 2, {}, None,
+    'staff': ('staff', ['mage', 'necromancer', 'druid', 'stormcaller'], 'ult_dmg', 2, {}, None,
               ['Budak Asa', 'Çırak Asası', 'Meşe Asa', 'Kristal Asa', 'Büyücü Asası', 'Kadim Asa', 'Başbüyücü Asası', 'Ay Asası', 'Yıldız Asası', 'Kozmik Asa'],
               ['Gnarled Staff', "Apprentice's Staff", 'Oak Staff', 'Crystal Staff', "Sorcerer's Staff", 'Ancient Staff', "Archmage's Staff", 'Moon Staff', 'Star Staff', 'Cosmic Staff'],
               ['#7a5230', '#6a4a2a', '#5a4a2a', '#5a3a4a', '#4a2a4a', '#3a2a4a', '#2a2a4a', '#3a3a5a', '#2a1a3a', '#1a1a2a']),
@@ -434,7 +434,7 @@ OFFHANDS10 = {
             ['Cam Küre', 'Buz Küresi', 'Ateş Küresi', 'Arkan Küre', 'Kristal Küre', 'Fırtına Küresi', 'Ay Küresi', 'Yıldız Küresi', 'Boşluk Küresi', 'Kozmik Küre'],
             ['Glass Orb', 'Frost Orb', 'Fire Orb', 'Arcane Orb', 'Crystal Orb', 'Storm Orb', 'Moon Orb', 'Star Orb', 'Void Orb', 'Cosmic Orb'],
             ['#8ab0c0', '#8adfff', '#ff8a2a', '#5fd8ff', '#bff4ff', '#8ab0ff', '#e8e4ff', '#ffd24a', '#b05cff', '#c890ff']),
-    'tome': ('tome', ['mage', 'necromancer', 'druid'], 'energy', 1,
+    'tome': ('tome', ['mage', 'necromancer', 'druid', 'stormcaller'], 'energy', 1,
              ['Eski Defter', 'Büyü Kitabı', 'Rün Kitabı', 'Bilge Kitabı', 'Kadim Tomar', 'Ay Kitabı', 'Lanet Kitabı', 'Kara Kitap', 'Yıldız Atlası', 'Kader Kitabı'],
              ['Old Notebook', 'Spellbook', 'Rune Book', "Sage's Book", 'Ancient Scroll', 'Moon Book', 'Book of Curses', 'Black Book', 'Star Atlas', 'Book of Fate'],
              ['#6b4a30', '#2c3a8a', '#4a2a6a', '#2a5a3a', '#6a4a1a', '#2a3a5a', '#4a1a2a', '#1a1a22', '#1a2a4a', '#3a1a3a']),
@@ -500,8 +500,8 @@ for t in range(10):
 LEGACY = {
     'blade': ('weapon', 'Kılıç', 'sword', ['warrior', 'paladin'], 2, {'slot': 'weapon', 'style': 'sword', 'color': '#c9d2dc', 'trim': '#d4a84a'}),
     'axe': ('weapon', 'Balta', 'skull_dmg', ['warrior', 'berserker'], 1, {'slot': 'weapon', 'style': 'axe', 'color': '#b8c0c8'}),
-    'scepter': ('weapon', 'Asa', 'ult_dmg', ['mage', 'necromancer', 'druid'], 2, {'slot': 'weapon', 'style': 'staff', 'color': '#7a5230', 'glow': '#5fd8ff'}),
-    'dagger': ('weapon', 'Hançer', 'lifeSteal', ['rogue'], 1, {'slot': 'weapon', 'style': 'dagger', 'color': '#c9d2dc'}),
+    'scepter': ('weapon', 'Asa', 'ult_dmg', ['mage', 'necromancer', 'druid', 'stormcaller'], 2, {'slot': 'weapon', 'style': 'staff', 'color': '#7a5230', 'glow': '#5fd8ff'}),
+    'dagger': ('weapon', 'Hançer', 'lifeSteal', ['rogue', 'alchemist'], 1, {'slot': 'weapon', 'style': 'dagger', 'color': '#c9d2dc'}),
     'bow': ('weapon', 'Yay', 'energy', ['archer'], 2, {'slot': 'weapon', 'style': 'bow', 'color': '#7a5230'}),
     'spear': ('weapon', 'Mızrak', 'skull_dmg', ['warrior'], 2, {'slot': 'weapon', 'style': 'spear', 'color': '#c9d2dc'}),
     'mace': ('weapon', 'Gürz', 'sword', ['warrior', 'paladin'], 1, {'slot': 'weapon', 'style': 'mace', 'color': '#a9b4c0'}),
