@@ -653,6 +653,8 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
         var w = ctx.world, T = w.g('CG_PFX_MOVES'), D = w.g('PFX_DATA'), M = w.g('CG_MOVES'), U = w.g('CG_ULTS'), SHOTS = w.g('CG_SHOTS'), SHEETS = w.g('PFX_SHOT_SHEETS');
         var ids = {};
         Object.keys(M).forEach(function (c) { Object.keys(M[c]).forEach(function (a) { M[c][a].forEach(function (m) { ids[m.id] = m; }); }); ids[U[c].id] = U[c]; });
+        var MM = w.g('CG_MONSTER_MOVES');
+        Object.keys(MM).forEach(function (k) { Object.keys(MM[k]).forEach(function (a) { MM[k][a].forEach(function (m) { ids[m.id] = m; }); }); });
         var n = 0;
         Object.keys(T).forEach(function (id) {
             expect(!!ids[id], 'a real move: ' + id).toBe(true);

@@ -70,11 +70,12 @@ const LIGHT_CUT = 14, COLOR_CUT = 8;
 const q4 = v => Math.min(255, Math.round(v / 4) * 4);
 
 // light -> straight-alpha RGBA: alpha = brightest channel
+let lightCut = LIGHT_CUT; // per effect: item.lightCut
 function lightPixel(l) {
   l &= 0xffffff;
   if (!l) return 0;
   const r = l & 255, g = (l >>> 8) & 255, b = (l >>> 16) & 255, m = Math.max(r, g, b), k = 255 / m;
-  if (m < LIGHT_CUT) return 0;
+  if (m < lightCut) return 0;
   return ((q4(m) << 24) | (q4(b * k) << 16) | (q4(g * k) << 8) | q4(r * k)) >>> 0;
 }
 function colorPixel(c) {
@@ -98,6 +99,7 @@ function bake(item) {
   const opts = Object.assign({ x: 0, y: 0 }, item.opts || {});
   if (meta.actor) opts.actor = blankDummy();
   const fx = createFx(mod, opts);
+  lightCut = item.lightCut || LIGHT_CUT;
   const fps = item.fps || meta.fps || 30;
   const dur = meta.loop ? (item.loopSec || meta.duration || 1) : Math.min(meta.duration || 1, item.maxSec || Infinity);
   const n = Math.max(1, Math.round(dur * fps));
@@ -109,7 +111,8 @@ function bake(item) {
   for (let i = 0; i < n; i++) {
     if (i > 0) fx.update(1 / fps);
     const t = i / fps, fade = fadeSec && t > dur - fadeSec ? Math.max(0, (dur - t) / fadeSec) : 1;
-    for (const [side, c, l] of [["back", "bc", "bl"], ["front", "fc", "fl"]]) {
+    // merge: one front layer with both sides (ambience - no fighters to stand between)
+    for (const [side, c, l] of item.merge ? [[undefined, "fc", "fl"]] : [["back", "bc", "bl"], ["front", "fc", "fl"]]) {
       clearFrame(frame);
       fx.draw(frame, side);
       const C = new Uint32Array(W * H), L = new Uint32Array(W * H);
@@ -123,7 +126,7 @@ function bake(item) {
 
   // one crop box for every frame and layer
   let x0 = W, y0 = H, x1 = -1, y1 = -1;
-  for (const k in layers) for (const F of layers[k]) for (let j = 0; j < F.length; j++) if (F[j] >>> 24) {
+  for (const k in layers) if (!(item.lightOnly && (k === 'fc' || k === 'bc'))) for (const F of layers[k]) for (let j = 0; j < F.length; j++) if (F[j] >>> 24) {
     const x = j % W, y = (j / W) | 0;
     if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
@@ -139,6 +142,7 @@ function bake(item) {
   let bytes = 0;
   for (const k in layers) {
     const F = layers[k];
+    if (item.lightOnly && (k === 'fc' || k === 'bc')) continue; // just the glow (ambience over a painted scene)
     if (!F.some(f => f.some(p => p >>> 24))) continue;
     const sw = cols * cw, sh = rows * ch, out = Buffer.alloc(sw * sh * 4);
     F.forEach((f, i) => {

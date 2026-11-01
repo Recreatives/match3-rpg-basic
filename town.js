@@ -184,12 +184,14 @@ function showTown() {
     renderTown();
     root.style.display = 'flex';
     document.body.classList.add('in-town');
+    if (typeof pfxAmbientTown === 'function') pfxAmbientTown(); // fireflies over the scene (pfx.js)
     if (typeof socialTouch === 'function') socialTouch('town');
 }
 function hideTown() {
     const root = document.getElementById('town-screen');
     if (root) root.style.display = 'none';
     document.body.classList.remove('in-town');
+    if (typeof pfxAmbientStop === 'function') pfxAmbientStop();
 }
 
 // The dungeon gate: a fresh solo run.

@@ -77,6 +77,25 @@ describe('Town', { world: false }, function () {
     });
 });
 
+describe('Town ambience (pfx.js)', { world: false }, function () {
+    it('fireflies drift over the town scene while it is open, and stop when it closes', async function () {
+        var w = await townWorld({ pixi: true });
+        try {
+            expect(await awaitInWorld(w, w.g("pfxLoad('weather-fireflies')"))).toBe(true);
+            w.g('cgLowGraphics = false; pfxAmbientTown()');
+            await awaitInWorld(w, w.g('cgInitShared()'));
+            await w.tick(300);
+            var cv = w.$('town-fx-canvas');
+            expect(!!cv, 'canvas over the scene').toBe(true);
+            expect(cv.width > 0 && cv.style.pointerEvents === 'none', 'sized, never in the way of a click').toBe(true);
+            expect(w.g('PFX_AMB.timer') !== null).toBe(true);
+            w.g('hideTown()');
+            expect(w.g('PFX_AMB.timer'), 'stopped').toBe(null);
+            expect(!!w.$('town-fx-canvas'), 'removed').toBe(false);
+        } finally { w.destroy(); }
+    }, { timeout: 20000 });
+});
+
 describe('Auction hall', { world: false }, function () {
     function seed(w) {
         w.g("__stub.table('player_items').push({ id: 'a1', player_id: 'test-user', character_id: 'char-1', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: null, item_level: 1, req_level: 1, locked: false, listed: false });"

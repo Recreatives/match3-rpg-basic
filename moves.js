@@ -377,7 +377,7 @@ const CG_MONSTER_MOVES = {
     },
     monster_drain: {
         attack: [
-            cgRanged('md.orb', 'cast', 'orb', CGC.purple, s => CG_VFX.orbit(s, CGC.purple, { n: 4 })),
+            cgRanged('md.orb', 'cast', 'pfxshadow', CGC.purple, s => CG_VFX.orbit(s, CGC.purple, { n: 4 })),
             cgRanged('md.drain', 'push', 'drain', CGC.purple, s => CG_VFX.aura(s, CGC.purple, { pulses: 2 })),
             cgRanged('md.hex', 'cast', 'bolt', CGC.purple, null),
             cgRanged('md.void', 'summon', 'beam', CGC.shadow, s => CG_VFX.rune(s, CGC.purple, { ms: 1000, size: 0.6 }), { tier: 2 }),
@@ -388,7 +388,7 @@ const CG_MONSTER_MOVES = {
         attack: [
             cgMelee('mb.charge', 'charge', 'charge', CGC.red, cgAll(s => CG_VFX.afterimages(s, CGC.red), cgSlashAt(CGC.red, { r: 0.55, width: 8 }))),
             cgMelee('mb.axe', 'heavy', 'dash', CGC.red, cgAll(cgSlashAt(CGC.red, { r: 0.6, width: 10 }), cgRingAt(CGC.orange, { r1: 0.9 }))),
-            cgRanged('mb.fire', 'push', 'fireball', CGC.orange, null),
+            cgRanged('mb.fire', 'push', 'pfxfireball', CGC.orange, null),
             cgRanged('mb.quake', 'slam', 'wave', CGC.orange, cgRingAt(CGC.orange, { r1: 1.1, width: 6 }), { tier: 2, launchMs: 200 }),
             cgMelee('mb.crush', 'slam', 'leap', CGC.red, cgAll(cgSlashAt(CGC.red, { r: 0.7, width: 12 }), cgRingAt(CGC.red, { r1: 1.4, width: 8 })), { tier: 3, onImpact: cgGroundHit(CGC.red, 16) }),
         ],
@@ -528,5 +528,19 @@ const CG_PFX_MOVES = (() => {
         'm.starfall': [foe('arcane-star-fall', 0.6), NOSHOT],
         'n.tendrils': [foe('shadow-shadow-tendrils', 0.6), NOSHOT], 'n.curse': [foe('shadow-curse', 0.9), NOSHOT],
         'p.radiant': [foe('melee-sword-slash-holy'), spark], 'p.sunburst': [at('holy-sunburst', { on: 'foeBody', scale: 0.7, ms: 900 }), NOSHOT],
+        // Faz 5 - monsters (they stand on the right: pfx.js mirrors everything for them)
+        'mn.club': [foe('melee-heavy-cleave'), blunt], 'mn.swipe': [foe('melee-claw-swipe')], 'mn.kick': [blunt],
+        'mn.smash': [foe('melee-hammer-smash'), foe('impacts-ground-slam', 0.5)], 'mn.roar': [rage], 'mn.flex': [charge],
+        'ma.slam': [foe('impacts-ground-slam', 0.55)], 'ma.bash': [blunt, foe('impacts-shield-block')],
+        'ma.quake': [foe('impacts-ground-slam', 0.7), foe('nature-earth-spike', 0.45)],
+        'ma.shell': [shieldUp], 'ma.guard': [self('impacts-shield-block')],
+        'ms.stab': [thrust], 'ms.slice': [foe('melee-double-slash')], 'ms.knife': [spark],
+        'ms.flurry': [foe('melee-dagger-flurry'), crit], 'ms.spin': [self('status-haste', 1, { ms: 900 })], 'ms.hop': [self('arcane-blink-out', 0.9)],
+        'md.drain': [self('shadow-life-steal', 0.9), NOSHOT], 'md.hex': [foe('shadow-curse', 0.9), NOSHOT],
+        'md.void': [foe('shadow-shadow-tendrils', 0.6), NOSHOT], 'md.feed': [skulls], 'md.gather': [self('shadow-hex-sigil', 0.8)],
+        'mb.charge': [foe('melee-heavy-cleave'), crit], 'mb.axe': [foe('melee-heavy-cleave'), slam],
+        'mb.quake': [foe('impacts-ground-slam', 0.75), foe('explosions-dirt-explosion', 0.5), NOSHOT],
+        'mb.crush': [foe('melee-hammer-smash'), foe('impacts-ground-slam', 0.8)],
+        'mb.meteor': [foe('fire-meteor', 0.65), NOSHOT], 'mb.roar': [rage], 'mb.power': [self('fire-fire-ring', 0.5)],
     };
 })();

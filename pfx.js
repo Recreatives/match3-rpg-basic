@@ -308,7 +308,7 @@ function pfxPreloadClass(cls) {
     moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
     names.forEach(pfxLoad);
     // loot beams for the common drops (rarer ones load when they first drop)
-    ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow'].forEach(pfxLoad);
+    ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up'].forEach(pfxLoad);
 }
 
 // --- projectiles --------------------------------------------------------------------
@@ -435,4 +435,114 @@ function pfxLootBeam(stage, rarityKey) {
     a.after(500, () => pfxPlay(a, beam, p.x, p.y, { scale: big ? 0.9 : 0.75, ms: 2200 }));
     if (big) a.after(650, () => pfxPlay(a, 'ui-confetti', p.x, p.y - 20, { scale: 0.6 }));
     return true;
+}
+
+// --- monsters, deaths, level-ups (effects roadmap Faz 5) ------------------------------
+
+// A monster's sheets, fetched when it walks in (graphics.js setMonster).
+function pfxPreloadMonster(charKey) {
+    if (typeof CG_MONSTER_MOVES === 'undefined' || PFX.preloaded[charKey]) return;
+    const set = CG_MONSTER_MOVES[charKey];
+    if (!set) return;
+    PFX.preloaded[charKey] = true;
+    const moves = [].concat(set.attack || [], set.buff || [], set.enraged || []);
+    const names = new Set([PFX_DEATH[charKey] || PFX_DEATH.hero]);
+    if (charKey === 'monster_boss') names.add('impacts-ground-slam');
+    moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
+    names.forEach(pfxLoad);
+}
+
+// How each kind of fighter goes down (graphics.js playDeath): a cartoon
+// poof for the beasts, the drainer's soul leaving, a blast for the boss.
+const PFX_DEATH = { monster_normal: 'spawn-poof', monster_swift: 'spawn-poof', monster_armored: 'spawn-poof', monster_drain: 'spawn-soul-rise', monster_boss: 'explosions-small-explosion', hero: 'spawn-soul-rise' };
+function pfxDeath(stage) {
+    if (!stage || !stage.arena || !cgEffectsEnabled()) return;
+    const name = PFX_DEATH[stage.charKey] || PFX_DEATH.hero;
+    if (!pfxReady(name)) { pfxLoad(name); return; }
+    const p = stage.arena.bodyPoint(stage, 0);
+    stage.arena.after(250, () => pfxPlay(stage.arena, name, p.x, p.y, { scale: name === 'explosions-small-explosion' ? 0.6 : 1 }));
+}
+
+// The boss lands at the end of its entrance (graphics.js playEntrance).
+function pfxBossLanding(stage) {
+    if (!stage || !stage.arena || !cgEffectsEnabled() || !pfxReady('impacts-ground-slam')) return;
+    const p = stage.arena.bodyPoint(stage, 0);
+    pfxPlay(stage.arena, 'impacts-ground-slam', p.x, p.y, { scale: 0.6 });
+}
+
+// My hero levelled up (characters.js charLevelUpToast): a pillar of gold
+// on my fighter in the mode on screen (the effect's own "LEVEL UP!" text
+// is baked off - the toast says it in the player's language).
+function pfxLevelUp() {
+    if (typeof cgGetStage !== 'function' || !cgEffectsEnabled()) return;
+    if (!pfxReady('ui-level-up')) { pfxLoad('ui-level-up'); return; }
+    ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || el.offsetParent === null) return;
+        const st = cgGetStage(id);
+        if (!st || !st.arena || !st.portraitSprite) return;
+        const p = st.arena.bodyPoint(st, 0);
+        pfxPlay(st.arena, 'ui-level-up', p.x, p.y, { scale: 0.75 });
+    });
+}
+
+// --- town ambience (effects roadmap Faz 5) ----------------------------------------
+// Fireflies drifting over the town scene (town.js #town-svg): a canvas laid
+// over it, drawn through the shared renderer at ~15 fps and only while the
+// town is on screen - the town has no running animation loop otherwise,
+// and this one stops by itself when the town closes or low graphics is on.
+const PFX_AMB = { name: 'weather-fireflies', timer: null, canvas: null, box: null, meshes: null, start: 0 };
+
+function pfxAmbientTown() {
+    if (typeof PIXI === 'undefined' || typeof cgInitShared !== 'function' || !cgEffectsEnabled()) return;
+    if (!document.getElementById('town-svg')) return;
+    if (!pfxReady(PFX_AMB.name)) { pfxLoad(PFX_AMB.name).then(ok => { if (ok) pfxAmbientTown(); }); return; }
+    cgInitShared().then(() => {
+        if (PFX_AMB.timer || !cgShared.renderer) return;
+        PFX_AMB.start = performance.now();
+        PFX_AMB.timer = setInterval(pfxAmbientTick, 66);
+        pfxAmbientTick();
+    });
+}
+
+function pfxAmbientStop() {
+    clearInterval(PFX_AMB.timer);
+    PFX_AMB.timer = null;
+    if (PFX_AMB.canvas && PFX_AMB.canvas.parentNode) PFX_AMB.canvas.parentNode.removeChild(PFX_AMB.canvas);
+}
+
+function pfxAmbientTick() {
+    const svg = document.getElementById('town-svg'), r = cgShared.renderer;
+    if (!svg || svg.offsetParent === null || !cgEffectsEnabled() || !r || cgShared.lost || document.hidden) { pfxAmbientStop(); return; }
+    const host = svg.parentElement, d = PFX_DATA[PFX_AMB.name];
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    let cv = PFX_AMB.canvas;
+    if (!cv) {
+        cv = PFX_AMB.canvas = document.createElement('canvas');
+        cv.id = 'town-fx-canvas';
+        cv.style.cssText = 'position:absolute; pointer-events:none; border-radius:12px;';
+    }
+    if (cv.parentNode !== host) host.appendChild(cv);
+    const W = Math.round(svg.clientWidth), H = Math.round(svg.clientHeight), res = cgShared.resolution || 1;
+    if (!W || !H) return;
+    cv.style.left = svg.offsetLeft + 'px'; cv.style.top = svg.offsetTop + 'px';
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    if (cv.width !== Math.round(W * res) || cv.height !== Math.round(H * res)) { cv.width = Math.round(W * res); cv.height = Math.round(H * res); }
+    if (!PFX_AMB.box) {
+        const set = PFX.textures[PFX_AMB.name], box = new PIXI.Container();
+        if (set.fc) box.addChild(pfxMesh(PFX_AMB.name, set.fc, 0, null, 1));
+        if (set.fl) { box.addChild(pfxMesh(PFX_AMB.name, set.fl, 1, 'add', 0.9)); box.addChild(pfxMesh(PFX_AMB.name, set.fl, 0, 'add', 1)); }
+        PFX_AMB.box = box; PFX_AMB.meshes = box.children.slice();
+    }
+    // the effect is a 320 x 180 strip: across the whole width, along the bottom
+    const k = W / 320, box = PFX_AMB.box;
+    box.scale.set(k); box.position.set(W / 2, H - 10 * k);
+    const i = Math.floor(((performance.now() - PFX_AMB.start) / 1000) * d.fps) % d.frames;
+    const fx = (i % d.cols) * d.cell[0], fy = Math.floor(i / d.cols) * d.cell[1];
+    PFX_AMB.meshes.forEach(m => { const u = m.pfx.uniforms.uniforms; u.uFrame[0] = fx; u.uFrame[1] = fy; m.pfx.uniforms.update(); });
+    if (r.width !== W || r.height !== H) r.resize(W, H);
+    r.render({ container: box, clear: true });
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(r.canvas, 0, 0, cv.width, cv.height);
 }

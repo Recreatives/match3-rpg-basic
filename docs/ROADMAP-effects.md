@@ -165,6 +165,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 ### Faz 5: Dünya, canavarlar ve arayüz
 - Canavar doğuş/ölüm, arena süsleri, kasaba havası, seviye/başarım/görev efektleri, kat geçişleri.
 
+**Faz 5 yapılanlar (v1.46):** 5 canavar türünün 30 hamlesi pixelfx ile (canavarlar sağda durduğu için her şey aynalanıyor); boss'un ateş topu ve ruh emicinin küresi pixelfx mermisi. Ölüm efektleri: canavarlarda poof, ruh emicide ruhun yükselişi, boss'ta patlama, kahramanda ruh. Boss sahneye inerken yer sarsılıyor. Seviye atlayınca kahramanda altın ışık sütunu (efektin kendi "LEVEL UP!" yazısı kapatıldı; Türkçe yazı zaten bildirimde). Kasabada sahnenin üstünde ateş böcekleri (yalnızca ışık katmanı, ~15 fps, kasaba kapanınca duruyor). Pişirme aracına `merge`, `lightCut`, `lightOnly` seçenekleri. **Bilerek yapılmayanlar:** arenada sürekli oynayan meşale/yarasa gibi süsler (arena şu an sadece bir şey değişince çiziliyor, sürekli süs pili ve kare hızını tüketir), tahtada eşleşme patlamaları (mobilde en hassas yer) ve kat geçiş efektleri.
+
 ### Faz 6: Durum etkileri (oyun mekaniği)
 - Yanma, zehir, kanama (tur başı hasar); donma, sersemleme (tur kaybı); yavaşlama.
 - Solo, PvP ve co-op'ta aynı kurallar; PvP'de iki tarafın senkron kalması; denge ve testler.

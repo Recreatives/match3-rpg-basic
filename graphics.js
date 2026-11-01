@@ -975,7 +975,8 @@ class CombatStage {
     async setAvatar(spec) {
         await this.ready;
         if (typeof avPaint !== 'function') return;
-        if (spec && spec.cls && typeof pfxPreloadClass === 'function') pfxPreloadClass(spec.cls); // its effect sheets (pfx.js)
+        // its effect sheets (pfx.js) - a monster borrows a class body but has its own moves
+        if (spec && spec.cls && !String(spec.charKey || '').startsWith('monster_') && typeof pfxPreloadClass === 'function') pfxPreloadClass(spec.cls);
         if (spec && typeof pfxPreloadGear === 'function') pfxPreloadGear(spec);
         // the weapon's rarity: every blow sparks in its color (pfx.js pfxRaritySpark)
         this.weaponRarity = (spec && spec.gear && spec.gear.weapon && spec.gear.weapon.rarity) || null;
@@ -1149,6 +1150,7 @@ class CombatStage {
     async setMonster(type, level) {
         if (typeof avMonsterSpec !== 'function') return this.setPortrait(MONSTER_SPRITES[type] || MONSTER_SPRITES.normal);
         await this.setAvatar(avMonsterSpec(type, level));
+        if (typeof pfxPreloadMonster === 'function') pfxPreloadMonster(this.charKey); // its effect sheets (pfx.js)
         if (this.arena && this.side === 'right') this.playEntrance();
     }
 
@@ -1536,7 +1538,7 @@ class CombatStage {
             this.activeMove = null;
             sprite.x = this.baseX; sprite.y = this.baseY;
             this._applyRig(null, 0);
-            if (boss && this.arena) { const p = this.arena.bodyPoint(this, 0); this.arena.dust(p.x, p.y, 12); this.arena.shake(8, 400); }
+            if (boss && this.arena) { const p = this.arena.bodyPoint(this, 0); this.arena.dust(p.x, p.y, 12); this.arena.shake(8, 400); if (typeof pfxBossLanding === 'function') pfxBossLanding(this); }
         });
     }
 
@@ -1706,6 +1708,7 @@ class CombatStage {
         this.activeMove = null;
         this.dead = true;
         this._rigTween('death', 650, true);
+        if (typeof pfxDeath === 'function') pfxDeath(this); // poof / soul / blast (pfx.js)
         const foe = this.arena ? this.arena.opponentOf(this) : null;
         if (foe && !foe.dead) this._after(450, () => foe.playVictory());
         this._tween(650, t => {

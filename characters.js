@@ -144,6 +144,7 @@ async function awardRunXp(floor, kills) {
 }
 
 function charLevelUpToast(lvl) {
+    if (typeof pfxLevelUp === 'function') pfxLevelUp(); // a pillar of gold on my fighter (pfx.js)
     const el = document.createElement('div');
     el.className = 'achievement-toast';
     const b = document.createElement('b');
