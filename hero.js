@@ -17,8 +17,9 @@ const HERO_STARTER = {
     archer: { chest: ['leather', '#3e4a2a'], legs: ['leather', '#33301e'], boots: ['leather', '#4a3020'], belt: ['leather', '#4a3020'], weapon: ['bow', '#7a5230'], offhand: ['quiver', '#5a3a22'] },
     mage: { chest: ['robe', '#5a4a6a'], boots: ['cloth', '#3a2a1a'], belt: ['sash', '#6a4a2a'], weapon: ['staff', '#7a5230'] },
     necromancer: { chest: ['robe', '#2e3428'], boots: ['cloth', '#2a2020'], belt: ['sash', '#3a3a2a'], weapon: ['scythe', '#9aa0a8'], offhand: ['lantern', '#5a5f66'] },
+    druid: { chest: ['robe', '#3e5a2a'], boots: ['cloth', '#3a2a1a'], belt: ['sash', '#6a5a2a'], weapon: ['staff', '#6a4a26'], offhand: ['tome', '#4a6a2a'] },
 };
-const HERO_CLASS_GLOW = { warrior: '#ff7a2a', paladin: '#ffe08a', berserker: '#ff4a1a', rogue: '#b05cff', archer: '#9aff6a', mage: '#5fd8ff', necromancer: '#7dff7a' };
+const HERO_CLASS_GLOW = { warrior: '#ff7a2a', paladin: '#ffe08a', berserker: '#ff4a1a', rogue: '#b05cff', archer: '#9aff6a', mage: '#5fd8ff', necromancer: '#7dff7a', druid: '#9aff5a' };
 
 // rarity -> how ornate the piece looks, and the color its gems/eyes glow
 const HERO_RARITY_LOOK = {

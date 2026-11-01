@@ -862,4 +862,7 @@ const EN_DICT = {
     'Durum etkileri: -{n} can': 'Status effects: -{n} HP',
     'Düşmana durum etkileri: -{n} can': 'Status effects on the enemy: -{n} HP',
     '💫 Düşman sersemledi, turunu kaçırdı!': '💫 The enemy is stunned and loses its turn!',
+    // === the druid (v1.48) ===
+    '<b>Doğa:</b> +4 İyileşme, +2 Zırh. Ult hasar verir, iyileştirir ve düşmanı <b>ZEHİRLER</b>.': '<b>Nature:</b> +4 Healing, +2 Armor. Ult deals damage, heals and <b>POISONS</b> the enemy.',
+    'ULT: Wrath of Nature {dmg} hasar verdi, {heal} iyileştirdi!': 'ULT: Wrath of Nature dealt {dmg} damage and healed {heal}!',
 };

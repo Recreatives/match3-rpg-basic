@@ -278,6 +278,22 @@ const CLASSES = {
             ctx.log(tf('ULT: Divine Judgement {heal} iyileştirdi, {dmg} hasar verdi!', { heal, dmg }), "log-heal");
             if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('weaken', 2);
         }
+    },
+    // Effects roadmap Faz 7 - the first new class: nature, healing, poison
+    DRUID: {
+        name: "Druid", emoji: "🌿",
+        desc: "<b>Doğa:</b> +4 İyileşme, +2 Zırh. Ult hasar verir, iyileştirir ve düşmanı <b>ZEHİRLER</b>.",
+        passive: (stats) => { stats.heart += 4; stats.shield += 2; },
+        dodgeChance: 0.05, incomingDmgMult: 1.0,
+        ultName: "WRATH OF NATURE",
+        ultEffect: (ctx) => {
+            let dmg = Math.floor(TILE_STATS.ult_dmg * 0.8);
+            let heal = Math.floor(TILE_STATS.heart * 2);
+            ctx.dealDamageToOpponent(dmg);
+            ctx.healSelf(heal);
+            ctx.log(tf('ULT: Wrath of Nature {dmg} hasar verdi, {heal} iyileştirdi!', { dmg, heal }), "log-heal");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('poison', 4);
+        }
     }
 };
 let selectedClass = null;

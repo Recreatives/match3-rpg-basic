@@ -180,6 +180,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 - Her sınıf için stil C karakter tasarımı (yan yana önizlemeyle onay), hamleler, ult, denge, metinler, testler.
 - `schema.sql` değişikliği ve Supabase'de yeniden çalıştırma.
 
+**Faz 7 yapılanlar (v1.48): Druid.** Doğa sınıfı: +4 iyileşme, +2 zırh, %5 savuşturma; ult WRATH OF NATURE (ult hasarının %80'i + iyileşmenin 2 katı iyileştirme + 4 tur zehir). 15 hamle + ult, hepsi pixelfx (sarmaşık kırbacı, diken dalgası, kök tuzağı, toprak dikeni, kasırga, spor, asit, deprem, ağaç kabuğu kalkanı, şifa çiçeği, yaprak fırtınası) ve vektör yedekli. Stil C boyalı görünüm (yeşil cüppe, asa, kitap), eski tek parça portre (`tools/make_characters.py`), karakter oluşturma, seviye büyümesi, el kitabı satırı, çeviriler. Katalog: kumaş zırh, asa ve kitaplar Druid'e de açık (`tools/make_catalog.py`, 386 referans satırı). **Veritabanı:** `characters.class_key` kontrolü yeniden kuruluyor (tekrar çalıştırılabilir, satırlar korunuyor) - `schema.sql`'in Supabase'de yeniden çalıştırılması gerekiyor, o zamana kadar Druid karakteri sunucuda oluşturulamaz. Fırtına Çağırıcı ve Simyacı sonraki sürümler.
+
 ### Faz 8 (isteğe bağlı): Kendi efektlerimiz
 - pixelfx'in Claude Code becerisiyle temamıza özel yeni efektler: benzersiz eşyaların imza efektleri ve yeni sınıfların ult'ları.
 

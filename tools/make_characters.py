@@ -1,4 +1,4 @@
-"""Generates the combat portraits: 7 hero classes + 5 monsters, as SVG.
+"""Generates the combat portraits: 8 hero classes + 5 monsters, as SVG.
 
 Stylized "chibi" vector characters (big head, bold outline, soft shading)
 built from one shared body template plus per-character parts: outfit colors,
@@ -288,6 +288,22 @@ def necromancer():
         'armR': staff(152, 172, 'skull', '#b57bff') + arm('R', 'url(#robe)', 'url(#skin)'),
     })
 
+def druid():
+    # Effects roadmap Faz 7: moss-green robe, a hood of leaves with a crown of
+    # antlers, a living staff with a green orb
+    d = grad('robe', '#6aa84a', '#24451a') + grad('hood', '#5a8a3a', '#1e3a14')
+    antler = 'none'
+    head_ = (head('') + eyes('#3d8a2a') + mouth('smile') + blush()
+             + P('M66 104 Q100 140 134 104 Q122 122 100 124 Q78 122 66 104 Z', '#8a6a46', 3)
+             + P('M44 92 Q40 30 100 28 Q160 30 156 92 Q144 58 100 54 Q56 58 44 92 Z', 'url(#hood)')
+             + P('M70 34 L58 6 M64 20 L50 14 M130 34 L142 6 M136 20 L150 14', antler, 4.5, 'stroke="#8a6a46" stroke-linecap="round"')
+             + '<path d="M86 40 q6 -10 14 0 q-7 5 -14 0Z M106 38 q7 -9 14 1 q-8 4 -14 -1Z" fill="#9ad66a" stroke="#161a24" stroke-width="2"/>')
+    return rig(d, SKIN_TAN, {
+        'torso': robe_torso('url(#robe)', '#c8a24a'), 'head': head_,
+        'armL': arm('L', 'url(#robe)', 'url(#skin)') + '<circle cx="46" cy="170" r="14" fill="#9aff5a" fill-opacity=".35"/>' + C(46, 170, 6, '#d8ffb0', 2),
+        'armR': staff(152, 172, 'orb', '#7ad84a') + arm('R', 'url(#robe)', 'url(#skin)'),
+    })
+
 def paladin():
     d = grad('armor', '#fff6d6', '#c9a13f') + grad('tabard', '#ffffff', '#cfd6e2')
     head_ = ('<ellipse cx="100" cy="30" rx="36" ry="9" fill="none" stroke="#ffe46a" stroke-width="5" stroke-opacity=".9"/>'
@@ -370,7 +386,7 @@ def minotaur():
 
 CHARACTERS = {
     'warrior': warrior, 'berserker': berserker, 'rogue': rogue, 'archer': archer,
-    'mage': mage, 'necromancer': necromancer, 'paladin': paladin,
+    'mage': mage, 'necromancer': necromancer, 'paladin': paladin, 'druid': druid,
     'monster_normal': goblin, 'monster_armored': golem, 'monster_swift': imp,
     'monster_drain': wraith, 'monster_boss': minotaur,
 }

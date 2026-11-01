@@ -13,7 +13,7 @@ let activeCharacter = null;
 let myCharacters = [];
 let charactersLoaded = false;
 const MAX_CHARACTERS = 6;
-const CHAR_CLASS_KEYS = ['warrior', 'paladin', 'berserker', 'rogue', 'archer', 'mage', 'necromancer'];
+const CHAR_CLASS_KEYS = ['warrior', 'paladin', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'druid'];
 
 // Total xp to reach a level - the same curve as schema.sql's xp_total_for.
 function xpTotalFor(level) {
@@ -264,6 +264,7 @@ const CLASS_GROWTH = {
     archer: { sword: 0.1, energy: 0.08, ult_dmg: 0.1 },
     mage: { ult_dmg: 0.3, energy: 0.08 },
     necromancer: { skull_dmg: 0.25, heart: 0.06, ult_dmg: 0.1 },
+    druid: { heart: 0.1, ult_dmg: 0.15, shield: 0.04 },
 };
 function characterLevel() { return (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1; }
 function applyCharacterLevelBonuses(stats, classKey, level) {

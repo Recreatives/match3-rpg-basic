@@ -421,7 +421,8 @@ describe('Combat feedback (numbers, sparkles, bar pulse)', { isolate: 'each', wo
 
 describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 'each' }, function () {
     var SLOTS = ['player-sprite', 'enemy-sprite', 'pvp-my-sprite', 'pvp-opp-sprite', 'coop-my-sprite', 'coop-ally-sprite', 'coop-enemy-sprite'];
-    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
+    // the 7 slots below play the first 7; the move-library checks cover all of them
+    var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid'];
     var ACTIONS = ['sword', 'skull', 'heart', 'shield', 'energy'];
     var JOINTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
 

@@ -24,7 +24,7 @@ const AV_BODIES = {
     robed_m: { sw: 26.5, ww: 16, hipw: 16, k: 1.06 },
     robed_f: { sw: 23.5, ww: 13, hipw: 16.5, k: 1.0, hy: 45, hr: 16.5, female: true },
 };
-const AV_CLASS_BODY = { warrior: 'heavy', paladin: 'heavy', berserker: 'heavy', rogue: 'agile', archer: 'agile', mage: 'robed', necromancer: 'robed' };
+const AV_CLASS_BODY = { warrior: 'heavy', paladin: 'heavy', berserker: 'heavy', rogue: 'agile', archer: 'agile', mage: 'robed', necromancer: 'robed', druid: 'robed' };
 const AV_SKINS = [['#f3d2b3', '#b98460'], ['#e8b98f', '#a86e46'], ['#c98c5e', '#7a4a2a'], ['#9a6440', '#56321c'], ['#6e4428', '#3a2010']];
 const AV_HAIR_COLORS = ['#1f1b1a', '#4a2e1a', '#8a3a1c', '#c9a060', '#e6e2da', '#9a2418'];
 const AV_HAIR = { m: ['short', 'long', 'topknot', 'shaved'], f: ['long', 'braid', 'bun', 'bob'] };
@@ -101,6 +101,8 @@ const AV_STANCES = {
     mage: { front: 10, back: -12, crouch: 0, lean: 0, head: [0, -1], R: { to: [10, 58] }, L: { to: [36, -8] }, wAng: -17 },
     // hunched, head low: scythe held diagonally, lantern hanging out front
     necromancer: { front: 12, back: -16, crouch: 6, lean: 9, head: [4, 6], R: { to: [18, 36] }, L: { to: [34, 44] }, wAng: -30 },
+    // rooted and open: staff planted, the free hand low with a seed of green light
+    druid: { front: 11, back: -13, crouch: 2, lean: 2, head: [1, 1], R: { to: [12, 54] }, L: { to: [34, 20] }, wAng: -14 },
 };
 
 // How each class breathes and fidgets while waiting (graphics.js cgFrame):
@@ -115,6 +117,7 @@ const AV_IDLE = {
     archer: { bob: 1.4, hz: 0.5, sway: 0.03, torso: 0.015, head: 0.02 },
     mage: { bob: 1.0, hz: 0.28, sway: 0.05, torso: 0.01, head: 0.035 },
     necromancer: { bob: 1.2, hz: 0.24, sway: 0.04, torso: 0.045, head: 0.05 },
+    druid: { bob: 1.1, hz: 0.3, sway: 0.06, torso: 0.02, head: 0.035 },
 };
 
 // Body builds on top of the class's body: lean / average / broad (shoulders,

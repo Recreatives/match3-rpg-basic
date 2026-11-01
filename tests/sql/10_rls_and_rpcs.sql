@@ -64,6 +64,14 @@ begin
     if (c.appearance->>'skin')::int <> 4 or c.appearance->>'hair' <> 'short' then raise exception 'FAIL: appearance not sanitized %', c.appearance; end if;
     if (select active_character_id from public.players where id = auth.uid()) <> c.id then raise exception 'FAIL: new character not active'; end if;
 end $$;
+-- v1.48: the druid is a class that exists (the rebuilt class_key check)
+do $$
+declare c public.characters; borin uuid := (select active_character_id from public.players where id = auth.uid());
+begin
+    select * into c from public.create_character('Sylva', 'druid', 'f', '{}');
+    if c.class_key <> 'druid' then raise exception 'FAIL: druid not created %', row_to_json(c); end if;
+    perform public.select_character(borin); -- the rest of this file plays Borin the warrior
+end $$;
 select tst.expect_error($q$select public.create_character('borin', 'rogue', 'm', '{}')$q$, 'already have');
 -- characters can't be written directly
 do $$

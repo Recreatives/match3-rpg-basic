@@ -305,6 +305,34 @@ const CG_MOVES = {
             cgSelf('n.souls', 'summon', CG_POSE.float(6), s => CG_VFX.orbit(s, CGC.bone, { n: 6, inward: true })),
         ],
     },
+    // Effects roadmap Faz 7 - the druid: nature at range, roots, spores, healing
+    druid: {
+        sword: [
+            cgRanged('d.vine', 'cast', 'orb', CGC.leaf, s => CG_VFX.rune(s, CGC.leaf, { ms: 900 }), { pose: CG_POSE.float(5) }),
+            cgRanged('d.thorn', 'push', 'orb', CGC.leaf, null, { pose: CG_POSE.float(4) }),
+            cgRanged('d.snare', 'cast', 'orb', CGC.leaf, null, { pose: CG_POSE.float(5) }),
+            cgRanged('d.spike', 'summon', 'wave', CGC.leaf, s => CG_VFX.rune(s, CGC.leaf, { ms: 1000, size: 0.6 }), { tier: 2, launchMs: 200, pose: CG_POSE.float(8) }),
+            cgRanged('d.tornado', 'summon', 'wave', CGC.leaf, s => CG_VFX.rune(s, CGC.green, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
+        ],
+        skull: [
+            cgRanged('d.spores', 'cast', 'orb', CGC.green, s => CG_VFX.particles(s, CGC.green, { n: 8 }), { pose: CG_POSE.float(6) }),
+            cgRanged('d.acid', 'push', 'orb', CGC.green, null, { pose: CG_POSE.float(5) }),
+            cgRanged('d.quake', 'summon', 'wave', CGC.orange, cgRingAt(CGC.orange, { r1: 1.0, width: 6 }), { tier: 2, launchMs: 200, pose: CG_POSE.float(6) }),
+            cgRanged('d.swarm', 'summon', 'wave', CGC.green, s => CG_VFX.rune(s, CGC.green, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
+        ],
+        shield: [
+            cgSelf('d.bark', 'guard', CG_POSE.brace(0.06), s => CG_VFX.dome(s, CGC.leaf, { ms: 900 })),
+            cgSelf('d.leafguard', 'block', CG_POSE.brace(0.08), s => CG_VFX.orbit(s, CGC.leaf, { n: 6 })),
+        ],
+        heart: [
+            cgSelf('d.bloom', 'heal', CG_POSE.float(6), s => CG_VFX.aura(s, CGC.green)),
+            cgSelf('d.rain', 'pray', CG_POSE.float(5), s => CG_VFX.particles(s, CGC.leaf, { n: 10 })),
+        ],
+        energy: [
+            cgSelf('d.leaves', 'power', CG_POSE.float(6), s => CG_VFX.orbit(s, CGC.leaf, { n: 5 })),
+            cgSelf('d.commune', 'summon', CG_POSE.float(6), s => CG_VFX.rune(s, CGC.gold, { ms: 900 })),
+        ],
+    },
     paladin: {
         sword: [
             cgMelee('p.hammer', 'slam', 'dash', CGC.gold, cgAll(cgRingAt(CGC.gold), cgSlashAt(CGC.holy, { width: 6 }))),
@@ -344,6 +372,7 @@ const CG_ULTS = {
     archer: cgRanged('a.ult', 'bow', 'rain', CGC.gold, cgAll(s => CG_VFX.rune(s, CGC.gold, { ms: 1300, size: 0.7 }), s => CG_VFX.beam(s, CGC.leaf, { ms: 900 })), { tier: 3, ms: 1300, launchMs: 140, pose: CG_POSE.draw() }),
     mage: cgRanged('m.ult', 'summon', 'meteor', CGC.orange, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1300, size: 0.75 }), s => CG_VFX.orbit(s, CGC.blue, { n: 6, ms: 1300, inward: true })), { tier: 3, ms: 1300, launchMs: 120, pose: CG_POSE.float(12) }),
     necromancer: cgRanged('n.ult', 'summon', 'graspers', CGC.purple, cgAll(s => CG_VFX.aura(s, CGC.shadow, { ms: 1300, pulses: 5 }), s => CG_VFX.rune(s, CGC.purple, { ms: 1300, size: 0.7 })), { tier: 3, ms: 1300, launchMs: 120, pose: CG_POSE.float(10), onImpact: (s, c) => { if (c.foe && c.arena) c.arena.shoot('drain', c.arena.handPoint(s), c.arena.bodyPoint(c.foe, 0.5), 300, CGC.green); } }),
+    druid: cgRanged('d.ult', 'summon', 'wave', CGC.leaf, cgAll(s => CG_VFX.rune(s, CGC.leaf, { ms: 1300, size: 0.7 }), s => CG_VFX.pillar(s, CGC.green, { ms: 1300 })), { tier: 3, ms: 1300, launchMs: 150, pose: CG_POSE.float(12) }),
     paladin: cgRanged('p.ult', 'summon', 'smite', CGC.holy, cgAll(s => CG_VFX.pillar(s, CGC.gold, { ms: 1300 }), s => CG_VFX.flash(s, CGC.holy, { ms: 600 })), { tier: 3, ms: 1400, launchMs: 120, pose: CG_POSE.float(10), onImpact: cgGroundHit(CGC.gold, 14) }),
 };
 
@@ -528,6 +557,17 @@ const CG_PFX_MOVES = (() => {
         'm.starfall': [foe('arcane-star-fall', 0.6), NOSHOT],
         'n.tendrils': [foe('shadow-shadow-tendrils', 0.6), NOSHOT], 'n.curse': [foe('shadow-curse', 0.9), NOSHOT],
         'p.radiant': [foe('melee-sword-slash-holy'), spark], 'p.sunburst': [at('holy-sunburst', { on: 'foeBody', scale: 0.7, ms: 900 }), NOSHOT],
+        // Faz 7 - the druid (its spells grow out of the ground: no projectile flies)
+        'd.vine': [self('nature-vine-whip', 0.7), NOSHOT], 'd.thorn': [self('nature-thorns', 0.5), NOSHOT],
+        'd.snare': [foe('nature-root-snare', 0.9), NOSHOT], 'd.spike': [foe('nature-earth-spike', 0.5), NOSHOT],
+        'd.tornado': [foe('nature-tornado', 0.7, { ms: 1100 }), NOSHOT],
+        'd.spores': [foe('nature-spore-burst', 0.6), NOSHOT], 'd.acid': [foe('nature-acid-splash', 0.8), NOSHOT],
+        'd.quake': [foe('impacts-ground-slam', 0.6), foe('nature-earth-spike', 0.45), NOSHOT],
+        'd.swarm': [foe('nature-tornado', 0.7, { ms: 1000 }), foe('nature-spore-burst', 0.6), NOSHOT],
+        'd.bark': [self('holy-divine-shield-bark', 1, { ms: 1100 })], 'd.leafguard': [self('nature-leaf-storm', 1, { ms: 1000 })],
+        'd.bloom': [self('nature-healing-bloom', 0.8)], 'd.rain': [heal],
+        'd.leaves': [self('nature-leaf-storm', 1, { ms: 1000 })], 'd.commune': [charge],
+        'd.ult': [foe('nature-tornado', 0.8, { ms: 1200 }), foe('nature-earth-spike', 0.5), self('nature-healing-bloom', 0.8), NOSHOT],
         // Faz 5 - monsters (they stand on the right: pfx.js mirrors everything for them)
         'mn.club': [foe('melee-heavy-cleave'), blunt], 'mn.swipe': [foe('melee-claw-swipe')], 'mn.kick': [blunt],
         'mn.smash': [foe('melee-hammer-smash'), foe('impacts-ground-slam', 0.5)], 'mn.roar': [rage], 'mn.flex': [charge],

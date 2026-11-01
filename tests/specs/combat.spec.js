@@ -15,7 +15,8 @@ var EXPECTED_PASSIVES = {
     ARCHER: {},
     MAGE: { energy: 10, sword: -2 },
     NECROMANCER: { lifeSteal: 3, skull_dmg: 8 },
-    PALADIN: { shield: 3, heart: 3 }
+    PALADIN: { shield: 3, heart: 3 },
+    DRUID: { heart: 4, shield: 2 }
 };
 
 function statsWithPassive(key) {
@@ -25,7 +26,7 @@ function statsWithPassive(key) {
 }
 
 describe('Classes', { isolate: 'each' }, function () {
-    it('there are exactly 7 classes, each with passive/ultEffect/ultName', function (ctx) {
+    it('there are exactly 8 classes, each with passive/ultEffect/ultName', function (ctx) {
         var C = ctx.world.g('CLASSES');
         expect(Object.keys(C).sort()).toEqual(Object.keys(EXPECTED_PASSIVES).sort());
         Object.keys(C).forEach(function (k) {
@@ -103,6 +104,11 @@ describe('Ultimates (solo combat context)', { isolate: 'each' }, function () {
         expect(ctx.world.g('playerHP')).toBe(50 + 7 * 4);
         expect(ctx.world.g('enemyHP')).toBe(500 - Math.floor(35 * 0.6));
     });
+    it('DRUID: deals 80% ult_dmg and heals 2x heart', async function (ctx) {
+        await ultWith(ctx, 'DRUID');
+        expect(ctx.world.g('enemyHP')).toBe(500 - Math.floor(35 * 0.8));
+        expect(ctx.world.g('playerHP')).toBe(50 + ctx.world.g('TILE_STATS.heart') * 2);
+    });
     it('ult is refused below 100% charge', async function (ctx) {
         await ultWith(ctx, 'WARRIOR', 'ultCharge = 99');
         expect(ctx.world.g('enemyHP')).toBe(500);
@@ -122,7 +128,7 @@ describe('Status effects (status.js, solo)', { isolate: 'each' }, function () {
     }
 
     it('every class ult leaves its status on the enemy, shown as a badge', async function (ctx) {
-        var w = ctx.world, want = { WARRIOR: 'stun', BERSERKER: 'bleed', ROGUE: 'poison', ARCHER: 'bleed', MAGE: 'burn', NECROMANCER: 'poison', PALADIN: 'weaken' };
+        var w = ctx.world, want = { WARRIOR: 'stun', BERSERKER: 'bleed', ROGUE: 'poison', ARCHER: 'bleed', MAGE: 'burn', NECROMANCER: 'poison', PALADIN: 'weaken', DRUID: 'poison' };
         for (var key in want) {
             await fight(w, key);
             freezeEnemyTurn(w);

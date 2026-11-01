@@ -83,6 +83,11 @@
     {"id": "status/poisoned", "fps": 20, "loopSec": 1.0, "lightOnly": true},
     {"id": "status/bleeding", "fps": 20, "loopSec": 1.0, "noBody": true},
     {"id": "status/stunned", "fps": 20, "loopSec": 1.0, "noBody": true},
-    {"id": "status/cursed", "fps": 20, "loopSec": 1.0, "noBody": true}
+    {"id": "status/cursed", "fps": 20, "loopSec": 1.0, "noBody": true},
+    {"id": "nature/vine-whip"},
+    {"id": "nature/healing-bloom", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20},
+    {"id": "nature/leaf-storm", "fps": 20, "loopSec": 1.2, "noBody": true},
+    {"id": "nature/tornado", "fps": 20, "loopSec": 1.2},
+    {"id": "holy/divine-shield", "as": "holy/divine-shield-bark", "fps": 20, "opts": {"palette": ["#0e1a06", "#1e3a0e", "#2e5a16", "#4a8a22", "#7ac43a", "#b4e88a", "#e6ffd0", "#ffffff"]}}
   ]
 }

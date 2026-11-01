@@ -256,6 +256,41 @@
   },
   "monster": false
  },
+ "druid": {
+  "parts": [
+   "torso",
+   "head",
+   "armL",
+   "armR"
+  ],
+  "pivots": {
+   "legL": [
+    88,
+    190
+   ],
+   "legR": [
+    112,
+    190
+   ],
+   "torso": [
+    100,
+    196
+   ],
+   "head": [
+    100,
+    124
+   ],
+   "armL": [
+    72,
+    134
+   ],
+   "armR": [
+    128,
+    134
+   ]
+  },
+  "monster": false
+ },
  "monster_normal": {
   "parts": [
    "legL",

@@ -112,6 +112,7 @@ const CHARACTER_SPRITES = {
     archer: 'assets/characters/archer.svg',
     mage: 'assets/characters/mage.svg',
     necromancer: 'assets/characters/necromancer.svg',
+    druid: 'assets/characters/druid.svg',
     paladin: 'assets/characters/paladin.svg',
 };
 
@@ -498,6 +499,7 @@ const CG_CLASS_RIGS = {
     archer: { sword: 'bow', skull: 'bow', shield: 'kneel', heart: 'heal', energy: 'power', ult: 'bow' },
     mage: { sword: 'cast', skull: 'cast', shield: 'block', heart: 'heal', energy: 'power', ult: 'cast' },
     necromancer: { sword: 'cast', skull: 'cast', shield: 'block', heart: 'heal', energy: 'power', ult: 'cast' },
+    druid: { sword: 'cast', skull: 'summon', shield: 'block', heart: 'heal', energy: 'power', ult: 'summon' },
     paladin: { sword: 'slam', skull: 'slam', shield: 'block', heart: 'heal', energy: 'power', ult: 'slam' },
 };
 const CG_MONSTER_RIGS = {
@@ -550,6 +552,14 @@ const CG_CLASS_ACTIONS = {
         heart: { ms: 1000, pose: CG_POSE.float(6), fx: s => { CG_VFX.particles(s, CG_COL.cyan, { n: 10 }); CG_VFX.aura(s, CG_COL.blue); } },
         energy: { ms: 900, pose: CG_POSE.float(6), fx: s => { CG_VFX.rune(s, CG_COL.gold); CG_VFX.orbit(s, CG_COL.cyan, { n: 5 }); } },
         ult: { ms: 1400, pose: CG_POSE.float(12), fx: s => { CG_VFX.rune(s, CG_COL.cyan, { ms: 1400, size: 0.7 }); CG_VFX.orbit(s, CG_COL.blue, { n: 6, ms: 1400, inward: true }); CG_VFX.beam(s, CG_COL.cyan, { at: 0.5, ms: 1400 }); CG_VFX.flash(s, CG_COL.cyan, { ms: 500 }); } },
+    },
+    druid: {
+        sword: { ms: 900, pose: CG_POSE.float(8), fx: s => { CG_VFX.rune(s, CG_COL.leaf); CG_VFX.particles(s, CG_COL.green, { n: 6, y: 0.4, vx: 0.8, rise: 0.05, at: 0.35 }); } },
+        skull: { ms: 1000, pose: CG_POSE.float(10), fx: s => { CG_VFX.rune(s, CG_COL.green); CG_VFX.ring(s, CG_COL.leaf, { at: 0.45 }); } },
+        shield: { ms: 1000, pose: CG_POSE.float(5), fx: s => { CG_VFX.dome(s, CG_COL.leaf); } },
+        heart: { ms: 1000, pose: CG_POSE.float(6), fx: s => { CG_VFX.particles(s, CG_COL.green, { n: 10 }); CG_VFX.aura(s, CG_COL.leaf); } },
+        energy: { ms: 900, pose: CG_POSE.float(6), fx: s => { CG_VFX.orbit(s, CG_COL.leaf, { n: 5 }); } },
+        ult: { ms: 1400, pose: CG_POSE.float(12), fx: s => { CG_VFX.rune(s, CG_COL.leaf, { ms: 1400, size: 0.7 }); CG_VFX.pillar(s, CG_COL.green, { ms: 1400 }); } },
     },
     necromancer: {
         sword: { ms: 900, pose: CG_POSE.float(4), fx: s => { CG_VFX.orbit(s, CG_COL.purple, { n: 4 }); CG_VFX.particles(s, CG_COL.purple, { n: 6, y: 0.5, vx: 0.8, rise: 0.05, at: 0.4 }); } },
@@ -624,6 +634,7 @@ const ULT_EFFECT_SPRITES = {
     rogue: [{ sprite: 'assets/effects/slash_04.webp', tint: 0x9b59b6 }, { sprite: 'assets/effects/spark_06.webp', tint: 0xe0c3fc }, { sprite: 'assets/effects/star_04.webp', tint: 0xd6a4ff }],
     archer: [{ sprite: 'assets/effects/muzzle_02.webp', tint: 0x2ecc71 }, { sprite: 'assets/effects/spark_06.webp', tint: 0xffffff }, { sprite: 'assets/effects/circle_04.webp', tint: 0x27ae60 }],
     mage: [{ sprite: 'assets/effects/magic_03.webp', tint: 0x3498db }, { sprite: 'assets/effects/star_04.webp', tint: 0x00d4ff }, { sprite: 'assets/effects/spark_06.webp', tint: 0x00eaff }],
+    druid: [{ sprite: 'assets/effects/magic_03.webp', tint: 0x6abf3a }, { sprite: 'assets/effects/star_04.webp', tint: 0xb8f07a }, { sprite: 'assets/effects/circle_04.webp', tint: 0x3d8a2a }],
     necromancer: [{ sprite: 'assets/effects/symbol_01.webp', tint: 0x8e44ad }, { sprite: 'assets/effects/smoke_04.webp', tint: 0x2c3e50 }, { sprite: 'assets/effects/circle_03.webp', tint: 0x4a148c }],
     paladin: [{ sprite: 'assets/effects/light_01.webp', tint: 0xf1c40f }, { sprite: 'assets/effects/circle_04.webp', tint: 0xffd700 }, { sprite: 'assets/effects/star_04.webp', tint: 0xfff9c4 }],
 };
@@ -1894,8 +1905,8 @@ function cgBossEnrageTransition(gridEl) {
 // second, class-based tint on the same shared board would fight that
 // signal instead of adding to it; the player's own portrait belongs to
 // them alone in every mode, so it's the right place for CLASS identity).
-const CLASS_GLOW_KEYS = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
-const CLASS_GLOW_COLORS = { warrior: 0x95a5a6, berserker: 0xe74c3c, rogue: 0x9b59b6, archer: 0x27ae60, mage: 0x3498db, necromancer: 0x8e44ad, paladin: 0xf1c40f };
+const CLASS_GLOW_KEYS = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin', 'druid'];
+const CLASS_GLOW_COLORS = { warrior: 0x95a5a6, berserker: 0xe74c3c, rogue: 0x9b59b6, archer: 0x27ae60, mage: 0x3498db, necromancer: 0x8e44ad, paladin: 0xf1c40f, druid: 0x6abf3a };
 function cgSetClassGlow(canvasId, classKey) {
     const el = document.getElementById(canvasId);
     if (!el) return;
