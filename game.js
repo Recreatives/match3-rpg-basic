@@ -194,6 +194,7 @@ const CLASSES = {
             let dmg = TILE_STATS.ult_dmg + ctx.getSelfArmor();
             ctx.dealDamageToOpponent(dmg);
             ctx.log(tf('ULT: Shield Slam {dmg} hasar verdi!', { dmg }), "log-hit");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('stun', 1); // status.js (solo)
         }
     },
     BERSERKER: {
@@ -206,6 +207,7 @@ const CLASSES = {
             ctx.dealDirectDamageToSelf(10);
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg * 2);
             ctx.log(t('ULT: Blood Lust çift hasar verdi!'), "log-crit");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('bleed', 3);
         }
     },
     ROGUE: {
@@ -218,6 +220,7 @@ const CLASSES = {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             ctx.grantExtraTurn();
             ctx.log(t('ULT: Assassinate! Ekstra Tur!'), "log-match");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('poison', 4);
         }
     },
     ARCHER: {
@@ -230,6 +233,7 @@ const CLASSES = {
             let pierceDmg = TILE_STATS.ult_dmg + (TILE_STATS.sword * 2);
             ctx.dealDirectDamageToOpponent(pierceDmg);
             ctx.log(tf('ULT: Piercing Shot zırhı yok saydı! -{pierceDmg} Can', { pierceDmg }), "log-crit");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('bleed', 3);
         }
     },
     MAGE: {
@@ -242,6 +246,7 @@ const CLASSES = {
             ctx.dealDamageToOpponent(TILE_STATS.ult_dmg);
             TILE_STATS.ult_dmg += 10;
             ctx.log(tf("ULT: Güç {val}'e yükseldi!", { val: TILE_STATS.ult_dmg }), "log-match");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('burn', 3);
         }
     },
     NECROMANCER: {
@@ -256,6 +261,7 @@ const CLASSES = {
             ctx.dealDamageToOpponent(dmg);
             ctx.healSelf(heal);
             ctx.log(tf('ULT: Soul Siphon {dmg} hasar verdi, {heal} iyileştirdi!', { dmg, heal }), "log-crit");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('poison', 4);
         }
     },
     PALADIN: {
@@ -270,6 +276,7 @@ const CLASSES = {
             ctx.healSelf(heal);
             ctx.dealDamageToOpponent(dmg);
             ctx.log(tf('ULT: Divine Judgement {heal} iyileştirdi, {dmg} hasar verdi!', { heal, dmg }), "log-heal");
+            if (ctx.applyStatusToOpponent) ctx.applyStatusToOpponent('weaken', 2);
         }
     }
 };
@@ -302,6 +309,8 @@ function makeSinglePlayerCombatContext() {
         addArmor(amount) { playerArmor += amount; },
         addEnergy(amount) { ultCharge = Math.min(ultCharge + amount, 100); },
         grantExtraTurn() { extraTurnTriggered = true; },
+        // status.js - only the solo context has it; the class ults check for it
+        applyStatusToOpponent(key, turns) { if (typeof statusApply === 'function') statusApply('enemy', key, turns); },
         log(msg, cls) { log(msg, cls); }
     };
 }
@@ -458,6 +467,7 @@ function resetGame() {
 
 function startLevel() {
     currentState = STATE.PLAYING;
+    if (typeof statusClear === 'function') statusClear(); // a new fight starts clean (status.js)
     if (typeof socialTouch === 'function') socialTouch('dungeon:' + Math.min(999, level));
     overlay.classList.remove('visible');
     rewardArea.style.display = 'none';
@@ -1304,6 +1314,11 @@ function applyRPGEffects(type, multiplier) {
         if (recoil > 0) soloCombatText(self, '-' + recoil, 'self');
         log(tf('Kafatası! Hasar: {dmg} / Kendine: {recoil}', { dmg: dmgToOpponent, recoil }), 'log-crit');
         if (!isPlayerTurn) drainPlayerUltIfNeeded();
+        // the soul-drainer's skulls poison, an enraged boss's burn (status.js)
+        if (!isPlayerTurn && typeof statusApply === 'function') {
+            if (currentMinionType === 'drain') statusApply('player', 'poison', 2);
+            if (bossEnraged) statusApply('player', 'burn', 2);
+        }
         // G3 - a monster's own landed hit gets a visible lunge.
         if (!isPlayerTurn && typeof cgStageDo === 'function') cgStageDo('enemy-sprite', 'playAttack', multiplier);
         if (typeof playSound === 'function') playSound('crit');
@@ -1367,6 +1382,8 @@ function applyDefensiveTraits(amount) {
 }
 
 function inflictDamage(targetStr, amount) {
+    // a weakened enemy hits for less (status.js)
+    if (targetStr === 'player' && !isPlayerTurn && typeof statusOutgoingMult === 'function') amount = Math.floor(amount * statusOutgoingMult('enemy'));
     if (targetStr === 'player') {
         let afterDefense = applyDefensiveTraits(amount);
         if (afterDefense === null) {
@@ -1438,6 +1455,19 @@ function endTurnLogic() {
         // derives the ULT button's disabled state from it - the other order
         // left a 100% ult unpressable until something else refreshed the UI.
         if (isPlayerTurn) isProcessing = false;
+        // status effects (status.js) at the start of whoever's turn it is now:
+        // damage over time can end the fight, a stunned enemy loses its turn
+        if (typeof statusTick === 'function') {
+            const tick = statusTick(isPlayerTurn ? 'player' : 'enemy');
+            if (playerHP <= 0 || enemyHP <= 0) { updateUI(); checkWinCondition(); return; }
+            if (!isPlayerTurn && tick.skip) {
+                log(t('💫 Düşman sersemledi, turunu kaçırdı!'), 'log-match');
+                isPlayerTurn = true;
+                isProcessing = false;
+                statusTick('player');
+                if (playerHP <= 0) { updateUI(); checkWinCondition(); return; }
+            }
+        }
         updateTurnBanner();
         updateUI();
         if (!isPlayerTurn) {

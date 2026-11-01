@@ -115,6 +115,77 @@ describe('Ultimates (solo combat context)', { isolate: 'each' }, function () {
     });
 });
 
+describe('Status effects (status.js, solo)', { isolate: 'each' }, function () {
+    async function fight(w, key) {
+        await startSolo(w, key, { level: 4 });
+        w.g('enemyHP = maxEnemyHP = 500; enemyArmor = 0; playerHP = maxPlayerHP = 200; playerArmor = 0; ultCharge = 100; isProcessing = false; currentMinionType = "normal"');
+    }
+
+    it('every class ult leaves its status on the enemy, shown as a badge', async function (ctx) {
+        var w = ctx.world, want = { WARRIOR: 'stun', BERSERKER: 'bleed', ROGUE: 'poison', ARCHER: 'bleed', MAGE: 'burn', NECROMANCER: 'poison', PALADIN: 'weaken' };
+        for (var key in want) {
+            await fight(w, key);
+            freezeEnemyTurn(w);
+            w.g('useUltimate()');
+            expect(w.g('statusHas("enemy", "' + want[key] + '")'), key + ' -> ' + want[key]).toBe(true);
+            expect(w.$('enemy-status-badges').textContent, key + ' badge').toContain(w.g('STATUS_DEFS.' + want[key] + '.icon'));
+        }
+    });
+
+    it('burning hurts the enemy at the start of its turn, through armor, and counts down', async function (ctx) {
+        var w = ctx.world;
+        await fight(w, 'MAGE');
+        w.g('enemyArmor = 999; statusApply("enemy", "burn", 3); isPlayerTurn = true');
+        w.g('endTurnLogic()');
+        expect(w.g('enemyHP'), '4% of 500 through 999 armor').toBe(480);
+        expect(w.g('soloStatus.enemy.burn')).toBe(2);
+        expect(w.g('enemyArmor')).toBe(999);
+    });
+
+    it('a stunned enemy loses its turn: it comes straight back to the player', async function (ctx) {
+        var w = ctx.world;
+        await fight(w, 'WARRIOR');
+        var played = 0;
+        w.win.enemyPlayTurn = function () { played++; };
+        w.g('statusApply("enemy", "stun", 1); isPlayerTurn = true');
+        w.g('endTurnLogic()');
+        await w.tick(2000);
+        expect(played, 'enemy never moved').toBe(0);
+        expect(w.g('isPlayerTurn')).toBe(true);
+        expect(w.g('statusHas("enemy", "stun")'), 'used up').toBe(false);
+    });
+
+    it('a weakened enemy hits for a quarter less', async function (ctx) {
+        var w = ctx.world;
+        await fight(w, 'WARRIOR');
+        w.g('statusApply("enemy", "weaken", 2); isPlayerTurn = false');
+        w.g('inflictDamage("player", 100)');
+        expect(w.g('playerHP')).toBe(200 - 75);
+    });
+
+    it("the soul-drainer's skulls poison you; damage over time can end the fight", async function (ctx) {
+        var w = ctx.world;
+        await fight(w, 'WARRIOR');
+        w.g('currentMinionType = "drain"; isPlayerTurn = false; applyRPGEffects("skull", 1)');
+        expect(w.g('soloStatus.player.poison')).toBe(2);
+        expect(w.$('player-status-badges').textContent).toContain('☠');
+        w.g('enemyHP = 5; statusApply("enemy", "bleed", 3); isPlayerTurn = true; isProcessing = true');
+        w.g('endTurnLogic()');
+        expect(w.g('enemyHP') <= 0, 'bled out').toBe(true);
+        expect(w.g('currentState')).toBe(w.g('STATE.GAMEOVER'));
+    });
+
+    it('a new fight starts clean', async function (ctx) {
+        var w = ctx.world;
+        await fight(w, 'WARRIOR');
+        w.g('statusApply("enemy", "burn", 3); statusApply("player", "poison", 2)');
+        w.g('level = 5; startLevel()');
+        await w.settle(500);
+        expect(w.g('Object.keys(soloStatus.enemy).length + Object.keys(soloStatus.player).length')).toBe(0);
+        expect(w.$('enemy-status-badges').textContent).toBe('');
+    });
+});
+
 describe('Damage, armor, defense', { isolate: 'each' }, function () {
     beforeEach(async function (ctx) { await startSolo(ctx.world, 'WARRIOR'); ctx.world.g('enemyHP = maxEnemyHP = 200; playerHP = maxPlayerHP = 100'); });
 

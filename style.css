@@ -388,6 +388,11 @@ body {
 .fighter-hud .hp-text { margin-top: 1px; font-size: 0.72rem; }
 .fighter-name { font-weight: bold; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fighter-left { left: 3%; }
+/* status effects (status.js): small badges in the HUD box's top corner -
+   absolutely placed, so they never add height to the arena HUD */
+.status-badges { position: absolute; bottom: -1px; right: 0; display: flex; gap: 2px; pointer-events: none; }
+.fighter-right .status-badges { right: auto; left: 0; }
+.status-badge { font-size: 0.62rem; line-height: 1; padding: 1px 3px; border-radius: 6px; background: rgba(10, 12, 18, 0.75); color: #fff; white-space: nowrap; }
 .fighter-right { right: 3%; }
 /* where each fighter stands - empty, the canvas draws them */
 .arena-slot { position: absolute; top: var(--arena-hud-h); bottom: 0; width: 40%; pointer-events: none; }

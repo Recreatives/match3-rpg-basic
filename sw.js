@@ -10,7 +10,7 @@
 // user, which is a much worse outcome than "no offline support." Network-
 // first means the cache is only ever a fallback for when the network
 // request itself fails, never a substitute for a working one.
-const CACHE_NAME = 'pixel-dungeon-v1.46';
+const CACHE_NAME = 'pixel-dungeon-v1.47';
 const APP_SHELL = [
     './',
     './index.html',
@@ -36,6 +36,7 @@ const APP_SHELL = [
     './achievements.js',
     './social.js',
     './game.js',
+    './status.js',
     './sharedboard.js',
     './pvp.js',
     './coop.js'

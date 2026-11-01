@@ -98,6 +98,10 @@ function bake(item) {
   const M = item.margin || MARGIN, W = W0 + 2 * M, H = H0 + 2 * M, OX = ox0 + M, OY = oy0 + M;
   const opts = Object.assign({ x: 0, y: 0 }, item.opts || {});
   if (meta.actor) opts.actor = blankDummy();
+  // noBody: an empty silhouette too - status effects otherwise fill the
+  // stock dummy's shape (a pale/green/charred figure over our painted
+  // fighter); without it only their particles remain (flames, bubbles, drops)
+  if (meta.actor && item.noBody) opts.actor = Object.assign({}, opts.actor, { mask: Object.assign({}, opts.actor.mask, { data: new Uint8Array(opts.actor.mask.data.length) }) });
   const fx = createFx(mod, opts);
   lightCut = item.lightCut || LIGHT_CUT;
   const fps = item.fps || meta.fps || 30;

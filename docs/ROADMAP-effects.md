@@ -173,6 +173,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 - Bazı yeni beceriler ve efsanevi pasifler bu etkileri kullanmaya başlar.
 - En riskli faz: savaş matematiği ve PvP değişir.
 
+**Faz 6 yapılanlar (v1.47, yalnızca solo):** `status.js`. Yanma (%4/tur), zehir (%3/tur), kanama (%5/tur) etkilenen tarafın sırası başlarken zırhı delerek vurur; sersemleme düşmana bir tur kaybettirir; zayıflık düşmanın hasarını %25 azaltır. Kaynaklar: her sınıfın ult'u (Savaşçı sersemletme, Paladin zayıflatma, Berserker/Okçu kanama, Haydut/Nekromant zehir, Büyücü yanma) ve canavarlar (ruh emicinin kafatası vuruşları zehirler, öfkeli boss yakar). Bilgi kutusunun alt köşesinde rozet (simge + kalan tur), her uygulama ve tikte pixelfx durum efekti. Durum efektleri gövdeyi boyamasın diye pişirmede `noBody`/`lightOnly`. Her yeni kat temiz başlar. **PvP ve co-op'ta henüz yok:** ult'lar orada eskisi gibi çalışıyor (savaş bağlamlarında etki fonksiyonu yok); iki tarafın her tiki ağ üzerinden aynı görmesi gerekiyor, ayrı bir adım.
+
 ### Faz 7: Yeni sınıflar
 - Her sürümde bir sınıf: önce Druid, sonra Fırtına Çağırıcı, sonra Simyacı.
 - Her sınıf için stil C karakter tasarımı (yan yana önizlemeyle onay), hamleler, ult, denge, metinler, testler.

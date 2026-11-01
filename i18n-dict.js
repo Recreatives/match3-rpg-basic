@@ -855,4 +855,11 @@ const EN_DICT = {
     'Klanın kuruldu!': 'Your clan is founded!',
     'Yeni mesaj': 'New message',
     "Adını 30 günde bir ücretsiz değiştirebilirsin (Posta Kulesi'nden altınla da olur).": 'You can change your name for free once every 30 days (or for gold at the Post Tower).',
+    // === status.js (v1.47) ===
+    'Yanma': 'Burning', 'Zehir': 'Poison', 'Kanama': 'Bleeding', 'Sersemleme': 'Stun', 'Zayıflık': 'Weakness',
+    '{icon} Düşman: {name} ({n} tur)': '{icon} Enemy: {name} ({n} turns)',
+    '{icon} Sen: {name} ({n} tur)': '{icon} You: {name} ({n} turns)',
+    'Durum etkileri: -{n} can': 'Status effects: -{n} HP',
+    'Düşmana durum etkileri: -{n} can': 'Status effects on the enemy: -{n} HP',
+    '💫 Düşman sersemledi, turunu kaçırdı!': '💫 The enemy is stunned and loses its turn!',
 };

@@ -308,7 +308,8 @@ function pfxPreloadClass(cls) {
     moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
     names.forEach(pfxLoad);
     // loot beams for the common drops (rarer ones load when they first drop)
-    ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up'].forEach(pfxLoad);
+    ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up',
+        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed'].forEach(pfxLoad);
 }
 
 // --- projectiles --------------------------------------------------------------------
@@ -545,4 +546,17 @@ function pfxAmbientTick() {
     const ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.drawImage(r.canvas, 0, 0, cv.width, cv.height);
+}
+
+// --- status effects (effects roadmap Faz 6, status.js) --------------------------------
+// A status landing on / ticking on a fighter: its pixelfx loop for a beat.
+function pfxStatus(stageId, name) {
+    if (typeof cgGetStage !== 'function' || !cgEffectsEnabled() || !PFX_DATA[name]) return;
+    if (!pfxReady(name)) { pfxLoad(name); return; }
+    const el = document.getElementById(stageId);
+    if (!el || el.offsetParent === null) return;
+    const st = cgGetStage(stageId);
+    if (!st || !st.arena || !st.portraitSprite) return;
+    const p = st.arena.bodyPoint(st, 0);
+    pfxPlay(st.arena, name, p.x, p.y, { scale: 1.1, ms: 900, flip: (st.facing || 1) < 0 });
 }
