@@ -975,6 +975,7 @@ class CombatStage {
     async setAvatar(spec) {
         await this.ready;
         if (typeof avPaint !== 'function') return;
+        if (spec && spec.cls && typeof pfxPreloadClass === 'function') pfxPreloadClass(spec.cls); // its effect sheets (pfx.js)
         const painted = avPaint(spec);
         const token = this.url = 'avatar:' + JSON.stringify(spec);
         this.charKey = spec.charKey || ('avatar_' + (spec.cls || 'hero'));
@@ -1394,6 +1395,7 @@ class CombatStage {
     // plays twice in a row.
     async playClassMotion(classKey, tileType, power, combo) {
         await this.ready;
+        if (typeof pfxPreloadClass === 'function') pfxPreloadClass(classKey);
         const act = tileType === 'teamheal' ? 'heart' : tileType;
         let list = typeof cgMovesFor === 'function' ? cgMovesFor(classKey, act) : null;
         // what's in the hand changes how it swings (moves.js CG_WEAPON_MOVES)
@@ -1433,9 +1435,12 @@ class CombatStage {
         if (foe) foe.incomingTier = Math.max(foe.incomingTier || 0, tier);
         this.lastAction = move;
         const ctx = { stage: this, foe, arena, reach, impactMs, ms, f, tier };
-        if (move.fx && cgEffectsEnabled()) move.fx(this, ctx);
+        // the move's pixelfx effects (pfx.js, moves.js CG_PFX_MOVES) when they
+        // are loaded, its vector effects otherwise
+        const pfxDone = typeof pfxRunMove === 'function' && pfxRunMove(move, this, ctx);
+        if (!pfxDone && move.fx && cgEffectsEnabled()) move.fx(this, ctx);
         if (kind === 'melee' && this.weaponTrail !== null && this.weaponTrail !== undefined && cgEffectsEnabled()) this._weaponTrail(this.weaponTrail, ms);
-        if (kind === 'ranged' && move.shot && foe) {
+        if (kind === 'ranged' && move.shot && foe && !(pfxDone && pfxNoShot(move))) {
             const launch = move.launchMs || 230;
             this._after(launch, () => {
                 if (foe.dead && !foe.portraitSprite) return;
@@ -1443,11 +1448,12 @@ class CombatStage {
             });
         }
         this._after(impactMs, () => {
-            if (move.onImpact && cgEffectsEnabled()) move.onImpact(this, ctx);
+            // (pixelfx moves bring their own impact - no vector burst on top)
+            if (!pfxDone && move.onImpact && cgEffectsEnabled()) move.onImpact(this, ctx);
             if (!foe) return;
             if (tier >= 2) cgHitStop(tier >= 3 ? 110 : 60);
             arena.shake(tier >= 3 ? 7 : tier === 2 ? 4 : 2, 260);
-            if (kind === 'melee') {
+            if (kind === 'melee' && !pfxDone) {
                 const p = arena.bodyPoint(foe, 0.55);
                 arena.impact(p.x - f * 8, p.y, move.color || 0xffffff, 0.5 + 0.3 * tier);
             }

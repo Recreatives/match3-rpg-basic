@@ -1,6 +1,6 @@
 # pixelfx efektleri: analiz ve yol haritası
 
-Durum: Faz 0 bitti, görünüm D seçildi. Faz 1 (altyapı) hazır, kullanıcı testi bekleniyor (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
+Durum: Faz 0-1 bitti (görünüm D). Fazlar sırayla `feature/pixelfx-faz1` dalında yapılıyor (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
 
 ## 1. pixelfx nedir?
 
@@ -149,6 +149,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 ### Faz 2: Mevcut sınıfların efektleri
 - Önce 7 ult, sonra kademe 3 bitirici hamleler, sonra kademe 2 ve 1.
 - Oyunculuk iyileştirmesi aynı fazda: hazırlık pozu, vuruşta donma, hedefin savrulması, toz.
+
+**Faz 2 yapılanlar (v1.43):** 43 pişirilmiş efekt (~8,6 MB toplam; oyuncu yalnızca kendi sınıfınınkini indirir, ~1-2,5 MB). `moves.js` `CG_PFX_MOVES`: 7 sınıfın 7 ult'u ve 110+ hamle/efekt eşleşmesi (kılıç/kafatası saldırıları, kalkan/kalp/enerji güçlendirmeleri). Yeni mermiler: `pfxarrow` (ok + kıvılcım), `pfxshard` (buz mızrağı + kırılma), `pfxshadow` (gölge küresi + karanlık patlama). Efektin çarpma karesi oyunun hasar anına denk getiriliyor (gerekirse efekt baştan kırpılarak); pixelfx hamlesinde eski vektör parlaması/yer çatlağı oynamıyor, hit-stop ve sarsıntı kalıyor. Pişirmede: soluk ışık atılıyor, ışık 4'lü adımlarla saklanıyor, uzun efektler 20 fps. "Impact frame" (tam ekran siyah-beyaz hız çizgileri) arenayı kapladığı için çıkarıldı. Oyunculuk (hazırlık pozu, donma, savrulma) bizim rig'de zaten vardı; ayrıca değiştirilmedi.
 
 ### Faz 3: Yeni beceriler (görsel çeşitlilik)
 - Bölüm 5'teki listeden her sınıfa 2-4 yeni hamle. Denge değişmez.

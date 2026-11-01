@@ -28,17 +28,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
 <script>/* always the files on disk, never a cached copy (dev page) */ for (const f of ["graphics","arena","pixelfx-data","pfx","moves","avatar","catalog","items","hero"]) document.write('<script src="' + f + '.js?t=' + Date.now() + '"><\/script>');</script>
 <script>
+// ?cls=paladin picks the class; every move of it (and its ult) gets a button
+const cls = new URLSearchParams(location.search).get('cls') || 'mage';
 const hero = cgGetStage('study-hero'), foe = cgGetStage('study-foe');
-hero.setAvatar(heroSpecFor('mage', null, []));
+hero.setAvatar(heroSpecFor(cls, null, []));
 foe.setMonster('boss', 8);
-function move(cls, id) { for (const k in CG_MOVES[cls]) for (const m of CG_MOVES[cls][k]) if (m.id === id) return m; }
-const MOVES = [['mage', 'm.fireball'], ['mage', 'm.fire']];
-MOVES.forEach(([c, id]) => {
-  const b = document.createElement('button'); b.textContent = id;
-  b.onclick = () => { hero._perform(move(c, id)); setTimeout(() => foe.playHit('skull', 0), cgImpactMs()); };
-  document.getElementById('buttons').appendChild(b);
+if (typeof cgEffectsEnabled === 'function' && !cgEffectsEnabled()) cgToggleLowGraphics();
+const bar = document.getElementById('buttons');
+bar.insertAdjacentHTML('beforeend', ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'].map(c => `<a href="?cls=${c}" style="color:${c === cls ? '#ffe2a0' : '#9fb0c0'};margin-right:8px">${c}</a>`).join('') + '<br>');
+const all = [].concat(...Object.values(CG_MOVES[cls]), CG_ULTS[cls]);
+function play(m) { hero._perform(m); if (m.kind !== 'self') setTimeout(() => foe.playHit('skull', 0), cgImpactMs()); }
+all.forEach(m => {
+  const b = document.createElement('button');
+  b.textContent = m.id + (CG_PFX_MOVES[m.id] || String(m.shot).startsWith('pfx') ? ' *' : '');
+  b.onclick = () => play(m);
+  bar.appendChild(b);
 });
+window.__preview = { hero, foe, all, play };
 setInterval(() => {
-  document.getElementById('info').textContent = 'yüklü: ' + Object.keys(PFX_DATA).map(n => n + (pfxReady(n) ? ' ✓' : ' …')).join('  ') + (PFX.broken ? '  SHADER HATASI' : '');
+  const names = Object.keys(PFX.textures);
+  document.getElementById('info').textContent = 'yüklü sayfa: ' + names.length + ' / ' + Object.keys(PFX_DATA).length + (PFX.broken ? '  SHADER HATASI' : '') + '   (* = pixelfx)';
 }, 500);
 </script></body></html>

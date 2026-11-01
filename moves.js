@@ -213,14 +213,14 @@ const CG_MOVES = {
     },
     archer: {
         sword: [
-            cgRanged('a.shot', 'bow', 'arrow', CGC.leaf, null, { pose: CG_POSE.draw() }),
-            cgRanged('a.double', 'bow', 'arrow', CGC.leaf, cgExtraShots(1, 10), { pose: CG_POSE.draw() }),
+            cgRanged('a.shot', 'bow', 'pfxarrow', CGC.leaf, null, { pose: CG_POSE.draw() }),
+            cgRanged('a.double', 'bow', 'pfxarrow', CGC.leaf, cgExtraShots(1, 10), { pose: CG_POSE.draw() }),
             cgMelee('a.bowbash', 'backhand', 'dash', CGC.leaf, cgSlashAt(CGC.leaf, { a0: 0.4, a1: 2.6, spin: -0.9, width: 4 })),
-            cgRanged('a.power', 'bow', 'arrow', CGC.gold, cgAll(s => CG_VFX.rune(s, CGC.leaf, { ms: 1000 }), cgExtraShots(2, 9)), { tier: 2, pose: CG_POSE.draw() }),
+            cgRanged('a.power', 'bow', 'pfxarrow', CGC.gold, cgAll(s => CG_VFX.rune(s, CGC.leaf, { ms: 1000 }), cgExtraShots(2, 9)), { tier: 2, pose: CG_POSE.draw() }),
             cgRanged('a.volley', 'bow', 'rain', CGC.leaf, s => CG_VFX.rune(s, CGC.gold, { ms: 1000 }), { tier: 3, launchMs: 160, pose: CG_POSE.draw() }),
         ],
         skull: [
-            cgRanged('a.redshot', 'bow', 'arrow', CGC.red, s => CG_VFX.rune(s, CGC.leaf, { ms: 900 }), { pose: CG_POSE.draw() }),
+            cgRanged('a.redshot', 'bow', 'pfxarrow', CGC.red, s => CG_VFX.rune(s, CGC.leaf, { ms: 900 }), { pose: CG_POSE.draw() }),
             cgRanged('a.venom', 'bow', 'orb', CGC.green, null, { pose: CG_POSE.draw() }),
             cgRanged('a.pierce', 'bow', 'beam', CGC.leaf, s => CG_VFX.rune(s, CGC.gold, { ms: 1000 }), { tier: 2, pose: CG_POSE.draw() }),
             cgRanged('a.storm', 'bow', 'rain', CGC.red, s => CG_VFX.rune(s, CGC.red, { ms: 1000 }), { tier: 3, launchMs: 160, pose: CG_POSE.draw() }),
@@ -241,7 +241,7 @@ const CG_MOVES = {
     mage: {
         sword: [
             cgRanged('m.missile', 'cast', 'orb', CGC.cyan, s => CG_VFX.rune(s, CGC.blue, { ms: 900 }), { pose: CG_POSE.float(5) }),
-            cgRanged('m.shard', 'push', 'shard', CGC.cyan, null, { pose: CG_POSE.float(4) }),
+            cgRanged('m.shard', 'push', 'pfxshard', CGC.cyan, null, { pose: CG_POSE.float(4) }),
             cgRanged('m.spark', 'cast', 'bolt', CGC.cyan, s => CG_VFX.orbit(s, CGC.cyan, { n: 3 }), { pose: CG_POSE.float(6) }),
             cgRanged('m.fireball', 'push', 'pfxfireball', CGC.orange, s => CG_VFX.rune(s, CGC.orange, { ms: 900 }), { tier: 2, pose: CG_POSE.float(6) }),
             cgRanged('m.meteor', 'summon', 'meteor', CGC.orange, s => CG_VFX.rune(s, CGC.orange, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
@@ -250,7 +250,7 @@ const CG_MOVES = {
             cgRanged('m.beam', 'cast', 'beam', CGC.cyan, s => CG_VFX.rune(s, CGC.purple, { ms: 900 }), { pose: CG_POSE.float(8) }),
             cgRanged('m.fire', 'push', 'pfxfireball', CGC.orange, null, { pose: CG_POSE.float(6) }),
             cgRanged('m.chain', 'cast', 'bolt', CGC.white, cgAll(s => CG_VFX.orbit(s, CGC.cyan, { n: 5 }), s => CG_VFX.flash(s, CGC.cyan, { ms: 400 })), { tier: 2, pose: CG_POSE.float(8) }),
-            cgRanged('m.frost', 'push', 'shard', CGC.cyan, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1000, size: 0.6 }), cgExtraShots(2, 10)), { tier: 3, pose: CG_POSE.float(8) }),
+            cgRanged('m.frost', 'push', 'pfxshard', CGC.cyan, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1000, size: 0.6 }), cgExtraShots(2, 10)), { tier: 3, pose: CG_POSE.float(8) }),
         ],
         shield: [
             cgSelf('m.barrier', 'cast', CG_POSE.float(5), cgOldFx('mage', 'shield')),
@@ -267,7 +267,7 @@ const CG_MOVES = {
     },
     necromancer: {
         sword: [
-            cgRanged('n.shadowbolt', 'cast', 'orb', CGC.purple, s => CG_VFX.orbit(s, CGC.purple, { n: 3 }), { pose: CG_POSE.float(4) }),
+            cgRanged('n.shadowbolt', 'cast', 'pfxshadow', CGC.purple, s => CG_VFX.orbit(s, CGC.purple, { n: 3 }), { pose: CG_POSE.float(4) }),
             cgRanged('n.bone', 'throw', 'dagger', CGC.bone, null),
             cgRanged('n.siphon', 'push', 'drain', CGC.purple, s => CG_VFX.aura(s, CGC.shadow, { pulses: 2 }), { tier: 2, pose: CG_POSE.float(5) }),
             cgRanged('n.grasp', 'summon', 'graspers', CGC.purple, s => CG_VFX.rune(s, CGC.purple, { ms: 1000, size: 0.6 }), { tier: 3, launchMs: 170, pose: CG_POSE.kneel(4) }),
@@ -427,3 +427,81 @@ function cgMonsterMoves(charKey, kind, enraged) {
     const list = set[kind] || [];
     return enraged && set.enraged ? list.concat(set.enraged) : list;
 }
+
+// --- PIXELFX EFFECTS PER MOVE --------------------------------------------------------
+// Effects roadmap Faz 2 (docs/ROADMAP-effects.md). A move listed here plays
+// these baked pixelfx effects (pfx.js) instead of its vector fx/onImpact -
+// but only once every sheet it names is loaded; until then (and in
+// low-graphics mode) the vector effects above still play. Specs:
+//   fx     sheet name (pixelfx-data.js)
+//   on     'foe' (feet, default) | 'foeBody' | 'self' | 'selfBody' | 'mid'
+//   at     'impact' (default: its contact frame meets the game's impact)
+//          | 'start' | ms after the move starts
+//   scale  x the arena's pixel size (big area effects are drawn for a
+//          bigger stage than our ~150px arena, so they run ~0.6)
+//   ms     how long a loop (shield, aura) plays
+// { noShot: true } in a list: the effect IS the projectile (a falling
+// meteor, hands from the ground) - the move's vector shot doesn't fly.
+// Sheets a move needs are fetched the first time its class enters a fight.
+const CG_PFX_MOVES = (() => {
+    const at = (fx, o) => Object.assign({ fx }, o);
+    const foe = (fx, scale, o) => at(fx, Object.assign({ on: 'foe', scale }, o));
+    const hit = (fx, scale, o) => at(fx, Object.assign({ on: 'foeBody', scale }, o));
+    const self = (fx, scale, o) => at(fx, Object.assign({ on: 'self', scale }, o));
+    const NOSHOT = { noShot: true };
+    const slash = foe('melee-sword-slash'), cleave = foe('melee-heavy-cleave'), thrust = foe('melee-thrust');
+    const spark = hit('impacts-hit-spark', 0.9), crit = hit('impacts-crit-hit', 0.7), blunt = hit('impacts-blunt-hit', 0.9);
+    const slam = foe('impacts-ground-slam', 0.6);
+    const heal = self('holy-heal'), shieldUp = self('holy-divine-shield', 1, { ms: 1100 }), charge = self('lightning-charge-up', 0.8);
+    const rage = self('status-rage', 1, { ms: 1000 }), skulls = self('shadow-necro-skulls', 0.9, { ms: 1100 });
+    return {
+        // warrior
+        'w.overhead': [slash, spark], 'w.backhand': [slash], 'w.thrust': [thrust],
+        'w.bashcut': [slash, blunt], 'w.leapstrike': [cleave, slam],
+        'w.heavy': [crit], 'w.uppercut': [foe('melee-uppercut')], 'w.shieldcharge': [blunt, crit],
+        'w.groundbreaker': [foe('impacts-ground-slam', 0.75), foe('explosions-dirt-explosion', 0.55)],
+        'w.block': [self('impacts-shield-block')], 'w.guard': [shieldUp], 'w.kneel': [heal], 'w.drink': [heal],
+        'w.roar': [rage], 'w.power': [charge],
+        'w.ult': [cleave, foe('impacts-ground-slam', 0.8), crit, foe('explosions-dirt-explosion', 0.6)],
+        // berserker
+        'b.whirl': [foe('melee-spin-slash')], 'b.chop': [cleave], 'b.kick': [blunt], 'b.frenzy': [foe('melee-double-slash')],
+        'b.cleave': [cleave, slam], 'b.heavy': [crit], 'b.uppercut': [foe('melee-uppercut')],
+        'b.bloodspin': [foe('melee-spin-slash'), self('shadow-life-steal', 0.9)],
+        'b.brace': [rage], 'b.stance': [rage], 'b.bloodlust': [rage], 'b.drink': [heal], 'b.power': [charge],
+        'b.stomp': [self('impacts-ground-slam', 0.55)],
+        'b.ult': [foe('melee-double-slash'), crit, rage, self('shadow-life-steal', 0.9)],
+        // rogue
+        'r.stab': [thrust], 'r.xslash': [foe('melee-double-slash')], 'r.backstab': [thrust, crit],
+        'r.flurry': [foe('melee-dagger-flurry'), crit], 'r.gut': [slash], 'r.poison': [foe('nature-acid-splash', 0.8)],
+        'r.shadowstep': [self('arcane-blink-out', 0.9, { at: 'start' }), foe('melee-double-slash')],
+        'r.execution': [foe('melee-uppercut'), crit],
+        'r.dodge': [self('arcane-blink-out', 0.9)], 'r.smoke': [self('explosions-smoke-bomb', 0.6)],
+        'r.bandage': [heal], 'r.drink': [heal], 'r.focus': [charge],
+        'r.ult': [self('explosions-smoke-bomb', 0.6, { at: 'start' }), foe('melee-dagger-flurry'), crit],
+        // archer (arrows: CG_SHOTS.pfxarrow, pfx.js)
+        'a.bowbash': [blunt], 'a.venom': [foe('nature-acid-splash', 0.8)], 'a.pierce': [crit, spark],
+        'a.herb': [heal], 'a.drink': [heal], 'a.focus': [charge],
+        'a.ult': [self('lightning-charge-up', 0.8, { at: 'start' }), crit, foe('impacts-ground-slam', 0.5)],
+        // mage (fireballs: pfxfireball, ice lances: pfxshard)
+        'm.missile': [foe('arcane-mana-burst', 0.6)], 'm.spark': [hit('lightning-zap-hit', 0.8)],
+        'm.meteor': [foe('fire-meteor', 0.6), NOSHOT], 'm.beam': [foe('arcane-mana-burst', 0.6)],
+        'm.chain': [foe('lightning-lightning-strike', 0.55), NOSHOT], 'm.frost': [foe('ice-frost-nova', 0.6)],
+        'm.barrier': [shieldUp], 'm.ward': [shieldUp], 'm.mend': [heal], 'm.pray': [heal],
+        'm.channel': [charge], 'm.gather': [self('arcane-magic-circle-cast', 0.55, { at: 'start' })],
+        'm.ult': [self('arcane-magic-circle-cast', 0.55, { at: 'start' }), foe('fire-meteor', 0.7), NOSHOT],
+        // necromancer (shadow bolts: pfxshadow)
+        'n.siphon': [self('shadow-life-steal', 0.9), NOSHOT], 'n.drain': [self('shadow-life-steal', 0.9), NOSHOT],
+        'n.grasp': [foe('shadow-grasping-hands', 0.8), NOSHOT], 'n.graspers': [foe('shadow-grasping-hands', 0.8), NOSHOT],
+        'n.doom': [foe('shadow-grasping-hands', 0.8), foe('shadow-dark-explosion', 0.55), NOSHOT],
+        'n.hex': [foe('shadow-hex-sigil', 0.8), NOSHOT],
+        'n.ritual': [self('shadow-hex-sigil', 0.8)], 'n.dark': [skulls], 'n.souls': [skulls], 'n.leech': [skulls],
+        'n.ult': [foe('shadow-hex-sigil', 0.8, { at: 'start' }), foe('shadow-grasping-hands', 0.9), self('shadow-life-steal', 0.9), NOSHOT],
+        // paladin
+        'p.hammer': [blunt], 'p.swing': [slash], 'p.bash': [blunt, spark], 'p.crush': [blunt, slam],
+        'p.judgement': [cleave, foe('holy-smite', 0.6)],
+        'p.smite': [foe('holy-smite', 0.6), NOSHOT], 'p.wrath': [foe('holy-holy-pillar', 0.6), NOSHOT],
+        'p.aegis': [shieldUp], 'p.guard': [shieldUp], 'p.light': [heal], 'p.prayer': [self('holy-heal-aoe', 0.6)],
+        'p.vow': [self('holy-blessing', 1, { ms: 1200 })], 'p.halo': [self('holy-blessing', 1, { ms: 1200 })],
+        'p.ult': [foe('holy-holy-pillar', 0.7), at('holy-feather-burst', { on: 'selfBody', scale: 0.7 }), NOSHOT],
+    };
+})();

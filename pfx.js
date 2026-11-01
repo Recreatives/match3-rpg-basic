@@ -21,6 +21,7 @@ const PFX = {
     loading: {},    // name -> Promise
     geometry: {},   // name -> PIXI.MeshGeometry (one quad per effect)
     broken: false,  // the shader failed once: stay on the vector effects
+    preloaded: {},  // class -> true once its sheets were requested
 };
 
 // Pixel size: a pixelfx character is ~48 px tall; ours fill the arena slot
@@ -190,12 +191,16 @@ function pfxPlay(arena, name, x, y, o) {
     }
     const k = pfxScale(arena) * (o.scale || 1);
     for (const c of [inst.front, inst.back]) { c.position.set(x, y); c.scale.set(o.flip ? -k : k, k); }
+    arena.pfxLive = (arena.pfxLive || 0) + 1; // effects playing right now (tests, debugging)
     if (inst.back.children.length) pfxBackLayer(arena).addChild(inst.back);
     arena.fxLayer.addChild(inst.front);
-    const ms = o.ms || (d.frames / d.fps) * 1000;
+    // skipMs: start this far into the effect (its contact frame comes later
+    // than the game's impact - play it from where it lines up)
+    const skip = Math.max(0, o.skipMs || 0), full = (d.frames / d.fps) * 1000;
+    const ms = o.ms || Math.max(1, full - skip);
     let last = -1;
     inst.frameAt = t => {
-        const age = (t * ms) / 1000;
+        const age = (t * ms + skip) / 1000;
         let i = Math.floor(age * d.fps);
         i = d.loop ? i % d.frames : Math.min(d.frames - 1, i);
         // a loop played for a set time fades out over its last 15%
@@ -213,6 +218,7 @@ function pfxPlay(arena, name, x, y, o) {
     inst.frameAt(0);
     arena._tween(ms, t => { inst.frameAt(t); if (o.onT) o.onT(t, inst); arena.dirty = true; }, () => {
         for (const c of [inst.front, inst.back]) { if (c.parent) c.parent.removeChild(c); c.destroy({ children: true }); }
+        arena.pfxLive--;
         if (o.onDone) o.onDone();
     });
     return inst;
@@ -229,40 +235,126 @@ function pfxGroundUnder(arena, pt) {
     return best ? { x: pt.x, y: best.y } : pt;
 }
 
+// --- moves -------------------------------------------------------------------------
+// Which move plays which effects is data: moves.js CG_PFX_MOVES maps a move
+// id to a list of specs { fx: sheet name, on: 'foe' | 'self' | 'foeBody' |
+// 'selfBody' | 'mid', at: 'impact' (default: the effect's own contact frame
+// lands on the game's impact) | 'start' | ms, ms (how long a loop plays),
+// scale }. CombatStage._perform (graphics.js) plays them INSTEAD of the
+// move's vector fx when every sheet they need is loaded, and keeps the
+// vector fx otherwise (while loading, low graphics, a shader problem).
+
+function pfxSpecsFor(move) {
+    return (move && typeof CG_PFX_MOVES !== 'undefined' && CG_PFX_MOVES[move.id]) || null;
+}
+function pfxNamesOf(specs) { return (specs || []).filter(s => s.fx).map(s => s.fx); }
+// the move's pixelfx effect is its projectile (meteor, hands from the ground)
+function pfxNoShot(move) { return (pfxSpecsFor(move) || []).some(s => s.noShot); }
+
+// All sheets of a move ready? If not, start fetching them so the next
+// time it is.
+function pfxMoveReady(move) {
+    const specs = pfxSpecsFor(move);
+    if (!specs || PFX.broken) return false;
+    const names = pfxNamesOf(specs);
+    if (names.every(pfxReady)) return true;
+    names.forEach(pfxLoad);
+    return false;
+}
+
+function pfxPointFor(stage, ctx, on) {
+    const arena = ctx.arena, foe = ctx.foe || stage;
+    switch (on) {
+        case 'self': return arena.bodyPoint(stage, 0);
+        case 'selfBody': return arena.bodyPoint(stage, 0.5);
+        case 'foeBody': return arena.bodyPoint(foe, 0.5);
+        case 'mid': { const a = arena.bodyPoint(stage, 0), b = arena.bodyPoint(foe, 0); return { x: (a.x + b.x) / 2, y: Math.max(a.y, b.y) }; }
+        default: return arena.bodyPoint(foe, 0);
+    }
+}
+
+// Plays a move's specs (see above). Returns false if it couldn't.
+function pfxRunMove(move, stage, ctx) {
+    const arena = ctx.arena;
+    if (!arena || !cgEffectsEnabled() || !pfxMoveReady(move)) return false;
+    const f = stage.facing || 1, k = pfxScale(arena);
+    pfxSpecsFor(move).forEach(spec => {
+        if (!spec.fx) return;
+        const d = PFX_DATA[spec.fx];
+        const hitMs = d.hits && d.hits.length ? d.hits[0] * 1000 : 0;
+        const at = spec.at === 'start' ? 0 : typeof spec.at === 'number' ? spec.at : Math.max(0, ctx.impactMs - hitMs);
+        const skipMs = spec.at === undefined || spec.at === 'impact' ? Math.max(0, hitMs - ctx.impactMs) : 0;
+        arena.pfxLive = (arena.pfxLive || 0) + 1; // scheduled counts as playing
+        arena.after(Math.max(1, at), () => {
+            arena.pfxLive--;
+            if (stage.dead && spec.on !== 'foe' && spec.on !== 'foeBody') return;
+            const p = pfxPointFor(stage, ctx, spec.on || 'foe');
+            let x = p.x;
+            // a caster->target effect (a slash): put its target on the foe
+            if (d.tx && (spec.on || 'foe').startsWith('foe')) x -= d.tx * k * (spec.scale || 1) * f;
+            pfxPlay(arena, spec.fx, x, p.y, { flip: f < 0, scale: spec.scale, ms: spec.ms, skipMs });
+        });
+    });
+    return true;
+}
+
+// Every sheet a class's moves (and ult) can use - fetched when that class
+// steps into an arena, so a player only ever downloads their own class.
+function pfxPreloadClass(cls) {
+    if (typeof CG_MOVES === 'undefined' || !CG_MOVES[cls] || PFX.preloaded[cls]) return;
+    PFX.preloaded[cls] = true;
+    const moves = [].concat(...Object.values(CG_MOVES[cls]), (typeof CG_ULTS !== 'undefined' && CG_ULTS[cls]) || []);
+    const names = new Set();
+    moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
+    names.forEach(pfxLoad);
+}
+
 // --- projectiles --------------------------------------------------------------------
 // A fireball that is a real pixelfx fireball, ending in a pixelfx ground
 // blast. Same contract as every CG_SHOTS kind (arena.js): arrive in `ms`,
 // then onHit. Falls back to the vector fireball until the sheets are in.
-if (typeof CG_SHOTS !== 'undefined') {
-    CG_SHOTS.pfxfireball = function (arena, from, to, ms, color, onHit) {
-        if (!pfxReady('fire-fireball') || !pfxReady('explosions-small-explosion') || !cgEffectsEnabled()) {
-            return CG_SHOTS.fireball(arena, from, to, ms, color, onHit);
+// Sheets each pixelfx projectile needs (for preloading).
+const PFX_SHOT_SHEETS = {};
+
+// A projectile: `ball` (a pixelfx loop facing right) flies from -> to on an
+// arc, turned along its path, and `blast` plays where it lands ('ground':
+// at the target's feet, 'hit': on the point itself). Falls back to the
+// vector shot `fallback` (arena.js) until both sheets are in.
+function pfxShot(kind, o) {
+    PFX_SHOT_SHEETS[kind] = [o.ball, o.blast];
+    CG_SHOTS[kind] = function (arena, from, to, ms, color, onHit) {
+        if (!pfxReady(o.ball) || !pfxReady(o.blast) || !cgEffectsEnabled()) {
+            pfxLoad(o.ball); pfxLoad(o.blast);
+            return CG_SHOTS[o.fallback](arena, from, to, ms, color, onHit);
         }
         const flip = to.x < from.x;
+        // ballDy: the sprite's own lift, in pixelfx px (an orb drawn hovering
+        // above its origin) - pulled back onto the flight path
+        const dy = (o.ballDy || 0) * pfxScale(arena) * (o.ballScale || 1);
         let prev = from;
-        const ball = pfxPlay(arena, 'fire-fireball', from.x, from.y, {
-            ms, flip, scale: 0.75,
+        const ball = pfxPlay(arena, o.ball, from.x, from.y + dy, {
+            ms, flip, scale: o.ballScale || 1,
             onT: (t, inst) => {
-                const p = cgArc(from, to, t, 20);
+                const p = cgArc(from, to, t, o.arc === undefined ? 20 : o.arc);
                 const a = Math.atan2(p.y - prev.y, p.x - prev.x);
-                if (t > 0) inst.front.rotation = inst.back.rotation = flip ? a - Math.PI : a;
-                inst.front.position.set(p.x, p.y); inst.back.position.set(p.x, p.y);
+                if (t > 0 && o.turn !== false) inst.front.rotation = inst.back.rotation = flip ? a - Math.PI : a;
+                inst.front.position.set(p.x, p.y + dy); inst.back.position.set(p.x, p.y + dy);
                 prev = p;
             },
         });
-        if (!ball) return CG_SHOTS.fireball(arena, from, to, ms, color, onHit);
+        if (!ball) return CG_SHOTS[o.fallback](arena, from, to, ms, color, onHit);
         arena.after(ms, () => {
-            const g = pfxGroundUnder(arena, to);
-            if (!pfxPlay(arena, 'explosions-small-explosion', g.x, g.y, { flip, scale: 0.65 })) arena.impact(to.x, to.y, 0xff8a2a, 1.5);
-            arena.shake(5, 250);
+            const g = o.blastAt === 'hit' ? to : pfxGroundUnder(arena, to);
+            if (!pfxPlay(arena, o.blast, g.x, g.y, { flip, scale: o.blastScale || 1 })) arena.impact(to.x, to.y, color, 1);
+            if (o.shake) arena.shake(o.shake, 250);
             if (onHit) onHit();
         });
     };
 }
 
-// The sheets are small (Faz 1: a handful); fetch them once the page is idle.
-if (typeof window !== 'undefined') {
-    const go = () => pfxPreload();
-    if (document.readyState === 'complete') setTimeout(go, 0);
-    else window.addEventListener('load', () => setTimeout(go, 0));
+if (typeof CG_SHOTS !== 'undefined') {
+    pfxShot('pfxfireball', { ball: 'fire-fireball', blast: 'explosions-small-explosion', fallback: 'fireball', ballScale: 0.75, blastScale: 0.65, shake: 5 });
+    pfxShot('pfxarrow', { ball: 'projectiles-arrow', blast: 'impacts-hit-spark', fallback: 'arrow', arc: 14, blastAt: 'hit', ballScale: 0.9, blastScale: 0.8 });
+    pfxShot('pfxshard', { ball: 'ice-ice-lance', blast: 'ice-ice-shatter', fallback: 'shard', arc: 0, blastAt: 'hit', ballScale: 0.7, blastScale: 0.6 });
+    pfxShot('pfxshadow', { ball: 'shadow-void-orb', blast: 'shadow-dark-explosion', fallback: 'orb', arc: 16, turn: false, ballDy: 78, ballScale: 0.4, blastScale: 0.5, shake: 3 });
 }

@@ -534,7 +534,8 @@ describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 
             for (var f = 0; f < 12; f++) {
                 await pumpFrames(w, 60);
                 stages.forEach(function (st, i) { JOINTS.forEach(function (j) { peak[i] = Math.max(peak[i], Math.abs(st.joints[j].rotation)); }); });
-                if (f === 3) stages.forEach(function (st) { drew.push(st.effectLayer.children.length + st.backLayer.children.length); });
+                // vector effects live on the fighter, pixelfx ones (pfx.js) on its arena
+                if (f === 3) stages.forEach(function (st) { drew.push(st.effectLayer.children.length + st.backLayer.children.length + ((st.arena && st.arena.pfxLive) || 0)); });
             }
             peak.forEach(function (p, i) { expect(p, CLASSES[i] + '.' + act + ' moves a limb').toBeGreaterThan(0.3); });
             if (act !== 'shield') drew.forEach(function (n, i) { expect(n, CLASSES[i] + '.' + act + ' spawned effects').toBeGreaterThan(0); });
@@ -551,6 +552,8 @@ describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 
         ['solo', 'pvp', 'coop'].forEach(function (k) {
             expect(w.g('cgArenas.' + k + '.fxLayer.children.length'), k + ' arena effects cleaned').toBe(0);
             expect(w.g('cgArenas.' + k + '.overlayLayer.children.length'), k + ' cinematic cleaned').toBe(0);
+            expect(w.g('cgArenas.' + k + '.pfxLive || 0'), k + ' pixelfx finished').toBe(0);
+            expect(w.g('cgArenas.' + k + '.pfxBack ? cgArenas.' + k + '.pfxBack.children.length : 0'), k + ' pixelfx back layer cleaned').toBe(0);
         });
     }, { timeout: 90000 });
 
@@ -645,6 +648,40 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
             });
         }
     }, { timeout: 20000 });
+
+    it('CG_PFX_MOVES only names real moves and baked sheets; every pfx shot has a vector fallback', function (ctx) {
+        var w = ctx.world, T = w.g('CG_PFX_MOVES'), D = w.g('PFX_DATA'), M = w.g('CG_MOVES'), U = w.g('CG_ULTS'), SHOTS = w.g('CG_SHOTS'), SHEETS = w.g('PFX_SHOT_SHEETS');
+        var ids = {};
+        Object.keys(M).forEach(function (c) { Object.keys(M[c]).forEach(function (a) { M[c][a].forEach(function (m) { ids[m.id] = m; }); }); ids[U[c].id] = U[c]; });
+        var n = 0;
+        Object.keys(T).forEach(function (id) {
+            expect(!!ids[id], 'a real move: ' + id).toBe(true);
+            T[id].forEach(function (s) {
+                if (s.noShot) { expect(ids[id].kind, id + ' noShot on a ranged move').toBe('ranged'); return; }
+                expect(!!D[s.fx], id + ' -> baked sheet ' + s.fx).toBe(true); n++;
+                expect(['foe', 'foeBody', 'self', 'selfBody', 'mid'].indexOf(s.on || 'foe') >= 0, id + ' on').toBe(true);
+            });
+        });
+        expect(n, 'effects wired to moves').toBeGreaterThanOrEqual(100);
+        Object.keys(ids).forEach(function (id) {
+            var shot = ids[id].shot;
+            if (!shot || shot.indexOf('pfx') !== 0) return;
+            expect(typeof SHOTS[shot], id + ' shot ' + shot).toBe('function');
+            (SHEETS[shot] || []).forEach(function (sh) { expect(!!D[sh], shot + ' sheet ' + sh).toBe(true); });
+        });
+        // every class has its ult and most of its attacks on pixelfx
+        Object.keys(M).forEach(function (c) { expect(!!T[U[c].id], c + ' ult').toBe(true); });
+    });
+
+    it('a class only fetches its own sheets when it steps into the arena', async function (ctx) {
+        var w = ctx.world;
+        w.g('PFX.textures = {}; PFX.loading = {}; PFX.preloaded = {}');
+        w.g("pfxPreloadClass('warrior')");
+        var asked = Object.keys(w.g('PFX.loading'));
+        expect(asked.indexOf('melee-sword-slash') >= 0, 'warrior slash requested').toBe(true);
+        expect(asked.indexOf('holy-holy-pillar') >= 0, 'no paladin pillar').toBe(false);
+        expect(asked.indexOf('shadow-dark-explosion') >= 0, 'no necromancer blast').toBe(false);
+    });
 
     it("the mage's fireball flies as the baked pixelfx fireball, blows up, and leaves nothing behind", async function (ctx) {
         var w = ctx.world, me = await mageReady(w);
