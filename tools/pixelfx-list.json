@@ -43,6 +43,20 @@
     { "id": "shadow/hex-sigil", "maxSec": 1.8, "fadeSec": 0.6, "fps": 20 },
     { "id": "shadow/necro-skulls", "fps": 20 },
     { "id": "status/rage" },
-    { "id": "nature/acid-splash", "maxSec": 1.4, "fadeSec": 0.6, "fps": 20 }
+    { "id": "nature/acid-splash", "maxSec": 1.4, "fadeSec": 0.6, "fps": 20 },
+    { "id": "melee/hammer-smash", "maxSec": 1.2, "fadeSec": 0.5 },
+    { "id": "melee/claw-swipe" },
+    { "id": "melee/sword-slash", "as": "melee/sword-slash-holy", "opts": { "palette": ["#5a3a0a", "#9a6a10", "#d4a020", "#ffd24a", "#ffe9a0", "#fff6d8", "#ffffff"] } },
+    { "id": "nature/earth-spike", "maxSec": 1.4, "fadeSec": 0.6, "fps": 20 },
+    { "id": "nature/spore-burst", "maxSec": 1.5, "fadeSec": 0.6, "fps": 20 },
+    { "id": "nature/root-snare", "maxSec": 1.6, "fadeSec": 0.5, "fps": 20 },
+    { "id": "nature/thorns", "maxSec": 1.5, "fadeSec": 0.6, "fps": 20 },
+    { "id": "impacts/ricochet" },
+    { "id": "ice/ice-spikes", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20, "hit": 0.4 },
+    { "id": "arcane/arcane-missiles", "maxSec": 1.4, "fadeSec": 0.4, "fps": 24 },
+    { "id": "arcane/star-fall", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20, "hit": 0.6 },
+    { "id": "shadow/curse", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20 },
+    { "id": "shadow/shadow-tendrils", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20, "hit": 0.5 },
+    { "id": "holy/sunburst", "fps": 20, "loopSec": 1.2 }
   ]
 }

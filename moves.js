@@ -134,6 +134,7 @@ const CG_MOVES = {
         sword: [
             cgMelee('w.overhead', 'overhead', 'dash', CGC.steel, cgSlashAt(CGC.steel, { width: 6 })),
             cgMelee('w.backhand', 'backhand', 'dash', CGC.steel, cgSlashAt(CGC.steel, { a0: 0.4, a1: 2.6, spin: -0.9, width: 6 })),
+            cgMelee('w.whirlwind', 'spin', 'charge', CGC.steel, cgSlashAt(CGC.steel, { a0: -Math.PI, a1: Math.PI, r: 0.45, cx: 0.5, spin: 2 }), { tier: 2, pose: CG_POSE.spin(1) }),
             cgMelee('w.thrust', 'thrust', 'dash', CGC.white, cgSlashAt(CGC.white, { a0: -0.35, a1: 0.35, r: 0.5, width: 4 })),
             cgMelee('w.bashcut', 'bash', 'charge', CGC.blue, cgAll(cgRingAt(CGC.blue, { y: 0.5, flat: 1, r1: 0.5 }), cgSlashAt(CGC.steel, { width: 6 })), { tier: 2 }),
             cgMelee('w.leapstrike', 'heavy', 'leap', CGC.white, cgAll(cgSlashAt(CGC.white, { r: 0.55, width: 9 }), cgRingAt(CGC.orange, { r1: 0.9 })), { tier: 3, onImpact: cgGroundHit(CGC.orange, 10) }),
@@ -141,6 +142,7 @@ const CG_MOVES = {
         skull: [
             cgMelee('w.heavy', 'heavy', 'dash', CGC.red, cgAll(cgSlashAt(CGC.red, { a0: -2.6, a1: 0.2, width: 7 }), cgRingAt(CGC.orange))),
             cgMelee('w.uppercut', 'uppercut', 'dash', CGC.red, cgSlashAt(CGC.red, { a0: 1.2, a1: -1.6, spin: -1.2, width: 7 })),
+            cgMelee('w.hammerfall', 'slam', 'leap', CGC.orange, cgAll(cgSlashAt(CGC.orange, { a0: -2.6, a1: 0.4, width: 9 }), cgRingAt(CGC.orange, { r1: 0.9 })), { tier: 2, onImpact: cgGroundHit(CGC.orange, 10) }),
             cgMelee('w.shieldcharge', 'bash', 'charge', CGC.blue, cgAll(s => CG_VFX.dome(s, CGC.blue, { ms: 700 }), cgRingAt(CGC.blue, { r1: 0.8 })), { tier: 2 }),
             cgMelee('w.groundbreaker', 'slam', 'leap', CGC.orange, cgAll(cgSlashAt(CGC.red, { a0: -2.6, a1: 0.4, r: 0.6, width: 10 }), cgRingAt(CGC.orange, { r1: 1.2, width: 6 })), { tier: 3, onImpact: cgGroundHit(CGC.orange, 14) }),
         ],
@@ -161,6 +163,7 @@ const CG_MOVES = {
         sword: [
             cgMelee('b.whirl', 'spin', 'dash', CGC.red, cgSlashAt(CGC.red, { a0: -Math.PI, a1: Math.PI, r: 0.4, cx: 0.5, spin: 2 }), { pose: CG_POSE.spin(1) }),
             cgMelee('b.chop', 'overhead', 'dash', CGC.red, cgSlashAt(CGC.red, { width: 8 })),
+            cgMelee('b.maul', 'backhand', 'dash', CGC.red, cgSlashAt(CGC.red, { a0: 0.4, a1: 2.6, spin: -0.9, width: 7 })),
             cgMelee('b.kick', 'kick', 'dash', CGC.orange, cgRingAt(CGC.orange, { y: 0.6, flat: 1, r1: 0.4 })),
             cgMelee('b.frenzy', 'xslash', 'charge', CGC.red, cgAll(cgSlashAt(CGC.red, { a0: -2.3, a1: -0.3 }), cgSlashAt(CGC.orange, { a0: 0.3, a1: 2.3, spin: -0.9 })), { tier: 2 }),
             cgMelee('b.cleave', 'heavy', 'leap', CGC.red, cgAll(cgSlashAt(CGC.red, { r: 0.6, width: 11 }), cgRingAt(CGC.red, { r1: 1.1, width: 6 })), { tier: 3, onImpact: cgGroundHit(CGC.red, 12) }),
@@ -168,6 +171,7 @@ const CG_MOVES = {
         skull: [
             cgMelee('b.heavy', 'heavy', 'dash', CGC.red, cgAll(s => CG_VFX.aura(s, CGC.red, { pulses: 3 }), cgSlashAt(CGC.red, { width: 8 }))),
             cgMelee('b.uppercut', 'uppercut', 'dash', CGC.orange, cgSlashAt(CGC.orange, { a0: 1.2, a1: -1.6, spin: -1.2, width: 8 })),
+            cgMelee('b.quake', 'slam', 'leap', CGC.orange, cgRingAt(CGC.orange, { r1: 1.1, width: 6 }), { tier: 2, onImpact: cgGroundHit(CGC.orange, 12) }),
             cgRanged('b.axethrow', 'throw', 'dagger', CGC.red, s => CG_VFX.aura(s, CGC.red, { pulses: 2 }), { tier: 2 }),
             cgMelee('b.bloodspin', 'spin', 'charge', CGC.red, cgAll(s => CG_VFX.aura(s, CGC.red, { pulses: 4 }), cgSlashAt(CGC.red, { a0: -Math.PI, a1: Math.PI, r: 0.45, cx: 0.5, spin: 3 })), { tier: 3, pose: CG_POSE.spin(2) }),
         ],
@@ -188,6 +192,7 @@ const CG_MOVES = {
         sword: [
             cgMelee('r.stab', 'stab', 'blink', CGC.purple, cgAll(s => CG_VFX.afterimages(s, CGC.shadow), cgSlashAt(CGC.purple, { width: 3, a0: -1.8, a1: 0.2 }))),
             cgMelee('r.xslash', 'xslash', 'blink', CGC.purple, cgAll(cgSlashAt(CGC.purple, { a0: -2.3, a1: -0.3 }), cgSlashAt(CGC.white, { a0: 0.3, a1: 2.3, spin: -0.9 }))),
+            cgMelee('r.vanish', 'stab', 'blink', CGC.purple, cgAll(s => CG_VFX.afterimages(s, CGC.shadow), cgSlashAt(CGC.purple, { width: 3 }))),
             cgRanged('r.daggers', 'throw', 'dagger', CGC.purple, cgExtraShots(1, 8)),
             cgMelee('r.backstab', 'thrust', 'blink', CGC.white, cgAll(s => CG_VFX.afterimages(s, CGC.shadow, { n: 4 }), cgSlashAt(CGC.white, { a0: -0.4, a1: 0.4, r: 0.5 })), { tier: 2 }),
             cgMelee('r.flurry', 'xslash', 'blink', CGC.purple, cgAll(s => CG_VFX.afterimages(s, CGC.shadow, { n: 4 }), ...[0, 1, 2].map(i => cgSlashAt(i % 2 ? CGC.white : CGC.purple, { a0: i % 2 ? 0.3 : -2.3, a1: i % 2 ? 2.3 : -0.3, spin: i % 2 ? -1 : 1 }))), { tier: 3 }),
@@ -195,6 +200,7 @@ const CG_MOVES = {
         skull: [
             cgMelee('r.gut', 'backhand', 'dash', CGC.purple, cgSlashAt(CGC.purple, { a0: 0.4, a1: 2.6, spin: -0.9 })),
             cgRanged('r.poison', 'throw', 'dagger', CGC.green, s => CG_VFX.particles(s, CGC.green, { n: 5 })),
+            cgRanged('r.toxin', 'throw', 'dagger', CGC.green, null, { tier: 2 }),
             cgMelee('r.shadowstep', 'stab', 'blink', CGC.shadow, cgAll(s => CG_VFX.afterimages(s, CGC.shadow, { n: 4 }), cgSlashAt(CGC.purple, { r: 0.5, width: 5 })), { tier: 2 }),
             cgMelee('r.execution', 'uppercut', 'blink', CGC.purple, cgAll(s => CG_VFX.afterimages(s, CGC.shadow, { n: 4 }), cgSlashAt(CGC.white, { a0: 1.2, a1: -1.6, spin: -1.3, r: 0.6, width: 7 }), cgRingAt(CGC.purple, { r1: 1 })), { tier: 3 }),
         ],
@@ -215,12 +221,15 @@ const CG_MOVES = {
         sword: [
             cgRanged('a.shot', 'bow', 'pfxarrow', CGC.leaf, null, { pose: CG_POSE.draw() }),
             cgRanged('a.double', 'bow', 'pfxarrow', CGC.leaf, cgExtraShots(1, 10), { pose: CG_POSE.draw() }),
+            cgRanged('a.ricochet', 'bow', 'pfxarrow', CGC.white, null, { pose: CG_POSE.draw() }),
             cgMelee('a.bowbash', 'backhand', 'dash', CGC.leaf, cgSlashAt(CGC.leaf, { a0: 0.4, a1: 2.6, spin: -0.9, width: 4 })),
             cgRanged('a.power', 'bow', 'pfxarrow', CGC.gold, cgAll(s => CG_VFX.rune(s, CGC.leaf, { ms: 1000 }), cgExtraShots(2, 9)), { tier: 2, pose: CG_POSE.draw() }),
             cgRanged('a.volley', 'bow', 'rain', CGC.leaf, s => CG_VFX.rune(s, CGC.gold, { ms: 1000 }), { tier: 3, launchMs: 160, pose: CG_POSE.draw() }),
         ],
         skull: [
             cgRanged('a.redshot', 'bow', 'pfxarrow', CGC.red, s => CG_VFX.rune(s, CGC.leaf, { ms: 900 }), { pose: CG_POSE.draw() }),
+            cgRanged('a.snare', 'bow', 'pfxarrow', CGC.leaf, null, { pose: CG_POSE.draw() }),
+            cgRanged('a.thorns', 'bow', 'pfxarrow', CGC.leaf, null, { tier: 2, pose: CG_POSE.draw() }),
             cgRanged('a.venom', 'bow', 'orb', CGC.green, null, { pose: CG_POSE.draw() }),
             cgRanged('a.pierce', 'bow', 'beam', CGC.leaf, s => CG_VFX.rune(s, CGC.gold, { ms: 1000 }), { tier: 2, pose: CG_POSE.draw() }),
             cgRanged('a.storm', 'bow', 'rain', CGC.red, s => CG_VFX.rune(s, CGC.red, { ms: 1000 }), { tier: 3, launchMs: 160, pose: CG_POSE.draw() }),
@@ -242,12 +251,15 @@ const CG_MOVES = {
         sword: [
             cgRanged('m.missile', 'cast', 'orb', CGC.cyan, s => CG_VFX.rune(s, CGC.blue, { ms: 900 }), { pose: CG_POSE.float(5) }),
             cgRanged('m.shard', 'push', 'pfxshard', CGC.cyan, null, { pose: CG_POSE.float(4) }),
+            cgRanged('m.spikes', 'push', 'pfxshard', CGC.cyan, null, { tier: 2, pose: CG_POSE.float(6) }),
             cgRanged('m.spark', 'cast', 'bolt', CGC.cyan, s => CG_VFX.orbit(s, CGC.cyan, { n: 3 }), { pose: CG_POSE.float(6) }),
             cgRanged('m.fireball', 'push', 'pfxfireball', CGC.orange, s => CG_VFX.rune(s, CGC.orange, { ms: 900 }), { tier: 2, pose: CG_POSE.float(6) }),
             cgRanged('m.meteor', 'summon', 'meteor', CGC.orange, s => CG_VFX.rune(s, CGC.orange, { ms: 1000, size: 0.65 }), { tier: 3, launchMs: 150, pose: CG_POSE.float(10) }),
         ],
         skull: [
             cgRanged('m.beam', 'cast', 'beam', CGC.cyan, s => CG_VFX.rune(s, CGC.purple, { ms: 900 }), { pose: CG_POSE.float(8) }),
+            cgRanged('m.arcane', 'cast', 'orb', CGC.purple, null, { pose: CG_POSE.float(6) }),
+            cgRanged('m.starfall', 'summon', 'meteor', CGC.gold, null, { tier: 2, pose: CG_POSE.float(10) }),
             cgRanged('m.fire', 'push', 'pfxfireball', CGC.orange, null, { pose: CG_POSE.float(6) }),
             cgRanged('m.chain', 'cast', 'bolt', CGC.white, cgAll(s => CG_VFX.orbit(s, CGC.cyan, { n: 5 }), s => CG_VFX.flash(s, CGC.cyan, { ms: 400 })), { tier: 2, pose: CG_POSE.float(8) }),
             cgRanged('m.frost', 'push', 'pfxshard', CGC.cyan, cgAll(s => CG_VFX.rune(s, CGC.cyan, { ms: 1000, size: 0.6 }), cgExtraShots(2, 10)), { tier: 3, pose: CG_POSE.float(8) }),
@@ -269,11 +281,13 @@ const CG_MOVES = {
         sword: [
             cgRanged('n.shadowbolt', 'cast', 'pfxshadow', CGC.purple, s => CG_VFX.orbit(s, CGC.purple, { n: 3 }), { pose: CG_POSE.float(4) }),
             cgRanged('n.bone', 'throw', 'dagger', CGC.bone, null),
+            cgRanged('n.tendrils', 'summon', 'graspers', CGC.shadow, null, { tier: 2, pose: CG_POSE.float(8) }),
             cgRanged('n.siphon', 'push', 'drain', CGC.purple, s => CG_VFX.aura(s, CGC.shadow, { pulses: 2 }), { tier: 2, pose: CG_POSE.float(5) }),
             cgRanged('n.grasp', 'summon', 'graspers', CGC.purple, s => CG_VFX.rune(s, CGC.purple, { ms: 1000, size: 0.6 }), { tier: 3, launchMs: 170, pose: CG_POSE.kneel(4) }),
         ],
         skull: [
             cgRanged('n.drain', 'push', 'drain', CGC.shadow, s => CG_VFX.aura(s, CGC.shadow, { pulses: 3 }), { pose: CG_POSE.float(4) }),
+            cgRanged('n.curse', 'cast', 'beam', CGC.purple, null, { pose: CG_POSE.float(6) }),
             cgRanged('n.hex', 'cast', 'beam', CGC.purple, s => CG_VFX.rune(s, CGC.purple, { ms: 900 }), { pose: CG_POSE.float(5) }),
             cgRanged('n.graspers', 'summon', 'graspers', CGC.bone, s => CG_VFX.particles(s, CGC.bone, { n: 6, y: 0.9, rise: 0.4 }), { tier: 2, launchMs: 170, pose: CG_POSE.kneel(4) }),
             cgRanged('n.doom', 'summon', 'graspers', CGC.purple, cgAll(s => CG_VFX.aura(s, CGC.shadow, { pulses: 4 }), s => CG_VFX.rune(s, CGC.purple, { ms: 1000, size: 0.7 })), { tier: 3, launchMs: 150, pose: CG_POSE.float(8), onImpact: cgGroundHit(CGC.purple, 10) }),
@@ -295,6 +309,7 @@ const CG_MOVES = {
         sword: [
             cgMelee('p.hammer', 'slam', 'dash', CGC.gold, cgAll(cgRingAt(CGC.gold), cgSlashAt(CGC.holy, { width: 6 }))),
             cgMelee('p.swing', 'overhead', 'dash', CGC.holy, cgSlashAt(CGC.holy, { width: 7 })),
+            cgMelee('p.radiant', 'overhead', 'dash', CGC.gold, cgSlashAt(CGC.gold, { width: 6 })),
             cgMelee('p.bash', 'bash', 'charge', CGC.gold, s => CG_VFX.dome(s, CGC.gold, { ms: 700 })),
             cgRanged('p.wave', 'slam', 'wave', CGC.gold, s => CG_VFX.pillar(s, CGC.holy, { ms: 700 }), { tier: 2, launchMs: 200 }),
             cgMelee('p.judgement', 'heavy', 'leap', CGC.gold, cgAll(cgSlashAt(CGC.holy, { r: 0.6, width: 10 }), cgRingAt(CGC.gold, { r1: 1.2, width: 6 })), { tier: 3, onImpact: cgGroundHit(CGC.gold, 12) }),
@@ -302,6 +317,7 @@ const CG_MOVES = {
         skull: [
             cgMelee('p.crush', 'slam', 'dash', CGC.gold, cgAll(s => CG_VFX.pillar(s, CGC.gold, { ms: 900 }), cgRingAt(CGC.holy, { r1: 0.8 }))),
             cgRanged('p.smite', 'cast', 'smite', CGC.holy, null, { pose: CG_POSE.float(4) }),
+            cgRanged('p.sunburst', 'cast', 'smite', CGC.holy, null, { tier: 2, pose: CG_POSE.float(8) }),
             cgRanged('p.holywave', 'slam', 'wave', CGC.holy, cgRingAt(CGC.gold, { r1: 1 }), { tier: 2, launchMs: 200 }),
             cgRanged('p.wrath', 'summon', 'smite', CGC.gold, cgAll(s => CG_VFX.pillar(s, CGC.gold, { ms: 1000 }), s => CG_VFX.flash(s, CGC.holy, { ms: 500 })), { tier: 3, launchMs: 160, pose: CG_POSE.float(8) }),
         ],
@@ -503,5 +519,14 @@ const CG_PFX_MOVES = (() => {
         'p.aegis': [shieldUp], 'p.guard': [shieldUp], 'p.light': [heal], 'p.prayer': [self('holy-heal-aoe', 0.6)],
         'p.vow': [self('holy-blessing', 1, { ms: 1200 })], 'p.halo': [self('holy-blessing', 1, { ms: 1200 })],
         'p.ult': [foe('holy-holy-pillar', 0.7), at('holy-feather-burst', { on: 'selfBody', scale: 0.7 }), NOSHOT],
+        // Faz 3 - new moves (visual variety: same damage as the rest of their action)
+        'w.whirlwind': [foe('melee-spin-slash'), crit], 'w.hammerfall': [foe('melee-hammer-smash'), foe('impacts-ground-slam', 0.5)],
+        'b.maul': [foe('melee-claw-swipe'), spark], 'b.quake': [foe('impacts-ground-slam', 0.6), foe('nature-earth-spike', 0.45)],
+        'r.vanish': [self('arcane-blink-out', 0.9, { at: 'start' }), thrust, spark], 'r.toxin': [foe('nature-spore-burst', 0.6)],
+        'a.ricochet': [hit('impacts-ricochet', 0.8)], 'a.snare': [foe('nature-root-snare', 0.9)], 'a.thorns': [self('nature-thorns', 0.5), NOSHOT],
+        'm.spikes': [self('ice-ice-spikes', 0.45), NOSHOT], 'm.arcane': [self('arcane-arcane-missiles', 0.8), NOSHOT],
+        'm.starfall': [foe('arcane-star-fall', 0.6), NOSHOT],
+        'n.tendrils': [foe('shadow-shadow-tendrils', 0.6), NOSHOT], 'n.curse': [foe('shadow-curse', 0.9), NOSHOT],
+        'p.radiant': [foe('melee-sword-slash-holy'), spark], 'p.sunburst': [at('holy-sunburst', { on: 'foeBody', scale: 0.7, ms: 900 }), NOSHOT],
     };
 })();

@@ -152,7 +152,8 @@ function bake(item) {
     writeFileSync(join(ROOT, file), buf);
     files[k] = file; bytes += buf.length;
   }
-  const hits = item.hit !== undefined ? [item.hit] : mod.act && mod.act.hits ? mod.act.hits.map(h => +h.t.toFixed(3)) : [];
+  // contact moments inside what was baked (a cut-short effect loses the later ones)
+  const hits = (item.hit !== undefined ? [item.hit] : mod.act && mod.act.hits ? mod.act.hits.map(h => +h.t.toFixed(3)) : []).filter(t => t < dur);
   console.log(`  ${name}: ${n} frames ${cw}x${ch} @${fps}fps, ${Object.keys(files).join(" ")}, ${(bytes / 1024).toFixed(0)} KB`);
   const tx = mod.act && mod.act.target ? mod.act.target.x : null; // a caster->target effect: where its target stands
   return [name, { src: item.id, fps, frames: n, cols, cell: [cw, ch], origin: [OX - x0, OY - y0], loop: !!meta.loop, layers: files, hits, tx }];

@@ -155,6 +155,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 ### Faz 3: Yeni beceriler (görsel çeşitlilik)
 - Bölüm 5'teki listeden her sınıfa 2-4 yeni hamle. Denge değişmez.
 
+**Faz 3 yapılanlar (v1.44):** 16 yeni hamle (Savaşçı: kasırga, çekiç düşüşü; Berserker: pençe, deprem; Haydut: kayboluş, zehir bulutu; Okçu: seken ok, kök tuzağı, diken dalgası; Büyücü: buz dikenleri, arkan füzeler, yıldız yağmuru; Nekromant: gölge dokunaçları, lanet; Paladin: altın kılıç, güneş patlaması). Hasar ve denge aynı: aynı eşleşmenin hamle listesine eklendiler, oyun aralarından seçiyor. Her birinin vektör yedeği var. 14 yeni pişirilmiş efekt; Paladin'in altın kılıç yayı pixelfx paletiyle (aynı efekt, farklı renk). Toplam 12 MB (sınıf başına ~1,5-3 MB).
+
 ### Faz 4: Nadir silah ve eşya efektleri
 - Nadirliğe göre vuruş efekti, benzersiz eşya imza efektleri, ganimet ışını ve sandık.
 

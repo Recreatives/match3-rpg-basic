@@ -196,7 +196,7 @@ function pfxPlay(arena, name, x, y, o) {
     arena.fxLayer.addChild(inst.front);
     // skipMs: start this far into the effect (its contact frame comes later
     // than the game's impact - play it from where it lines up)
-    const skip = Math.max(0, o.skipMs || 0), full = (d.frames / d.fps) * 1000;
+    const full = (d.frames / d.fps) * 1000, skip = Math.min(full * 0.5, Math.max(0, o.skipMs || 0)); // never more than half of it
     const ms = o.ms || Math.max(1, full - skip);
     let last = -1;
     inst.frameAt = t => {
