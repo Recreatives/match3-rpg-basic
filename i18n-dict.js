@@ -865,4 +865,5 @@ const EN_DICT = {
     // === the druid (v1.48) ===
     '<b>Doğa:</b> +4 İyileşme, +2 Zırh. Ult hasar verir, iyileştirir ve düşmanı <b>ZEHİRLER</b>.': '<b>Nature:</b> +4 Healing, +2 Armor. Ult deals damage, heals and <b>POISONS</b> the enemy.',
     'ULT: Wrath of Nature {dmg} hasar verdi, {heal} iyileştirdi!': 'ULT: Wrath of Nature dealt {dmg} damage and healed {heal}!',
+    '💫 Sersemledin, bu turu kaçırdın!': "💫 You're stunned and lose this turn!",
 };

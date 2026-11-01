@@ -5,7 +5,7 @@
 // state, which is where a real "ULT is 100% but I can't press it" bug hid
 // (the enemy turn handed control back without re-enabling the button).
 
-var ULT_CLASSES = ['WARRIOR', 'BERSERKER', 'ROGUE', 'ARCHER', 'MAGE', 'NECROMANCER', 'PALADIN'];
+var ULT_CLASSES = ['WARRIOR', 'BERSERKER', 'ROGUE', 'ARCHER', 'MAGE', 'NECROMANCER', 'PALADIN', 'DRUID'];
 
 // A 3-in-a-row energy match (no extra turn) on the solo board: swap 2<->3.
 function soloEnergyMove(w) {
@@ -91,6 +91,8 @@ describe('Ultimate button (PvP and co-op, every class)', { world: false }, funct
                 expect(M.g('pvpUltCharge')).toBe(0);
                 expect(W.g('pvpMyHP'), 'opponent hit').toBeLessThan(hpBefore);
                 if (key === 'ROGUE') expect(M.g('pvpMyTurn'), 'rogue keeps the turn').toBe(true);
+                // the warrior's ult stuns (status.js): the turn passes and comes straight back
+                else if (key === 'WARRIOR') { expect(M.g('pvpMyTurn'), 'stunned opponent - back to me').toBe(true); expect(W.g('pvpMyTurn')).toBe(false); }
                 else expect(W.g('pvpMyTurn'), 'turn passed').toBe(true);
                 expect(M.g('pvpProcessing'), 'not stuck').toBe(false);
             } finally { A.destroy(); B.destroy(); }

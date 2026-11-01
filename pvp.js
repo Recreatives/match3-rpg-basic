@@ -43,6 +43,7 @@
 const PVP_WIDTH = 8;
 const PVP_MAX_HP = 100;
 
+let pvpStatusMe = {}, pvpStatusOpp = {}; // status effects (status.js), see pvpStatusRender
 let pvpChannel = null;
 let pvpRoomCode = null;
 let pvpMyId = null;
@@ -327,6 +328,69 @@ function pvpResetSessionState() {
     pvpOpponentId = null;
     pvpCurseTurnCount = 0;
     pvpBetrayalResolved = false;
+    pvpStatusMe = {}; pvpStatusOpp = {};
+    pvpStatusRender();
+}
+
+// --- status effects (status.js) ---------------------------------------------------
+// Each client keeps ITS OWN statuses - it owns its HP, so it is the one
+// that ticks them. An ult sends 'status-apply' to the victim; whenever my
+// statuses change I broadcast them ('status-sync') so the opponent can
+// draw my badges, and their copy of mine is display-only.
+function pvpStatusRender() {
+    if (typeof statusBadges !== 'function') return;
+    statusBadges(statusHudOf('pvp-my-hp-bar-container'), 'pvp-my-status-badges', pvpStatusMe);
+    statusBadges(statusHudOf('pvp-opp-status-bar'), 'pvp-opp-status-badges', pvpStatusOpp);
+}
+function pvpStatusSync() {
+    if (pvpChannel) pvpChannel.send({ type: 'broadcast', event: 'status-sync', payload: { map: pvpStatusMe } });
+    pvpStatusRender();
+}
+function pvpReceiveStatusApply(payload) {
+    if (pvpMatchOver || typeof statusAdd !== 'function' || !statusAdd(pvpStatusMe, payload.key, payload.turns)) return;
+    pvpLog(statusLogText(false, payload.key, payload.turns));
+    statusFx('pvp-my-sprite', payload.key);
+    pvpStatusSync();
+}
+function pvpReceiveStatusSync(payload) {
+    pvpStatusOpp = (payload && payload.map) || {};
+    pvpStatusRender();
+}
+// my outgoing damage, weakened or not
+function pvpOutgoing(amount) {
+    return typeof statusMultOf === 'function' ? Math.floor(amount * statusMultOf(pvpStatusMe)) : amount;
+}
+// The start of my turn: my statuses tick. Returns true when a stun ate it
+// (the turn has already been handed back) or the damage beat me.
+function pvpTickMyStatus() {
+    if (typeof statusTickMap !== 'function' || !Object.keys(pvpStatusMe).length) return false;
+    const r = statusTickMap(pvpStatusMe, PVP_MAX_HP);
+    r.keys.forEach(k => statusFx('pvp-my-sprite', k));
+    if (r.dmg) {
+        pvpMyHP -= r.dmg; // through armor, like every damage over time
+        pvpLog(tf('Durum etkileri: -{n} can', { n: r.dmg }));
+        pvpCombatText('me', '-' + r.dmg, 'self', false);
+    }
+    pvpStatusSync();
+    pvpUpdateUI();
+    if (pvpMyHP <= 0 && !pvpMatchOver) {
+        pvpMatchOver = true;
+        pvpStopThinkingAnimation();
+        pvpChannel.send({ type: 'broadcast', event: 'defeated', payload: {} });
+        pvpSetStatus(t('KAYBETTİN'));
+        pvpOnDefeat();
+        pvpUpdateUI();
+        return true;
+    }
+    if (r.skip) {
+        pvpLog(t('💫 Sersemledin, bu turu kaçırdın!'));
+        pvpMyTurn = false;
+        pvpStartThinkingAnimation();
+        pvpChannel.send({ type: 'broadcast', event: 'turn-end', payload: {} });
+        pvpUpdateUI();
+        return true;
+    }
+    return false;
 }
 
 async function pvpConnectChannel(code) {
@@ -345,6 +409,8 @@ async function pvpConnectChannel(code) {
     pvpChannel.on('broadcast', { event: 'attack' }, ({ payload }) => pvpReceiveAttack(payload));
     pvpChannel.on('broadcast', { event: 'defeated' }, () => pvpOnOpponentDefeated());
     pvpChannel.on('broadcast', { event: 'turn-end' }, () => pvpReceiveTurnEnd());
+    pvpChannel.on('broadcast', { event: 'status-apply' }, ({ payload }) => pvpReceiveStatusApply(payload));
+    pvpChannel.on('broadcast', { event: 'status-sync' }, ({ payload }) => pvpReceiveStatusSync(payload));
     pvpChannel.on('broadcast', { event: 'status-update' }, ({ payload }) => pvpApplyOpponentStatus(payload));
     // The winner's resolve_betrayal already moved the row server-side - this
     // is purely so the LOSER's own log can name what was taken instead of
@@ -458,6 +524,7 @@ function pvpStartMatch() {
 const PVP_CURSE_PERCENTS = [3, 5, 8, 13, 21, 34];
 
 function pvpBeginMyTurn() {
+    if (pvpTickMyStatus()) return; // burned / poisoned / bled out, or stunned (status.js)
     pvpCurseTurnCount++;
     pvpStartSpeedTimer(); // a fresh speed-bonus window for every new turn, curse or not
     if (!pvpBetrayalMode || pvpBetrayalMode.isMutual || !pvpBetrayalMode.isBetrayer) return;
@@ -763,10 +830,12 @@ function pvpCloseBetrayalSummary() {
 function makePvpCombatContext() {
     return {
         dealDamageToOpponent(amount) {
+            amount = pvpOutgoing(amount);
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: 'ult' } });
         },
         dealDirectDamageToOpponent(amount) {
+            amount = pvpOutgoing(amount);
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: 'ult', direct: true } });
         },
@@ -782,6 +851,14 @@ function makePvpCombatContext() {
         addArmor(amount) { pvpMyArmor += amount; },
         addEnergy(amount) { pvpUltCharge = Math.min(pvpUltCharge + amount, 100); },
         grantExtraTurn() { pvpExtraTurnTriggered = true; },
+        // status.js - the victim owns it: sent over, ticked on their side
+        applyStatusToOpponent(key, turns) {
+            if (typeof statusAdd !== 'function' || !statusAdd(pvpStatusOpp, key, turns)) return;
+            pvpChannel.send({ type: 'broadcast', event: 'status-apply', payload: { key, turns } });
+            pvpLog(statusLogText(true, key, turns));
+            statusFx('pvp-opp-sprite', key);
+            pvpStatusRender();
+        },
         log(msg) { pvpLog(msg); }
     };
 }
@@ -940,6 +1017,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
                 amount = payload.dmgToOpponent;
                 recoil = payload.recoil;
             }
+            amount = pvpOutgoing(amount); // weakened? (status.js)
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'skull');
@@ -948,6 +1026,7 @@ function pvpApplyGroupEffect(group, shape, isInitial) {
             if (pvpMyArmor >= recoil) pvpMyArmor -= recoil; else { pvpMyHP -= (recoil - pvpMyArmor); pvpMyArmor = 0; }
             pvpMyTurnStats.selfDamage += recoil;
         } else {
+            amount = pvpOutgoing(amount); // weakened? (status.js)
             pvpMyTurnStats.damage += amount;
             pvpChannel.send({ type: 'broadcast', event: 'attack', payload: { amount, type: group.type, power: shape.multiplier } });
             pvpPlayHitReaction('opp', 'sword');

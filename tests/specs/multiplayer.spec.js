@@ -129,7 +129,9 @@ describe('PvP (two live clients)', { world: false }, function () {
         M.g('pvpUltCharge = 100; pvpMyArmor = 10; pvpUseUltimate()');
         await settleAll([A, B], bus);
         expect(W.g('pvpMyHP')).toBe(100 - (35 + 10));
-        expect(W.g('pvpMyTurn')).toBe(true);
+        // the turn passed - and, the warrior's ult being a stun (status.js), came straight back
+        expect(W.stub.calls.some(function (c) { return c.event === 'turn-end'; }), 'the stunned side handed it back').toBe(true);
+        expect(M.g('pvpMyTurn')).toBe(true);
     });
 
     it('the opponent only ever sees a coarse health tier, never the number', async function () {
@@ -287,6 +289,62 @@ describe('Co-op (two live clients)', { world: false }, function () {
         expect(H.g('coopMatchOver') && G.g('coopMatchOver')).toBe(true);
         expect(G.$('coop-status').textContent).toContain('DÜŞTÜNÜZ');
     });
+});
+
+describe('Status effects across the network (status.js)', { world: false }, function () {
+    it('PvP: a burn is sent to the victim, ticks at the start of their turn, and both screens show it', async function () {
+        var bus = makeBus(), p = await joinPvp(bus, 'MAGE', 'MAGE'), A = p.A, B = p.B;
+        try {
+            var M = A.g('pvpMyTurn') ? A : B, W = M === A ? B : A;
+            var ult = M.g('TILE_STATS.ult_dmg');
+            M.g('pvpUltCharge = 100; pvpUseUltimate()');
+            await settleAll([A, B], bus);
+            expect(W.g('pvpMyTurn'), 'their turn now').toBe(true);
+            expect(W.g('pvpStatusMe.burn'), 'ticked once at the start of it').toBe(2);
+            expect(M.g('pvpStatusOpp.burn'), 'synced back').toBe(2);
+            expect(W.g('pvpMyHP')).toBe(100 - ult - 4);
+            expect(M.$('pvp-opp-status-badges').textContent).toContain('🔥2');
+            expect(W.$('pvp-my-status-badges').textContent).toContain('🔥2');
+        } finally { A.destroy(); B.destroy(); }
+    }, { timeout: 30000 });
+
+    it("PvP: a stun makes the victim's turn come straight back", async function () {
+        var bus = makeBus(), p = await joinPvp(bus, 'WARRIOR', 'WARRIOR'), A = p.A, B = p.B;
+        try {
+            var M = A.g('pvpMyTurn') ? A : B, W = M === A ? B : A;
+            M.g('pvpUltCharge = 100; pvpUseUltimate()');
+            await settleAll([A, B], bus);
+            expect(M.g('pvpMyTurn'), 'back to the caster').toBe(true);
+            expect(W.g('pvpMyTurn')).toBe(false);
+            expect(W.g('pvpStatusMe.stun || 0'), 'used up').toBe(0);
+        } finally { A.destroy(); B.destroy(); }
+    }, { timeout: 30000 });
+
+    it("co-op: the host's burn and the guest's stun both live with the host, and a stunned enemy doesn't strike back", async function () {
+        var bus = makeBus(), p = await joinCoop(bus, 'MAGE', 'WARRIOR'), H = p.H, G = p.G;
+        try {
+            expect(H.g('coopMyTurn')).toBe(true);
+            [H, G].forEach(function (w) { w.g('coopEnemyHP = coopEnemyMaxHP = 1000'); }); // nobody kills it by accident
+            var max = 1000;
+            H.g('coopUltCharge = 100; coopUseUltimate()');
+            await settleAll([H, G], bus);
+            expect(H.g('coopEnemyStatus.burn'), 'ticked as the enemy struck back').toBe(2);
+            expect(G.g('coopEnemyStatus.burn'), "the guest's copy").toBe(2);
+            expect(G.$('coop-enemy-status-badges').textContent).toContain('🔥2');
+            expect(G.g('coopEnemyHP')).toBe(H.g('coopEnemyHP'));
+            // the guest's turn: a warrior ult stuns the enemy (sent to the host)
+            expect(G.g('coopMyTurn')).toBe(true);
+            var hpBefore = G.g('coopMyHP') + G.g('coopMyArmor');
+            var enemyBefore = H.g('coopEnemyHP');
+            G.g('coopUltCharge = 100; coopUseUltimate()');
+            await settleAll([H, G], bus);
+            expect(G.g('coopMyHP') + G.g('coopMyArmor'), 'the stunned enemy never hit back').toBe(hpBefore);
+            expect(H.g('coopEnemyHP'), 'ult + one more burn tick').toBeLessThan(enemyBefore - Math.round(max * 0.04));
+            expect(H.g('coopLevel'), 'same enemy').toBe(1);
+            expect(H.g('coopEnemyStatus.stun || 0')).toBe(0);
+            expect(H.g('coopMyTurn'), 'back to the host').toBe(true);
+        } finally { H.destroy(); G.destroy(); }
+    }, { timeout: 30000 });
 });
 
 describe('Co-op opening board (regressions)', { world: false }, function () {

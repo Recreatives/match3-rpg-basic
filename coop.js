@@ -82,6 +82,7 @@ const COOP_MINION_LOG = {
     drain: '🌀 Enerji emen düşman - saldırısı ult şarjını da çalıyor.'
 };
 
+let coopEnemyStatus = {}; // the enemy's status effects (status.js) - the host's, see coopEnemyStatusApply
 let coopChannel = null;
 let coopRoomCode = null;
 let coopMyId = null;
@@ -234,6 +235,47 @@ function coopResetSessionState() {
     coopVoteChoice = null;
     coopVotes = {};
     coopPendingVoteContext = null;
+    coopEnemyStatus = {};
+    coopStatusRender();
+}
+
+// --- status effects on the enemy (status.js) ----------------------------------------
+// The host resolves the enemy's turns, so the host owns its statuses: an
+// ult sends them there ('enemy-status'), the host ticks them when the enemy
+// is about to strike back and broadcasts the result ('enemy-status-sync').
+function coopStatusRender() {
+    if (typeof statusBadges === 'function') statusBadges(statusHudOf('coop-boss-hp-bar-container'), 'coop-enemy-status-badges', coopEnemyStatus);
+}
+function coopEnemyStatusApply(key, turns) {
+    if (typeof statusAdd !== 'function' || !statusAdd(coopEnemyStatus, key, turns)) return;
+    coopChannel.send({ type: 'broadcast', event: 'enemy-status-sync', payload: { map: coopEnemyStatus, applied: key, turns } });
+    coopLog(statusLogText(true, key, turns));
+    statusFx('coop-enemy-sprite', key);
+    coopStatusRender();
+}
+function coopOnEnemyStatusSync(payload) {
+    coopEnemyStatus = (payload && payload.map) || {};
+    if (payload.applied) { coopLog(statusLogText(true, payload.applied, payload.turns)); statusFx('coop-enemy-sprite', payload.applied); }
+    if (payload.dmg) coopLog(tf('Düşmana durum etkileri: -{n} can', { n: payload.dmg }));
+    if (payload.skip) coopLog(t('💫 Düşman sersemledi, turunu kaçırdı!'));
+    (payload.ticked || []).forEach(k => statusFx('coop-enemy-sprite', k));
+    coopStatusRender();
+}
+// Host: the enemy is about to strike back. Returns 'dead' (the damage over
+// time finished it), 'skip' (stunned) or null (it attacks as usual).
+function coopHostTickEnemyStatus(moverRole) {
+    if (typeof statusTickMap !== 'function' || !Object.keys(coopEnemyStatus).length) return null;
+    const r = statusTickMap(coopEnemyStatus, coopEnemyMaxHP);
+    coopChannel.send({ type: 'broadcast', event: 'enemy-status-sync', payload: { map: coopEnemyStatus, dmg: r.dmg, skip: r.skip, ticked: r.keys } });
+    r.keys.forEach(k => statusFx('coop-enemy-sprite', k));
+    if (r.dmg) coopLog(tf('Düşmana durum etkileri: -{n} can', { n: r.dmg }));
+    coopStatusRender();
+    if (r.dmg) {
+        coopApplyEnemyDamage(r.dmg, moverRole);
+        if (coopEnemyHP <= 0) return 'dead';
+    }
+    if (r.skip) { coopLog(t('💫 Düşman sersemledi, turunu kaçırdı!')); return 'skip'; }
+    return null;
 }
 
 // --- ROOM JOINING ------------------------------------------------------------
@@ -260,6 +302,8 @@ async function coopJoinRoom() {
     coopChannel.on('broadcast', { event: 'enemy-defeated' }, ({ payload }) => coopOnEnemyDefeated(payload));
     coopChannel.on('broadcast', { event: 'enemy-damage' }, ({ payload }) => { if (coopIsHost) coopApplyEnemyDamage(payload.amount || 0, payload.from); });
     coopChannel.on('broadcast', { event: 'enemy-hp-sync' }, ({ payload }) => { coopEnemyHP = payload.hp; coopEnemyArmor = payload.armor || 0; coopUpdateUI(); });
+    coopChannel.on('broadcast', { event: 'enemy-status' }, ({ payload }) => { if (coopIsHost) coopEnemyStatusApply(payload.key, payload.turns); });
+    coopChannel.on('broadcast', { event: 'enemy-status-sync' }, ({ payload }) => coopOnEnemyStatusSync(payload));
     coopChannel.on('broadcast', { event: 'enemy-attack' }, ({ payload }) => coopOnEnemyAttack(payload));
     coopChannel.on('broadcast', { event: 'hp-sync' }, ({ payload }) => coopOnAllyHpSync(payload));
     coopChannel.on('broadcast', { event: 'turn-set' }, ({ payload }) => coopOnTurnSet(payload));
@@ -410,6 +454,8 @@ function coopOnLevelStart(payload) {
     coopEnemyHP = payload.enemyHP;
     coopEnemyMaxHP = payload.enemyMaxHP;
     coopEnemyArmor = payload.enemyArmor || 0;
+    coopEnemyStatus = {}; // a new enemy starts clean
+    coopStatusRender();
     coopEnemyStats = payload.enemyStats;
     coopMinionType = payload.minionType || 'normal';
     coopMatchOver = false;
@@ -887,7 +933,13 @@ function coopHostResolveTurnEnd(moverRole) {
         return;
     }
 
-    let rollHit = () => Math.round(coopEnemyStats.sword * (1 + Math.random() * 0.6));
+    // its statuses first (status.js): damage over time may finish it, a
+    // stun skips its attack, weakness softens it
+    const st = coopHostTickEnemyStatus(moverRole);
+    if (st === 'dead') return;
+    if (st === 'skip') { coopFinishHostTurnResolution(moverRole); return; }
+    const weak = typeof statusMultOf === 'function' ? statusMultOf(coopEnemyStatus) : 1;
+    let rollHit = () => Math.round(coopEnemyStats.sword * (1 + Math.random() * 0.6) * weak);
     // Swift minions (see COOP_MINION_TYPES) hit twice as often as they get a
     // turn - modeled as two independent rolls summed into one attack message
     // rather than two separate ones, so the remote-target wait below still
@@ -999,6 +1051,11 @@ function makeCoopCombatContext() {
         addArmor(amount) { coopMyArmor += amount; coopSyncSelfState(); },
         addEnergy(amount) { coopUltCharge = Math.min(coopUltCharge + amount, 100); },
         grantExtraTurn() { coopExtraTurnTriggered = true; },
+        // status.js - the enemy's statuses live with the host
+        applyStatusToOpponent(key, turns) {
+            if (coopIsHost) coopEnemyStatusApply(key, turns);
+            else coopChannel.send({ type: 'broadcast', event: 'enemy-status', payload: { key, turns } });
+        },
         log(msg) { coopLog(msg); }
     };
 }
