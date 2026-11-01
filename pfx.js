@@ -51,7 +51,16 @@ function pfxLoad(name) {
         .catch(e => { console.warn('pfx: could not load ' + name, e); return false; });
     return PFX.loading[name];
 }
-function pfxPreload(names) { (names || Object.keys(typeof PFX_DATA !== 'undefined' ? PFX_DATA : {})).forEach(pfxLoad); }
+// Fetches a sheet the game wants but nobody explicitly asked for (class /
+// gear / monster preloads, a move or shot meeting a sheet that isn't in
+// yet). Test worlds set PFX_NO_PRELOAD (tests/world-prelude.js): they
+// play the vector effects unless a test loads a sheet itself - dozens of
+// worlds each decoding megabytes of sheets made the CI runner crawl.
+function pfxWant(name) {
+    if (typeof window !== 'undefined' && window.PFX_NO_PRELOAD) return;
+    pfxLoad(name);
+}
+function pfxPreload(names) { (names || Object.keys(typeof PFX_DATA !== 'undefined' ? PFX_DATA : {})).forEach(n => pfxLoad(n)); }
 
 const PFX_VERTEX = `
 in vec2 aPosition;
@@ -258,7 +267,7 @@ function pfxMoveReady(move) {
     if (!specs || PFX.broken) return false;
     const names = pfxNamesOf(specs);
     if (names.every(pfxReady)) return true;
-    names.forEach(pfxLoad);
+    names.forEach(pfxWant);
     return false;
 }
 
@@ -306,10 +315,10 @@ function pfxPreloadClass(cls) {
     const moves = [].concat(...Object.values(CG_MOVES[cls]), (typeof CG_ULTS !== 'undefined' && CG_ULTS[cls]) || []);
     const names = new Set();
     moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
-    names.forEach(pfxLoad);
+    names.forEach(pfxWant);
     // loot beams for the common drops (rarer ones load when they first drop)
     ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up',
-        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed', 'own-rune-awaken'].forEach(pfxLoad);
+        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed', 'own-rune-awaken'].forEach(pfxWant);
 }
 
 // --- projectiles --------------------------------------------------------------------
@@ -327,7 +336,7 @@ function pfxShot(kind, o) {
     PFX_SHOT_SHEETS[kind] = [o.ball, o.blast];
     CG_SHOTS[kind] = function (arena, from, to, ms, color, onHit) {
         if (!pfxReady(o.ball) || !pfxReady(o.blast) || !cgEffectsEnabled()) {
-            pfxLoad(o.ball); pfxLoad(o.blast);
+            pfxWant(o.ball); pfxWant(o.blast);
             return CG_SHOTS[o.fallback](arena, from, to, ms, color, onHit);
         }
         const flip = to.x < from.x;
@@ -399,9 +408,9 @@ function pfxPreloadGear(spec) {
     Object.keys(gear).forEach(slot => {
         const g = gear[slot];
         if (!g) return;
-        if (slot === 'weapon' && PFX_RARITY_SPARK[g.rarity]) PFX_RARITY_SPARK[g.rarity].forEach(pfxLoad);
+        if (slot === 'weapon' && PFX_RARITY_SPARK[g.rarity]) PFX_RARITY_SPARK[g.rarity].forEach(pfxWant);
         const sig = pfxUniqueFx(g);
-        if (sig && ['orange', 'red', 'teal'].indexOf(g.rarity) !== -1) pfxLoad(sig[0]);
+        if (sig && ['orange', 'red', 'teal'].indexOf(g.rarity) !== -1) pfxWant(sig[0]);
     });
 }
 
@@ -417,7 +426,7 @@ function pfxRaritySpark(stage, foe) {
 function pfxGearProc(stage, item) {
     const sig = pfxUniqueFx(item);
     if (!sig || !stage || !stage.arena) return false;
-    if (!pfxReady(sig[0])) { pfxLoad(sig[0]); return false; }
+    if (!pfxReady(sig[0])) { pfxWant(sig[0]); return false; }
     const p = stage.arena.bodyPoint(stage, sig[0] === 'holy-feather-burst' ? 0.5 : 0);
     return !!pfxPlay(stage.arena, sig[0], p.x, p.y, { flip: (stage.facing || 1) < 0, scale: sig[1], ms: PFX_DATA[sig[0]].loop ? 1000 : undefined });
 }
@@ -430,7 +439,7 @@ function pfxLootBeam(stage, rarityKey) {
     if (!stage || !stage.arena || !PFX_DATA[beam]) return false;
     const big = ['orange', 'red', 'teal', 'green'].indexOf(rarityKey) !== -1;
     const need = [beam, 'pickups-chest-open'].concat(big ? ['ui-confetti'] : []);
-    if (!need.every(pfxReady)) { need.forEach(pfxLoad); return false; }
+    if (!need.every(pfxReady)) { need.forEach(pfxWant); return false; }
     const a = stage.arena, p = a.bodyPoint(stage, 0);
     pfxPlay(a, 'pickups-chest-open', p.x, p.y, { scale: 0.6 });
     a.after(500, () => pfxPlay(a, beam, p.x, p.y, { scale: big ? 0.9 : 0.75, ms: 2200 }));
@@ -450,7 +459,7 @@ function pfxPreloadMonster(charKey) {
     const names = new Set([PFX_DEATH[charKey] || PFX_DEATH.hero]);
     if (charKey === 'monster_boss') names.add('impacts-ground-slam');
     moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
-    names.forEach(pfxLoad);
+    names.forEach(pfxWant);
 }
 
 // How each kind of fighter goes down (graphics.js playDeath): a cartoon
@@ -459,7 +468,7 @@ const PFX_DEATH = { monster_normal: 'spawn-poof', monster_swift: 'spawn-poof', m
 function pfxDeath(stage) {
     if (!stage || !stage.arena || !cgEffectsEnabled()) return;
     const name = PFX_DEATH[stage.charKey] || PFX_DEATH.hero;
-    if (!pfxReady(name)) { pfxLoad(name); return; }
+    if (!pfxReady(name)) { pfxWant(name); return; }
     const p = stage.arena.bodyPoint(stage, 0);
     stage.arena.after(250, () => pfxPlay(stage.arena, name, p.x, p.y, { scale: name === 'explosions-small-explosion' ? 0.6 : 1 }));
 }
@@ -476,7 +485,7 @@ function pfxBossLanding(stage) {
 // is baked off - the toast says it in the player's language).
 function pfxLevelUp() {
     if (typeof cgGetStage !== 'function' || !cgEffectsEnabled()) return;
-    if (!pfxReady('ui-level-up')) { pfxLoad('ui-level-up'); return; }
+    if (!pfxReady('ui-level-up')) { pfxWant('ui-level-up'); return; }
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
         const el = document.getElementById(id);
         if (!el || el.offsetParent === null) return;
@@ -497,7 +506,7 @@ const PFX_AMB = { name: 'weather-fireflies', timer: null, canvas: null, box: nul
 function pfxAmbientTown() {
     if (typeof PIXI === 'undefined' || typeof cgInitShared !== 'function' || !cgEffectsEnabled()) return;
     if (!document.getElementById('town-svg')) return;
-    if (!pfxReady(PFX_AMB.name)) { pfxLoad(PFX_AMB.name).then(ok => { if (ok) pfxAmbientTown(); }); return; }
+    if (!pfxReady(PFX_AMB.name)) { if (!window.PFX_NO_PRELOAD) pfxLoad(PFX_AMB.name).then(ok => { if (ok) pfxAmbientTown(); }); return; }
     cgInitShared().then(() => {
         if (PFX_AMB.timer || !cgShared.renderer) return;
         PFX_AMB.start = performance.now();
@@ -552,7 +561,7 @@ function pfxAmbientTick() {
 // A status landing on / ticking on a fighter: its pixelfx loop for a beat.
 function pfxStatus(stageId, name) {
     if (typeof cgGetStage !== 'function' || !cgEffectsEnabled() || !PFX_DATA[name]) return;
-    if (!pfxReady(name)) { pfxLoad(name); return; }
+    if (!pfxReady(name)) { pfxWant(name); return; }
     const el = document.getElementById(stageId);
     if (!el || el.offsetParent === null) return;
     const st = cgGetStage(stageId);
@@ -566,7 +575,7 @@ function pfxStatus(stageId, name) {
 // five runes gather on the hero and burst.
 function pfxRuneAwaken(stage) {
     if (!stage || !stage.arena || !stage.portraitSprite || !cgEffectsEnabled()) return;
-    if (!pfxReady('own-rune-awaken')) { pfxLoad('own-rune-awaken'); return; }
+    if (!pfxReady('own-rune-awaken')) { pfxWant('own-rune-awaken'); return; }
     const p = stage.arena.bodyPoint(stage, 0);
     pfxPlay(stage.arena, 'own-rune-awaken', p.x, p.y, { scale: 0.6 });
 }

@@ -718,7 +718,7 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
 
     it('a class only fetches its own sheets when it steps into the arena', async function (ctx) {
         var w = ctx.world;
-        w.g('PFX.textures = {}; PFX.loading = {}; PFX.preloaded = {}');
+        w.g('PFX_NO_PRELOAD = false; PFX.textures = {}; PFX.loading = {}; PFX.preloaded = {}');
         w.g("pfxPreloadClass('warrior')");
         var asked = Object.keys(w.g('PFX.loading'));
         expect(asked.indexOf('melee-sword-slash') >= 0, 'warrior slash requested').toBe(true);

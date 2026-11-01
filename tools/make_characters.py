@@ -296,7 +296,7 @@ def druid():
     head_ = (head('') + eyes('#3d8a2a') + mouth('smile') + blush()
              + P('M66 104 Q100 140 134 104 Q122 122 100 124 Q78 122 66 104 Z', '#8a6a46', 3)
              + P('M44 92 Q40 30 100 28 Q160 30 156 92 Q144 58 100 54 Q56 58 44 92 Z', 'url(#hood)')
-             + P('M70 34 L58 6 M64 20 L50 14 M130 34 L142 6 M136 20 L150 14', antler, 4.5, 'stroke="#8a6a46" stroke-linecap="round"')
+             + P('M70 34 L58 6 M64 20 L50 14 M130 34 L142 6 M136 20 L150 14', antler, 4.5, 'stroke="#8a6a46"')
              + '<path d="M86 40 q6 -10 14 0 q-7 5 -14 0Z M106 38 q7 -9 14 1 q-8 4 -14 -1Z" fill="#9ad66a" stroke="#161a24" stroke-width="2"/>')
     return rig(d, SKIN_TAN, {
         'torso': robe_torso('url(#robe)', '#c8a24a'), 'head': head_,

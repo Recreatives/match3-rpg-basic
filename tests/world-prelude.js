@@ -50,6 +50,12 @@
     try { Object.defineProperty(window, 'localStorage', { value: memStorage, configurable: true }); } catch (e) {}
     window.__memStorage = mem;
 
+    // pfx.js: no automatic sheet downloads in a test world - effects stay on
+    // their vector fallbacks unless a test loads a sheet itself (pfxLoad).
+    // Every world fetching and decoding the class/monster sheets made the CI
+    // runner slow enough for auto-quality to switch effects off mid-test.
+    window.PFX_NO_PRELOAD = !cfg.pfxPreload;
+
     window.__testErrors = [];
     window.addEventListener('error', function (e) {
         // Resource load errors (a 404'd image) also fire 'error' but carry no
