@@ -80,8 +80,12 @@ function applyStaticTranslations() {
 // no point re-rendering the shop if it's closed).
 function refreshDynamicTranslations() {
     if (typeof updateUI === 'function') updateUI();
-    if (typeof renderClassButtons === 'function') renderClassButtons();
-    if (typeof renderModeButtons === 'function') renderModeButtons();
+    // only what's on screen (these also SHOW their container - redrawing a
+    // hidden one used to pop it open under whatever was really showing)
+    const shown = id => { const el = document.getElementById(id); return !!el && el.style.display !== 'none' && el.style.display !== ''; };
+    if (typeof renderClassButtons === 'function' && shown('class-selection')) renderClassButtons();
+    if (typeof renderModeButtons === 'function' && shown('mode-selection')) renderModeButtons();
+    if (typeof renderTown === 'function' && shown('town-screen')) renderTown();
     if (typeof renderAccountStatus === 'function' && document.getElementById('account-modal') && document.getElementById('account-modal').style.display === 'flex') renderAccountStatus();
     if (typeof renderShop === 'function' && document.getElementById('shop-modal') && document.getElementById('shop-modal').style.display === 'flex') { renderShop(); renderInventory(); }
     if (typeof renderFriendsList === 'function' && document.getElementById('friends-modal') && document.getElementById('friends-modal').style.display === 'flex') renderFriendsList();

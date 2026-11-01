@@ -548,7 +548,7 @@ function coopOnEnemyDefeated(payload) {
     // OWN drop against their OWN wallet/inventory, not a shared roll. Same
     // reasoning for gold (goldRewardForKill, game.js) - each player earns
     // their own pay for the kill, not a shared pot split between them.
-    if (typeof awardLootDrop === 'function') awardLootDrop();
+    if (typeof awardLootDrop === 'function' && (payload.isBoss || Math.random() < LOOT_FLOOR_CHANCE)) awardLootDrop({ floor: payload.level, boss: payload.isBoss });
     if (typeof awardRunXp === 'function') awardRunXp(payload.level, payload.isBoss ? 3 : 1);
     if (typeof adjustWallet === 'function' && typeof goldRewardForKill === 'function') {
         let goldReward = goldRewardForKill(payload.level, payload.isBoss);

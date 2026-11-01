@@ -101,9 +101,9 @@ drop policy if exists "read own player row" on public.players;
 create policy "read own player row" on public.players
     for select using (auth.uid() = id);
 
+-- (no update policy: every players column changes through a function -
+-- set_handle, set_equipped_title, select_character, ... - see section 35)
 drop policy if exists "update own player row" on public.players;
-create policy "update own player row" on public.players
-    for update using (auth.uid() = id);
 
 do $$
 begin
@@ -231,6 +231,8 @@ create table if not exists public.player_items (
     acquired_at   timestamptz not null default now()
 );
 
+-- (v1.40) an item put up in the auction hall: frozen until sold / taken back
+alter table public.player_items add column if not exists listed boolean not null default false;
 alter table public.player_items enable row level security;
 
 drop policy if exists "read own items" on public.player_items;
@@ -434,7 +436,7 @@ create table if not exists public.item_rarity_bounds (
     max_stat_value  integer not null
 );
 insert into public.item_rarity_bounds (rarity, max_affix_count, max_stat_value) values
-    ('grey', 1, 5), ('white', 1, 8), ('blue', 2, 15), ('yellow', 4, 25)
+    ('grey', 1, 5), ('white', 1, 8), ('blue', 2, 15), ('yellow', 3, 20)
 on conflict (rarity) do update set max_affix_count = excluded.max_affix_count, max_stat_value = excluded.max_stat_value;
 
 -- Same reasoning as item_bases above: without this, a client could widen
@@ -470,236 +472,936 @@ create policy "read item fixed defs" on public.item_fixed_defs for select using 
 -- BEGIN GENERATED CATALOG (tools/make_catalog.py - do not edit by hand)
 delete from public.item_bases;
 insert into public.item_bases (slot, base_id, primary_stat, classes, min_level, max_level, legacy) values
-    ('helmet', 'plate_helmet_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('shoulder', 'plate_shoulder_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('chest', 'plate_chest_1', 'heart', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('gloves', 'plate_gloves_1', 'sword', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('legs', 'plate_legs_1', 'heart', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('boots', 'plate_boots_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, false),
-    ('helmet', 'plate_helmet_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('shoulder', 'plate_shoulder_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('chest', 'plate_chest_2', 'heart', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('gloves', 'plate_gloves_2', 'sword', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('legs', 'plate_legs_2', 'heart', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('boots', 'plate_boots_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, false),
-    ('helmet', 'plate_helmet_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('shoulder', 'plate_shoulder_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('chest', 'plate_chest_3', 'heart', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('gloves', 'plate_gloves_3', 'sword', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('legs', 'plate_legs_3', 'heart', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('boots', 'plate_boots_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, false),
-    ('helmet', 'plate_helmet_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('shoulder', 'plate_shoulder_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('chest', 'plate_chest_4', 'heart', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('gloves', 'plate_gloves_4', 'sword', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('legs', 'plate_legs_4', 'heart', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('boots', 'plate_boots_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, false),
-    ('helmet', 'plate_helmet_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('shoulder', 'plate_shoulder_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('chest', 'plate_chest_5', 'heart', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('gloves', 'plate_gloves_5', 'sword', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('legs', 'plate_legs_5', 'heart', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('boots', 'plate_boots_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, false),
-    ('helmet', 'leather_helmet_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('shoulder', 'leather_shoulder_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('chest', 'leather_chest_1', 'sword', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('gloves', 'leather_gloves_1', 'lifeSteal', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('legs', 'leather_legs_1', 'sword', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('boots', 'leather_boots_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, false),
-    ('helmet', 'leather_helmet_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('shoulder', 'leather_shoulder_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('chest', 'leather_chest_2', 'sword', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('gloves', 'leather_gloves_2', 'lifeSteal', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('legs', 'leather_legs_2', 'sword', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('boots', 'leather_boots_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, false),
-    ('helmet', 'leather_helmet_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('shoulder', 'leather_shoulder_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('chest', 'leather_chest_3', 'sword', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('gloves', 'leather_gloves_3', 'lifeSteal', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('legs', 'leather_legs_3', 'sword', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('boots', 'leather_boots_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, false),
-    ('helmet', 'leather_helmet_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('shoulder', 'leather_shoulder_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('chest', 'leather_chest_4', 'sword', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('gloves', 'leather_gloves_4', 'lifeSteal', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('legs', 'leather_legs_4', 'sword', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('boots', 'leather_boots_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, false),
-    ('helmet', 'leather_helmet_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('shoulder', 'leather_shoulder_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('chest', 'leather_chest_5', 'sword', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('gloves', 'leather_gloves_5', 'lifeSteal', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('legs', 'leather_legs_5', 'sword', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('boots', 'leather_boots_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, false),
-    ('helmet', 'cloth_helmet_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, false),
-    ('shoulder', 'cloth_shoulder_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, false),
-    ('chest', 'cloth_chest_1', 'heart', array['mage','necromancer']::text[], 1, 10, false),
-    ('gloves', 'cloth_gloves_1', 'energy', array['mage','necromancer']::text[], 1, 10, false),
-    ('legs', 'cloth_legs_1', 'heart', array['mage','necromancer']::text[], 1, 10, false),
-    ('boots', 'cloth_boots_1', 'energy', array['mage','necromancer']::text[], 1, 10, false),
-    ('helmet', 'cloth_helmet_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, false),
-    ('shoulder', 'cloth_shoulder_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, false),
-    ('chest', 'cloth_chest_2', 'heart', array['mage','necromancer']::text[], 10, 20, false),
-    ('gloves', 'cloth_gloves_2', 'energy', array['mage','necromancer']::text[], 10, 20, false),
-    ('legs', 'cloth_legs_2', 'heart', array['mage','necromancer']::text[], 10, 20, false),
-    ('boots', 'cloth_boots_2', 'energy', array['mage','necromancer']::text[], 10, 20, false),
-    ('helmet', 'cloth_helmet_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, false),
-    ('shoulder', 'cloth_shoulder_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, false),
-    ('chest', 'cloth_chest_3', 'heart', array['mage','necromancer']::text[], 20, 30, false),
-    ('gloves', 'cloth_gloves_3', 'energy', array['mage','necromancer']::text[], 20, 30, false),
-    ('legs', 'cloth_legs_3', 'heart', array['mage','necromancer']::text[], 20, 30, false),
-    ('boots', 'cloth_boots_3', 'energy', array['mage','necromancer']::text[], 20, 30, false),
-    ('helmet', 'cloth_helmet_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, false),
-    ('shoulder', 'cloth_shoulder_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, false),
-    ('chest', 'cloth_chest_4', 'heart', array['mage','necromancer']::text[], 30, 40, false),
-    ('gloves', 'cloth_gloves_4', 'energy', array['mage','necromancer']::text[], 30, 40, false),
-    ('legs', 'cloth_legs_4', 'heart', array['mage','necromancer']::text[], 30, 40, false),
-    ('boots', 'cloth_boots_4', 'energy', array['mage','necromancer']::text[], 30, 40, false),
-    ('helmet', 'cloth_helmet_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, false),
-    ('shoulder', 'cloth_shoulder_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, false),
-    ('chest', 'cloth_chest_5', 'heart', array['mage','necromancer']::text[], 40, 50, false),
-    ('gloves', 'cloth_gloves_5', 'energy', array['mage','necromancer']::text[], 40, 50, false),
-    ('legs', 'cloth_legs_5', 'heart', array['mage','necromancer']::text[], 40, 50, false),
-    ('boots', 'cloth_boots_5', 'energy', array['mage','necromancer']::text[], 40, 50, false),
-    ('helmet', 'shroud_helmet_1', 'skull_dmg', array['mage','necromancer']::text[], 1, 10, false),
-    ('shoulder', 'shroud_shoulder_1', 'lifeSteal', array['mage','necromancer']::text[], 1, 10, false),
-    ('chest', 'shroud_chest_1', 'heart', array['mage','necromancer']::text[], 1, 10, false),
-    ('gloves', 'shroud_gloves_1', 'skull_dmg', array['mage','necromancer']::text[], 1, 10, false),
-    ('legs', 'shroud_legs_1', 'heart', array['mage','necromancer']::text[], 1, 10, false),
-    ('boots', 'shroud_boots_1', 'energy', array['mage','necromancer']::text[], 1, 10, false),
-    ('helmet', 'shroud_helmet_2', 'skull_dmg', array['mage','necromancer']::text[], 10, 20, false),
-    ('shoulder', 'shroud_shoulder_2', 'lifeSteal', array['mage','necromancer']::text[], 10, 20, false),
-    ('chest', 'shroud_chest_2', 'heart', array['mage','necromancer']::text[], 10, 20, false),
-    ('gloves', 'shroud_gloves_2', 'skull_dmg', array['mage','necromancer']::text[], 10, 20, false),
-    ('legs', 'shroud_legs_2', 'heart', array['mage','necromancer']::text[], 10, 20, false),
-    ('boots', 'shroud_boots_2', 'energy', array['mage','necromancer']::text[], 10, 20, false),
-    ('helmet', 'shroud_helmet_3', 'skull_dmg', array['mage','necromancer']::text[], 20, 30, false),
-    ('shoulder', 'shroud_shoulder_3', 'lifeSteal', array['mage','necromancer']::text[], 20, 30, false),
-    ('chest', 'shroud_chest_3', 'heart', array['mage','necromancer']::text[], 20, 30, false),
-    ('gloves', 'shroud_gloves_3', 'skull_dmg', array['mage','necromancer']::text[], 20, 30, false),
-    ('legs', 'shroud_legs_3', 'heart', array['mage','necromancer']::text[], 20, 30, false),
-    ('boots', 'shroud_boots_3', 'energy', array['mage','necromancer']::text[], 20, 30, false),
-    ('helmet', 'shroud_helmet_4', 'skull_dmg', array['mage','necromancer']::text[], 30, 40, false),
-    ('shoulder', 'shroud_shoulder_4', 'lifeSteal', array['mage','necromancer']::text[], 30, 40, false),
-    ('chest', 'shroud_chest_4', 'heart', array['mage','necromancer']::text[], 30, 40, false),
-    ('gloves', 'shroud_gloves_4', 'skull_dmg', array['mage','necromancer']::text[], 30, 40, false),
-    ('legs', 'shroud_legs_4', 'heart', array['mage','necromancer']::text[], 30, 40, false),
-    ('boots', 'shroud_boots_4', 'energy', array['mage','necromancer']::text[], 30, 40, false),
-    ('helmet', 'shroud_helmet_5', 'skull_dmg', array['mage','necromancer']::text[], 40, 50, false),
-    ('shoulder', 'shroud_shoulder_5', 'lifeSteal', array['mage','necromancer']::text[], 40, 50, false),
-    ('chest', 'shroud_chest_5', 'heart', array['mage','necromancer']::text[], 40, 50, false),
-    ('gloves', 'shroud_gloves_5', 'skull_dmg', array['mage','necromancer']::text[], 40, 50, false),
-    ('legs', 'shroud_legs_5', 'heart', array['mage','necromancer']::text[], 40, 50, false),
-    ('boots', 'shroud_boots_5', 'energy', array['mage','necromancer']::text[], 40, 50, false),
-    ('weapon', 'sword_1', 'sword', array['warrior','paladin']::text[], 1, 10, false),
-    ('weapon', 'sword_2', 'sword', array['warrior','paladin']::text[], 10, 20, false),
-    ('weapon', 'sword_3', 'sword', array['warrior','paladin']::text[], 20, 30, false),
-    ('weapon', 'sword_4', 'sword', array['warrior','paladin']::text[], 30, 40, false),
-    ('weapon', 'sword_5', 'sword', array['warrior','paladin']::text[], 40, 50, false),
-    ('weapon', 'axe_1', 'skull_dmg', array['warrior','berserker']::text[], 1, 10, false),
-    ('weapon', 'axe_2', 'skull_dmg', array['warrior','berserker']::text[], 10, 20, false),
-    ('weapon', 'axe_3', 'skull_dmg', array['warrior','berserker']::text[], 20, 30, false),
-    ('weapon', 'axe_4', 'skull_dmg', array['warrior','berserker']::text[], 30, 40, false),
-    ('weapon', 'axe_5', 'skull_dmg', array['warrior','berserker']::text[], 40, 50, false),
-    ('weapon', 'greataxe_1', 'skull_dmg', array['berserker']::text[], 1, 10, false),
-    ('weapon', 'greataxe_2', 'skull_dmg', array['berserker']::text[], 10, 20, false),
-    ('weapon', 'greataxe_3', 'skull_dmg', array['berserker']::text[], 20, 30, false),
-    ('weapon', 'greataxe_4', 'skull_dmg', array['berserker']::text[], 30, 40, false),
-    ('weapon', 'greataxe_5', 'skull_dmg', array['berserker']::text[], 40, 50, false),
-    ('weapon', 'mace_1', 'sword', array['warrior','paladin']::text[], 1, 10, false),
-    ('weapon', 'mace_2', 'sword', array['warrior','paladin']::text[], 10, 20, false),
-    ('weapon', 'mace_3', 'sword', array['warrior','paladin']::text[], 20, 30, false),
-    ('weapon', 'mace_4', 'sword', array['warrior','paladin']::text[], 30, 40, false),
-    ('weapon', 'mace_5', 'sword', array['warrior','paladin']::text[], 40, 50, false),
-    ('weapon', 'hammer_1', 'heart', array['paladin']::text[], 1, 10, false),
-    ('weapon', 'hammer_2', 'heart', array['paladin']::text[], 10, 20, false),
-    ('weapon', 'hammer_3', 'heart', array['paladin']::text[], 20, 30, false),
-    ('weapon', 'hammer_4', 'heart', array['paladin']::text[], 30, 40, false),
-    ('weapon', 'hammer_5', 'heart', array['paladin']::text[], 40, 50, false),
-    ('weapon', 'spear_1', 'skull_dmg', array['warrior']::text[], 1, 10, false),
-    ('weapon', 'spear_2', 'skull_dmg', array['warrior']::text[], 10, 20, false),
-    ('weapon', 'spear_3', 'skull_dmg', array['warrior']::text[], 20, 30, false),
-    ('weapon', 'spear_4', 'skull_dmg', array['warrior']::text[], 30, 40, false),
-    ('weapon', 'spear_5', 'skull_dmg', array['warrior']::text[], 40, 50, false),
-    ('weapon', 'dagger_1', 'lifeSteal', array['rogue']::text[], 1, 10, false),
-    ('weapon', 'dagger_2', 'lifeSteal', array['rogue']::text[], 10, 20, false),
-    ('weapon', 'dagger_3', 'lifeSteal', array['rogue']::text[], 20, 30, false),
-    ('weapon', 'dagger_4', 'lifeSteal', array['rogue']::text[], 30, 40, false),
-    ('weapon', 'dagger_5', 'lifeSteal', array['rogue']::text[], 40, 50, false),
-    ('weapon', 'bow_1', 'energy', array['archer']::text[], 1, 10, false),
-    ('weapon', 'bow_2', 'energy', array['archer']::text[], 10, 20, false),
-    ('weapon', 'bow_3', 'energy', array['archer']::text[], 20, 30, false),
-    ('weapon', 'bow_4', 'energy', array['archer']::text[], 30, 40, false),
-    ('weapon', 'bow_5', 'energy', array['archer']::text[], 40, 50, false),
-    ('weapon', 'staff_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, false),
-    ('weapon', 'staff_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, false),
-    ('weapon', 'staff_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, false),
-    ('weapon', 'staff_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, false),
-    ('weapon', 'staff_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, false),
-    ('weapon', 'wand_1', 'energy', array['mage']::text[], 1, 10, false),
-    ('weapon', 'wand_2', 'energy', array['mage']::text[], 10, 20, false),
-    ('weapon', 'wand_3', 'energy', array['mage']::text[], 20, 30, false),
-    ('weapon', 'wand_4', 'energy', array['mage']::text[], 30, 40, false),
-    ('weapon', 'wand_5', 'energy', array['mage']::text[], 40, 50, false),
-    ('weapon', 'scythe_1', 'skull_dmg', array['necromancer']::text[], 1, 10, false),
-    ('weapon', 'scythe_2', 'skull_dmg', array['necromancer']::text[], 10, 20, false),
-    ('weapon', 'scythe_3', 'skull_dmg', array['necromancer']::text[], 20, 30, false),
-    ('weapon', 'scythe_4', 'skull_dmg', array['necromancer']::text[], 30, 40, false),
-    ('weapon', 'scythe_5', 'skull_dmg', array['necromancer']::text[], 40, 50, false),
-    ('offhand', 'kite_1', 'shield', array['warrior','paladin']::text[], 1, 10, false),
-    ('offhand', 'kite_2', 'shield', array['warrior','paladin']::text[], 10, 20, false),
-    ('offhand', 'kite_3', 'shield', array['warrior','paladin']::text[], 20, 30, false),
-    ('offhand', 'kite_4', 'shield', array['warrior','paladin']::text[], 30, 40, false),
-    ('offhand', 'kite_5', 'shield', array['warrior','paladin']::text[], 40, 50, false),
-    ('offhand', 'tower_1', 'heart', array['warrior','paladin']::text[], 1, 10, false),
-    ('offhand', 'tower_2', 'heart', array['warrior','paladin']::text[], 10, 20, false),
-    ('offhand', 'tower_3', 'heart', array['warrior','paladin']::text[], 20, 30, false),
-    ('offhand', 'tower_4', 'heart', array['warrior','paladin']::text[], 30, 40, false),
-    ('offhand', 'tower_5', 'heart', array['warrior','paladin']::text[], 40, 50, false),
-    ('offhand', 'orb_1', 'ult_dmg', array['mage']::text[], 1, 10, false),
-    ('offhand', 'orb_2', 'ult_dmg', array['mage']::text[], 10, 20, false),
-    ('offhand', 'orb_3', 'ult_dmg', array['mage']::text[], 20, 30, false),
-    ('offhand', 'orb_4', 'ult_dmg', array['mage']::text[], 30, 40, false),
-    ('offhand', 'orb_5', 'ult_dmg', array['mage']::text[], 40, 50, false),
-    ('offhand', 'tome_1', 'energy', array['mage','necromancer']::text[], 1, 10, false),
-    ('offhand', 'tome_2', 'energy', array['mage','necromancer']::text[], 10, 20, false),
-    ('offhand', 'tome_3', 'energy', array['mage','necromancer']::text[], 20, 30, false),
-    ('offhand', 'tome_4', 'energy', array['mage','necromancer']::text[], 30, 40, false),
-    ('offhand', 'tome_5', 'energy', array['mage','necromancer']::text[], 40, 50, false),
-    ('offhand', 'lantern_1', 'lifeSteal', array['necromancer']::text[], 1, 10, false),
-    ('offhand', 'lantern_2', 'lifeSteal', array['necromancer']::text[], 10, 20, false),
-    ('offhand', 'lantern_3', 'lifeSteal', array['necromancer']::text[], 20, 30, false),
-    ('offhand', 'lantern_4', 'lifeSteal', array['necromancer']::text[], 30, 40, false),
-    ('offhand', 'lantern_5', 'lifeSteal', array['necromancer']::text[], 40, 50, false),
-    ('offhand', 'quiver_1', 'energy', array['archer']::text[], 1, 10, false),
-    ('offhand', 'quiver_2', 'energy', array['archer']::text[], 10, 20, false),
-    ('offhand', 'quiver_3', 'energy', array['archer']::text[], 20, 30, false),
-    ('offhand', 'quiver_4', 'energy', array['archer']::text[], 30, 40, false),
-    ('offhand', 'quiver_5', 'energy', array['archer']::text[], 40, 50, false),
-    ('offhand', 'offdagger_1', 'sword', array['rogue']::text[], 1, 10, false),
-    ('offhand', 'offdagger_2', 'sword', array['rogue']::text[], 10, 20, false),
-    ('offhand', 'offdagger_3', 'sword', array['rogue']::text[], 20, 30, false),
-    ('offhand', 'offdagger_4', 'sword', array['rogue']::text[], 30, 40, false),
-    ('offhand', 'offdagger_5', 'sword', array['rogue']::text[], 40, 50, false),
-    ('belt', 'belt_1', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, false),
-    ('belt', 'sash_1', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, false),
-    ('belt', 'belt_2', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, false),
-    ('belt', 'sash_2', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, false),
-    ('belt', 'belt_3', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, false),
-    ('belt', 'sash_3', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, false),
-    ('belt', 'belt_4', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, false),
-    ('belt', 'sash_4', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, false),
-    ('belt', 'belt_5', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, false),
-    ('belt', 'sash_5', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, false),
-    ('amulet', 'amulet_1', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, false),
-    ('ring', 'ring_1', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, false),
-    ('amulet', 'amulet_2', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, false),
-    ('ring', 'ring_2', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, false),
-    ('amulet', 'amulet_3', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, false),
-    ('ring', 'ring_3', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, false),
-    ('amulet', 'amulet_4', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, false),
-    ('ring', 'ring_4', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, false),
-    ('amulet', 'amulet_5', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, false),
-    ('ring', 'ring_5', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, false),
+    ('helmet', 'plate_helmet_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('shoulder', 'plate_shoulder_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('chest', 'plate_chest_1', 'heart', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('gloves', 'plate_gloves_1', 'sword', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('legs', 'plate_legs_1', 'heart', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('boots', 'plate_boots_1', 'shield', array['warrior','paladin','berserker']::text[], 1, 10, true),
+    ('helmet', 'plate_helmet_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('shoulder', 'plate_shoulder_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('chest', 'plate_chest_2', 'heart', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('gloves', 'plate_gloves_2', 'sword', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('legs', 'plate_legs_2', 'heart', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('boots', 'plate_boots_2', 'shield', array['warrior','paladin','berserker']::text[], 10, 20, true),
+    ('helmet', 'plate_helmet_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('shoulder', 'plate_shoulder_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('chest', 'plate_chest_3', 'heart', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('gloves', 'plate_gloves_3', 'sword', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('legs', 'plate_legs_3', 'heart', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('boots', 'plate_boots_3', 'shield', array['warrior','paladin','berserker']::text[], 20, 30, true),
+    ('helmet', 'plate_helmet_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('shoulder', 'plate_shoulder_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('chest', 'plate_chest_4', 'heart', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('gloves', 'plate_gloves_4', 'sword', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('legs', 'plate_legs_4', 'heart', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('boots', 'plate_boots_4', 'shield', array['warrior','paladin','berserker']::text[], 30, 40, true),
+    ('helmet', 'plate_helmet_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('shoulder', 'plate_shoulder_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('chest', 'plate_chest_5', 'heart', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('gloves', 'plate_gloves_5', 'sword', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('legs', 'plate_legs_5', 'heart', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('boots', 'plate_boots_5', 'shield', array['warrior','paladin','berserker']::text[], 40, 50, true),
+    ('helmet', 'leather_helmet_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('shoulder', 'leather_shoulder_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('chest', 'leather_chest_1', 'sword', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('gloves', 'leather_gloves_1', 'lifeSteal', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('legs', 'leather_legs_1', 'sword', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('boots', 'leather_boots_1', 'energy', array['rogue','archer','berserker']::text[], 1, 10, true),
+    ('helmet', 'leather_helmet_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('shoulder', 'leather_shoulder_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('chest', 'leather_chest_2', 'sword', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('gloves', 'leather_gloves_2', 'lifeSteal', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('legs', 'leather_legs_2', 'sword', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('boots', 'leather_boots_2', 'energy', array['rogue','archer','berserker']::text[], 10, 20, true),
+    ('helmet', 'leather_helmet_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('shoulder', 'leather_shoulder_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('chest', 'leather_chest_3', 'sword', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('gloves', 'leather_gloves_3', 'lifeSteal', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('legs', 'leather_legs_3', 'sword', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('boots', 'leather_boots_3', 'energy', array['rogue','archer','berserker']::text[], 20, 30, true),
+    ('helmet', 'leather_helmet_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('shoulder', 'leather_shoulder_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('chest', 'leather_chest_4', 'sword', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('gloves', 'leather_gloves_4', 'lifeSteal', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('legs', 'leather_legs_4', 'sword', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('boots', 'leather_boots_4', 'energy', array['rogue','archer','berserker']::text[], 30, 40, true),
+    ('helmet', 'leather_helmet_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('shoulder', 'leather_shoulder_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('chest', 'leather_chest_5', 'sword', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('gloves', 'leather_gloves_5', 'lifeSteal', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('legs', 'leather_legs_5', 'sword', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('boots', 'leather_boots_5', 'energy', array['rogue','archer','berserker']::text[], 40, 50, true),
+    ('helmet', 'cloth_helmet_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, true),
+    ('shoulder', 'cloth_shoulder_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, true),
+    ('chest', 'cloth_chest_1', 'heart', array['mage','necromancer']::text[], 1, 10, true),
+    ('gloves', 'cloth_gloves_1', 'energy', array['mage','necromancer']::text[], 1, 10, true),
+    ('legs', 'cloth_legs_1', 'heart', array['mage','necromancer']::text[], 1, 10, true),
+    ('boots', 'cloth_boots_1', 'energy', array['mage','necromancer']::text[], 1, 10, true),
+    ('helmet', 'cloth_helmet_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, true),
+    ('shoulder', 'cloth_shoulder_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, true),
+    ('chest', 'cloth_chest_2', 'heart', array['mage','necromancer']::text[], 10, 20, true),
+    ('gloves', 'cloth_gloves_2', 'energy', array['mage','necromancer']::text[], 10, 20, true),
+    ('legs', 'cloth_legs_2', 'heart', array['mage','necromancer']::text[], 10, 20, true),
+    ('boots', 'cloth_boots_2', 'energy', array['mage','necromancer']::text[], 10, 20, true),
+    ('helmet', 'cloth_helmet_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, true),
+    ('shoulder', 'cloth_shoulder_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, true),
+    ('chest', 'cloth_chest_3', 'heart', array['mage','necromancer']::text[], 20, 30, true),
+    ('gloves', 'cloth_gloves_3', 'energy', array['mage','necromancer']::text[], 20, 30, true),
+    ('legs', 'cloth_legs_3', 'heart', array['mage','necromancer']::text[], 20, 30, true),
+    ('boots', 'cloth_boots_3', 'energy', array['mage','necromancer']::text[], 20, 30, true),
+    ('helmet', 'cloth_helmet_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, true),
+    ('shoulder', 'cloth_shoulder_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, true),
+    ('chest', 'cloth_chest_4', 'heart', array['mage','necromancer']::text[], 30, 40, true),
+    ('gloves', 'cloth_gloves_4', 'energy', array['mage','necromancer']::text[], 30, 40, true),
+    ('legs', 'cloth_legs_4', 'heart', array['mage','necromancer']::text[], 30, 40, true),
+    ('boots', 'cloth_boots_4', 'energy', array['mage','necromancer']::text[], 30, 40, true),
+    ('helmet', 'cloth_helmet_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, true),
+    ('shoulder', 'cloth_shoulder_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, true),
+    ('chest', 'cloth_chest_5', 'heart', array['mage','necromancer']::text[], 40, 50, true),
+    ('gloves', 'cloth_gloves_5', 'energy', array['mage','necromancer']::text[], 40, 50, true),
+    ('legs', 'cloth_legs_5', 'heart', array['mage','necromancer']::text[], 40, 50, true),
+    ('boots', 'cloth_boots_5', 'energy', array['mage','necromancer']::text[], 40, 50, true),
+    ('helmet', 'shroud_helmet_1', 'skull_dmg', array['mage','necromancer']::text[], 1, 10, true),
+    ('shoulder', 'shroud_shoulder_1', 'lifeSteal', array['mage','necromancer']::text[], 1, 10, true),
+    ('chest', 'shroud_chest_1', 'heart', array['mage','necromancer']::text[], 1, 10, true),
+    ('gloves', 'shroud_gloves_1', 'skull_dmg', array['mage','necromancer']::text[], 1, 10, true),
+    ('legs', 'shroud_legs_1', 'heart', array['mage','necromancer']::text[], 1, 10, true),
+    ('boots', 'shroud_boots_1', 'energy', array['mage','necromancer']::text[], 1, 10, true),
+    ('helmet', 'shroud_helmet_2', 'skull_dmg', array['mage','necromancer']::text[], 10, 20, true),
+    ('shoulder', 'shroud_shoulder_2', 'lifeSteal', array['mage','necromancer']::text[], 10, 20, true),
+    ('chest', 'shroud_chest_2', 'heart', array['mage','necromancer']::text[], 10, 20, true),
+    ('gloves', 'shroud_gloves_2', 'skull_dmg', array['mage','necromancer']::text[], 10, 20, true),
+    ('legs', 'shroud_legs_2', 'heart', array['mage','necromancer']::text[], 10, 20, true),
+    ('boots', 'shroud_boots_2', 'energy', array['mage','necromancer']::text[], 10, 20, true),
+    ('helmet', 'shroud_helmet_3', 'skull_dmg', array['mage','necromancer']::text[], 20, 30, true),
+    ('shoulder', 'shroud_shoulder_3', 'lifeSteal', array['mage','necromancer']::text[], 20, 30, true),
+    ('chest', 'shroud_chest_3', 'heart', array['mage','necromancer']::text[], 20, 30, true),
+    ('gloves', 'shroud_gloves_3', 'skull_dmg', array['mage','necromancer']::text[], 20, 30, true),
+    ('legs', 'shroud_legs_3', 'heart', array['mage','necromancer']::text[], 20, 30, true),
+    ('boots', 'shroud_boots_3', 'energy', array['mage','necromancer']::text[], 20, 30, true),
+    ('helmet', 'shroud_helmet_4', 'skull_dmg', array['mage','necromancer']::text[], 30, 40, true),
+    ('shoulder', 'shroud_shoulder_4', 'lifeSteal', array['mage','necromancer']::text[], 30, 40, true),
+    ('chest', 'shroud_chest_4', 'heart', array['mage','necromancer']::text[], 30, 40, true),
+    ('gloves', 'shroud_gloves_4', 'skull_dmg', array['mage','necromancer']::text[], 30, 40, true),
+    ('legs', 'shroud_legs_4', 'heart', array['mage','necromancer']::text[], 30, 40, true),
+    ('boots', 'shroud_boots_4', 'energy', array['mage','necromancer']::text[], 30, 40, true),
+    ('helmet', 'shroud_helmet_5', 'skull_dmg', array['mage','necromancer']::text[], 40, 50, true),
+    ('shoulder', 'shroud_shoulder_5', 'lifeSteal', array['mage','necromancer']::text[], 40, 50, true),
+    ('chest', 'shroud_chest_5', 'heart', array['mage','necromancer']::text[], 40, 50, true),
+    ('gloves', 'shroud_gloves_5', 'skull_dmg', array['mage','necromancer']::text[], 40, 50, true),
+    ('legs', 'shroud_legs_5', 'heart', array['mage','necromancer']::text[], 40, 50, true),
+    ('boots', 'shroud_boots_5', 'energy', array['mage','necromancer']::text[], 40, 50, true),
+    ('weapon', 'sword_1', 'sword', array['warrior','paladin']::text[], 1, 10, true),
+    ('weapon', 'sword_2', 'sword', array['warrior','paladin']::text[], 10, 20, true),
+    ('weapon', 'sword_3', 'sword', array['warrior','paladin']::text[], 20, 30, true),
+    ('weapon', 'sword_4', 'sword', array['warrior','paladin']::text[], 30, 40, true),
+    ('weapon', 'sword_5', 'sword', array['warrior','paladin']::text[], 40, 50, true),
+    ('weapon', 'axe_1', 'skull_dmg', array['warrior','berserker']::text[], 1, 10, true),
+    ('weapon', 'axe_2', 'skull_dmg', array['warrior','berserker']::text[], 10, 20, true),
+    ('weapon', 'axe_3', 'skull_dmg', array['warrior','berserker']::text[], 20, 30, true),
+    ('weapon', 'axe_4', 'skull_dmg', array['warrior','berserker']::text[], 30, 40, true),
+    ('weapon', 'axe_5', 'skull_dmg', array['warrior','berserker']::text[], 40, 50, true),
+    ('weapon', 'greataxe_1', 'skull_dmg', array['berserker']::text[], 1, 10, true),
+    ('weapon', 'greataxe_2', 'skull_dmg', array['berserker']::text[], 10, 20, true),
+    ('weapon', 'greataxe_3', 'skull_dmg', array['berserker']::text[], 20, 30, true),
+    ('weapon', 'greataxe_4', 'skull_dmg', array['berserker']::text[], 30, 40, true),
+    ('weapon', 'greataxe_5', 'skull_dmg', array['berserker']::text[], 40, 50, true),
+    ('weapon', 'mace_1', 'sword', array['warrior','paladin']::text[], 1, 10, true),
+    ('weapon', 'mace_2', 'sword', array['warrior','paladin']::text[], 10, 20, true),
+    ('weapon', 'mace_3', 'sword', array['warrior','paladin']::text[], 20, 30, true),
+    ('weapon', 'mace_4', 'sword', array['warrior','paladin']::text[], 30, 40, true),
+    ('weapon', 'mace_5', 'sword', array['warrior','paladin']::text[], 40, 50, true),
+    ('weapon', 'hammer_1', 'heart', array['paladin']::text[], 1, 10, true),
+    ('weapon', 'hammer_2', 'heart', array['paladin']::text[], 10, 20, true),
+    ('weapon', 'hammer_3', 'heart', array['paladin']::text[], 20, 30, true),
+    ('weapon', 'hammer_4', 'heart', array['paladin']::text[], 30, 40, true),
+    ('weapon', 'hammer_5', 'heart', array['paladin']::text[], 40, 50, true),
+    ('weapon', 'spear_1', 'skull_dmg', array['warrior']::text[], 1, 10, true),
+    ('weapon', 'spear_2', 'skull_dmg', array['warrior']::text[], 10, 20, true),
+    ('weapon', 'spear_3', 'skull_dmg', array['warrior']::text[], 20, 30, true),
+    ('weapon', 'spear_4', 'skull_dmg', array['warrior']::text[], 30, 40, true),
+    ('weapon', 'spear_5', 'skull_dmg', array['warrior']::text[], 40, 50, true),
+    ('weapon', 'dagger_1', 'lifeSteal', array['rogue']::text[], 1, 10, true),
+    ('weapon', 'dagger_2', 'lifeSteal', array['rogue']::text[], 10, 20, true),
+    ('weapon', 'dagger_3', 'lifeSteal', array['rogue']::text[], 20, 30, true),
+    ('weapon', 'dagger_4', 'lifeSteal', array['rogue']::text[], 30, 40, true),
+    ('weapon', 'dagger_5', 'lifeSteal', array['rogue']::text[], 40, 50, true),
+    ('weapon', 'bow_1', 'energy', array['archer']::text[], 1, 10, true),
+    ('weapon', 'bow_2', 'energy', array['archer']::text[], 10, 20, true),
+    ('weapon', 'bow_3', 'energy', array['archer']::text[], 20, 30, true),
+    ('weapon', 'bow_4', 'energy', array['archer']::text[], 30, 40, true),
+    ('weapon', 'bow_5', 'energy', array['archer']::text[], 40, 50, true),
+    ('weapon', 'staff_1', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, true),
+    ('weapon', 'staff_2', 'ult_dmg', array['mage','necromancer']::text[], 10, 20, true),
+    ('weapon', 'staff_3', 'ult_dmg', array['mage','necromancer']::text[], 20, 30, true),
+    ('weapon', 'staff_4', 'ult_dmg', array['mage','necromancer']::text[], 30, 40, true),
+    ('weapon', 'staff_5', 'ult_dmg', array['mage','necromancer']::text[], 40, 50, true),
+    ('weapon', 'wand_1', 'energy', array['mage']::text[], 1, 10, true),
+    ('weapon', 'wand_2', 'energy', array['mage']::text[], 10, 20, true),
+    ('weapon', 'wand_3', 'energy', array['mage']::text[], 20, 30, true),
+    ('weapon', 'wand_4', 'energy', array['mage']::text[], 30, 40, true),
+    ('weapon', 'wand_5', 'energy', array['mage']::text[], 40, 50, true),
+    ('weapon', 'scythe_1', 'skull_dmg', array['necromancer']::text[], 1, 10, true),
+    ('weapon', 'scythe_2', 'skull_dmg', array['necromancer']::text[], 10, 20, true),
+    ('weapon', 'scythe_3', 'skull_dmg', array['necromancer']::text[], 20, 30, true),
+    ('weapon', 'scythe_4', 'skull_dmg', array['necromancer']::text[], 30, 40, true),
+    ('weapon', 'scythe_5', 'skull_dmg', array['necromancer']::text[], 40, 50, true),
+    ('offhand', 'kite_1', 'shield', array['warrior','paladin']::text[], 1, 10, true),
+    ('offhand', 'kite_2', 'shield', array['warrior','paladin']::text[], 10, 20, true),
+    ('offhand', 'kite_3', 'shield', array['warrior','paladin']::text[], 20, 30, true),
+    ('offhand', 'kite_4', 'shield', array['warrior','paladin']::text[], 30, 40, true),
+    ('offhand', 'kite_5', 'shield', array['warrior','paladin']::text[], 40, 50, true),
+    ('offhand', 'tower_1', 'heart', array['warrior','paladin']::text[], 1, 10, true),
+    ('offhand', 'tower_2', 'heart', array['warrior','paladin']::text[], 10, 20, true),
+    ('offhand', 'tower_3', 'heart', array['warrior','paladin']::text[], 20, 30, true),
+    ('offhand', 'tower_4', 'heart', array['warrior','paladin']::text[], 30, 40, true),
+    ('offhand', 'tower_5', 'heart', array['warrior','paladin']::text[], 40, 50, true),
+    ('offhand', 'orb_1', 'ult_dmg', array['mage']::text[], 1, 10, true),
+    ('offhand', 'orb_2', 'ult_dmg', array['mage']::text[], 10, 20, true),
+    ('offhand', 'orb_3', 'ult_dmg', array['mage']::text[], 20, 30, true),
+    ('offhand', 'orb_4', 'ult_dmg', array['mage']::text[], 30, 40, true),
+    ('offhand', 'orb_5', 'ult_dmg', array['mage']::text[], 40, 50, true),
+    ('offhand', 'tome_1', 'energy', array['mage','necromancer']::text[], 1, 10, true),
+    ('offhand', 'tome_2', 'energy', array['mage','necromancer']::text[], 10, 20, true),
+    ('offhand', 'tome_3', 'energy', array['mage','necromancer']::text[], 20, 30, true),
+    ('offhand', 'tome_4', 'energy', array['mage','necromancer']::text[], 30, 40, true),
+    ('offhand', 'tome_5', 'energy', array['mage','necromancer']::text[], 40, 50, true),
+    ('offhand', 'lantern_1', 'lifeSteal', array['necromancer']::text[], 1, 10, true),
+    ('offhand', 'lantern_2', 'lifeSteal', array['necromancer']::text[], 10, 20, true),
+    ('offhand', 'lantern_3', 'lifeSteal', array['necromancer']::text[], 20, 30, true),
+    ('offhand', 'lantern_4', 'lifeSteal', array['necromancer']::text[], 30, 40, true),
+    ('offhand', 'lantern_5', 'lifeSteal', array['necromancer']::text[], 40, 50, true),
+    ('offhand', 'quiver_1', 'energy', array['archer']::text[], 1, 10, true),
+    ('offhand', 'quiver_2', 'energy', array['archer']::text[], 10, 20, true),
+    ('offhand', 'quiver_3', 'energy', array['archer']::text[], 20, 30, true),
+    ('offhand', 'quiver_4', 'energy', array['archer']::text[], 30, 40, true),
+    ('offhand', 'quiver_5', 'energy', array['archer']::text[], 40, 50, true),
+    ('offhand', 'offdagger_1', 'sword', array['rogue']::text[], 1, 10, true),
+    ('offhand', 'offdagger_2', 'sword', array['rogue']::text[], 10, 20, true),
+    ('offhand', 'offdagger_3', 'sword', array['rogue']::text[], 20, 30, true),
+    ('offhand', 'offdagger_4', 'sword', array['rogue']::text[], 30, 40, true),
+    ('offhand', 'offdagger_5', 'sword', array['rogue']::text[], 40, 50, true),
+    ('belt', 'belt_1', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, true),
+    ('belt', 'sash_1', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, true),
+    ('belt', 'belt_2', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, true),
+    ('belt', 'sash_2', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, true),
+    ('belt', 'belt_3', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, true),
+    ('belt', 'sash_3', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, true),
+    ('belt', 'belt_4', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, true),
+    ('belt', 'sash_4', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, true),
+    ('belt', 'belt_5', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, true),
+    ('belt', 'sash_5', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, true),
+    ('amulet', 'amulet_1', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, true),
+    ('ring', 'ring_1', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 10, true),
+    ('amulet', 'amulet_2', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, true),
+    ('ring', 'ring_2', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 10, 20, true),
+    ('amulet', 'amulet_3', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, true),
+    ('ring', 'ring_3', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 20, 30, true),
+    ('amulet', 'amulet_4', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, true),
+    ('ring', 'ring_4', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 30, 40, true),
+    ('amulet', 'amulet_5', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, true),
+    ('ring', 'ring_5', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 40, 50, true),
+    ('helmet', 'plate_helmet_t1', 'shield', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('shoulder', 'plate_shoulder_t1', 'shield', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('chest', 'plate_chest_t1', 'heart', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('gloves', 'plate_gloves_t1', 'sword', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('legs', 'plate_legs_t1', 'heart', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('boots', 'plate_boots_t1', 'shield', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('helmet', 'plate_helmet_t2', 'shield', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('shoulder', 'plate_shoulder_t2', 'shield', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('chest', 'plate_chest_t2', 'heart', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('gloves', 'plate_gloves_t2', 'sword', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('legs', 'plate_legs_t2', 'heart', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('boots', 'plate_boots_t2', 'shield', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('helmet', 'plate_helmet_t3', 'shield', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('shoulder', 'plate_shoulder_t3', 'shield', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('chest', 'plate_chest_t3', 'heart', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('gloves', 'plate_gloves_t3', 'sword', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('legs', 'plate_legs_t3', 'heart', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('boots', 'plate_boots_t3', 'shield', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('helmet', 'plate_helmet_t4', 'shield', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('shoulder', 'plate_shoulder_t4', 'shield', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('chest', 'plate_chest_t4', 'heart', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('gloves', 'plate_gloves_t4', 'sword', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('legs', 'plate_legs_t4', 'heart', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('boots', 'plate_boots_t4', 'shield', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('helmet', 'plate_helmet_t5', 'shield', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('shoulder', 'plate_shoulder_t5', 'shield', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('chest', 'plate_chest_t5', 'heart', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('gloves', 'plate_gloves_t5', 'sword', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('legs', 'plate_legs_t5', 'heart', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('boots', 'plate_boots_t5', 'shield', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('helmet', 'plate_helmet_t6', 'shield', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('shoulder', 'plate_shoulder_t6', 'shield', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('chest', 'plate_chest_t6', 'heart', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('gloves', 'plate_gloves_t6', 'sword', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('legs', 'plate_legs_t6', 'heart', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('boots', 'plate_boots_t6', 'shield', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('helmet', 'plate_helmet_t7', 'shield', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('shoulder', 'plate_shoulder_t7', 'shield', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('chest', 'plate_chest_t7', 'heart', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('gloves', 'plate_gloves_t7', 'sword', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('legs', 'plate_legs_t7', 'heart', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('boots', 'plate_boots_t7', 'shield', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('helmet', 'plate_helmet_t8', 'shield', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('shoulder', 'plate_shoulder_t8', 'shield', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('chest', 'plate_chest_t8', 'heart', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('gloves', 'plate_gloves_t8', 'sword', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('legs', 'plate_legs_t8', 'heart', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('boots', 'plate_boots_t8', 'shield', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('helmet', 'plate_helmet_t9', 'shield', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('shoulder', 'plate_shoulder_t9', 'shield', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('chest', 'plate_chest_t9', 'heart', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('gloves', 'plate_gloves_t9', 'sword', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('legs', 'plate_legs_t9', 'heart', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('boots', 'plate_boots_t9', 'shield', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('helmet', 'plate_helmet_t10', 'shield', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('shoulder', 'plate_shoulder_t10', 'shield', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('chest', 'plate_chest_t10', 'heart', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('gloves', 'plate_gloves_t10', 'sword', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('legs', 'plate_legs_t10', 'heart', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('boots', 'plate_boots_t10', 'shield', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('helmet', 'mail_helmet_t1', 'shield', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('shoulder', 'mail_shoulder_t1', 'sword', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('chest', 'mail_chest_t1', 'shield', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('gloves', 'mail_gloves_t1', 'sword', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('legs', 'mail_legs_t1', 'heart', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('boots', 'mail_boots_t1', 'energy', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('helmet', 'mail_helmet_t2', 'shield', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('shoulder', 'mail_shoulder_t2', 'sword', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('chest', 'mail_chest_t2', 'shield', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('gloves', 'mail_gloves_t2', 'sword', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('legs', 'mail_legs_t2', 'heart', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('boots', 'mail_boots_t2', 'energy', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('helmet', 'mail_helmet_t3', 'shield', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('shoulder', 'mail_shoulder_t3', 'sword', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('chest', 'mail_chest_t3', 'shield', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('gloves', 'mail_gloves_t3', 'sword', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('legs', 'mail_legs_t3', 'heart', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('boots', 'mail_boots_t3', 'energy', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('helmet', 'mail_helmet_t4', 'shield', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('shoulder', 'mail_shoulder_t4', 'sword', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('chest', 'mail_chest_t4', 'shield', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('gloves', 'mail_gloves_t4', 'sword', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('legs', 'mail_legs_t4', 'heart', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('boots', 'mail_boots_t4', 'energy', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('helmet', 'mail_helmet_t5', 'shield', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('shoulder', 'mail_shoulder_t5', 'sword', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('chest', 'mail_chest_t5', 'shield', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('gloves', 'mail_gloves_t5', 'sword', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('legs', 'mail_legs_t5', 'heart', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('boots', 'mail_boots_t5', 'energy', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('helmet', 'mail_helmet_t6', 'shield', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('shoulder', 'mail_shoulder_t6', 'sword', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('chest', 'mail_chest_t6', 'shield', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('gloves', 'mail_gloves_t6', 'sword', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('legs', 'mail_legs_t6', 'heart', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('boots', 'mail_boots_t6', 'energy', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('helmet', 'mail_helmet_t7', 'shield', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('shoulder', 'mail_shoulder_t7', 'sword', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('chest', 'mail_chest_t7', 'shield', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('gloves', 'mail_gloves_t7', 'sword', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('legs', 'mail_legs_t7', 'heart', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('boots', 'mail_boots_t7', 'energy', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('helmet', 'mail_helmet_t8', 'shield', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('shoulder', 'mail_shoulder_t8', 'sword', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('chest', 'mail_chest_t8', 'shield', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('gloves', 'mail_gloves_t8', 'sword', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('legs', 'mail_legs_t8', 'heart', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('boots', 'mail_boots_t8', 'energy', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('helmet', 'mail_helmet_t9', 'shield', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('shoulder', 'mail_shoulder_t9', 'sword', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('chest', 'mail_chest_t9', 'shield', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('gloves', 'mail_gloves_t9', 'sword', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('legs', 'mail_legs_t9', 'heart', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('boots', 'mail_boots_t9', 'energy', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('helmet', 'mail_helmet_t10', 'shield', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('shoulder', 'mail_shoulder_t10', 'sword', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('chest', 'mail_chest_t10', 'shield', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('gloves', 'mail_gloves_t10', 'sword', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('legs', 'mail_legs_t10', 'heart', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('boots', 'mail_boots_t10', 'energy', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('helmet', 'leather_helmet_t1', 'energy', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('shoulder', 'leather_shoulder_t1', 'energy', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('chest', 'leather_chest_t1', 'sword', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('gloves', 'leather_gloves_t1', 'lifeSteal', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('legs', 'leather_legs_t1', 'sword', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('boots', 'leather_boots_t1', 'energy', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('helmet', 'leather_helmet_t2', 'energy', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('shoulder', 'leather_shoulder_t2', 'energy', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('chest', 'leather_chest_t2', 'sword', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('gloves', 'leather_gloves_t2', 'lifeSteal', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('legs', 'leather_legs_t2', 'sword', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('boots', 'leather_boots_t2', 'energy', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('helmet', 'leather_helmet_t3', 'energy', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('shoulder', 'leather_shoulder_t3', 'energy', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('chest', 'leather_chest_t3', 'sword', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('gloves', 'leather_gloves_t3', 'lifeSteal', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('legs', 'leather_legs_t3', 'sword', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('boots', 'leather_boots_t3', 'energy', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('helmet', 'leather_helmet_t4', 'energy', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('shoulder', 'leather_shoulder_t4', 'energy', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('chest', 'leather_chest_t4', 'sword', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('gloves', 'leather_gloves_t4', 'lifeSteal', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('legs', 'leather_legs_t4', 'sword', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('boots', 'leather_boots_t4', 'energy', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('helmet', 'leather_helmet_t5', 'energy', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('shoulder', 'leather_shoulder_t5', 'energy', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('chest', 'leather_chest_t5', 'sword', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('gloves', 'leather_gloves_t5', 'lifeSteal', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('legs', 'leather_legs_t5', 'sword', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('boots', 'leather_boots_t5', 'energy', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('helmet', 'leather_helmet_t6', 'energy', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('shoulder', 'leather_shoulder_t6', 'energy', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('chest', 'leather_chest_t6', 'sword', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('gloves', 'leather_gloves_t6', 'lifeSteal', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('legs', 'leather_legs_t6', 'sword', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('boots', 'leather_boots_t6', 'energy', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('helmet', 'leather_helmet_t7', 'energy', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('shoulder', 'leather_shoulder_t7', 'energy', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('chest', 'leather_chest_t7', 'sword', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('gloves', 'leather_gloves_t7', 'lifeSteal', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('legs', 'leather_legs_t7', 'sword', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('boots', 'leather_boots_t7', 'energy', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('helmet', 'leather_helmet_t8', 'energy', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('shoulder', 'leather_shoulder_t8', 'energy', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('chest', 'leather_chest_t8', 'sword', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('gloves', 'leather_gloves_t8', 'lifeSteal', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('legs', 'leather_legs_t8', 'sword', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('boots', 'leather_boots_t8', 'energy', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('helmet', 'leather_helmet_t9', 'energy', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('shoulder', 'leather_shoulder_t9', 'energy', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('chest', 'leather_chest_t9', 'sword', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('gloves', 'leather_gloves_t9', 'lifeSteal', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('legs', 'leather_legs_t9', 'sword', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('boots', 'leather_boots_t9', 'energy', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('helmet', 'leather_helmet_t10', 'energy', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('shoulder', 'leather_shoulder_t10', 'energy', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('chest', 'leather_chest_t10', 'sword', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('gloves', 'leather_gloves_t10', 'lifeSteal', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('legs', 'leather_legs_t10', 'sword', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('boots', 'leather_boots_t10', 'energy', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('helmet', 'hide_helmet_t1', 'skull_dmg', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('shoulder', 'hide_shoulder_t1', 'sword', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('chest', 'hide_chest_t1', 'heart', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('gloves', 'hide_gloves_t1', 'sword', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('legs', 'hide_legs_t1', 'heart', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('boots', 'hide_boots_t1', 'energy', array['rogue','archer','berserker']::text[], 1, 5, false),
+    ('helmet', 'hide_helmet_t2', 'skull_dmg', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('shoulder', 'hide_shoulder_t2', 'sword', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('chest', 'hide_chest_t2', 'heart', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('gloves', 'hide_gloves_t2', 'sword', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('legs', 'hide_legs_t2', 'heart', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('boots', 'hide_boots_t2', 'energy', array['rogue','archer','berserker']::text[], 6, 10, false),
+    ('helmet', 'hide_helmet_t3', 'skull_dmg', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('shoulder', 'hide_shoulder_t3', 'sword', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('chest', 'hide_chest_t3', 'heart', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('gloves', 'hide_gloves_t3', 'sword', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('legs', 'hide_legs_t3', 'heart', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('boots', 'hide_boots_t3', 'energy', array['rogue','archer','berserker']::text[], 11, 15, false),
+    ('helmet', 'hide_helmet_t4', 'skull_dmg', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('shoulder', 'hide_shoulder_t4', 'sword', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('chest', 'hide_chest_t4', 'heart', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('gloves', 'hide_gloves_t4', 'sword', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('legs', 'hide_legs_t4', 'heart', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('boots', 'hide_boots_t4', 'energy', array['rogue','archer','berserker']::text[], 16, 20, false),
+    ('helmet', 'hide_helmet_t5', 'skull_dmg', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('shoulder', 'hide_shoulder_t5', 'sword', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('chest', 'hide_chest_t5', 'heart', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('gloves', 'hide_gloves_t5', 'sword', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('legs', 'hide_legs_t5', 'heart', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('boots', 'hide_boots_t5', 'energy', array['rogue','archer','berserker']::text[], 21, 25, false),
+    ('helmet', 'hide_helmet_t6', 'skull_dmg', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('shoulder', 'hide_shoulder_t6', 'sword', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('chest', 'hide_chest_t6', 'heart', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('gloves', 'hide_gloves_t6', 'sword', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('legs', 'hide_legs_t6', 'heart', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('boots', 'hide_boots_t6', 'energy', array['rogue','archer','berserker']::text[], 26, 30, false),
+    ('helmet', 'hide_helmet_t7', 'skull_dmg', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('shoulder', 'hide_shoulder_t7', 'sword', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('chest', 'hide_chest_t7', 'heart', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('gloves', 'hide_gloves_t7', 'sword', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('legs', 'hide_legs_t7', 'heart', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('boots', 'hide_boots_t7', 'energy', array['rogue','archer','berserker']::text[], 31, 35, false),
+    ('helmet', 'hide_helmet_t8', 'skull_dmg', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('shoulder', 'hide_shoulder_t8', 'sword', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('chest', 'hide_chest_t8', 'heart', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('gloves', 'hide_gloves_t8', 'sword', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('legs', 'hide_legs_t8', 'heart', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('boots', 'hide_boots_t8', 'energy', array['rogue','archer','berserker']::text[], 36, 40, false),
+    ('helmet', 'hide_helmet_t9', 'skull_dmg', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('shoulder', 'hide_shoulder_t9', 'sword', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('chest', 'hide_chest_t9', 'heart', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('gloves', 'hide_gloves_t9', 'sword', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('legs', 'hide_legs_t9', 'heart', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('boots', 'hide_boots_t9', 'energy', array['rogue','archer','berserker']::text[], 41, 45, false),
+    ('helmet', 'hide_helmet_t10', 'skull_dmg', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('shoulder', 'hide_shoulder_t10', 'sword', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('chest', 'hide_chest_t10', 'heart', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('gloves', 'hide_gloves_t10', 'sword', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('legs', 'hide_legs_t10', 'heart', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('boots', 'hide_boots_t10', 'energy', array['rogue','archer','berserker']::text[], 46, 50, false),
+    ('helmet', 'cloth_helmet_t1', 'ult_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('shoulder', 'cloth_shoulder_t1', 'ult_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('chest', 'cloth_chest_t1', 'heart', array['mage','necromancer']::text[], 1, 5, false),
+    ('gloves', 'cloth_gloves_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('legs', 'cloth_legs_t1', 'heart', array['mage','necromancer']::text[], 1, 5, false),
+    ('boots', 'cloth_boots_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('helmet', 'cloth_helmet_t2', 'ult_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('shoulder', 'cloth_shoulder_t2', 'ult_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('chest', 'cloth_chest_t2', 'heart', array['mage','necromancer']::text[], 6, 10, false),
+    ('gloves', 'cloth_gloves_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('legs', 'cloth_legs_t2', 'heart', array['mage','necromancer']::text[], 6, 10, false),
+    ('boots', 'cloth_boots_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('helmet', 'cloth_helmet_t3', 'ult_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('shoulder', 'cloth_shoulder_t3', 'ult_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('chest', 'cloth_chest_t3', 'heart', array['mage','necromancer']::text[], 11, 15, false),
+    ('gloves', 'cloth_gloves_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('legs', 'cloth_legs_t3', 'heart', array['mage','necromancer']::text[], 11, 15, false),
+    ('boots', 'cloth_boots_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('helmet', 'cloth_helmet_t4', 'ult_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('shoulder', 'cloth_shoulder_t4', 'ult_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('chest', 'cloth_chest_t4', 'heart', array['mage','necromancer']::text[], 16, 20, false),
+    ('gloves', 'cloth_gloves_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('legs', 'cloth_legs_t4', 'heart', array['mage','necromancer']::text[], 16, 20, false),
+    ('boots', 'cloth_boots_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('helmet', 'cloth_helmet_t5', 'ult_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('shoulder', 'cloth_shoulder_t5', 'ult_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('chest', 'cloth_chest_t5', 'heart', array['mage','necromancer']::text[], 21, 25, false),
+    ('gloves', 'cloth_gloves_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('legs', 'cloth_legs_t5', 'heart', array['mage','necromancer']::text[], 21, 25, false),
+    ('boots', 'cloth_boots_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('helmet', 'cloth_helmet_t6', 'ult_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('shoulder', 'cloth_shoulder_t6', 'ult_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('chest', 'cloth_chest_t6', 'heart', array['mage','necromancer']::text[], 26, 30, false),
+    ('gloves', 'cloth_gloves_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('legs', 'cloth_legs_t6', 'heart', array['mage','necromancer']::text[], 26, 30, false),
+    ('boots', 'cloth_boots_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('helmet', 'cloth_helmet_t7', 'ult_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('shoulder', 'cloth_shoulder_t7', 'ult_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('chest', 'cloth_chest_t7', 'heart', array['mage','necromancer']::text[], 31, 35, false),
+    ('gloves', 'cloth_gloves_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('legs', 'cloth_legs_t7', 'heart', array['mage','necromancer']::text[], 31, 35, false),
+    ('boots', 'cloth_boots_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('helmet', 'cloth_helmet_t8', 'ult_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('shoulder', 'cloth_shoulder_t8', 'ult_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('chest', 'cloth_chest_t8', 'heart', array['mage','necromancer']::text[], 36, 40, false),
+    ('gloves', 'cloth_gloves_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('legs', 'cloth_legs_t8', 'heart', array['mage','necromancer']::text[], 36, 40, false),
+    ('boots', 'cloth_boots_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('helmet', 'cloth_helmet_t9', 'ult_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('shoulder', 'cloth_shoulder_t9', 'ult_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('chest', 'cloth_chest_t9', 'heart', array['mage','necromancer']::text[], 41, 45, false),
+    ('gloves', 'cloth_gloves_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('legs', 'cloth_legs_t9', 'heart', array['mage','necromancer']::text[], 41, 45, false),
+    ('boots', 'cloth_boots_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('helmet', 'cloth_helmet_t10', 'ult_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('shoulder', 'cloth_shoulder_t10', 'ult_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('chest', 'cloth_chest_t10', 'heart', array['mage','necromancer']::text[], 46, 50, false),
+    ('gloves', 'cloth_gloves_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('legs', 'cloth_legs_t10', 'heart', array['mage','necromancer']::text[], 46, 50, false),
+    ('boots', 'cloth_boots_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('helmet', 'silk_helmet_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('shoulder', 'silk_shoulder_t1', 'ult_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('chest', 'silk_chest_t1', 'heart', array['mage','necromancer']::text[], 1, 5, false),
+    ('gloves', 'silk_gloves_t1', 'ult_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('legs', 'silk_legs_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('boots', 'silk_boots_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('helmet', 'silk_helmet_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('shoulder', 'silk_shoulder_t2', 'ult_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('chest', 'silk_chest_t2', 'heart', array['mage','necromancer']::text[], 6, 10, false),
+    ('gloves', 'silk_gloves_t2', 'ult_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('legs', 'silk_legs_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('boots', 'silk_boots_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('helmet', 'silk_helmet_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('shoulder', 'silk_shoulder_t3', 'ult_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('chest', 'silk_chest_t3', 'heart', array['mage','necromancer']::text[], 11, 15, false),
+    ('gloves', 'silk_gloves_t3', 'ult_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('legs', 'silk_legs_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('boots', 'silk_boots_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('helmet', 'silk_helmet_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('shoulder', 'silk_shoulder_t4', 'ult_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('chest', 'silk_chest_t4', 'heart', array['mage','necromancer']::text[], 16, 20, false),
+    ('gloves', 'silk_gloves_t4', 'ult_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('legs', 'silk_legs_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('boots', 'silk_boots_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('helmet', 'silk_helmet_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('shoulder', 'silk_shoulder_t5', 'ult_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('chest', 'silk_chest_t5', 'heart', array['mage','necromancer']::text[], 21, 25, false),
+    ('gloves', 'silk_gloves_t5', 'ult_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('legs', 'silk_legs_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('boots', 'silk_boots_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('helmet', 'silk_helmet_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('shoulder', 'silk_shoulder_t6', 'ult_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('chest', 'silk_chest_t6', 'heart', array['mage','necromancer']::text[], 26, 30, false),
+    ('gloves', 'silk_gloves_t6', 'ult_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('legs', 'silk_legs_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('boots', 'silk_boots_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('helmet', 'silk_helmet_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('shoulder', 'silk_shoulder_t7', 'ult_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('chest', 'silk_chest_t7', 'heart', array['mage','necromancer']::text[], 31, 35, false),
+    ('gloves', 'silk_gloves_t7', 'ult_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('legs', 'silk_legs_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('boots', 'silk_boots_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('helmet', 'silk_helmet_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('shoulder', 'silk_shoulder_t8', 'ult_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('chest', 'silk_chest_t8', 'heart', array['mage','necromancer']::text[], 36, 40, false),
+    ('gloves', 'silk_gloves_t8', 'ult_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('legs', 'silk_legs_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('boots', 'silk_boots_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('helmet', 'silk_helmet_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('shoulder', 'silk_shoulder_t9', 'ult_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('chest', 'silk_chest_t9', 'heart', array['mage','necromancer']::text[], 41, 45, false),
+    ('gloves', 'silk_gloves_t9', 'ult_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('legs', 'silk_legs_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('boots', 'silk_boots_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('helmet', 'silk_helmet_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('shoulder', 'silk_shoulder_t10', 'ult_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('chest', 'silk_chest_t10', 'heart', array['mage','necromancer']::text[], 46, 50, false),
+    ('gloves', 'silk_gloves_t10', 'ult_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('legs', 'silk_legs_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('boots', 'silk_boots_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('helmet', 'shroud_helmet_t1', 'skull_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('shoulder', 'shroud_shoulder_t1', 'lifeSteal', array['mage','necromancer']::text[], 1, 5, false),
+    ('chest', 'shroud_chest_t1', 'heart', array['mage','necromancer']::text[], 1, 5, false),
+    ('gloves', 'shroud_gloves_t1', 'skull_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('legs', 'shroud_legs_t1', 'heart', array['mage','necromancer']::text[], 1, 5, false),
+    ('boots', 'shroud_boots_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('helmet', 'shroud_helmet_t2', 'skull_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('shoulder', 'shroud_shoulder_t2', 'lifeSteal', array['mage','necromancer']::text[], 6, 10, false),
+    ('chest', 'shroud_chest_t2', 'heart', array['mage','necromancer']::text[], 6, 10, false),
+    ('gloves', 'shroud_gloves_t2', 'skull_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('legs', 'shroud_legs_t2', 'heart', array['mage','necromancer']::text[], 6, 10, false),
+    ('boots', 'shroud_boots_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('helmet', 'shroud_helmet_t3', 'skull_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('shoulder', 'shroud_shoulder_t3', 'lifeSteal', array['mage','necromancer']::text[], 11, 15, false),
+    ('chest', 'shroud_chest_t3', 'heart', array['mage','necromancer']::text[], 11, 15, false),
+    ('gloves', 'shroud_gloves_t3', 'skull_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('legs', 'shroud_legs_t3', 'heart', array['mage','necromancer']::text[], 11, 15, false),
+    ('boots', 'shroud_boots_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('helmet', 'shroud_helmet_t4', 'skull_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('shoulder', 'shroud_shoulder_t4', 'lifeSteal', array['mage','necromancer']::text[], 16, 20, false),
+    ('chest', 'shroud_chest_t4', 'heart', array['mage','necromancer']::text[], 16, 20, false),
+    ('gloves', 'shroud_gloves_t4', 'skull_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('legs', 'shroud_legs_t4', 'heart', array['mage','necromancer']::text[], 16, 20, false),
+    ('boots', 'shroud_boots_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('helmet', 'shroud_helmet_t5', 'skull_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('shoulder', 'shroud_shoulder_t5', 'lifeSteal', array['mage','necromancer']::text[], 21, 25, false),
+    ('chest', 'shroud_chest_t5', 'heart', array['mage','necromancer']::text[], 21, 25, false),
+    ('gloves', 'shroud_gloves_t5', 'skull_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('legs', 'shroud_legs_t5', 'heart', array['mage','necromancer']::text[], 21, 25, false),
+    ('boots', 'shroud_boots_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('helmet', 'shroud_helmet_t6', 'skull_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('shoulder', 'shroud_shoulder_t6', 'lifeSteal', array['mage','necromancer']::text[], 26, 30, false),
+    ('chest', 'shroud_chest_t6', 'heart', array['mage','necromancer']::text[], 26, 30, false),
+    ('gloves', 'shroud_gloves_t6', 'skull_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('legs', 'shroud_legs_t6', 'heart', array['mage','necromancer']::text[], 26, 30, false),
+    ('boots', 'shroud_boots_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('helmet', 'shroud_helmet_t7', 'skull_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('shoulder', 'shroud_shoulder_t7', 'lifeSteal', array['mage','necromancer']::text[], 31, 35, false),
+    ('chest', 'shroud_chest_t7', 'heart', array['mage','necromancer']::text[], 31, 35, false),
+    ('gloves', 'shroud_gloves_t7', 'skull_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('legs', 'shroud_legs_t7', 'heart', array['mage','necromancer']::text[], 31, 35, false),
+    ('boots', 'shroud_boots_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('helmet', 'shroud_helmet_t8', 'skull_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('shoulder', 'shroud_shoulder_t8', 'lifeSteal', array['mage','necromancer']::text[], 36, 40, false),
+    ('chest', 'shroud_chest_t8', 'heart', array['mage','necromancer']::text[], 36, 40, false),
+    ('gloves', 'shroud_gloves_t8', 'skull_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('legs', 'shroud_legs_t8', 'heart', array['mage','necromancer']::text[], 36, 40, false),
+    ('boots', 'shroud_boots_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('helmet', 'shroud_helmet_t9', 'skull_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('shoulder', 'shroud_shoulder_t9', 'lifeSteal', array['mage','necromancer']::text[], 41, 45, false),
+    ('chest', 'shroud_chest_t9', 'heart', array['mage','necromancer']::text[], 41, 45, false),
+    ('gloves', 'shroud_gloves_t9', 'skull_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('legs', 'shroud_legs_t9', 'heart', array['mage','necromancer']::text[], 41, 45, false),
+    ('boots', 'shroud_boots_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('helmet', 'shroud_helmet_t10', 'skull_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('shoulder', 'shroud_shoulder_t10', 'lifeSteal', array['mage','necromancer']::text[], 46, 50, false),
+    ('chest', 'shroud_chest_t10', 'heart', array['mage','necromancer']::text[], 46, 50, false),
+    ('gloves', 'shroud_gloves_t10', 'skull_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('legs', 'shroud_legs_t10', 'heart', array['mage','necromancer']::text[], 46, 50, false),
+    ('boots', 'shroud_boots_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('weapon', 'sword_t1', 'sword', array['warrior','paladin']::text[], 1, 5, false),
+    ('weapon', 'sword_t2', 'sword', array['warrior','paladin']::text[], 6, 10, false),
+    ('weapon', 'sword_t3', 'sword', array['warrior','paladin']::text[], 11, 15, false),
+    ('weapon', 'sword_t4', 'sword', array['warrior','paladin']::text[], 16, 20, false),
+    ('weapon', 'sword_t5', 'sword', array['warrior','paladin']::text[], 21, 25, false),
+    ('weapon', 'sword_t6', 'sword', array['warrior','paladin']::text[], 26, 30, false),
+    ('weapon', 'sword_t7', 'sword', array['warrior','paladin']::text[], 31, 35, false),
+    ('weapon', 'sword_t8', 'sword', array['warrior','paladin']::text[], 36, 40, false),
+    ('weapon', 'sword_t9', 'sword', array['warrior','paladin']::text[], 41, 45, false),
+    ('weapon', 'sword_t10', 'sword', array['warrior','paladin']::text[], 46, 50, false),
+    ('weapon', 'saber_t1', 'sword', array['warrior','rogue']::text[], 1, 5, false),
+    ('weapon', 'saber_t2', 'sword', array['warrior','rogue']::text[], 6, 10, false),
+    ('weapon', 'saber_t3', 'sword', array['warrior','rogue']::text[], 11, 15, false),
+    ('weapon', 'saber_t4', 'sword', array['warrior','rogue']::text[], 16, 20, false),
+    ('weapon', 'saber_t5', 'sword', array['warrior','rogue']::text[], 21, 25, false),
+    ('weapon', 'saber_t6', 'sword', array['warrior','rogue']::text[], 26, 30, false),
+    ('weapon', 'saber_t7', 'sword', array['warrior','rogue']::text[], 31, 35, false),
+    ('weapon', 'saber_t8', 'sword', array['warrior','rogue']::text[], 36, 40, false),
+    ('weapon', 'saber_t9', 'sword', array['warrior','rogue']::text[], 41, 45, false),
+    ('weapon', 'saber_t10', 'sword', array['warrior','rogue']::text[], 46, 50, false),
+    ('weapon', 'axe_t1', 'skull_dmg', array['warrior','berserker']::text[], 1, 5, false),
+    ('weapon', 'axe_t2', 'skull_dmg', array['warrior','berserker']::text[], 6, 10, false),
+    ('weapon', 'axe_t3', 'skull_dmg', array['warrior','berserker']::text[], 11, 15, false),
+    ('weapon', 'axe_t4', 'skull_dmg', array['warrior','berserker']::text[], 16, 20, false),
+    ('weapon', 'axe_t5', 'skull_dmg', array['warrior','berserker']::text[], 21, 25, false),
+    ('weapon', 'axe_t6', 'skull_dmg', array['warrior','berserker']::text[], 26, 30, false),
+    ('weapon', 'axe_t7', 'skull_dmg', array['warrior','berserker']::text[], 31, 35, false),
+    ('weapon', 'axe_t8', 'skull_dmg', array['warrior','berserker']::text[], 36, 40, false),
+    ('weapon', 'axe_t9', 'skull_dmg', array['warrior','berserker']::text[], 41, 45, false),
+    ('weapon', 'axe_t10', 'skull_dmg', array['warrior','berserker']::text[], 46, 50, false),
+    ('weapon', 'greataxe_t1', 'skull_dmg', array['berserker']::text[], 1, 5, false),
+    ('weapon', 'greataxe_t2', 'skull_dmg', array['berserker']::text[], 6, 10, false),
+    ('weapon', 'greataxe_t3', 'skull_dmg', array['berserker']::text[], 11, 15, false),
+    ('weapon', 'greataxe_t4', 'skull_dmg', array['berserker']::text[], 16, 20, false),
+    ('weapon', 'greataxe_t5', 'skull_dmg', array['berserker']::text[], 21, 25, false),
+    ('weapon', 'greataxe_t6', 'skull_dmg', array['berserker']::text[], 26, 30, false),
+    ('weapon', 'greataxe_t7', 'skull_dmg', array['berserker']::text[], 31, 35, false),
+    ('weapon', 'greataxe_t8', 'skull_dmg', array['berserker']::text[], 36, 40, false),
+    ('weapon', 'greataxe_t9', 'skull_dmg', array['berserker']::text[], 41, 45, false),
+    ('weapon', 'greataxe_t10', 'skull_dmg', array['berserker']::text[], 46, 50, false),
+    ('weapon', 'mace_t1', 'sword', array['warrior','paladin']::text[], 1, 5, false),
+    ('weapon', 'mace_t2', 'sword', array['warrior','paladin']::text[], 6, 10, false),
+    ('weapon', 'mace_t3', 'sword', array['warrior','paladin']::text[], 11, 15, false),
+    ('weapon', 'mace_t4', 'sword', array['warrior','paladin']::text[], 16, 20, false),
+    ('weapon', 'mace_t5', 'sword', array['warrior','paladin']::text[], 21, 25, false),
+    ('weapon', 'mace_t6', 'sword', array['warrior','paladin']::text[], 26, 30, false),
+    ('weapon', 'mace_t7', 'sword', array['warrior','paladin']::text[], 31, 35, false),
+    ('weapon', 'mace_t8', 'sword', array['warrior','paladin']::text[], 36, 40, false),
+    ('weapon', 'mace_t9', 'sword', array['warrior','paladin']::text[], 41, 45, false),
+    ('weapon', 'mace_t10', 'sword', array['warrior','paladin']::text[], 46, 50, false),
+    ('weapon', 'flail_t1', 'skull_dmg', array['paladin','berserker']::text[], 1, 5, false),
+    ('weapon', 'flail_t2', 'skull_dmg', array['paladin','berserker']::text[], 6, 10, false),
+    ('weapon', 'flail_t3', 'skull_dmg', array['paladin','berserker']::text[], 11, 15, false),
+    ('weapon', 'flail_t4', 'skull_dmg', array['paladin','berserker']::text[], 16, 20, false),
+    ('weapon', 'flail_t5', 'skull_dmg', array['paladin','berserker']::text[], 21, 25, false),
+    ('weapon', 'flail_t6', 'skull_dmg', array['paladin','berserker']::text[], 26, 30, false),
+    ('weapon', 'flail_t7', 'skull_dmg', array['paladin','berserker']::text[], 31, 35, false),
+    ('weapon', 'flail_t8', 'skull_dmg', array['paladin','berserker']::text[], 36, 40, false),
+    ('weapon', 'flail_t9', 'skull_dmg', array['paladin','berserker']::text[], 41, 45, false),
+    ('weapon', 'flail_t10', 'skull_dmg', array['paladin','berserker']::text[], 46, 50, false),
+    ('weapon', 'hammer_t1', 'heart', array['paladin']::text[], 1, 5, false),
+    ('weapon', 'hammer_t2', 'heart', array['paladin']::text[], 6, 10, false),
+    ('weapon', 'hammer_t3', 'heart', array['paladin']::text[], 11, 15, false),
+    ('weapon', 'hammer_t4', 'heart', array['paladin']::text[], 16, 20, false),
+    ('weapon', 'hammer_t5', 'heart', array['paladin']::text[], 21, 25, false),
+    ('weapon', 'hammer_t6', 'heart', array['paladin']::text[], 26, 30, false),
+    ('weapon', 'hammer_t7', 'heart', array['paladin']::text[], 31, 35, false),
+    ('weapon', 'hammer_t8', 'heart', array['paladin']::text[], 36, 40, false),
+    ('weapon', 'hammer_t9', 'heart', array['paladin']::text[], 41, 45, false),
+    ('weapon', 'hammer_t10', 'heart', array['paladin']::text[], 46, 50, false),
+    ('weapon', 'spear_t1', 'skull_dmg', array['warrior']::text[], 1, 5, false),
+    ('weapon', 'spear_t2', 'skull_dmg', array['warrior']::text[], 6, 10, false),
+    ('weapon', 'spear_t3', 'skull_dmg', array['warrior']::text[], 11, 15, false),
+    ('weapon', 'spear_t4', 'skull_dmg', array['warrior']::text[], 16, 20, false),
+    ('weapon', 'spear_t5', 'skull_dmg', array['warrior']::text[], 21, 25, false),
+    ('weapon', 'spear_t6', 'skull_dmg', array['warrior']::text[], 26, 30, false),
+    ('weapon', 'spear_t7', 'skull_dmg', array['warrior']::text[], 31, 35, false),
+    ('weapon', 'spear_t8', 'skull_dmg', array['warrior']::text[], 36, 40, false),
+    ('weapon', 'spear_t9', 'skull_dmg', array['warrior']::text[], 41, 45, false),
+    ('weapon', 'spear_t10', 'skull_dmg', array['warrior']::text[], 46, 50, false),
+    ('weapon', 'dagger_t1', 'lifeSteal', array['rogue']::text[], 1, 5, false),
+    ('weapon', 'dagger_t2', 'lifeSteal', array['rogue']::text[], 6, 10, false),
+    ('weapon', 'dagger_t3', 'lifeSteal', array['rogue']::text[], 11, 15, false),
+    ('weapon', 'dagger_t4', 'lifeSteal', array['rogue']::text[], 16, 20, false),
+    ('weapon', 'dagger_t5', 'lifeSteal', array['rogue']::text[], 21, 25, false),
+    ('weapon', 'dagger_t6', 'lifeSteal', array['rogue']::text[], 26, 30, false),
+    ('weapon', 'dagger_t7', 'lifeSteal', array['rogue']::text[], 31, 35, false),
+    ('weapon', 'dagger_t8', 'lifeSteal', array['rogue']::text[], 36, 40, false),
+    ('weapon', 'dagger_t9', 'lifeSteal', array['rogue']::text[], 41, 45, false),
+    ('weapon', 'dagger_t10', 'lifeSteal', array['rogue']::text[], 46, 50, false),
+    ('weapon', 'bow_t1', 'energy', array['archer']::text[], 1, 5, false),
+    ('weapon', 'bow_t2', 'energy', array['archer']::text[], 6, 10, false),
+    ('weapon', 'bow_t3', 'energy', array['archer']::text[], 11, 15, false),
+    ('weapon', 'bow_t4', 'energy', array['archer']::text[], 16, 20, false),
+    ('weapon', 'bow_t5', 'energy', array['archer']::text[], 21, 25, false),
+    ('weapon', 'bow_t6', 'energy', array['archer']::text[], 26, 30, false),
+    ('weapon', 'bow_t7', 'energy', array['archer']::text[], 31, 35, false),
+    ('weapon', 'bow_t8', 'energy', array['archer']::text[], 36, 40, false),
+    ('weapon', 'bow_t9', 'energy', array['archer']::text[], 41, 45, false),
+    ('weapon', 'bow_t10', 'energy', array['archer']::text[], 46, 50, false),
+    ('weapon', 'staff_t1', 'ult_dmg', array['mage','necromancer']::text[], 1, 5, false),
+    ('weapon', 'staff_t2', 'ult_dmg', array['mage','necromancer']::text[], 6, 10, false),
+    ('weapon', 'staff_t3', 'ult_dmg', array['mage','necromancer']::text[], 11, 15, false),
+    ('weapon', 'staff_t4', 'ult_dmg', array['mage','necromancer']::text[], 16, 20, false),
+    ('weapon', 'staff_t5', 'ult_dmg', array['mage','necromancer']::text[], 21, 25, false),
+    ('weapon', 'staff_t6', 'ult_dmg', array['mage','necromancer']::text[], 26, 30, false),
+    ('weapon', 'staff_t7', 'ult_dmg', array['mage','necromancer']::text[], 31, 35, false),
+    ('weapon', 'staff_t8', 'ult_dmg', array['mage','necromancer']::text[], 36, 40, false),
+    ('weapon', 'staff_t9', 'ult_dmg', array['mage','necromancer']::text[], 41, 45, false),
+    ('weapon', 'staff_t10', 'ult_dmg', array['mage','necromancer']::text[], 46, 50, false),
+    ('weapon', 'wand_t1', 'energy', array['mage']::text[], 1, 5, false),
+    ('weapon', 'wand_t2', 'energy', array['mage']::text[], 6, 10, false),
+    ('weapon', 'wand_t3', 'energy', array['mage']::text[], 11, 15, false),
+    ('weapon', 'wand_t4', 'energy', array['mage']::text[], 16, 20, false),
+    ('weapon', 'wand_t5', 'energy', array['mage']::text[], 21, 25, false),
+    ('weapon', 'wand_t6', 'energy', array['mage']::text[], 26, 30, false),
+    ('weapon', 'wand_t7', 'energy', array['mage']::text[], 31, 35, false),
+    ('weapon', 'wand_t8', 'energy', array['mage']::text[], 36, 40, false),
+    ('weapon', 'wand_t9', 'energy', array['mage']::text[], 41, 45, false),
+    ('weapon', 'wand_t10', 'energy', array['mage']::text[], 46, 50, false),
+    ('weapon', 'scythe_t1', 'skull_dmg', array['necromancer']::text[], 1, 5, false),
+    ('weapon', 'scythe_t2', 'skull_dmg', array['necromancer']::text[], 6, 10, false),
+    ('weapon', 'scythe_t3', 'skull_dmg', array['necromancer']::text[], 11, 15, false),
+    ('weapon', 'scythe_t4', 'skull_dmg', array['necromancer']::text[], 16, 20, false),
+    ('weapon', 'scythe_t5', 'skull_dmg', array['necromancer']::text[], 21, 25, false),
+    ('weapon', 'scythe_t6', 'skull_dmg', array['necromancer']::text[], 26, 30, false),
+    ('weapon', 'scythe_t7', 'skull_dmg', array['necromancer']::text[], 31, 35, false),
+    ('weapon', 'scythe_t8', 'skull_dmg', array['necromancer']::text[], 36, 40, false),
+    ('weapon', 'scythe_t9', 'skull_dmg', array['necromancer']::text[], 41, 45, false),
+    ('weapon', 'scythe_t10', 'skull_dmg', array['necromancer']::text[], 46, 50, false),
+    ('offhand', 'kite_t1', 'shield', array['warrior','paladin']::text[], 1, 5, false),
+    ('offhand', 'kite_t2', 'shield', array['warrior','paladin']::text[], 6, 10, false),
+    ('offhand', 'kite_t3', 'shield', array['warrior','paladin']::text[], 11, 15, false),
+    ('offhand', 'kite_t4', 'shield', array['warrior','paladin']::text[], 16, 20, false),
+    ('offhand', 'kite_t5', 'shield', array['warrior','paladin']::text[], 21, 25, false),
+    ('offhand', 'kite_t6', 'shield', array['warrior','paladin']::text[], 26, 30, false),
+    ('offhand', 'kite_t7', 'shield', array['warrior','paladin']::text[], 31, 35, false),
+    ('offhand', 'kite_t8', 'shield', array['warrior','paladin']::text[], 36, 40, false),
+    ('offhand', 'kite_t9', 'shield', array['warrior','paladin']::text[], 41, 45, false),
+    ('offhand', 'kite_t10', 'shield', array['warrior','paladin']::text[], 46, 50, false),
+    ('offhand', 'tower_t1', 'heart', array['warrior','paladin']::text[], 1, 5, false),
+    ('offhand', 'tower_t2', 'heart', array['warrior','paladin']::text[], 6, 10, false),
+    ('offhand', 'tower_t3', 'heart', array['warrior','paladin']::text[], 11, 15, false),
+    ('offhand', 'tower_t4', 'heart', array['warrior','paladin']::text[], 16, 20, false),
+    ('offhand', 'tower_t5', 'heart', array['warrior','paladin']::text[], 21, 25, false),
+    ('offhand', 'tower_t6', 'heart', array['warrior','paladin']::text[], 26, 30, false),
+    ('offhand', 'tower_t7', 'heart', array['warrior','paladin']::text[], 31, 35, false),
+    ('offhand', 'tower_t8', 'heart', array['warrior','paladin']::text[], 36, 40, false),
+    ('offhand', 'tower_t9', 'heart', array['warrior','paladin']::text[], 41, 45, false),
+    ('offhand', 'tower_t10', 'heart', array['warrior','paladin']::text[], 46, 50, false),
+    ('offhand', 'buckler_t1', 'energy', array['warrior','paladin','berserker']::text[], 1, 5, false),
+    ('offhand', 'buckler_t2', 'energy', array['warrior','paladin','berserker']::text[], 6, 10, false),
+    ('offhand', 'buckler_t3', 'energy', array['warrior','paladin','berserker']::text[], 11, 15, false),
+    ('offhand', 'buckler_t4', 'energy', array['warrior','paladin','berserker']::text[], 16, 20, false),
+    ('offhand', 'buckler_t5', 'energy', array['warrior','paladin','berserker']::text[], 21, 25, false),
+    ('offhand', 'buckler_t6', 'energy', array['warrior','paladin','berserker']::text[], 26, 30, false),
+    ('offhand', 'buckler_t7', 'energy', array['warrior','paladin','berserker']::text[], 31, 35, false),
+    ('offhand', 'buckler_t8', 'energy', array['warrior','paladin','berserker']::text[], 36, 40, false),
+    ('offhand', 'buckler_t9', 'energy', array['warrior','paladin','berserker']::text[], 41, 45, false),
+    ('offhand', 'buckler_t10', 'energy', array['warrior','paladin','berserker']::text[], 46, 50, false),
+    ('offhand', 'orb_t1', 'ult_dmg', array['mage']::text[], 1, 5, false),
+    ('offhand', 'orb_t2', 'ult_dmg', array['mage']::text[], 6, 10, false),
+    ('offhand', 'orb_t3', 'ult_dmg', array['mage']::text[], 11, 15, false),
+    ('offhand', 'orb_t4', 'ult_dmg', array['mage']::text[], 16, 20, false),
+    ('offhand', 'orb_t5', 'ult_dmg', array['mage']::text[], 21, 25, false),
+    ('offhand', 'orb_t6', 'ult_dmg', array['mage']::text[], 26, 30, false),
+    ('offhand', 'orb_t7', 'ult_dmg', array['mage']::text[], 31, 35, false),
+    ('offhand', 'orb_t8', 'ult_dmg', array['mage']::text[], 36, 40, false),
+    ('offhand', 'orb_t9', 'ult_dmg', array['mage']::text[], 41, 45, false),
+    ('offhand', 'orb_t10', 'ult_dmg', array['mage']::text[], 46, 50, false),
+    ('offhand', 'tome_t1', 'energy', array['mage','necromancer']::text[], 1, 5, false),
+    ('offhand', 'tome_t2', 'energy', array['mage','necromancer']::text[], 6, 10, false),
+    ('offhand', 'tome_t3', 'energy', array['mage','necromancer']::text[], 11, 15, false),
+    ('offhand', 'tome_t4', 'energy', array['mage','necromancer']::text[], 16, 20, false),
+    ('offhand', 'tome_t5', 'energy', array['mage','necromancer']::text[], 21, 25, false),
+    ('offhand', 'tome_t6', 'energy', array['mage','necromancer']::text[], 26, 30, false),
+    ('offhand', 'tome_t7', 'energy', array['mage','necromancer']::text[], 31, 35, false),
+    ('offhand', 'tome_t8', 'energy', array['mage','necromancer']::text[], 36, 40, false),
+    ('offhand', 'tome_t9', 'energy', array['mage','necromancer']::text[], 41, 45, false),
+    ('offhand', 'tome_t10', 'energy', array['mage','necromancer']::text[], 46, 50, false),
+    ('offhand', 'lantern_t1', 'lifeSteal', array['necromancer']::text[], 1, 5, false),
+    ('offhand', 'lantern_t2', 'lifeSteal', array['necromancer']::text[], 6, 10, false),
+    ('offhand', 'lantern_t3', 'lifeSteal', array['necromancer']::text[], 11, 15, false),
+    ('offhand', 'lantern_t4', 'lifeSteal', array['necromancer']::text[], 16, 20, false),
+    ('offhand', 'lantern_t5', 'lifeSteal', array['necromancer']::text[], 21, 25, false),
+    ('offhand', 'lantern_t6', 'lifeSteal', array['necromancer']::text[], 26, 30, false),
+    ('offhand', 'lantern_t7', 'lifeSteal', array['necromancer']::text[], 31, 35, false),
+    ('offhand', 'lantern_t8', 'lifeSteal', array['necromancer']::text[], 36, 40, false),
+    ('offhand', 'lantern_t9', 'lifeSteal', array['necromancer']::text[], 41, 45, false),
+    ('offhand', 'lantern_t10', 'lifeSteal', array['necromancer']::text[], 46, 50, false),
+    ('offhand', 'skull_t1', 'skull_dmg', array['necromancer']::text[], 1, 5, false),
+    ('offhand', 'skull_t2', 'skull_dmg', array['necromancer']::text[], 6, 10, false),
+    ('offhand', 'skull_t3', 'skull_dmg', array['necromancer']::text[], 11, 15, false),
+    ('offhand', 'skull_t4', 'skull_dmg', array['necromancer']::text[], 16, 20, false),
+    ('offhand', 'skull_t5', 'skull_dmg', array['necromancer']::text[], 21, 25, false),
+    ('offhand', 'skull_t6', 'skull_dmg', array['necromancer']::text[], 26, 30, false),
+    ('offhand', 'skull_t7', 'skull_dmg', array['necromancer']::text[], 31, 35, false),
+    ('offhand', 'skull_t8', 'skull_dmg', array['necromancer']::text[], 36, 40, false),
+    ('offhand', 'skull_t9', 'skull_dmg', array['necromancer']::text[], 41, 45, false),
+    ('offhand', 'skull_t10', 'skull_dmg', array['necromancer']::text[], 46, 50, false),
+    ('offhand', 'quiver_t1', 'energy', array['archer']::text[], 1, 5, false),
+    ('offhand', 'quiver_t2', 'energy', array['archer']::text[], 6, 10, false),
+    ('offhand', 'quiver_t3', 'energy', array['archer']::text[], 11, 15, false),
+    ('offhand', 'quiver_t4', 'energy', array['archer']::text[], 16, 20, false),
+    ('offhand', 'quiver_t5', 'energy', array['archer']::text[], 21, 25, false),
+    ('offhand', 'quiver_t6', 'energy', array['archer']::text[], 26, 30, false),
+    ('offhand', 'quiver_t7', 'energy', array['archer']::text[], 31, 35, false),
+    ('offhand', 'quiver_t8', 'energy', array['archer']::text[], 36, 40, false),
+    ('offhand', 'quiver_t9', 'energy', array['archer']::text[], 41, 45, false),
+    ('offhand', 'quiver_t10', 'energy', array['archer']::text[], 46, 50, false),
+    ('offhand', 'offdagger_t1', 'sword', array['rogue']::text[], 1, 5, false),
+    ('offhand', 'offdagger_t2', 'sword', array['rogue']::text[], 6, 10, false),
+    ('offhand', 'offdagger_t3', 'sword', array['rogue']::text[], 11, 15, false),
+    ('offhand', 'offdagger_t4', 'sword', array['rogue']::text[], 16, 20, false),
+    ('offhand', 'offdagger_t5', 'sword', array['rogue']::text[], 21, 25, false),
+    ('offhand', 'offdagger_t6', 'sword', array['rogue']::text[], 26, 30, false),
+    ('offhand', 'offdagger_t7', 'sword', array['rogue']::text[], 31, 35, false),
+    ('offhand', 'offdagger_t8', 'sword', array['rogue']::text[], 36, 40, false),
+    ('offhand', 'offdagger_t9', 'sword', array['rogue']::text[], 41, 45, false),
+    ('offhand', 'offdagger_t10', 'sword', array['rogue']::text[], 46, 50, false),
+    ('belt', 'belt_t1', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('belt', 'sash_t1', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('belt', 'chainbelt_t1', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('belt', 'belt_t2', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('belt', 'sash_t2', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('belt', 'chainbelt_t2', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('belt', 'belt_t3', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('belt', 'sash_t3', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('belt', 'chainbelt_t3', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('belt', 'belt_t4', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('belt', 'sash_t4', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('belt', 'chainbelt_t4', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('belt', 'belt_t5', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('belt', 'sash_t5', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('belt', 'chainbelt_t5', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('belt', 'belt_t6', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('belt', 'sash_t6', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('belt', 'chainbelt_t6', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('belt', 'belt_t7', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('belt', 'sash_t7', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('belt', 'chainbelt_t7', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('belt', 'belt_t8', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('belt', 'sash_t8', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('belt', 'chainbelt_t8', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('belt', 'belt_t9', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('belt', 'sash_t9', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('belt', 'chainbelt_t9', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('belt', 'belt_t10', 'heart', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
+    ('belt', 'sash_t10', 'energy', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
+    ('belt', 'chainbelt_t10', 'shield', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
+    ('amulet', 'amulet_t1', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('ring', 'ring_t1', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('ring', 'healring_t1', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 1, 5, false),
+    ('amulet', 'amulet_t2', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('ring', 'ring_t2', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('ring', 'healring_t2', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 6, 10, false),
+    ('amulet', 'amulet_t3', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('ring', 'ring_t3', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('ring', 'healring_t3', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 11, 15, false),
+    ('amulet', 'amulet_t4', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('ring', 'ring_t4', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('ring', 'healring_t4', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 16, 20, false),
+    ('amulet', 'amulet_t5', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('ring', 'ring_t5', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('ring', 'healring_t5', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 21, 25, false),
+    ('amulet', 'amulet_t6', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('ring', 'ring_t6', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('ring', 'healring_t6', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 26, 30, false),
+    ('amulet', 'amulet_t7', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('ring', 'ring_t7', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('ring', 'healring_t7', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 31, 35, false),
+    ('amulet', 'amulet_t8', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('ring', 'ring_t8', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('ring', 'healring_t8', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 36, 40, false),
+    ('amulet', 'amulet_t9', 'ult_dmg', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('ring', 'ring_t9', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('ring', 'healring_t9', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 41, 45, false),
+    ('amulet', 'amulet_t10', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
+    ('ring', 'ring_t10', 'lifeSteal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
+    ('ring', 'healring_t10', 'teamHeal', array['warrior','paladin','berserker','rogue','archer','mage','necromancer']::text[], 46, 50, false),
     ('weapon', 'blade', 'sword', array['warrior','paladin']::text[], 1, 10, true),
     ('weapon', 'axe', 'skull_dmg', array['warrior','berserker']::text[], 1, 10, true),
     ('weapon', 'scepter', 'ult_dmg', array['mage','necromancer']::text[], 1, 10, true),
@@ -2021,7 +2723,7 @@ begin
     end if;
 
     if p_offer_item_id is not null and not exists (
-        select 1 from public.player_items where id = p_offer_item_id and player_id = v_me
+        select 1 from public.player_items where id = p_offer_item_id and player_id = v_me and not listed
     ) then
         raise exception 'you do not own that item';
     end if;
@@ -2758,7 +3460,14 @@ as $$
         'skin', greatest(0, least(4, coalesce((p->>'skin')::integer, 1))),
         'hair', case when p->>'hair' in ('short', 'long', 'topknot', 'shaved', 'braid', 'bun', 'bob') then p->>'hair' else 'short' end,
         'hairColor', greatest(0, least(5, coalesce((p->>'hairColor')::integer, 1))),
-        'beard', case when p->>'beard' in ('none', 'stubble', 'full', 'braided') then p->>'beard' else 'none' end);
+        'beard', case when p->>'beard' in ('none', 'stubble', 'full', 'braided') then p->>'beard' else 'none' end,
+        -- (v1.40) body build and face details
+        'build', case when p->>'build' in ('lean', 'average', 'broad') then p->>'build' else 'average' end,
+        'face', case when p->>'face' in ('oval', 'square', 'angular') then p->>'face' else 'oval' end,
+        'nose', case when p->>'nose' in ('straight', 'hooked', 'broad') then p->>'nose' else 'straight' end,
+        'brows', case when p->>'brows' in ('stern', 'thick', 'arched') then p->>'brows' else 'stern' end,
+        'eyes', greatest(0, least(4, coalesce((p->>'eyes')::integer, 0))),
+        'marks', case when p->>'marks' in ('none', 'scar', 'paint', 'tattoo', 'freckles') then p->>'marks' else 'none' end);
 $$;
 
 create or replace function public.create_character(p_name text, p_class text, p_gender text, p_appearance jsonb)
@@ -2923,7 +3632,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'equip_item: item not found or not yours'; end if;
     v_classes := public.item_classes_of(v_item.base_id);
     if v_classes is not null and not (v_char.class_key = any(v_classes)) then
@@ -2978,18 +3687,18 @@ declare
 begin
     if v_char is null then raise exception 'no active character'; end if;
     if p_to = 'stash' then
-        if (select count(*) from public.player_items where player_id = auth.uid() and character_id is null) >= 120 then
+        if (select count(*) from public.player_items where player_id = auth.uid() and character_id is null and not listed) >= 120 then
             raise exception 'move_item: the stash is full';
         end if;
         update public.player_items set character_id = null
-            where id = p_item_id and player_id = auth.uid() and character_id = v_char and equipped_slot is null
+            where id = p_item_id and player_id = auth.uid() and character_id = v_char and equipped_slot is null and not listed
             returning * into v_row;
     elsif p_to = 'bag' then
         if (select count(*) from public.player_items where character_id = v_char and equipped_slot is null) >= 60 then
             raise exception 'move_item: the bag is full';
         end if;
         update public.player_items set character_id = v_char
-            where id = p_item_id and player_id = auth.uid() and character_id is null
+            where id = p_item_id and player_id = auth.uid() and character_id is null and not listed
             returning * into v_row;
     else
         raise exception 'move_item: unknown destination';
@@ -3010,7 +3719,7 @@ declare
     v_row public.player_items;
 begin
     update public.player_items set locked = coalesce(p_locked, false)
-        where id = p_item_id and player_id = auth.uid() returning * into v_row;
+        where id = p_item_id and player_id = auth.uid() and not listed returning * into v_row;
     if not found then raise exception 'lock_item: item not found'; end if;
     return v_row;
 end;
@@ -3043,7 +3752,8 @@ begin
     else
         select c.* into v_char from public.characters c join public.players p on p.active_character_id = c.id where p.id = new.player_id;
     end if;
-    v_level_cap := least(50, coalesce(v_char.level, 1) + 5);
+    -- since v1.39 a drop is always wearable by the character that found it
+    v_level_cap := least(50, coalesce(v_char.level, 1));
 
     if new.rarity in ('orange', 'red', 'teal', 'green') then
         select * into v_fixed from public.item_fixed_defs
@@ -3056,6 +3766,9 @@ begin
         end if;
         if v_fixed.slot is not null and new.slot <> v_fixed.slot then
             raise exception 'validate_player_item_insert: wrong slot for %', new.base_id;
+        end if;
+        if v_fixed.req_level > coalesce(v_char.level, 1) then
+            raise exception 'validate_player_item_insert: item level % above the character''s level', v_fixed.req_level;
         end if;
         new.item_level := v_fixed.req_level;
         new.req_level := v_fixed.req_level;
@@ -3127,7 +3840,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'scrap_item: item not found or not yours'; end if;
     if v_item.equipped_slot is not null then raise exception 'scrap_item: unequip it first'; end if;
     if v_item.locked then raise exception 'scrap_item: the item is locked'; end if;
@@ -3153,7 +3866,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'sell_item: item not found or not yours'; end if;
     if v_item.equipped_slot is not null then raise exception 'sell_item: unequip it first'; end if;
     if v_item.locked then raise exception 'sell_item: the item is locked'; end if;
@@ -3189,7 +3902,7 @@ begin
     select * into v_char from public.characters c where c.id = public.my_active_character();
     if not found then raise exception 'no active character'; end if;
     select * into v_item from public.player_items where id = p_item_id and player_id = auth.uid()
-        and (character_id = v_char.id or character_id is null);
+        and (character_id = v_char.id or character_id is null) and not listed;
     if not found then raise exception 'upgrade_item: item not found or not yours'; end if;
     if v_item.req_level > v_char.level then raise exception 'upgrade_item: requires level %', v_item.req_level; end if;
     select * into v_cost from public.item_upgrade_costs where from_rarity = v_item.rarity;
@@ -3199,8 +3912,9 @@ begin
         where id = v_char.id and gold >= v_cost.gold_cost and materials >= v_cost.material_cost;
     if not found then raise exception 'upgrade_item: insufficient gold or materials'; end if;
 
-    v_affix_count := case v_cost.to_rarity when 'white' then 1 when 'blue' then 2 when 'yellow' then 4 end;
-    v_stat_mult := (case v_cost.to_rarity when 'white' then 1.0 when 'blue' then 1.6 when 'yellow' then 2.4 end) * (1 + (v_item.item_level - 1) * 0.03);
+    -- (the same multipliers as items.js RARITY_DEFS since v1.39)
+    v_affix_count := case v_cost.to_rarity when 'white' then 1 when 'blue' then 2 when 'yellow' then 3 end;
+    v_stat_mult := (case v_cost.to_rarity when 'white' then 1.0 when 'blue' then 1.3 when 'yellow' then 1.7 end) * (1 + (v_item.item_level - 1) * 0.03);
 
     select primary_stat into v_primary_stat from public.item_bases where slot = v_item.slot and base_id = v_item.base_id;
     if v_primary_stat is null then raise exception 'upgrade_item: unknown base %/%', v_item.slot, v_item.base_id; end if;
@@ -3254,7 +3968,7 @@ begin
 
     v_cost := round(20 * (case p_rarity when 'grey' then 0.4 when 'white' then 1 when 'blue' then 2.5 end) * (1 + (v_char.level - 1) * 0.05));
     v_affix_count := case p_rarity when 'grey' then 1 when 'white' then 1 when 'blue' then 2 end;
-    v_stat_mult := (case p_rarity when 'grey' then 0.5 when 'white' then 1.0 when 'blue' then 1.6 end) * (1 + (v_char.level - 1) * 0.03);
+    v_stat_mult := (case p_rarity when 'grey' then 0.55 when 'white' then 1.0 when 'blue' then 1.3 end) * (1 + (v_char.level - 1) * 0.03);
 
     update public.characters set gold = gold - v_cost, updated_at = now() where id = v_char.id and gold >= v_cost;
     if not found then raise exception 'purchase_item: insufficient gold'; end if;
@@ -3343,10 +4057,10 @@ begin
         where id = p_offer_id and to_player = v_me and status = 'pending' returning * into v_offer;
     if not found then raise exception 'offer not found or already resolved'; end if;
     if v_offer.offer_item_id is not null and not exists (
-        select 1 from public.player_items where id = v_offer.offer_item_id and player_id = v_offer.from_player and not locked
+        select 1 from public.player_items where id = v_offer.offer_item_id and player_id = v_offer.from_player and not locked and not listed
     ) then raise exception 'offered item no longer available'; end if;
     if v_offer.request_item_id is not null and not exists (
-        select 1 from public.player_items where id = v_offer.request_item_id and player_id = v_me and not locked
+        select 1 from public.player_items where id = v_offer.request_item_id and player_id = v_me and not locked and not listed
     ) then raise exception 'requested item no longer available'; end if;
     if v_offer.offer_gold > 0 and not exists (
         select 1 from public.wallets where player_id = v_offer.from_player and gold >= v_offer.offer_gold
@@ -3458,3 +4172,1394 @@ begin
 end;
 $$;
 grant execute on function public.lose_item_on_death(text) to authenticated;
+
+-- =====================================================================================
+-- 32. DUNGEON RUNS (v1.40): experience is banked during a solo run
+-- =====================================================================================
+-- A solo run's experience builds up floor by floor and is only paid out
+-- when the run ends: leaving by choice (only right after a boss, every 5th
+-- floor) pays all of it; dying pays half and costs 10% of the character's
+-- gold and one worn item. A run left open (the game closed mid-dungeon)
+-- counts as a death the next time a run starts. Floors must come in order
+-- and not faster than a real fight, and each floor's gain is bounded, so a
+-- client can't bank more than real play would.
+create table if not exists public.dungeon_runs (
+    id            uuid primary key default gen_random_uuid(),
+    character_id  uuid not null references public.characters(id) on delete cascade,
+    started_at    timestamptz not null default now(),
+    floor         integer not null default 0,
+    pending_xp    integer not null default 0,
+    last_floor_at timestamptz,
+    ended_at      timestamptz,
+    outcome       text check (outcome in ('exit', 'death', 'abandoned'))
+);
+create index if not exists dungeon_runs_open_idx on public.dungeon_runs (character_id) where ended_at is null;
+alter table public.dungeon_runs enable row level security;
+drop policy if exists "read own runs" on public.dungeon_runs;
+create policy "read own runs" on public.dungeon_runs
+    for select using (exists (select 1 from public.characters c where c.id = character_id and c.player_id = auth.uid()));
+
+-- Internal helpers (not callable by clients).
+create or replace function public.grant_character_xp(p_char uuid, p_gain integer)
+returns table(level integer, xp integer, mastery integer, leveled_up boolean)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_char public.characters;
+    v_level integer;
+    v_xp integer;
+begin
+    select * into v_char from public.characters c where c.id = p_char for update;
+    if not found then return; end if;
+    v_xp := v_char.xp + greatest(0, p_gain);
+    v_level := v_char.level;
+    while v_level < 50 and v_xp >= public.xp_total_for(v_level + 1) loop
+        v_level := v_level + 1;
+    end loop;
+    update public.characters c
+        set xp = v_xp, level = v_level, updated_at = now(),
+            mastery = case when v_level >= 50 then greatest(0, (v_xp - public.xp_total_for(50)) / 8000) else 0 end
+        where c.id = p_char;
+    return query select c.level, c.xp, c.mastery, (c.level > v_char.level) from public.characters c where c.id = p_char;
+end;
+$$;
+revoke execute on function public.grant_character_xp(uuid, integer) from public, anon, authenticated;
+
+-- Dying in the dungeon: 10% of the purse and one random worn item.
+create or replace function public.apply_death_penalty(p_char uuid)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_lost integer;
+    v_item public.player_items;
+begin
+    select floor(c.gold * 0.1)::integer into v_lost from public.characters c where c.id = p_char for update;
+    update public.characters c set gold = c.gold - coalesce(v_lost, 0), updated_at = now() where c.id = p_char;
+    select * into v_item from public.player_items where character_id = p_char and equipped_slot is not null order by random() limit 1;
+    if v_item.id is not null then delete from public.player_items where id = v_item.id; end if;
+    return jsonb_build_object('lost_gold', coalesce(v_lost, 0),
+        'lost_item', case when v_item.id is null then null else jsonb_build_object('id', v_item.id, 'base_id', v_item.base_id, 'slot', v_item.slot,
+            'rarity', v_item.rarity, 'set_key', v_item.set_key, 'item_level', v_item.item_level, 'rolled_stats', v_item.rolled_stats) end);
+end;
+$$;
+revoke execute on function public.apply_death_penalty(uuid) from public, anon, authenticated;
+
+-- Closes a run: 'exit' pays all its experience, 'death' / 'abandoned' half
+-- plus the death penalty.
+create or replace function public.close_run(p_run public.dungeon_runs, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_paid integer;
+    v_xp record;
+    v_pen jsonb := '{}'::jsonb;
+begin
+    v_paid := case when p_outcome = 'exit' then p_run.pending_xp else p_run.pending_xp / 2 end;
+    update public.dungeon_runs set ended_at = now(), outcome = p_outcome where id = p_run.id;
+    select * into v_xp from public.grant_character_xp(p_run.character_id, v_paid);
+    if p_outcome <> 'exit' then v_pen := public.apply_death_penalty(p_run.character_id); end if;
+    return jsonb_build_object('outcome', p_outcome, 'floor', p_run.floor, 'banked_xp', p_run.pending_xp, 'xp_granted', v_paid,
+        'level', v_xp.level, 'xp', v_xp.xp, 'mastery', v_xp.mastery, 'leveled_up', coalesce(v_xp.leveled_up, false)) || v_pen;
+end;
+$$;
+revoke execute on function public.close_run(public.dungeon_runs, text) from public, anon, authenticated;
+
+-- Starts a solo run for the active character. Returns the run id, and the
+-- result of closing a run that was left open (or null).
+create or replace function public.start_run()
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_char uuid := public.my_active_character();
+    v_old public.dungeon_runs;
+    v_closed jsonb := null;
+    v_id uuid;
+begin
+    if v_char is null then raise exception 'no active character'; end if;
+    select * into v_old from public.dungeon_runs where character_id = v_char and ended_at is null order by started_at desc limit 1 for update;
+    if v_old.id is not null then
+        -- a run with no floor cleared costs nothing (a misclick, a reload at the door)
+        if v_old.floor = 0 then update public.dungeon_runs set ended_at = now(), outcome = 'abandoned' where id = v_old.id;
+        else v_closed := public.close_run(v_old, 'abandoned'); end if;
+    end if;
+    update public.dungeon_runs set ended_at = now(), outcome = 'abandoned' where character_id = v_char and ended_at is null;
+    insert into public.dungeon_runs (character_id) values (v_char) returning id into v_id;
+    return jsonb_build_object('run_id', v_id, 'abandoned', v_closed);
+end;
+$$;
+grant execute on function public.start_run() to authenticated;
+
+-- One cleared floor: in order, not faster than a fight, bounded gain.
+create or replace function public.record_floor(p_run uuid, p_floor integer, p_kills integer default 1)
+returns table(floor integer, pending_xp integer, gain integer)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_run public.dungeon_runs;
+    v_gain integer;
+begin
+    select * into v_run from public.dungeon_runs r where r.id = p_run and r.ended_at is null
+        and r.character_id = public.my_active_character() for update;
+    if not found then raise exception 'record_floor: no such open run'; end if;
+    if p_floor <> v_run.floor + 1 then raise exception 'record_floor: floors must come in order'; end if;
+    if p_kills < 0 or p_kills > 50 then raise exception 'record_floor: out of bounds'; end if;
+    if v_run.last_floor_at is not null and v_run.last_floor_at > now() - interval '3 seconds' then raise exception 'record_floor: too soon'; end if;
+    v_gain := least(30 + p_floor * 9 + least(p_kills, 10) * 3, 600);
+    update public.dungeon_runs r set floor = p_floor, pending_xp = r.pending_xp + v_gain, last_floor_at = now() where r.id = p_run;
+    return query select r.floor, r.pending_xp, v_gain from public.dungeon_runs r where r.id = p_run;
+end;
+$$;
+grant execute on function public.record_floor(uuid, integer, integer) to authenticated;
+
+-- Ends a run: 'exit' (only right after a boss) or 'death'.
+create or replace function public.end_run(p_run uuid, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_run public.dungeon_runs;
+begin
+    if p_outcome not in ('exit', 'death') then raise exception 'end_run: unknown outcome'; end if;
+    select * into v_run from public.dungeon_runs r where r.id = p_run and r.ended_at is null
+        and r.character_id = public.my_active_character() for update;
+    if not found then raise exception 'end_run: no such open run'; end if;
+    if p_outcome = 'exit' and (v_run.floor = 0 or v_run.floor % 5 <> 0) then
+        raise exception 'end_run: you can only leave right after a boss';
+    end if;
+    return public.close_run(v_run, p_outcome);
+end;
+$$;
+grant execute on function public.end_run(uuid, text) to authenticated;
+
+-- =====================================================================================
+-- 33. AUCTION HALL (v1.40): players sell items to each other for gold
+-- =====================================================================================
+-- Fixed price, first buyer gets it. 5% of every sale is burned (a gold sink
+-- that keeps prices honest). A listing runs 48 hours; unsold, the item goes
+-- back to its seller's shared stash. While listed, an item can't be worn,
+-- moved, sold, scrapped, upgraded, locked or traded (player_items.listed).
+-- Bought items land in the buyer's shared stash. Everyone may browse;
+-- every change goes through the functions below.
+create table if not exists public.auction_listings (
+    id               uuid primary key default gen_random_uuid(),
+    item_id          uuid references public.player_items(id) on delete set null,
+    seller_player    uuid not null references public.players(id) on delete cascade,
+    seller_character uuid references public.characters(id) on delete set null,
+    seller_name      text,
+    base_id          text not null,
+    slot             text not null,
+    rarity           text not null,
+    rolled_stats     jsonb not null default '{}'::jsonb,
+    set_key          text,
+    item_level       integer not null default 1,
+    req_level        integer not null default 1,
+    price            integer not null check (price between 1 and 1000000),
+    status           text not null default 'active' check (status in ('active', 'sold', 'cancelled', 'expired')),
+    buyer_player     uuid references public.players(id) on delete set null,
+    created_at       timestamptz not null default now(),
+    expires_at       timestamptz not null default now() + interval '48 hours',
+    closed_at        timestamptz
+);
+create index if not exists auction_active_idx on public.auction_listings (status, slot, rarity, price);
+create index if not exists auction_seller_idx on public.auction_listings (seller_player, created_at desc);
+alter table public.auction_listings enable row level security;
+drop policy if exists "browse auction" on public.auction_listings;
+create policy "browse auction" on public.auction_listings for select using (auth.uid() is not null);
+
+-- Unsold listings past their 48 hours go back to the stash (run lazily by
+-- every auction call - no scheduler needed).
+create or replace function public.auction_expire()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    with gone as (
+        update public.auction_listings set status = 'expired', closed_at = now()
+            where status = 'active' and expires_at <= now()
+            returning item_id
+    )
+    update public.player_items set listed = false, character_id = null where id in (select item_id from gone where item_id is not null);
+end;
+$$;
+revoke execute on function public.auction_expire() from public, anon, authenticated;
+
+create or replace function public.list_item(p_item_id uuid, p_price integer)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_char public.characters;
+    v_item public.player_items;
+    v_row public.auction_listings;
+begin
+    perform public.auction_expire();
+    select * into v_char from public.characters c where c.id = public.my_active_character();
+    if not found then raise exception 'no active character'; end if;
+    if p_price is null or p_price < 1 or p_price > 1000000 then raise exception 'list_item: price out of bounds'; end if;
+    select * into v_item from public.player_items where id = p_item_id and player_id = v_me
+        and (character_id = v_char.id or character_id is null) for update;
+    if not found then raise exception 'list_item: item not found or not yours'; end if;
+    if v_item.equipped_slot is not null then raise exception 'list_item: unequip it first'; end if;
+    if v_item.locked then raise exception 'list_item: the item is locked'; end if;
+    if v_item.listed then raise exception 'list_item: already listed'; end if;
+    if (select count(*) from public.auction_listings where seller_player = v_me and status = 'active') >= 20 then
+        raise exception 'list_item: at most 20 active listings';
+    end if;
+    update public.player_items set listed = true, character_id = null where id = v_item.id;
+    insert into public.auction_listings (item_id, seller_player, seller_character, seller_name, base_id, slot, rarity, rolled_stats, set_key, item_level, req_level, price)
+        values (v_item.id, v_me, v_char.id, v_char.name, v_item.base_id, v_item.slot, v_item.rarity, v_item.rolled_stats, v_item.set_key, v_item.item_level, v_item.req_level, p_price)
+        returning * into v_row;
+    return v_row;
+end;
+$$;
+grant execute on function public.list_item(uuid, integer) to authenticated;
+
+create or replace function public.buy_listing(p_listing_id uuid)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_buyer uuid := public.my_active_character();
+    v_l public.auction_listings;
+    v_payee uuid;
+    v_row public.auction_listings;
+begin
+    perform public.auction_expire();
+    if v_buyer is null then raise exception 'no active character'; end if;
+    select * into v_l from public.auction_listings where id = p_listing_id for update;
+    if not found or v_l.status <> 'active' then raise exception 'buy_listing: no longer for sale'; end if;
+    if v_l.seller_player = v_me then raise exception 'buy_listing: that is your own listing'; end if;
+    if v_l.item_id is null then raise exception 'buy_listing: no longer for sale'; end if;
+    update public.characters set gold = gold - v_l.price, updated_at = now() where id = v_buyer and gold >= v_l.price;
+    if not found then raise exception 'buy_listing: insufficient gold'; end if;
+    -- the seller is paid on the character that listed it (or, if deleted, their active one); 5% is burned
+    v_payee := coalesce((select id from public.characters where id = v_l.seller_character),
+                        (select active_character_id from public.players where id = v_l.seller_player));
+    if v_payee is not null then
+        update public.characters set gold = gold + (v_l.price - floor(v_l.price * 0.05)::integer), updated_at = now() where id = v_payee;
+    end if;
+    update public.player_items set player_id = v_me, character_id = null, listed = false, locked = false, equipped_slot = null where id = v_l.item_id;
+    update public.auction_listings set status = 'sold', buyer_player = v_me, closed_at = now() where id = v_l.id returning * into v_row;
+    return v_row;
+end;
+$$;
+grant execute on function public.buy_listing(uuid) to authenticated;
+
+create or replace function public.cancel_listing(p_listing_id uuid)
+returns public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_l public.auction_listings;
+begin
+    perform public.auction_expire();
+    update public.auction_listings set status = 'cancelled', closed_at = now()
+        where id = p_listing_id and seller_player = auth.uid() and status = 'active' returning * into v_l;
+    if not found then raise exception 'cancel_listing: not your active listing'; end if;
+    update public.player_items set listed = false, character_id = null where id = v_l.item_id;
+    return v_l;
+end;
+$$;
+grant execute on function public.cancel_listing(uuid) to authenticated;
+
+-- Browsing: active listings, filtered and sorted ('price', 'price_desc', 'new', 'level').
+create or replace function public.get_auction_listings(p_slot text default null, p_rarity text default null, p_min_level integer default 1,
+    p_max_level integer default 50, p_sort text default 'price', p_limit integer default 60, p_offset integer default 0)
+returns setof public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    perform public.auction_expire();
+    return query
+        select * from public.auction_listings l
+        where l.status = 'active' and l.expires_at > now()
+          and (p_slot is null or l.slot = p_slot) and (p_rarity is null or l.rarity = p_rarity)
+          and l.req_level between greatest(1, coalesce(p_min_level, 1)) and least(50, coalesce(p_max_level, 50))
+        order by case when p_sort = 'price' then l.price end asc,
+                 case when p_sort = 'price_desc' then l.price end desc,
+                 case when p_sort = 'level' then l.req_level end desc,
+                 l.created_at desc
+        limit least(greatest(coalesce(p_limit, 60), 1), 100) offset greatest(coalesce(p_offset, 0), 0);
+end;
+$$;
+grant execute on function public.get_auction_listings(text, text, integer, integer, text, integer, integer) to authenticated;
+
+create or replace function public.get_my_listings()
+returns setof public.auction_listings
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    perform public.auction_expire();
+    return query select * from public.auction_listings where seller_player = auth.uid() order by created_at desc limit 50;
+end;
+$$;
+grant execute on function public.get_my_listings() to authenticated;
+
+-- =====================================================================================
+-- 34. CHANGING A CHARACTER'S LOOK (v1.40)
+-- =====================================================================================
+-- Body build, face, hair, skin... can be changed any time (class and name
+-- can't). Same whitelist as character creation.
+create or replace function public.update_character_look(p_id uuid, p_gender text, p_appearance jsonb)
+returns public.characters
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_row public.characters;
+begin
+    update public.characters set gender = case when p_gender = 'f' then 'f' else 'm' end,
+            appearance = public.character_appearance_clean(p_appearance), updated_at = now()
+        where id = p_id and player_id = auth.uid() and not needs_setup
+        returning * into v_row;
+    if not found then raise exception 'update_character_look: character not found'; end if;
+    return v_row;
+end;
+$$;
+grant execute on function public.update_character_look(uuid, text, jsonb) to authenticated;
+
+-- =====================================================================================
+-- 35. HANDLES (v1.41): Name#1234
+-- =====================================================================================
+-- Every account has one handle: a name (3-16 letters, digits, _ ; Turkish
+-- letters too) and a 4-digit tag the server picks, e.g. "Hakan#4821". Many
+-- players can share a name; name + tag is unique. players.display_name
+-- carries the full "Name#1234" so every existing screen (leaderboards,
+-- friends, trades) shows it. The first name is free; after that one free
+-- change every 30 days, or pay 5,000 gold to change sooner.
+--
+-- Also closes a hole: the old "update own player row" policy let a client
+-- rewrite ANY column of its own players row (e.g. prestige_level). Every
+-- players column now changes through a function only.
+alter table public.players add column if not exists handle_name text;
+alter table public.players add column if not exists handle_tag integer;
+alter table public.players add column if not exists handle_changed_at timestamptz;
+alter table public.players add column if not exists msg_privacy text not null default 'friends_clan';
+alter table public.players drop constraint if exists players_msg_privacy_check;
+alter table public.players add constraint players_msg_privacy_check check (msg_privacy in ('friends', 'friends_clan', 'nobody'));
+create unique index if not exists players_handle_idx on public.players (lower(handle_name), handle_tag) where handle_name is not null;
+drop policy if exists "update own player row" on public.players;
+
+create or replace function public.handle_is_valid(p text)
+returns boolean
+language sql
+immutable
+as $$
+    select coalesce(p ~ '^[A-Za-z0-9_ÇĞİÖŞÜçğıöşü]{3,16}$', false)
+       and lower(p) not in ('admin', 'administrator', 'moderator', 'moderatör', 'mod', 'gm', 'gamemaster', 'system', 'sistem', 'support', 'destek', 'pixeldungeon', 'mub', 'yetkili', 'yonetici', 'yönetici')
+       and not public.contains_banned_word(p);
+$$;
+
+-- A free tag for a name (internal).
+create or replace function public.pick_handle_tag(p_name text)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v integer;
+begin
+    for i in 1..60 loop
+        v := 1000 + floor(random() * 9000)::integer;
+        if not exists (select 1 from public.players where lower(handle_name) = lower(p_name) and handle_tag = v) then return v; end if;
+    end loop;
+    select t into v from generate_series(1000, 9999) t
+        where not exists (select 1 from public.players where lower(handle_name) = lower(p_name) and handle_tag = t) limit 1;
+    if v is null then raise exception 'handle: that name is full, pick another'; end if;
+    return v;
+end;
+$$;
+revoke execute on function public.pick_handle_tag(text) from public, anon, authenticated;
+
+-- Sets / changes my handle. Returns "Name#1234".
+create or replace function public.set_handle(p_name text, p_pay boolean default false)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_name text := trim(coalesce(p_name, ''));
+    v_p public.players;
+    v_tag integer;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if not public.handle_is_valid(v_name) then raise exception 'handle: invalid name'; end if;
+    select * into v_p from public.players where id = v_me for update;
+    if v_p.handle_name is not null and v_p.handle_name = v_name then return v_p.handle_name || '#' || v_p.handle_tag; end if;
+    if v_p.handle_changed_at is not null and v_p.handle_changed_at > now() - interval '30 days' then
+        if not coalesce(p_pay, false) then
+            raise exception 'handle: next free change on %', to_char(v_p.handle_changed_at + interval '30 days', 'YYYY-MM-DD');
+        end if;
+        update public.characters set gold = gold - 5000, updated_at = now() where id = public.my_active_character() and gold >= 5000;
+        if not found then raise exception 'handle: insufficient gold'; end if;
+    end if;
+    v_tag := public.pick_handle_tag(v_name);
+    update public.players set handle_name = v_name, handle_tag = v_tag, handle_changed_at = now(), display_name = v_name || '#' || v_tag where id = v_me;
+    return v_name || '#' || v_tag;
+end;
+$$;
+grant execute on function public.set_handle(text, boolean) to authenticated;
+
+-- Everyone who already had a nickname keeps it, with a tag (and a free change).
+do $$
+declare
+    r record;
+    v_name text;
+begin
+    for r in select id, display_name from public.players where handle_name is null and display_name is not null and display_name !~ '#[0-9]{4}$' loop
+        v_name := left(regexp_replace(r.display_name, '[^A-Za-z0-9_ÇĞİÖŞÜçğıöşü]', '', 'g'), 16);
+        if not public.handle_is_valid(v_name) then v_name := 'Kahraman'; end if;
+        update public.players set handle_name = v_name, handle_tag = public.pick_handle_tag(v_name), handle_changed_at = null where id = r.id;
+        update public.players set display_name = handle_name || '#' || handle_tag where id = r.id;
+    end loop;
+end $$;
+
+-- "Name#1234" -> player id (internal; case-insensitive).
+create or replace function public.find_handle(p_handle text)
+returns uuid
+language sql
+stable
+security definer set search_path = public
+as $$
+    select id from public.players
+    where handle_name is not null and lower(handle_name || '#' || handle_tag) = lower(trim(coalesce(p_handle, '')))
+    limit 1;
+$$;
+revoke execute on function public.find_handle(text) from public, anon, authenticated;
+
+-- =====================================================================================
+-- 36. FRIENDS 2.0 (v1.41): blocks, removal, presence
+-- =====================================================================================
+create table if not exists public.player_blocks (
+    blocker_id uuid not null references public.players(id) on delete cascade,
+    blocked_id uuid not null references public.players(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    primary key (blocker_id, blocked_id),
+    check (blocker_id <> blocked_id)
+);
+alter table public.player_blocks enable row level security;
+drop policy if exists "read own blocks" on public.player_blocks;
+create policy "read own blocks" on public.player_blocks for select using (auth.uid() = blocker_id);
+
+create or replace function public.is_blocked_between(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.player_blocks where (blocker_id = a and blocked_id = b) or (blocker_id = b and blocked_id = a));
+$$;
+revoke execute on function public.is_blocked_between(uuid, uuid) from public, anon, authenticated;
+
+-- Where my friends are: refreshed by the client about once a minute.
+create table if not exists public.player_presence (
+    player_id  uuid primary key references public.players(id) on delete cascade,
+    last_seen  timestamptz not null default now(),
+    activity   text not null default 'town',
+    char_name  text,
+    char_class text,
+    char_level integer
+);
+alter table public.player_presence enable row level security;
+drop policy if exists "read own presence" on public.player_presence;
+create policy "read own presence" on public.player_presence for select using (auth.uid() = player_id);
+
+create or replace function public.touch_presence(p_activity text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.characters;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if p_activity !~ '^(town|dungeon(:[0-9]{1,3})?|pvp|coop)$' then raise exception 'touch_presence: unknown activity'; end if;
+    select * into v_c from public.characters c where c.id = public.my_active_character();
+    insert into public.player_presence (player_id, last_seen, activity, char_name, char_class, char_level)
+        values (v_me, now(), p_activity, v_c.name, v_c.class_key, v_c.level)
+    on conflict (player_id) do update set last_seen = now(), activity = excluded.activity, char_name = excluded.char_name,
+        char_class = excluded.char_class, char_level = excluded.char_level
+        where public.player_presence.last_seen < now() - interval '10 seconds' or public.player_presence.activity <> excluded.activity;
+end;
+$$;
+grant execute on function public.touch_presence(text) to authenticated;
+
+-- Friend requests now go by "Name#1234". Returns 'sent' / 'accepted' (they
+-- had already asked me) / 'already_exists' / 'not_found' / 'full' / 'self'.
+-- A block in either direction looks like 'not_found'.
+create or replace function public.send_friend_request(p_display_name text)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_target uuid;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    v_target := public.find_handle(p_display_name);
+    if v_target is null then
+        select id into v_target from public.players where lower(display_name) = lower(trim(coalesce(p_display_name, ''))) limit 1;
+    end if;
+    if v_target is null or public.is_blocked_between(v_me, v_target) then return 'not_found'; end if;
+    if v_target = v_me then return 'self'; end if;
+    if exists (select 1 from public.friendships where requester_id = v_target and addressee_id = v_me and status = 'pending') then
+        update public.friendships set status = 'accepted' where requester_id = v_target and addressee_id = v_me;
+        return 'accepted';
+    end if;
+    if exists (select 1 from public.friendships f where (f.requester_id = v_me and f.addressee_id = v_target) or (f.requester_id = v_target and f.addressee_id = v_me)) then
+        return 'already_exists';
+    end if;
+    if (select count(*) from public.friendships f where (f.requester_id = v_me or f.addressee_id = v_me) and f.status = 'accepted') >= 100 then return 'full'; end if;
+    insert into public.friendships (requester_id, addressee_id, status) values (v_me, v_target, 'pending');
+    return 'sent';
+end;
+$$;
+grant execute on function public.send_friend_request(text) to authenticated;
+
+create or replace function public.remove_friend(p_friend_id uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    delete from public.friendships
+    where (requester_id = auth.uid() and addressee_id = p_friend_id) or (requester_id = p_friend_id and addressee_id = auth.uid());
+$$;
+grant execute on function public.remove_friend(uuid) to authenticated;
+
+create or replace function public.block_player(p_target uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if auth.uid() is null or p_target is null or p_target = auth.uid() then raise exception 'block_player: invalid'; end if;
+    insert into public.player_blocks (blocker_id, blocked_id) values (auth.uid(), p_target) on conflict do nothing;
+    delete from public.friendships where (requester_id = auth.uid() and addressee_id = p_target) or (requester_id = p_target and addressee_id = auth.uid());
+end;
+$$;
+grant execute on function public.block_player(uuid) to authenticated;
+
+create or replace function public.unblock_player(p_target uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    delete from public.player_blocks where blocker_id = auth.uid() and blocked_id = p_target;
+$$;
+grant execute on function public.unblock_player(uuid) to authenticated;
+
+create or replace function public.get_blocked_list()
+returns table(player_id uuid, handle text, blocked_at timestamptz)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select b.blocked_id, coalesce(p.display_name, '?'), b.created_at
+    from public.player_blocks b join public.players p on p.id = b.blocked_id
+    where b.blocker_id = auth.uid() order by b.created_at desc;
+$$;
+grant execute on function public.get_blocked_list() to authenticated;
+
+-- =====================================================================================
+-- 37. MESSAGING 2.0 (v1.41)
+-- =====================================================================================
+alter table public.direct_messages add column if not exists read_at timestamptz;
+create index if not exists dm_pair_idx on public.direct_messages (least(sender_id, receiver_id), greatest(sender_id, receiver_id), created_at desc);
+create index if not exists dm_unread_idx on public.direct_messages (receiver_id) where read_at is null;
+
+-- (created in section 38; declared here so the messaging rules can see clan mates)
+create table if not exists public.clans (
+    id         uuid primary key default gen_random_uuid(),
+    name       text not null,
+    tag        text not null,
+    leader_id  uuid references public.players(id) on delete set null,
+    motd       text not null default '',
+    join_mode  text not null default 'apply' check (join_mode in ('open', 'apply', 'invite')),
+    xp         integer not null default 0,
+    crest      jsonb not null default '{"c1": "#8e1b1b", "c2": "#d4a84a", "sym": "lion"}'::jsonb,
+    created_at timestamptz not null default now()
+);
+create unique index if not exists clans_name_idx on public.clans (lower(name));
+create unique index if not exists clans_tag_idx on public.clans (upper(tag));
+create table if not exists public.clan_members (
+    player_id uuid primary key references public.players(id) on delete cascade,
+    clan_id   uuid not null references public.clans(id) on delete cascade,
+    rank      text not null default 'recruit' check (rank in ('leader', 'officer', 'member', 'recruit')),
+    joined_at timestamptz not null default now(),
+    xp_day    date,
+    xp_today  integer not null default 0
+);
+create index if not exists clan_members_clan_idx on public.clan_members (clan_id);
+
+create or replace function public.same_clan(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.clan_members x join public.clan_members y on y.clan_id = x.clan_id where x.player_id = a and y.player_id = b);
+$$;
+revoke execute on function public.same_clan(uuid, uuid) from public, anon, authenticated;
+
+create or replace function public.are_friends(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select exists (select 1 from public.friendships f where f.status = 'accepted'
+        and ((f.requester_id = a and f.addressee_id = b) or (f.requester_id = b and f.addressee_id = a)));
+$$;
+revoke execute on function public.are_friends(uuid, uuid) from public, anon, authenticated;
+
+-- May `a` write to `b`? Not blocked, and b's privacy setting allows it.
+create or replace function public.can_message(a uuid, b uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+    select a <> b and not public.is_blocked_between(a, b)
+       and case (select msg_privacy from public.players where id = b)
+           when 'nobody' then false
+           when 'friends' then public.are_friends(a, b)
+           else public.are_friends(a, b) or public.same_clan(a, b) end;
+$$;
+revoke execute on function public.can_message(uuid, uuid) from public, anon, authenticated;
+
+create or replace function public.set_message_privacy(p_mode text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    if p_mode not in ('friends', 'friends_clan', 'nobody') then raise exception 'set_message_privacy: unknown mode'; end if;
+    update public.players set msg_privacy = p_mode where id = auth.uid();
+end;
+$$;
+grant execute on function public.set_message_privacy(text) to authenticated;
+
+create or replace function public.send_direct_message(p_receiver_id uuid, p_body text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_body text := trim(coalesce(p_body, ''));
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if v_body = '' or char_length(v_body) > 500 then raise exception 'invalid message'; end if;
+    if v_me = p_receiver_id then raise exception 'cannot message yourself'; end if;
+    if not public.can_message(v_me, p_receiver_id) then raise exception 'not allowed to message this player'; end if;
+    if (select count(*) from public.direct_messages where sender_id = v_me and created_at > now() - interval '10 seconds') >= 8 then
+        raise exception 'slow down';
+    end if;
+    if public.contains_banned_word(v_body) then raise exception 'message not allowed'; end if;
+    insert into public.direct_messages (sender_id, receiver_id, body) values (v_me, p_receiver_id, v_body);
+    -- keep the newest 200 of a conversation
+    delete from public.direct_messages d where d.id in (
+        select id from public.direct_messages
+        where least(sender_id, receiver_id) = least(v_me, p_receiver_id) and greatest(sender_id, receiver_id) = greatest(v_me, p_receiver_id)
+        order by created_at desc offset 200);
+end;
+$$;
+grant execute on function public.send_direct_message(uuid, text) to authenticated;
+
+-- My conversations: partner, last message, unread count.
+create or replace function public.get_conversations()
+returns table(partner_id uuid, handle text, last_body text, last_at timestamptz, last_from_me boolean, unread integer)
+language sql
+stable
+security definer set search_path = public
+as $$
+    with mine as (
+        select case when d.sender_id = auth.uid() then d.receiver_id else d.sender_id end as partner, d.*
+        from public.direct_messages d where d.sender_id = auth.uid() or d.receiver_id = auth.uid()
+    ), last as (
+        select distinct on (partner) partner, body, created_at, (sender_id = auth.uid()) as from_me from mine order by partner, created_at desc
+    )
+    select l.partner, coalesce(p.display_name, '?'), l.body, l.created_at, l.from_me,
+        (select count(*)::integer from mine m where m.partner = l.partner and m.receiver_id = auth.uid() and m.read_at is null)
+    from last l join public.players p on p.id = l.partner
+    order by l.created_at desc limit 50;
+$$;
+grant execute on function public.get_conversations() to authenticated;
+
+create or replace function public.mark_conversation_read(p_partner uuid)
+returns void
+language sql
+security definer set search_path = public
+as $$
+    update public.direct_messages set read_at = now() where receiver_id = auth.uid() and sender_id = p_partner and read_at is null;
+$$;
+grant execute on function public.mark_conversation_read(uuid) to authenticated;
+
+-- Live delivery: Supabase Realtime streams new rows to their receiver (RLS
+-- decides who sees what). Only when the publication exists (not on plain
+-- Postgres in CI).
+do $$
+begin
+    if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        begin alter publication supabase_realtime add table public.direct_messages; exception when duplicate_object then null; end;
+    end if;
+end $$;
+
+-- =====================================================================================
+-- 38. CLANS (v1.41), replacing guilds
+-- =====================================================================================
+-- Founding a clan takes a level 20 character and 5,000 gold. A clan has a
+-- name, a 2-4 letter tag shown as [TAG] next to its members, a join mode
+-- (open / apply / invite), ranks (leader, officer, member, recruit - a
+-- recruit becomes a member after 3 days), a message of the day, a chat, a
+-- log, a crest (shown on capes, tabards and shields) and a level that its
+-- members' dungeon runs raise. Members: 20, plus 4 per clan level (max 50).
+alter table public.clans enable row level security;
+drop policy if exists "browse clans" on public.clans;
+create policy "browse clans" on public.clans for select using (auth.uid() is not null);
+alter table public.clan_members enable row level security;
+drop policy if exists "read own clan members" on public.clan_members;
+create policy "read own clan members" on public.clan_members for select using (public.same_clan(auth.uid(), player_id));
+
+create table if not exists public.clan_applications (
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    player_id  uuid not null references public.players(id) on delete cascade,
+    message    text not null default '',
+    created_at timestamptz not null default now(),
+    primary key (clan_id, player_id)
+);
+create table if not exists public.clan_invites (
+    clan_id     uuid not null references public.clans(id) on delete cascade,
+    player_id   uuid not null references public.players(id) on delete cascade,
+    from_player uuid references public.players(id) on delete set null,
+    created_at  timestamptz not null default now(),
+    primary key (clan_id, player_id)
+);
+create table if not exists public.clan_log (
+    id         bigserial primary key,
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    text       text not null
+);
+create table if not exists public.clan_messages (
+    id         uuid primary key default gen_random_uuid(),
+    clan_id    uuid not null references public.clans(id) on delete cascade,
+    sender_id  uuid references public.players(id) on delete set null,
+    sender     text,
+    body       text not null check (char_length(body) between 1 and 300),
+    created_at timestamptz not null default now()
+);
+create index if not exists clan_messages_idx on public.clan_messages (clan_id, created_at desc);
+alter table public.clan_applications enable row level security;
+alter table public.clan_invites enable row level security;
+alter table public.clan_log enable row level security;
+alter table public.clan_messages enable row level security;
+drop policy if exists "read own clan chat" on public.clan_messages;
+create policy "read own clan chat" on public.clan_messages for select
+    using (exists (select 1 from public.clan_members m where m.player_id = auth.uid() and m.clan_id = clan_messages.clan_id));
+do $$
+begin
+    if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        begin alter publication supabase_realtime add table public.clan_messages; exception when duplicate_object then null; end;
+    end if;
+end $$;
+
+create or replace function public.clan_rank_value(p text)
+returns integer
+language sql
+immutable
+as $$ select case p when 'leader' then 4 when 'officer' then 3 when 'member' then 2 when 'recruit' then 1 else 0 end; $$;
+
+create or replace function public.clan_level_of(p_xp integer)
+returns integer
+language sql
+immutable
+as $$ select least(10, 1 + floor(sqrt(greatest(p_xp, 0) / 1000.0))::integer); $$;
+
+create or replace function public.clan_cap_of(p_xp integer)
+returns integer
+language sql
+immutable
+as $$ select least(50, 20 + (public.clan_level_of(p_xp) - 1) * 4); $$;
+
+create or replace function public.clan_log_add(p_clan uuid, p_text text)
+returns void
+language sql
+security definer set search_path = public
+as $$ insert into public.clan_log (clan_id, text) values (p_clan, left(p_text, 200)); $$;
+revoke execute on function public.clan_log_add(uuid, text) from public, anon, authenticated;
+
+-- My clan membership (internal).
+create or replace function public.my_clan_member()
+returns public.clan_members
+language sql
+stable
+security definer set search_path = public
+as $$ select * from public.clan_members where player_id = auth.uid(); $$;
+revoke execute on function public.my_clan_member() from public, anon, authenticated;
+
+create or replace function public.create_clan(p_name text, p_tag text)
+returns public.clans
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_name text := trim(coalesce(p_name, ''));
+    v_tag text := upper(trim(coalesce(p_tag, '')));
+    v_char public.characters;
+    v_row public.clans;
+begin
+    if v_me is null then raise exception 'not authenticated'; end if;
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'create_clan: already in a clan'; end if;
+    if v_name !~ '^[A-Za-z0-9ÇĞİÖŞÜçğıöşü ]{3,24}$' or public.contains_banned_word(v_name) then raise exception 'create_clan: invalid name'; end if;
+    if v_tag !~ '^[A-Z0-9]{2,4}$' or public.contains_banned_word(v_tag) then raise exception 'create_clan: invalid tag'; end if;
+    if exists (select 1 from public.clans where lower(name) = lower(v_name)) then raise exception 'create_clan: name taken'; end if;
+    if exists (select 1 from public.clans where upper(tag) = v_tag) then raise exception 'create_clan: tag taken'; end if;
+    select * into v_char from public.characters c where c.id = public.my_active_character() for update;
+    if not found then raise exception 'no active character'; end if;
+    if v_char.level < 20 then raise exception 'create_clan: requires a level 20 character'; end if;
+    update public.characters set gold = gold - 5000, updated_at = now() where id = v_char.id and gold >= 5000;
+    if not found then raise exception 'create_clan: insufficient gold'; end if;
+    insert into public.clans (name, tag, leader_id) values (v_name, v_tag, v_me) returning * into v_row;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_row.id, 'leader');
+    delete from public.clan_applications where player_id = v_me;
+    delete from public.clan_invites where player_id = v_me;
+    perform public.clan_log_add(v_row.id, 'kuruldu');
+    return v_row;
+end;
+$$;
+grant execute on function public.create_clan(text, text) to authenticated;
+
+create or replace function public.get_clan_list(p_search text default null)
+returns table(id uuid, name text, tag text, level integer, members integer, cap integer, join_mode text, crest jsonb, motd text)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select c.id, c.name, c.tag, public.clan_level_of(c.xp), (select count(*)::integer from public.clan_members m where m.clan_id = c.id),
+        public.clan_cap_of(c.xp), c.join_mode, c.crest, c.motd
+    from public.clans c
+    where p_search is null or p_search = '' or c.name ilike '%' || p_search || '%' or c.tag ilike p_search
+    order by c.xp desc, c.created_at limit 50;
+$$;
+grant execute on function public.get_clan_list(text) to authenticated;
+
+-- Everything about my clan in one call (recruits past 3 days become members).
+create or replace function public.get_my_clan()
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members;
+    v_c public.clans;
+begin
+    select * into v_m from public.clan_members where player_id = auth.uid();
+    if not found then return null; end if;
+    update public.clan_members set rank = 'member' where clan_id = v_m.clan_id and rank = 'recruit' and joined_at < now() - interval '3 days';
+    select * into v_c from public.clans where id = v_m.clan_id;
+    select * into v_m from public.clan_members where player_id = auth.uid();
+    return jsonb_build_object(
+        'clan', jsonb_build_object('id', v_c.id, 'name', v_c.name, 'tag', v_c.tag, 'motd', v_c.motd, 'join_mode', v_c.join_mode, 'crest', v_c.crest,
+            'xp', v_c.xp, 'level', public.clan_level_of(v_c.xp), 'cap', public.clan_cap_of(v_c.xp),
+            'next_level_xp', case when public.clan_level_of(v_c.xp) >= 10 then null else 1000 * public.clan_level_of(v_c.xp) * public.clan_level_of(v_c.xp) end),
+        'me', jsonb_build_object('rank', v_m.rank),
+        'members', coalesce((select jsonb_agg(jsonb_build_object('player_id', m.player_id, 'handle', p.display_name, 'rank', m.rank, 'joined_at', m.joined_at,
+                'last_seen', pr.last_seen, 'activity', pr.activity, 'char_name', pr.char_name, 'char_class', pr.char_class, 'char_level', pr.char_level)
+                order by public.clan_rank_value(m.rank) desc, m.joined_at)
+            from public.clan_members m join public.players p on p.id = m.player_id left join public.player_presence pr on pr.player_id = m.player_id
+            where m.clan_id = v_c.id), '[]'::jsonb),
+        'applications', case when public.clan_rank_value(v_m.rank) >= 3 then coalesce((select jsonb_agg(jsonb_build_object('player_id', a.player_id, 'handle', p.display_name, 'message', a.message, 'at', a.created_at) order by a.created_at)
+            from public.clan_applications a join public.players p on p.id = a.player_id where a.clan_id = v_c.id), '[]'::jsonb) else '[]'::jsonb end,
+        'log', coalesce((select jsonb_agg(jsonb_build_object('at', l.created_at, 'text', l.text) order by l.created_at desc)
+            from (select * from public.clan_log where clan_id = v_c.id order by created_at desc limit 30) l), '[]'::jsonb));
+end;
+$$;
+grant execute on function public.get_my_clan() to authenticated;
+
+-- Join an open clan, or apply to one that reviews applications.
+create or replace function public.join_clan(p_clan_id uuid, p_message text default '')
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.clans;
+begin
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'join_clan: already in a clan'; end if;
+    select * into v_c from public.clans where id = p_clan_id for update;
+    if not found then raise exception 'join_clan: no such clan'; end if;
+    if v_c.join_mode = 'invite' then raise exception 'join_clan: invite only'; end if;
+    if v_c.join_mode = 'apply' then
+        insert into public.clan_applications (clan_id, player_id, message) values (v_c.id, v_me, left(coalesce(p_message, ''), 200))
+            on conflict (clan_id, player_id) do update set message = excluded.message, created_at = now();
+        return 'applied';
+    end if;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'join_clan: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = v_me;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = v_me) || ' katıldı');
+    return 'joined';
+end;
+$$;
+grant execute on function public.join_clan(uuid, text) to authenticated;
+
+create or replace function public.invite_to_clan(p_player uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 2 then raise exception 'invite_to_clan: not allowed'; end if;
+    if p_player is null or public.is_blocked_between(auth.uid(), p_player) then raise exception 'invite_to_clan: not allowed'; end if;
+    if exists (select 1 from public.clan_members where player_id = p_player) then raise exception 'invite_to_clan: already in a clan'; end if;
+    insert into public.clan_invites (clan_id, player_id, from_player) values (v_m.clan_id, p_player, auth.uid())
+        on conflict (clan_id, player_id) do update set created_at = now(), from_player = excluded.from_player;
+end;
+$$;
+grant execute on function public.invite_to_clan(uuid) to authenticated;
+
+create or replace function public.respond_clan_invite(p_clan_id uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_c public.clans;
+begin
+    delete from public.clan_invites where clan_id = p_clan_id and player_id = v_me;
+    if not found then raise exception 'respond_clan_invite: no such invite'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if exists (select 1 from public.clan_members where player_id = v_me) then raise exception 'respond_clan_invite: already in a clan'; end if;
+    select * into v_c from public.clans where id = p_clan_id for update;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'respond_clan_invite: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (v_me, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = v_me;
+    delete from public.clan_invites where player_id = v_me;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = v_me) || ' katıldı (davetle)');
+end;
+$$;
+grant execute on function public.respond_clan_invite(uuid, boolean) to authenticated;
+
+-- Officers and the leader accept / turn down applications.
+create or replace function public.review_clan_application(p_player uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_c public.clans;
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 3 then raise exception 'review_clan_application: not allowed'; end if;
+    delete from public.clan_applications where clan_id = v_m.clan_id and player_id = p_player;
+    if not found then raise exception 'review_clan_application: no such application'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if exists (select 1 from public.clan_members where player_id = p_player) then raise exception 'review_clan_application: already in a clan'; end if;
+    select * into v_c from public.clans where id = v_m.clan_id for update;
+    if (select count(*) from public.clan_members where clan_id = v_c.id) >= public.clan_cap_of(v_c.xp) then raise exception 'review_clan_application: clan is full'; end if;
+    insert into public.clan_members (player_id, clan_id, rank) values (p_player, v_c.id, 'recruit');
+    delete from public.clan_applications where player_id = p_player;
+    perform public.clan_log_add(v_c.id, (select display_name from public.players where id = p_player) || ' katıldı (başvuru)');
+end;
+$$;
+grant execute on function public.review_clan_application(uuid, boolean) to authenticated;
+
+-- Officers remove recruits / members; the leader anyone.
+create or replace function public.kick_clan_member(p_player uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_t public.clan_members;
+begin
+    select * into v_t from public.clan_members where player_id = p_player;
+    if v_m.player_id is null or v_t.player_id is null or v_t.clan_id <> v_m.clan_id or p_player = auth.uid() then raise exception 'kick_clan_member: not allowed'; end if;
+    if not (v_m.rank = 'leader' or (v_m.rank = 'officer' and v_t.rank in ('member', 'recruit'))) then raise exception 'kick_clan_member: not allowed'; end if;
+    delete from public.clan_members where player_id = p_player;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = p_player) || ' çıkarıldı');
+end;
+$$;
+grant execute on function public.kick_clan_member(uuid) to authenticated;
+
+-- The leader sets ranks; making someone leader hands the clan over.
+create or replace function public.set_clan_rank(p_player uuid, p_rank text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or v_m.rank <> 'leader' or p_player = auth.uid() then raise exception 'set_clan_rank: not allowed'; end if;
+    if p_rank not in ('leader', 'officer', 'member', 'recruit') then raise exception 'set_clan_rank: unknown rank'; end if;
+    update public.clan_members set rank = p_rank where player_id = p_player and clan_id = v_m.clan_id;
+    if not found then raise exception 'set_clan_rank: not a member'; end if;
+    if p_rank = 'leader' then
+        update public.clan_members set rank = 'officer' where player_id = auth.uid();
+        update public.clans set leader_id = p_player where id = v_m.clan_id;
+    end if;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = p_player) || ' → ' || p_rank);
+end;
+$$;
+grant execute on function public.set_clan_rank(uuid, text) to authenticated;
+
+-- Leaving: a leaving leader hands over to the highest-ranked, longest member;
+-- the last one out closes the clan.
+create or replace function public.leave_clan()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_next uuid;
+begin
+    if v_m.player_id is null then raise exception 'leave_clan: not in a clan'; end if;
+    delete from public.clan_members where player_id = auth.uid();
+    if v_m.rank = 'leader' then
+        select player_id into v_next from public.clan_members where clan_id = v_m.clan_id order by public.clan_rank_value(rank) desc, joined_at limit 1;
+        if v_next is null then delete from public.clans where id = v_m.clan_id; return; end if;
+        update public.clan_members set rank = 'leader' where player_id = v_next;
+        update public.clans set leader_id = v_next where id = v_m.clan_id;
+    end if;
+    perform public.clan_log_add(v_m.clan_id, (select display_name from public.players where id = auth.uid()) || ' ayrıldı');
+end;
+$$;
+grant execute on function public.leave_clan() to authenticated;
+
+-- Officers set the message of the day; the leader also the join mode and crest.
+create or replace function public.set_clan_settings(p_motd text default null, p_join_mode text default null, p_crest jsonb default null)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+begin
+    if v_m.player_id is null or public.clan_rank_value(v_m.rank) < 3 then raise exception 'set_clan_settings: not allowed'; end if;
+    if p_motd is not null then
+        if public.contains_banned_word(p_motd) then raise exception 'set_clan_settings: not allowed text'; end if;
+        update public.clans set motd = left(trim(p_motd), 200) where id = v_m.clan_id;
+    end if;
+    if p_join_mode is not null or p_crest is not null then
+        if v_m.rank <> 'leader' then raise exception 'set_clan_settings: leader only'; end if;
+        if p_join_mode is not null then
+            if p_join_mode not in ('open', 'apply', 'invite') then raise exception 'set_clan_settings: unknown join mode'; end if;
+            update public.clans set join_mode = p_join_mode where id = v_m.clan_id;
+        end if;
+        if p_crest is not null then
+            update public.clans set crest = jsonb_build_object(
+                'c1', case when p_crest->>'c1' ~ '^#[0-9a-fA-F]{6}$' then p_crest->>'c1' else '#8e1b1b' end,
+                'c2', case when p_crest->>'c2' ~ '^#[0-9a-fA-F]{6}$' then p_crest->>'c2' else '#d4a84a' end,
+                'sym', case when p_crest->>'sym' in ('lion', 'wolf', 'skull', 'star', 'tower', 'axe', 'eagle', 'moon') then p_crest->>'sym' else 'lion' end)
+                where id = v_m.clan_id;
+        end if;
+    end if;
+end;
+$$;
+grant execute on function public.set_clan_settings(text, text, jsonb) to authenticated;
+
+create or replace function public.send_clan_message(p_body text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members := public.my_clan_member();
+    v_body text := trim(coalesce(p_body, ''));
+begin
+    if v_m.player_id is null then raise exception 'send_clan_message: not in a clan'; end if;
+    if v_body = '' or char_length(v_body) > 300 then raise exception 'invalid message'; end if;
+    if public.contains_banned_word(v_body) then raise exception 'message not allowed'; end if;
+    if (select count(*) from public.clan_messages where sender_id = auth.uid() and created_at > now() - interval '10 seconds') >= 6 then raise exception 'slow down'; end if;
+    insert into public.clan_messages (clan_id, sender_id, sender, body)
+        values (v_m.clan_id, auth.uid(), (select display_name from public.players where id = auth.uid()), v_body);
+    delete from public.clan_messages where id in (select id from public.clan_messages where clan_id = v_m.clan_id order by created_at desc offset 300);
+end;
+$$;
+grant execute on function public.send_clan_message(text) to authenticated;
+
+create or replace function public.get_clan_messages(p_limit integer default 60)
+returns table(sender text, sender_id uuid, body text, created_at timestamptz)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select * from (
+        select m.sender, m.sender_id, m.body, m.created_at from public.clan_messages m
+        where m.clan_id = (select clan_id from public.clan_members where player_id = auth.uid())
+        order by m.created_at desc limit least(greatest(coalesce(p_limit, 60), 1), 200)) x
+    order by created_at;
+$$;
+grant execute on function public.get_clan_messages(integer) to authenticated;
+
+-- Clan experience: a member's dungeon run adds its floors x 10 to the clan,
+-- at most 300 per member per day (internal).
+create or replace function public.add_clan_xp(p_player uuid, p_amount integer)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_m public.clan_members;
+    v_add integer;
+begin
+    select * into v_m from public.clan_members where player_id = p_player for update;
+    if not found or p_amount <= 0 then return; end if;
+    if v_m.xp_day is distinct from current_date then v_m.xp_today := 0; end if;
+    v_add := least(p_amount, greatest(0, 300 - v_m.xp_today));
+    if v_add <= 0 then return; end if;
+    update public.clan_members set xp_day = current_date, xp_today = v_m.xp_today + v_add where player_id = p_player;
+    update public.clans set xp = xp + v_add where id = v_m.clan_id;
+end;
+$$;
+revoke execute on function public.add_clan_xp(uuid, integer) from public, anon, authenticated;
+
+-- close_run (section 32) again, now also feeding the clan.
+create or replace function public.close_run(p_run public.dungeon_runs, p_outcome text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_paid integer;
+    v_xp record;
+    v_pen jsonb := '{}'::jsonb;
+begin
+    v_paid := case when p_outcome = 'exit' then p_run.pending_xp else p_run.pending_xp / 2 end;
+    update public.dungeon_runs set ended_at = now(), outcome = p_outcome where id = p_run.id;
+    select * into v_xp from public.grant_character_xp(p_run.character_id, v_paid);
+    if p_outcome <> 'exit' then v_pen := public.apply_death_penalty(p_run.character_id); end if;
+    perform public.add_clan_xp((select player_id from public.characters where id = p_run.character_id), p_run.floor * 10);
+    return jsonb_build_object('outcome', p_outcome, 'floor', p_run.floor, 'banked_xp', p_run.pending_xp, 'xp_granted', v_paid,
+        'level', v_xp.level, 'xp', v_xp.xp, 'mastery', v_xp.mastery, 'leveled_up', coalesce(v_xp.leveled_up, false)) || v_pen;
+end;
+$$;
+revoke execute on function public.close_run(public.dungeon_runs, text) from public, anon, authenticated;
+
+-- Guilds become clans (once): owner -> leader, tag from the name.
+do $$
+declare
+    g record;
+    v_tag text;
+    v_id uuid;
+    i integer;
+begin
+    if (select count(*) from public.clans) > 0 or to_regclass('public.guilds') is null then return; end if;
+    for g in select * from public.guilds loop
+        v_tag := left(upper(regexp_replace(g.name, '[^A-Za-z0-9]', '', 'g')), 3);
+        if char_length(v_tag) < 2 then v_tag := 'KL'; end if;
+        i := 1;
+        while exists (select 1 from public.clans where upper(tag) = v_tag) loop v_tag := left(v_tag, 3) || i; i := i + 1; end loop;
+        insert into public.clans (name, tag, leader_id) values (left(g.name, 24), v_tag, g.owner_id) returning id into v_id;
+        insert into public.clan_members (player_id, clan_id, rank, joined_at)
+            select gm.player_id, v_id, case when gm.player_id = g.owner_id then 'leader' else 'member' end, gm.joined_at
+            from public.guild_members gm where gm.guild_id = g.id
+            on conflict (player_id) do nothing;
+    end loop;
+end $$;
+
+-- =====================================================================================
+-- 39. PARTY (v1.41): two players, straight into co-op together
+-- =====================================================================================
+create table if not exists public.parties (
+    id         uuid primary key default gen_random_uuid(),
+    leader_id  uuid not null references public.players(id) on delete cascade,
+    coop_code  text,
+    created_at timestamptz not null default now()
+);
+create table if not exists public.party_members (
+    player_id uuid primary key references public.players(id) on delete cascade,
+    party_id  uuid not null references public.parties(id) on delete cascade,
+    joined_at timestamptz not null default now()
+);
+create table if not exists public.party_invites (
+    id          uuid primary key default gen_random_uuid(),
+    party_id    uuid not null references public.parties(id) on delete cascade,
+    from_player uuid not null references public.players(id) on delete cascade,
+    to_player   uuid not null references public.players(id) on delete cascade,
+    created_at  timestamptz not null default now()
+);
+alter table public.parties enable row level security;
+alter table public.party_members enable row level security;
+alter table public.party_invites enable row level security;
+
+create or replace function public.leave_party()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_pm public.party_members;
+    v_next uuid;
+begin
+    select * into v_pm from public.party_members where player_id = auth.uid();
+    if not found then return; end if;
+    delete from public.party_members where player_id = auth.uid();
+    select player_id into v_next from public.party_members where party_id = v_pm.party_id order by joined_at limit 1;
+    if v_next is null then delete from public.parties where id = v_pm.party_id;
+    else update public.parties set leader_id = v_next, coop_code = null where id = v_pm.party_id; end if;
+end;
+$$;
+grant execute on function public.leave_party() to authenticated;
+
+-- Invite a friend or clan mate (2 per party; the invite lasts 2 minutes).
+create or replace function public.invite_to_party(p_player uuid)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_me uuid := auth.uid();
+    v_party uuid;
+    v_id uuid;
+begin
+    if v_me is null or p_player is null or p_player = v_me then raise exception 'invite_to_party: invalid'; end if;
+    if public.is_blocked_between(v_me, p_player) or not (public.are_friends(v_me, p_player) or public.same_clan(v_me, p_player)) then
+        raise exception 'invite_to_party: friends and clan mates only';
+    end if;
+    select party_id into v_party from public.party_members where player_id = v_me;
+    if v_party is null then
+        insert into public.parties (leader_id) values (v_me) returning id into v_party;
+        insert into public.party_members (player_id, party_id) values (v_me, v_party);
+    end if;
+    if (select count(*) from public.party_members where party_id = v_party) >= 2 then raise exception 'invite_to_party: party is full'; end if;
+    delete from public.party_invites where party_id = v_party and to_player = p_player;
+    insert into public.party_invites (party_id, from_player, to_player) values (v_party, v_me, p_player) returning id into v_id;
+    return v_id;
+end;
+$$;
+grant execute on function public.invite_to_party(uuid) to authenticated;
+
+create or replace function public.respond_party_invite(p_invite uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_inv public.party_invites;
+begin
+    delete from public.party_invites where id = p_invite and to_player = auth.uid() returning * into v_inv;
+    if v_inv.id is null then raise exception 'respond_party_invite: no such invite'; end if;
+    if not coalesce(p_accept, false) then return; end if;
+    if v_inv.created_at < now() - interval '2 minutes' then raise exception 'respond_party_invite: the invite expired'; end if;
+    if not exists (select 1 from public.parties where id = v_inv.party_id) then raise exception 'respond_party_invite: the party is gone'; end if;
+    if (select count(*) from public.party_members where party_id = v_inv.party_id) >= 2 then raise exception 'respond_party_invite: party is full'; end if;
+    perform public.leave_party();
+    insert into public.party_members (player_id, party_id) values (auth.uid(), v_inv.party_id);
+end;
+$$;
+grant execute on function public.respond_party_invite(uuid, boolean) to authenticated;
+
+create or replace function public.get_my_party()
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+    select case when pm.party_id is null then null else jsonb_build_object(
+        'party_id', p.id, 'leader_id', p.leader_id, 'coop_code', p.coop_code,
+        'members', (select jsonb_agg(jsonb_build_object('player_id', m.player_id, 'handle', pl.display_name, 'char_name', pr.char_name,
+                'char_class', pr.char_class, 'char_level', pr.char_level, 'last_seen', pr.last_seen, 'activity', pr.activity) order by m.joined_at)
+            from public.party_members m join public.players pl on pl.id = m.player_id left join public.player_presence pr on pr.player_id = m.player_id
+            where m.party_id = p.id)) end
+    from (select auth.uid() as me) x
+    left join public.party_members pm on pm.player_id = x.me
+    left join public.parties p on p.id = pm.party_id;
+$$;
+grant execute on function public.get_my_party() to authenticated;
+
+-- The leader starts co-op: a fresh room code both clients join.
+create or replace function public.party_start_coop()
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_code text := 'P' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 5));
+begin
+    update public.parties set coop_code = v_code where leader_id = auth.uid();
+    if not found then raise exception 'party_start_coop: only the party leader'; end if;
+    return v_code;
+end;
+$$;
+grant execute on function public.party_start_coop() to authenticated;
+
+-- =====================================================================================
+-- 40. SOCIAL LISTS AND NOTIFICATIONS (v1.41)
+-- =====================================================================================
+-- My friends and requests with where they are, their clan tag and unread
+-- messages.
+create or replace function public.get_social_list()
+returns table(friend_id uuid, handle text, status text, incoming boolean, last_seen timestamptz, activity text,
+    char_name text, char_class text, char_level integer, clan_tag text, unread integer)
+language sql
+stable
+security definer set search_path = public
+as $$
+    select o.other, coalesce(p.display_name, '?'), f.status, (f.status = 'pending' and f.addressee_id = auth.uid()),
+        pr.last_seen, pr.activity, pr.char_name, pr.char_class, pr.char_level, c.tag,
+        (select count(*)::integer from public.direct_messages d where d.receiver_id = auth.uid() and d.sender_id = o.other and d.read_at is null)
+    from public.friendships f
+    cross join lateral (select case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end as other) o
+    join public.players p on p.id = o.other
+    left join public.player_presence pr on pr.player_id = o.other
+    left join public.clan_members cm on cm.player_id = o.other
+    left join public.clans c on c.id = cm.clan_id
+    where f.requester_id = auth.uid() or f.addressee_id = auth.uid()
+    order by (f.status = 'pending') desc, pr.last_seen desc nulls last;
+$$;
+grant execute on function public.get_social_list() to authenticated;
+
+-- Everything waiting for me, for the town's bell.
+create or replace function public.get_notifications(p_since timestamptz default null)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+    select jsonb_build_object(
+        'friend_requests', (select count(*) from public.friendships where addressee_id = auth.uid() and status = 'pending'),
+        'unread_messages', (select count(*) from public.direct_messages where receiver_id = auth.uid() and read_at is null),
+        'party_invites', coalesce((select jsonb_agg(jsonb_build_object('id', i.id, 'from', p.display_name, 'at', i.created_at) order by i.created_at desc)
+            from public.party_invites i join public.players p on p.id = i.from_player
+            where i.to_player = auth.uid() and i.created_at > now() - interval '2 minutes'), '[]'::jsonb),
+        'clan_invites', coalesce((select jsonb_agg(jsonb_build_object('clan_id', c.id, 'name', c.name, 'tag', c.tag, 'from', p.display_name))
+            from public.clan_invites ci join public.clans c on c.id = ci.clan_id left join public.players p on p.id = ci.from_player
+            where ci.player_id = auth.uid()), '[]'::jsonb),
+        'clan_applications', (select count(*) from public.clan_applications a join public.clan_members m on m.clan_id = a.clan_id
+            where m.player_id = auth.uid() and m.rank in ('leader', 'officer')),
+        'sold', coalesce((select jsonb_agg(jsonb_build_object('base_id', l.base_id, 'rarity', l.rarity, 'price', l.price, 'at', l.closed_at))
+            from public.auction_listings l where l.seller_player = auth.uid() and l.status = 'sold' and l.closed_at > coalesce(p_since, now() - interval '1 day')), '[]'::jsonb),
+        'clan_tag', (select c.tag from public.clan_members m join public.clans c on c.id = m.clan_id where m.player_id = auth.uid()),
+        'clan_crest', (select c.crest from public.clan_members m join public.clans c on c.id = m.clan_id where m.player_id = auth.uid()));
+$$;
+grant execute on function public.get_notifications(timestamptz) to authenticated;

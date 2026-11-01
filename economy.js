@@ -745,13 +745,14 @@ async function upgradeItem(itemId) {
 // Called after a solo/PvP/co-op victory - rolls one random item (any
 // rarity, including the ones the shop never sells) and adds it straight to
 // the inventory, unequipped. Shows a toast the same way an achievement does.
-// dropLevel: the item level to roll at (default: the character's level).
-// Deeper floors roll up to 5 levels above the character (the server's
-// insert guard allows exactly that much).
-async function awardLootDrop(dropLevel) {
+// A post-battle drop for the active character: always at its own level (so
+// it can always wear what it finds - since v1.39), the floor's depth and a
+// boss only nudge the rarity odds. opts: { floor, boss }.
+async function awardLootDrop(opts) {
+    opts = opts || {};
     const lvl = (typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.level : 1;
-    if (dropLevel) dropLevel = Math.min(lvl + 5, dropLevel);
-    let item = rollLootDrop(currentOwnedItems, { level: Math.max(1, Math.min(50, dropLevel || lvl)), cls: selectedClass ? selectedClass.name.toLowerCase() : null });
+    const cls = selectedClass ? selectedClass.name.toLowerCase() : ((typeof activeCharacter !== 'undefined' && activeCharacter) ? activeCharacter.class_key : null);
+    let item = rollLootDrop(currentOwnedItems, { level: lvl, cls, floor: opts.floor || 1, boss: !!opts.boss });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
@@ -785,26 +786,21 @@ async function fetchLeaderboard(limit) {
     return data;
 }
 
-// players.display_name is nullable and defaults to null (shown as
-// "İsimsiz Kahraman" on the leaderboard) - RLS's existing "update own player
-// row" policy already covers this, no new policy or RPC needed. Now unique
-// (schema.sql, added alongside the friends list - a friend request looks
-// someone up BY this name, so two players can no longer share one) - a
-// duplicate attempt comes back as Postgres error code 23505, surfaced here
-// as 'taken' instead of the generic 'error' so the UI can say why it failed.
+// The nickname is the account's handle now ("Name#1234", schema.sql
+// section 35): set_handle picks the tag and keeps display_name in step.
+// There is no client UPDATE policy on players any more.
 async function setDisplayName(name) {
-    const trimmed = (name || '').trim().slice(0, 24);
+    const trimmed = (name || '').trim().replace(/#\d{0,4}$/, '').slice(0, 16);
     if (!trimmed) return 'empty';
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return 'error';
-
-    const { error } = await sb.from('players').update({ display_name: trimmed }).eq('id', user.id);
+    const { error } = await sb.rpc('set_handle', { p_name: trimmed, p_pay: false });
     if (error) {
-        console.error('Display name update failed:', error.message);
-        if (error.code === '23505') return 'taken';
-        if (error.message.includes('inappropriate')) return 'inappropriate';
+        console.error('set_handle failed:', error.message);
+        if (/invalid/.test(error.message)) return 'inappropriate';
+        if (/full/.test(error.message)) return 'taken';
+        if (/next free/.test(error.message)) return 'cooldown';
         return 'error';
     }
+    if (typeof socialFetchMe === 'function') await socialFetchMe();
     return 'ok';
 }
 
@@ -1281,7 +1277,7 @@ async function submitDisplayName() {
     if (!input) return;
     let result = await setDisplayName(input.value);
     let status = document.getElementById('leaderboard-name-status');
-    const messages = { ok: t('Kaydedildi!'), taken: t('Bu isim zaten alınmış, başka bir isim dene.'), empty: t('Önce bir isim yaz.'), inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'), error: t('Kaydedilemedi.') };
+    const messages = { ok: t('Kaydedildi!'), taken: t('Bu isim zaten alınmış, başka bir isim dene.'), empty: t('Önce bir isim yaz.'), inappropriate: t('Bu isim kullanılamaz, başka bir isim dene.'), cooldown: t('Adını 30 günde bir ücretsiz değiştirebilirsin (Posta Kulesi\'nden altınla da olur).'), error: t('Kaydedilemedi.') };
     if (status) status.innerText = t(messages[result] || messages.error);
     if (result === 'ok') renderLeaderboard();
 }
@@ -1478,7 +1474,7 @@ async function initEconomy() {
         window.__pendingClientErrors = [];
         pending.forEach(entry => sb.from('client_errors').insert(entry).then(() => {}, () => {}));
     }
-    if (!session) return;
+    if (!session) { if (typeof charShowServerDown === 'function') charShowServerDown(); return; }
     // characters first: the wallet, items and talents are the active one's
     if (typeof initCharacters === 'function') await initCharacters();
     await fetchWallet();
@@ -1486,6 +1482,7 @@ async function initEconomy() {
     await fetchDailyLoginStatus();
     await fetchDailyQuestStatus();
     if (typeof fetchAchievements === 'function') await fetchAchievements();
+    if (typeof socialInit === 'function') socialInit();
 }
 
 // Item trading (friends only) - see supabase/schema.sql's trade_offers

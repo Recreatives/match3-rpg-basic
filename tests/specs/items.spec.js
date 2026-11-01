@@ -31,9 +31,10 @@ describe('Item catalog', function () {
 
     it('every catalog base has a band, classes, a size and (except rings) a look the painter knows', function (ctx) {
         var w = ctx.world, B = w.g('CATALOG_BASES'), P = w.g('AV_PAINT'), W = w.g('AV_WEAPONS');
-        var styles = { helmet: ['greathelm', 'horned', 'nasal', 'hood', 'cowl', 'circlet'], chest: ['plate', 'mail', 'leather', 'robe'], shoulders: ['plate', 'spiked', 'leather', 'mantle'],
-            gloves: ['gauntlet', 'leather'], legs: ['plate', 'leather', 'cloth'], boots: ['plate', 'leather', 'cloth'], belt: ['leather', 'sash'], amulet: ['pendant'],
-            offhand: ['kite', 'tower', 'orb', 'tome', 'lantern', 'dagger', 'quiver'] };
+        var styles = { helmet: ['greathelm', 'horned', 'nasal', 'hood', 'cowl', 'circlet', 'kettle', 'winged', 'bonemask', 'pelt'], chest: ['plate', 'mail', 'leather', 'robe', 'brigandine', 'fur'],
+            shoulders: ['plate', 'spiked', 'leather', 'mantle', 'fur', 'bone'],
+            gloves: ['gauntlet', 'leather'], legs: ['plate', 'leather', 'cloth'], boots: ['plate', 'leather', 'cloth', 'fur'], belt: ['leather', 'sash', 'chain'], amulet: ['pendant'],
+            offhand: ['kite', 'tower', 'orb', 'tome', 'lantern', 'dagger', 'quiver', 'buckler', 'skull'], ring: ['band'] };
         Object.keys(B).forEach(function (id) {
             var b = B[id];
             expect(b.min >= 1 && b.max <= 50 && b.min < b.max, id + ' band').toBe(true);
@@ -238,5 +239,39 @@ describe('Unique passives in combat', { isolate: 'each' }, function () {
             var payload = { amount: 20, dmgToOpponent: 30, recoil: 10 };
             P[id].effect(c, payload);
         });
+    });
+});
+
+describe('Loot: always wearable, strong items rare', function () {
+    it('a drop never needs a higher level than the character has', function (ctx) {
+        var w = ctx.world;
+        var bad = w.g("(function(){ var bad=[]; [1,3,7,12,19,24,29,33,38,44,50].forEach(function(L){ for (var i=0;i<150;i++){ var it=rollLootDrop([], { level: L, cls: 'warrior', floor: L * 2, boss: i % 4 === 0 }); if (itemReqLevel(it) > L) bad.push(L+':'+it.base_id+'@'+itemReqLevel(it)); } }); return bad.slice(0,10); })()");
+        expect(bad).toEqual([]);
+    });
+
+    it('each 5 levels brings new bases (10 tiers), never rolling the legacy ones', function (ctx) {
+        var w = ctx.world;
+        var tiers = w.g("(function(){ var s={}; Object.keys(CATALOG_BASES).forEach(function(id){ var b=CATALOG_BASES[id]; if (!b.legacy) s[b.min+'-'+b.max]=1; }); return Object.keys(s).length; })()");
+        expect(tiers).toBe(10);
+        var legacy = w.g("(function(){ for (var i=0;i<300;i++){ var it=generateItem('chest','white',{ level: 1 + (i % 50) }); if (CATALOG_BASES[it.base_id].legacy) return it.base_id; } return null; })()");
+        expect(legacy).toBe(null);
+        expect(w.g("Object.keys(CATALOG_BASES).filter(function(id){ return !CATALOG_BASES[id].legacy; }).length")).toBeGreaterThan(600);
+    });
+
+    it('rare-and-up stays rare: ~7% normally, under 15% even on a deep boss; uniques around 1% at most', function (ctx) {
+        var w = ctx.world;
+        var r = w.g("(function(){ var w1=lootRarityWeights({ floor: 1 }), w2=lootRarityWeights({ floor: 50, boss: true }); function share(w, keys){ var t=0,k=0; Object.keys(w).forEach(function(x){ t+=w[x]; if (keys.indexOf(x)!==-1) k+=w[x]; }); return k/t; } return { rare1: share(w1,['yellow','green','orange','red','teal']), uniq1: share(w1,['orange','red','teal']), rareBoss: share(w2,['yellow','green','orange','red','teal']), uniqBoss: share(w2,['orange','red','teal']) }; })()");
+        expect(r.rare1).toBeLessThan(0.08);
+        expect(r.uniq1).toBeLessThan(0.008);
+        expect(r.rareBoss).toBeLessThan(0.15);
+        expect(r.uniqBoss).toBeLessThan(0.015);
+    });
+
+    it('a rare (yellow) item gets its own stable two-word name', function (ctx) {
+        var w = ctx.world;
+        var a = w.g("itemDisplayInfo({ base_id: 'plate_chest_t3', slot: 'chest', rarity: 'yellow', rolled_stats: { heart: 3, sword: 2 } }).name");
+        var b = w.g("itemDisplayInfo({ base_id: 'plate_chest_t3', slot: 'chest', rarity: 'yellow', rolled_stats: { heart: 3, sword: 2 } }).name");
+        expect(a).toBe(b);
+        expect(a.split(' · ').length).toBe(2);
     });
 });

@@ -113,10 +113,10 @@ select tst.expect_error($q$insert into public.player_items (player_id, base_id, 
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'blade', 'weapon', 'grey', '{"sword": 2, "heart": 2}')$q$, 'exceeds bound');
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'uniq_nights_lament', 'weapon', 'orange', '{"sword": 80, "lifeSteal": 6}')$q$, 'mismatch');
 select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'uniq_fake', 'weapon', 'red', '{"sword": 1}')$q$, 'unknown fixed item');
--- item level: at most the character's level + 5; stats scale with it
-select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level) values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 7)$q$, 'item level');
-insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level)
-    values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 6);
+-- item level: never above the character's own level (every drop is wearable)
+select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats, item_level) values (auth.uid(), 'blade', 'weapon', 'white', '{"sword": 3}', 2)$q$, 'item level');
+-- nor a set piece / unique the character is too young for (level 20+)
+select tst.expect_error($q$insert into public.player_items (player_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), 'bloodied_gauntlet', 'gloves', 'green', '{"sword": 3}')$q$, 'above the character');
 -- a character can't be given someone else's character's items
 select tst.expect_error($q$insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), current_setting('tst.ayla')::uuid, 'blade', 'weapon', 'white', '{"sword": 3}')$q$, 'not your character');
 -- and can't be planted in someone else's inventory
@@ -159,7 +159,6 @@ begin
     select * into r2 from public.equip_item(r2.id, null);
     if r1.equipped_slot <> 'ring1' or r2.equipped_slot <> 'ring2' then raise exception 'FAIL: rings -> % / %', r1.equipped_slot, r2.equipped_slot; end if;
 end $$;
-select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and item_level = 6 limit 1), null)$q$, 'requires level');
 -- (no character_id = straight into the shared stash; this one goes in the bag)
 insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), public.my_active_character(), 'bow', 'weapon', 'white', '{"energy": 3}');
 select tst.expect_error($q$select public.equip_item((select id from public.player_items where player_id = auth.uid() and base_id = 'bow' limit 1), null)$q$, 'class cannot');
@@ -214,6 +213,83 @@ end $$;
 select tst.expect_error($q$select public.lose_item_on_death('pvp')$q$, 'too soon');
 select tst.expect_error($q$select public.lose_item_on_death('coop')$q$, 'unknown mode');
 
+-- dungeon runs: banked experience, in-order floors, exit only after a boss
+select set_config('tst.run', public.start_run()->>'run_id', false);
+do $$ declare r record; begin
+    select * into r from public.record_floor(current_setting('tst.run')::uuid, 1, 1);
+    if r.floor <> 1 or r.pending_xp <> 42 then raise exception 'FAIL: record_floor(1) -> %', row_to_json(r); end if;
+end $$;
+select tst.expect_error($q$select * from public.record_floor(current_setting('tst.run')::uuid, 3, 1)$q$, 'in order');
+select tst.expect_error($q$select * from public.record_floor(current_setting('tst.run')::uuid, 2, 1)$q$, 'too soon');
+select tst.expect_error($q$select public.end_run(current_setting('tst.run')::uuid, 'exit')$q$, 'right after a boss');
+-- (the test runner skips the waiting between floors 2..5)
+reset role;
+do $$ begin
+    for i in 2..5 loop
+        update public.dungeon_runs set last_floor_at = now() - interval '1 minute' where id = current_setting('tst.run')::uuid;
+        perform * from public.record_floor(current_setting('tst.run')::uuid, i, 1);
+    end loop;
+end $$;
+set local role authenticated;
+do $$ declare x0 integer; res jsonb; banked integer; begin
+    select c.xp into x0 from public.characters c where c.id = public.my_active_character();
+    select pending_xp into banked from public.dungeon_runs where id = current_setting('tst.run')::uuid;
+    res := public.end_run(current_setting('tst.run')::uuid, 'exit');
+    if (res->>'xp_granted')::integer <> banked or (select c.xp from public.characters c where c.id = public.my_active_character()) <> x0 + banked then
+        raise exception 'FAIL: exit should pay all % banked xp: %', banked, res; end if;
+end $$;
+-- dying: half the experience, 10% of the gold
+select set_config('tst.run2', public.start_run()->>'run_id', false);
+do $$ declare g0 integer; x0 integer; res jsonb; begin
+    perform * from public.record_floor(current_setting('tst.run2')::uuid, 1, 1);
+    select c.gold, c.xp into g0, x0 from public.characters c where c.id = public.my_active_character();
+    res := public.end_run(current_setting('tst.run2')::uuid, 'death');
+    if (res->>'xp_granted')::integer <> 21 then raise exception 'FAIL: death should pay half (21): %', res; end if;
+    if (select c.gold from public.characters c where c.id = public.my_active_character()) <> g0 - floor(g0 * 0.1)::integer then
+        raise exception 'FAIL: death should cost 10%% of % gold: %', g0, res; end if;
+end $$;
+select tst.expect_error($q$select public.end_run(current_setting('tst.run2')::uuid, 'death')$q$, 'no such open run');
+-- the helpers are not client-callable
+select tst.expect_error($q$select public.apply_death_penalty(public.my_active_character())$q$, 'permission denied');
+
+-- auction hall: list (frozen), can't buy your own, the buyer pays, the seller gets 95%
+do $$ declare it public.player_items; l public.auction_listings; begin
+    insert into public.player_items (player_id, character_id, base_id, slot, rarity, rolled_stats) values (auth.uid(), public.my_active_character(), 'blade', 'weapon', 'white', '{"sword": 2}') returning * into it;
+    l := public.list_item(it.id, 50);
+    perform set_config('tst.listing', l.id::text, false);
+    if not (select listed from public.player_items where id = it.id) then raise exception 'FAIL: listed item not frozen'; end if;
+    begin perform public.sell_item(it.id); raise exception 'FAIL: sold a listed item'; exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    begin perform public.equip_item(it.id, null); raise exception 'FAIL: equipped a listed item'; exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+end $$;
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'your own listing');
+select tst.expect_error($q$select public.list_item((select id from public.player_items where player_id = auth.uid() and equipped_slot is null and not listed limit 1), 0)$q$, 'price out of bounds');
+commit;
+-- player 2 (Ayla, a mage with no gold) can't afford it; give her 100 gold, then she buys it
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'insufficient gold');
+select public.earn_currency(100, 0);
+do $$ declare l public.auction_listings; it_owner uuid; seller_gold0 integer; begin
+    reset role;
+    select c.gold into seller_gold0 from public.characters c join public.players p on p.active_character_id = c.id where p.id = '11111111-1111-1111-1111-111111111111';
+    set local role authenticated;
+    l := public.buy_listing(current_setting('tst.listing')::uuid);
+    if l.status <> 'sold' then raise exception 'FAIL: listing not sold: %', row_to_json(l); end if;
+    if (select gold from public.wallets where player_id = auth.uid()) <> 50 then raise exception 'FAIL: buyer should have 50 left'; end if;
+    reset role;
+    select player_id into it_owner from public.player_items where id = l.item_id;
+    if it_owner <> '22222222-2222-2222-2222-222222222222' then raise exception 'FAIL: item did not move to the buyer'; end if;
+    if (select c.gold from public.characters c join public.players p on p.active_character_id = c.id where p.id = '11111111-1111-1111-1111-111111111111') <> seller_gold0 + 48 then
+        raise exception 'FAIL: seller should get 95%% (48)'; end if;
+    set local role authenticated;
+end $$;
+select tst.expect_error($q$select public.buy_listing(current_setting('tst.listing')::uuid)$q$, 'no longer for sale');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
 -- a second character has its own (empty) purse
 do $$
 declare c public.characters; first_id uuid;
@@ -234,9 +310,9 @@ end $$;
 
 commit;
 
--- player 2 still has exactly what they started with
+-- player 2 has exactly what their own actions left them: 100 earned, 50 spent at auction
 do $$ begin
-    if (select gold from public.wallets where player_id = '22222222-2222-2222-2222-222222222222') <> 0 then
+    if (select gold from public.wallets where player_id = '22222222-2222-2222-2222-222222222222') <> 50 then
         raise exception 'FAIL: player 2''s wallet changed';
     end if;
 end $$;

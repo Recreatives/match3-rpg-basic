@@ -29,7 +29,7 @@
         // the wallet row stands for the active character's purse (a view on
         // the real server - schema.sql section 30)
         wallets: [{ player_id: userId, gold: 100, materials: 0 }],
-        players: [{ id: userId, display_name: 'Tester', prestige_level: 0, active_character_id: cfg.noCharacter ? null : 'char-1' }],
+        players: [{ id: userId, display_name: cfg.noHandle ? 'Tester' : 'Tester#1234', handle_name: cfg.noHandle ? null : 'Tester', handle_tag: cfg.noHandle ? null : 1234, handle_changed_at: null, msg_privacy: 'friends_clan', prestige_level: 0, active_character_id: cfg.noCharacter ? null : 'char-1' }],
         characters: cfg.noCharacter ? [] : [{ id: 'char-1', player_id: userId, name: 'Tester', class_key: 'warrior', gender: 'm', appearance: {}, level: 1, xp: 0, mastery: 0, gold: 100, materials: 0, needs_setup: false, last_played_at: '2026-01-01T00:00:00Z' }],
         player_items: [],
         player_achievements: [],
@@ -50,6 +50,7 @@
         function matches(row) { return q.filters.every(function (f) { return f(row); }); }
         function exec() {
             calls.push({ type: 'from', table: tableName, op: q.op, payload: clone(q.payload) });
+            if (cfg.serverDown) return { data: null, error: { message: 'TypeError: Failed to fetch' } };
             var rows = table(tableName), result;
             if (q.op === 'insert' || q.op === 'upsert') {
                 var list = Array.isArray(q.payload) ? q.payload : [q.payload];
@@ -133,6 +134,55 @@
         get_available_titles: function () { return { data: [], error: null }; },
         get_my_trade_offers: function () { return { data: [], error: null }; },
         get_guild_list: function () { return { data: [], error: null }; },
+        // social (schema.sql sections 35-40) - the shapes, plus just enough
+        // state (a handle, one clan, a list tests can fill) to drive the UI
+        set_handle: function (a) {
+            var p = table('players')[0], name = String(a.p_name || '').trim();
+            if (!/^[A-Za-z0-9_ÇĞİÖŞÜçğıöşü]{3,16}$/.test(name)) return { data: null, error: { message: 'handle: invalid name' } };
+            if (p.handle_changed_at && !a.p_pay) return { data: null, error: { message: 'handle: next free change on 2026-12-01' } };
+            p.handle_name = name; p.handle_tag = 4821; p.handle_changed_at = new Date().toISOString(); p.display_name = name + '#4821';
+            return { data: p.display_name, error: null };
+        },
+        touch_presence: function () { return { data: null, error: null }; },
+        get_social_list: function () { return { data: clone(table('social_list')), error: null }; },
+        send_friend_request: function (a) {
+            if (a.p_display_name === table('players')[0].display_name) return { data: 'self', error: null };
+            var hit = table('known_players').find(function (r) { return r.handle === a.p_display_name; });
+            if (!hit) return { data: 'not_found', error: null };
+            table('social_list').push({ friend_id: hit.id, handle: hit.handle, status: 'pending', incoming: false, last_seen: null, activity: null, char_name: null, char_class: null, char_level: null, clan_tag: null, unread: 0 });
+            return { data: 'sent', error: null };
+        },
+        get_conversations: function () { return { data: [], error: null }; },
+        get_blocked_list: function () { return { data: [], error: null }; },
+        get_my_party: function () { return { data: db.party || null, error: null }; },
+        get_clan_list: function () { return { data: clone(table('clan_list')), error: null }; },
+        get_clan_messages: function () { return { data: clone(table('clan_messages')), error: null }; },
+        create_clan: function (a) {
+            var c = table('characters').find(function (x) { return x.id === table('players')[0].active_character_id; });
+            if (!c || c.level < 20) return { data: null, error: { message: 'create_clan: requires a level 20 character' } };
+            if (c.gold < 5000) return { data: null, error: { message: 'create_clan: insufficient gold' } };
+            c.gold -= 5000;
+            var w = table('wallets')[0]; if (w) w.gold = c.gold;
+            db.clan = { clan: { id: 'clan-1', name: a.p_name, tag: a.p_tag, motd: '', join_mode: 'apply', crest: { c1: '#8e1b1b', c2: '#d4a84a', sym: 'lion' }, xp: 0, level: 1, cap: 20, next_level_xp: 1000 },
+                me: { rank: 'leader' }, members: [{ player_id: userId, handle: table('players')[0].display_name, rank: 'leader', last_seen: new Date().toISOString(), activity: 'town' }], applications: [], log: [{ at: new Date().toISOString(), text: 'Klan kuruldu' }] };
+            return { data: { id: 'clan-1' }, error: null };
+        },
+        get_my_clan: function () { return { data: clone(db.clan || null), error: null }; },
+        set_clan_settings: function (a) {
+            if (!db.clan) return { data: null, error: { message: 'set_clan_settings: not allowed' } };
+            if (a.p_motd !== null && a.p_motd !== undefined) db.clan.clan.motd = a.p_motd;
+            if (a.p_join_mode) db.clan.clan.join_mode = a.p_join_mode;
+            if (a.p_crest) db.clan.clan.crest = clone(a.p_crest);
+            return { data: null, error: null };
+        },
+        leave_clan: function () { db.clan = null; return { data: null, error: null }; },
+        send_clan_message: function (a) { table('clan_messages').push({ sender: table('players')[0].display_name, sender_id: userId, body: a.p_body, created_at: new Date().toISOString() }); return { data: null, error: null }; },
+        get_notifications: function () {
+            var list = table('social_list');
+            return { data: { friend_requests: list.filter(function (r) { return r.status === 'pending' && r.incoming; }).length, unread_messages: list.reduce(function (n, r) { return n + (r.unread || 0); }, 0),
+                party_invites: clone(table('party_invites')), clan_invites: clone(table('clan_invites')), clan_applications: 0, sold: [],
+                clan_tag: db.clan ? db.clan.clan.tag : null, clan_crest: db.clan ? clone(db.clan.clan.crest) : null }, error: null };
+        },
         // characters (schema.sql section 30) - same shapes, no rules beyond
         // what the client relies on
         create_character: function (a) {
@@ -189,6 +239,73 @@
             if (!it || it.equipped_slot) return { data: null, error: { message: 'move_item: item not found (or it is worn)' } };
             it.character_id = a.p_to === 'stash' ? null : table('players')[0].active_character_id;
             return { data: clone(it), error: null };
+        },
+        // dungeon runs (schema.sql section 32)
+        start_run: function () { var r = { id: 'run-' + (nextRowId++), floor: 0, pending_xp: 0 }; table('dungeon_runs').push(r); return { data: { run_id: r.id, abandoned: null }, error: null }; },
+        record_floor: function (a) {
+            var r = table('dungeon_runs').find(function (x) { return x.id === a.p_run; });
+            if (!r || a.p_floor !== r.floor + 1) return { data: null, error: { message: 'record_floor: floors must come in order' } };
+            var gain = Math.min(30 + a.p_floor * 9 + Math.min(a.p_kills, 10) * 3, 600);
+            r.floor = a.p_floor; r.pending_xp += gain;
+            return { data: [{ floor: r.floor, pending_xp: r.pending_xp, gain: gain }], error: null };
+        },
+        end_run: function (a) {
+            var r = table('dungeon_runs').find(function (x) { return x.id === a.p_run; });
+            if (!r || r.ended) return { data: null, error: { message: 'end_run: no such open run' } };
+            r.ended = true;
+            var paid = a.p_outcome === 'exit' ? r.pending_xp : Math.floor(r.pending_xp / 2);
+            var p = table('players')[0], c = table('characters').find(function (x) { return x.id === p.active_character_id; });
+            var total = function (L) { var s = 0; for (var i = 1; i < L; i++) s += Math.round(80 * Math.pow(i, 1.6)); return s; };
+            if (c) { c.xp += paid; while (c.level < 50 && c.xp >= total(c.level + 1)) c.level++; }
+            var out = { outcome: a.p_outcome, floor: r.floor, banked_xp: r.pending_xp, xp_granted: paid, level: c ? c.level : 1, xp: c ? c.xp : 0, mastery: 0, leveled_up: false, lost_gold: 0, lost_item: null };
+            if (a.p_outcome !== 'exit') {
+                var w = table('wallets')[0]; if (w) { out.lost_gold = Math.floor(w.gold * 0.1); w.gold -= out.lost_gold; }
+                var worn = table('player_items').filter(function (x) { return x.equipped_slot; });
+                if (worn.length) { out.lost_item = clone(worn[0]); db.player_items = table('player_items').filter(function (x) { return x !== worn[0]; }); }
+            }
+            return { data: out, error: null };
+        },
+        update_character_look: function (a) {
+            var c = table('characters').find(function (x) { return x.id === a.p_id; });
+            if (!c) return { data: null, error: { message: 'update_character_look: character not found' } };
+            c.gender = a.p_gender === 'f' ? 'f' : 'm'; c.appearance = clone(a.p_appearance || {});
+            return { data: clone(c), error: null };
+        },
+        // auction hall (schema.sql section 33)
+        list_item: function (a) {
+            var it = table('player_items').find(function (r) { return r.id === a.p_item_id; });
+            if (!it || it.equipped_slot || it.locked || it.listed) return { data: null, error: { message: 'list_item: item not found or not yours' } };
+            if (!(a.p_price >= 1 && a.p_price <= 1000000)) return { data: null, error: { message: 'list_item: price out of bounds' } };
+            it.listed = true; it.character_id = null;
+            var c = table('characters').find(function (x) { return x.id === table('players')[0].active_character_id; });
+            var l = { id: 'lst-' + (nextRowId++), item_id: it.id, seller_player: userId, seller_character: c ? c.id : null, seller_name: c ? c.name : '', base_id: it.base_id, slot: it.slot, rarity: it.rarity,
+                rolled_stats: clone(it.rolled_stats), set_key: it.set_key || null, item_level: it.item_level || 1, req_level: it.req_level || 1, price: a.p_price, status: 'active' };
+            table('auction_listings').push(l);
+            return { data: clone(l), error: null };
+        },
+        get_auction_listings: function (a) {
+            var rows = table('auction_listings').filter(function (l) { return l.status === 'active' && (!a.p_slot || l.slot === a.p_slot) && (!a.p_rarity || l.rarity === a.p_rarity); });
+            rows.sort(function (x, y) { return a.p_sort === 'price_desc' ? y.price - x.price : x.price - y.price; });
+            return { data: clone(rows), error: null };
+        },
+        get_my_listings: function () { return { data: clone(table('auction_listings').filter(function (l) { return l.seller_player === userId; })), error: null }; },
+        buy_listing: function (a) {
+            var l = table('auction_listings').find(function (x) { return x.id === a.p_listing_id; });
+            if (!l || l.status !== 'active') return { data: null, error: { message: 'buy_listing: no longer for sale' } };
+            if (l.seller_player === userId) return { data: null, error: { message: 'buy_listing: that is your own listing' } };
+            var w = table('wallets')[0];
+            if (!w || w.gold < l.price) return { data: null, error: { message: 'buy_listing: insufficient gold' } };
+            w.gold -= l.price; l.status = 'sold'; l.buyer_player = userId;
+            table('player_items').push({ id: l.item_id || ('row-' + (nextRowId++)), player_id: userId, character_id: null, base_id: l.base_id, slot: l.slot, rarity: l.rarity, rolled_stats: clone(l.rolled_stats), set_key: l.set_key, item_level: l.item_level, req_level: l.req_level, equipped_slot: null, listed: false, locked: false });
+            return { data: clone(l), error: null };
+        },
+        cancel_listing: function (a) {
+            var l = table('auction_listings').find(function (x) { return x.id === a.p_listing_id && x.seller_player === userId && x.status === 'active'; });
+            if (!l) return { data: null, error: { message: 'cancel_listing: not your active listing' } };
+            l.status = 'cancelled';
+            var it = table('player_items').find(function (r) { return r.id === l.item_id; });
+            if (it) { it.listed = false; it.character_id = null; }
+            return { data: clone(l), error: null };
         },
         lose_item_on_death: function () {
             var charId = table('players')[0].active_character_id;

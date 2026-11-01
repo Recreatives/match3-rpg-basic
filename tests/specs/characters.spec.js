@@ -14,7 +14,9 @@ describe('Characters', { world: false }, function () {
             list.children[0].click();
             await w.settle(1000);
             expect(w.g('selectedClass && selectedClass.name')).toBe('Warrior');
-            expect(w.$('mode-selection').style.display).toBe('flex');
+            // the hero goes to town (town.js)
+            expect(w.$('town-screen').style.display).toBe('flex');
+            expect(w.$('mode-selection').style.display).not.toBe('flex');
             expect(w.$('player-class-label').textContent).toContain('TESTER · Sv. 1');
         } finally { w.destroy(); }
     });
@@ -85,6 +87,17 @@ describe('Characters', { world: false }, function () {
 
 });
 
+describe('Characters: server down', { world: false }, function () {
+    it('an unreachable server says so with a retry, instead of an empty hero list', async function () {
+        var w = await createWorld({ pixi: false, serverDown: true });
+        try {
+            expect(w.$('overlay-title').textContent).toBe('SUNUCUYA BAĞLANILAMIYOR');
+            expect(w.$('server-retry-btn')).toBeTruthy();
+            expect(w.$('char-list')).toBe(null);
+        } finally { w.destroy(); }
+    });
+});
+
 describe('Characters: level curve', function () {
     it('the level curve matches schema.sql (level 2 at 80 xp)', function (ctx) {
         var w = ctx.world;
@@ -94,15 +107,78 @@ describe('Characters: level curve', function () {
     });
 });
 
-describe('Characters: death penalty', function () {
-    it('dying in a solo run costs one worn item, through the server function', async function (ctx) {
+describe('Characters: death penalty and banked experience', function () {
+    it('dying in a solo run ends it through end_run: half the experience, 10% gold, one worn item', async function (ctx) {
         var w = ctx.world;
         await startSolo(w, 'WARRIOR');
+        await awaitInWorld(w, w.g('runStart()'));
         w.g("currentOwnedItems = [{ id: 'd1', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: 'weapon', character_id: 'char-1' }, { id: 'd2', base_id: 'blade', slot: 'weapon', rarity: 'white', rolled_stats: { sword: 3 }, equipped_slot: null, character_id: 'char-1' }]; __stub.db.player_items = JSON.parse(JSON.stringify(currentOwnedItems));");
+        await awaitInWorld(w, w.g('runRecordFloor(1, 1)'));
+        expect(w.g('dungeonRun.pending')).toBe(42);
+        expect(w.g('activeCharacter.xp')).toBe(0); // banked, not paid yet
         w.g('gameOver()');
         await w.settle(1000);
-        expect(w.stub.calls.some(function (c) { return c.fn === 'lose_item_on_death' && c.args.p_mode === 'solo'; })).toBe(true);
+        var end = w.stub.calls.filter(function (c) { return c.fn === 'end_run'; })[0];
+        expect(end && end.args.p_outcome).toBe('death');
+        expect(w.g('activeCharacter.xp')).toBe(21);
         expect(w.g("currentOwnedItems.map(function (i) { return i.id; })")).toEqual(['d2']);
+    });
+
+    it('leaving after a boss pays the whole banked run', async function (ctx) {
+        var w = ctx.world;
+        w.g('activeCharacter.xp = 0; activeCharacter.level = 1; __stub.table("characters")[0].xp = 0; __stub.table("characters")[0].level = 1;');
+        await startSolo(w, 'WARRIOR');
+        await awaitInWorld(w, w.g('runStart()'));
+        for (var f = 1; f <= 5; f++) await awaitInWorld(w, w.g('runRecordFloor(' + f + ', 1)'));
+        var banked = w.g('dungeonRun.pending');
+        await awaitInWorld(w, w.g("runEnd('exit')"));
+        expect(w.g('activeCharacter.xp')).toBe(banked);
+        expect(w.g('dungeonRun')).toBe(null);
+    });
+});
+
+describe('Characters: looks', { world: false }, function () {
+    it('the creator offers build, face, nose, brows, eye color and marks, and saves them', async function () {
+        var w = await createWorld({ pixi: false, noCharacter: true });
+        try {
+            var rows = w.$('character-creator').querySelectorAll('.char-row-label');
+            var labels = Array.prototype.map.call(rows, function (r) { return r.textContent; });
+            ['Yapı', 'Yüz', 'Burun', 'Kaş', 'Göz rengi', 'İz / Boya'].forEach(function (l) { expect(labels).toContain(l.toLocaleUpperCase('tr') === l ? l : l); });
+            w.g("charDraft.build = 'broad'; charDraft.face = 'angular'; charDraft.marks = 'scar'; charDraft.eyes = 3; renderCharacterCreator()");
+            w.$('char-name-input').value = 'Varg'; w.$('char-name-input').oninput();
+            w.$('char-create-btn').click();
+            await w.settle(1500);
+            var call = w.stub.calls.filter(function (c) { return c.fn === 'create_character'; })[0];
+            expect(call.args.p_appearance.build + '/' + call.args.p_appearance.face + '/' + call.args.p_appearance.marks + '/' + call.args.p_appearance.eyes).toBe('broad/angular/scar/3');
+            // and they reach the painted hero
+            expect(w.g("myAvatarSpec().build + '/' + myAvatarSpec().face")).toBe('broad/angular');
+        } finally { w.destroy(); }
+    });
+
+    it('an existing hero can change its look (not its class or name)', async function () {
+        var w = await createWorld({ pixi: false });
+        try {
+            w.$('char-list').querySelector('.char-edit').click();
+            expect(w.$('character-modal').style.display).toBe('flex');
+            expect(w.$('char-name-input')).toBe(null);
+            w.g("charDraft.face = 'square'; charDraft.nose = 'hooked'");
+            w.$('char-create-btn').click();
+            await w.settle(1000);
+            var call = w.stub.calls.filter(function (c) { return c.fn === 'update_character_look'; })[0];
+            expect(call && call.args.p_appearance.face + '/' + call.args.p_appearance.nose).toBe('square/hooked');
+            expect(w.stub.calls.some(function (c) { return c.fn === 'create_character'; })).toBe(false);
+        } finally { w.destroy(); }
+    });
+});
+
+describe('Characters: features', function () {
+    it("another player's look keeps only known values; monsters differ floor to floor", function (ctx) {
+        var w = ctx.world;
+        var r = w.g("heroRemoteSpec({ cls: 'rogue', gear: {}, build: 'giant', face: 'square', marks: '<img>', eyes: 99 })");
+        expect(r.build + '/' + r.face + '/' + r.marks + '/' + r.eyes).toBe('average/square/none/4');
+        var looks = w.g("[1,2,3,4,5,6].map(function (L) { var s = avMonsterSpec('normal', L); return [s.build, s.face, s.nose, s.marks, s.skinTone[0]].join(','); })");
+        var distinct = looks.filter(function (x, i) { return looks.indexOf(x) === i; }).length;
+        expect(distinct).toBeGreaterThan(3);
     });
 });
 

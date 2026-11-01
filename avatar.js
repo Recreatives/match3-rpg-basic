@@ -117,8 +117,13 @@ const AV_IDLE = {
     necromancer: { bob: 1.2, hz: 0.24, sway: 0.04, torso: 0.045, head: 0.05 },
 };
 
-function avGeom(bodyKey, cls) {
+// Body builds on top of the class's body: lean / average / broad (shoulders,
+// waist, hips and limb thickness - the height and the rig stay the same).
+const AV_BUILDS = { lean: { sw: 0.86, ww: 0.8, hipw: 0.9, k: 0.9 }, average: { sw: 1, ww: 1, hipw: 1, k: 1 }, broad: { sw: 1.16, ww: 1.22, hipw: 1.1, k: 1.12 } };
+function avGeom(bodyKey, cls, build) {
     const P = Object.assign({}, AV_BASE, AV_BODIES[bodyKey] || {});
+    const B = AV_BUILDS[build] || AV_BUILDS.average;
+    ['sw', 'ww', 'hipw', 'k'].forEach(key => { P[key] *= B[key]; });
     const st = AV_STANCES[cls] || AV_STANCES.warrior;
     P.stance = st;
     const k = P.k;
@@ -270,15 +275,27 @@ function avAcross(A, t, w) { // a line across the limb at t
 }
 
 // --- head: a 3/4 face turned toward the enemy -------------------------------------
+// Face shapes (look.face: oval / square / angular) and noses (look.nose:
+// straight / hooked / broad) change the profile; the female defaults are a
+// little finer.
+const AV_FACES = ['oval', 'square', 'angular'];
+const AV_NOSES = ['straight', 'hooked', 'broad'];
 function avHeadPath(P, grow) {
     const g = grow || 0, hx = P.headX, hy = P.hy, r = P.hr + g, f = P.female;
-    return `M${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Q${avN(hx - r * 1.0)} ${avN(hy - r * 1.05)} ${avN(hx + r * 0.05)} ${avN(hy - r * 1.1)} ` +
-        `Q${avN(hx + r * 0.95)} ${avN(hy - r * 1.02)} ${avN(hx + r * 0.95)} ${avN(hy - r * 0.2)} ` +              // forehead
-        `L${avN(hx + r * (f ? 1.02 : 1.08))} ${avN(hy + r * 0.34)} L${avN(hx + r * 0.9)} ${avN(hy + r * 0.44)} ` +   // nose
-        `Q${avN(hx + r * 0.95)} ${avN(hy + r * 0.62)} ${avN(hx + r * 0.84)} ${avN(hy + r * 0.72)} ` +              // lips
-        `Q${avN(hx + r * (f ? 0.82 : 0.9))} ${avN(hy + r * 0.98)} ${avN(hx + r * (f ? 0.58 : 0.66))} ${avN(hy + r * (f ? 1.0 : 1.04))} ` + // chin
-        `Q${avN(hx + r * 0.05)} ${avN(hy + r * (f ? 0.95 : 1.02))} ${avN(hx - r * 0.38)} ${avN(hy + r * 0.62)} ` +  // jaw
-        `Q${avN(hx - r * 0.7)} ${avN(hy + r * 0.55)} ${avN(hx - r * 0.95)} ${avN(hy - r * 0.1)} Z`;
+    const X = v => avN(hx + r * v), Y = v => avN(hy + r * v);
+    const nose = P.nose === 'hooked' ? `L${X(f ? 1.04 : 1.1)} ${Y(0.12)} L${X(f ? 1.08 : 1.16)} ${Y(0.36)} L${X(0.9)} ${Y(0.46)} `
+        : P.nose === 'broad' ? `L${X(f ? 1.0 : 1.05)} ${Y(0.34)} Q${X(f ? 1.06 : 1.12)} ${Y(0.47)} ${X(0.88)} ${Y(0.5)} `
+        : `L${X(f ? 1.02 : 1.08)} ${Y(0.34)} L${X(0.9)} ${Y(0.44)} `;
+    const fc = P.face === 'square' ? { cx: f ? 0.88 : 0.95, cy: 1.0, chx: f ? 0.64 : 0.74, chy: f ? 1.02 : 1.08, jx: 0.12, jy: f ? 1.0 : 1.08, ex: -0.42, ey: 0.7 }
+        : P.face === 'angular' ? { cx: f ? 0.84 : 0.9, cy: 1.02, chx: f ? 0.56 : 0.64, chy: f ? 1.06 : 1.14, jx: 0.15, jy: 0.92, ex: -0.34, ey: 0.56 }
+        : { cx: f ? 0.82 : 0.9, cy: 0.98, chx: f ? 0.58 : 0.66, chy: f ? 1.0 : 1.04, jx: 0.05, jy: f ? 0.95 : 1.02, ex: -0.38, ey: 0.62 };
+    return `M${X(-0.95)} ${Y(-0.1)} Q${X(-1.0)} ${Y(-1.05)} ${X(0.05)} ${Y(-1.1)} ` +
+        `Q${X(0.95)} ${Y(-1.02)} ${X(0.95)} ${Y(-0.2)} ` +              // forehead
+        nose +
+        `Q${X(0.95)} ${Y(0.62)} ${X(0.84)} ${Y(0.72)} ` +              // lips
+        `Q${X(fc.cx)} ${Y(fc.cy)} ${X(fc.chx)} ${Y(fc.chy)} ` +      // chin
+        `Q${X(fc.jx)} ${Y(fc.jy)} ${X(fc.ex)} ${Y(fc.ey)} ` +         // jaw
+        `Q${X(-0.7)} ${Y(0.55)} ${X(-0.95)} ${Y(-0.1)} Z`;
 }
 function avFace(S, look) {
     const P = S.P, hx = P.headX, hy = P.hy, r = P.hr, f = P.female;
@@ -288,22 +305,42 @@ function avFace(S, look) {
     // ear on the back half of the head
     s += S.path(`M${avN(hx - r * 0.34)} ${avN(hy - r * 0.02)} Q${avN(hx - r * 0.62)} ${avN(hy - r * 0.12)} ${avN(hx - r * 0.6)} ${avN(hy + r * 0.24)} Q${avN(hx - r * 0.55)} ${avN(hy + r * 0.48)} ${avN(hx - r * 0.3)} ${avN(hy + r * 0.44)}`, S.skin(skin), P.ol * 0.6);
     // eyes: the near one full, the far one narrow by the nose; stern brows
-    const ey = hy + r * 0.08, iris = look.eyeColor || '#3a2a1c';
+    const ey = hy + r * 0.08, iris = AV_EYE_COLORS[look.eyes | 0] || look.eyeColor || '#3a2a1c';
+    const thick = look.brows === 'thick' ? 1.7 : 1, arched = look.brows === 'arched';
     const brow = AV_HAIR_COLORS[look.hairColor || 0] === '#e6e2da' ? '#8a8578' : AV_INK;
     [[0.34, 0.2, 1], [0.8, 0.11, 0.7]].forEach(([o, w0, sc]) => {
         const x = hx + r * o, w = r * w0;
         s += S.path(`M${avN(x - w)} ${avN(ey)} Q${avN(x)} ${avN(ey - r * 0.12 * sc)} ${avN(x + w)} ${avN(ey + r * 0.01)} Q${avN(x)} ${avN(ey + r * 0.09 * sc)} ${avN(x - w)} ${avN(ey)} Z`, '#f4efe6', P.ol * 0.42);
         s += S.circle(x + w * 0.35, ey, r * 0.07 * (sc > 0.8 ? 1 : 0.85), iris, 0);
         if (f) s += S.line(`M${avN(x + w)} ${avN(ey)} l${avN(r * 0.07)} ${avN(-r * 0.07)}`, AV_INK, P.ol * 0.45);
-        s += S.line(f ? `M${avN(x - w)} ${avN(ey - r * 0.18)} Q${avN(x)} ${avN(ey - r * 0.27)} ${avN(x + w * 1.1)} ${avN(ey - r * 0.2)}`
-                      : `M${avN(x - w * 1.2)} ${avN(ey - r * 0.27)} L${avN(x + w * 1.1)} ${avN(ey - r * 0.18)}`, brow, f ? P.ol * 0.5 : P.ol * 0.9);
+        s += S.line(f || arched ? `M${avN(x - w)} ${avN(ey - r * 0.18)} Q${avN(x)} ${avN(ey - r * (arched ? 0.36 : 0.27))} ${avN(x + w * 1.1)} ${avN(ey - r * 0.2)}`
+                      : `M${avN(x - w * 1.2)} ${avN(ey - r * 0.27)} L${avN(x + w * 1.1)} ${avN(ey - r * 0.18)}`, brow, (f ? P.ol * 0.5 : P.ol * 0.9) * thick);
     });
+    s += avMarks(S, look, skin);
     s += avRaceFace(S, look, skin);
     // cheekbone, mouth
     s += S.line(`M${avN(hx + r * 0.2)} ${avN(hy + r * 0.42)} Q${avN(hx + r * 0.4)} ${avN(hy + r * 0.5)} ${avN(hx + r * 0.55)} ${avN(hy + r * 0.42)}`, avDark(skin[1], 0.2), P.ol * 0.35, 0.6);
     s += f ? S.path(`M${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.61)} ${avN(hx + r * 0.85)} ${avN(hy + r * 0.66)} Q${avN(hx + r * 0.72)} ${avN(hy + r * 0.76)} ${avN(hx + r * 0.58)} ${avN(hy + r * 0.66)} Z`, '#a85a52', P.ol * 0.3)
         : S.line(`M${avN(hx + r * 0.55)} ${avN(hy + r * 0.68)} Q${avN(hx + r * 0.7)} ${avN(hy + r * 0.66)} ${avN(hx + r * 0.84)} ${avN(hy + r * 0.7)}`, avDark(skin[1], 0.45), P.ol * 0.55);
     return s;
+}
+
+const AV_EYE_COLORS = ['#3a2a1c', '#2e5a2e', '#2a4a7a', '#5a5a62', '#8a5a1a'];
+const AV_BROWS = ['stern', 'thick', 'arched'];
+const AV_MARKS = ['none', 'scar', 'paint', 'tattoo', 'freckles'];
+// Scars, war paint, rune tattoos, freckles.
+function avMarks(S, look, skin) {
+    const m = look.marks;
+    if (!m || m === 'none') return '';
+    const P = S.P, hx = P.headX, hy = P.hy, r = P.hr;
+    if (m === 'scar') return S.line(`M${avN(hx + r * 0.22)} ${avN(hy - r * 0.42)} L${avN(hx + r * 0.62)} ${avN(hy + r * 0.5)}`, avLight(skin[0], 0.35), 1.6, 0.9)
+        + [0.2, 0.5, 0.78].map(t0 => { const x = hx + r * (0.22 + 0.4 * t0), y = hy + r * (-0.42 + 0.92 * t0); return S.line(`M${avN(x - r * 0.08)} ${avN(y + r * 0.03)} L${avN(x + r * 0.08)} ${avN(y - r * 0.03)}`, avDark(skin[1], 0.2), 0.8, 0.8); }).join('');
+    if (m === 'paint') { const c = look.paint || '#2a4a8a'; return [0, 1].map(i => S.path(`M${avN(hx + r * (0.2 + i * 0.32))} ${avN(hy + r * 0.2)} L${avN(hx + r * (0.42 + i * 0.32))} ${avN(hy + r * 0.2)} L${avN(hx + r * (0.36 + i * 0.3))} ${avN(hy + r * 0.62)} Z`, c, 0)).join('')
+        + S.path(`M${avN(hx - r * 0.1)} ${avN(hy - r * 0.55)} L${avN(hx + r * 0.95)} ${avN(hy - r * 0.48)} L${avN(hx + r * 0.95)} ${avN(hy - r * 0.38)} L${avN(hx - r * 0.1)} ${avN(hy - r * 0.42)} Z`, c, 0); }
+    if (m === 'tattoo') { const c = '#2a5a5a'; return S.line(`M${avN(hx - r * 0.2)} ${avN(hy + r * 0.1)} L${avN(hx - r * 0.05)} ${avN(hy + r * 0.45)} L${avN(hx + r * 0.15)} ${avN(hy + r * 0.25)} M${avN(hx - r * 0.12)} ${avN(hy - r * 0.15)} L${avN(hx + r * 0.1)} ${avN(hy - r * 0.05)}`, c, 1.4, 0.85)
+        + S.circle(hx - r * 0.02, hy + r * 0.62, r * 0.06, c, 0); }
+    if (m === 'freckles') { let s = ''; [[0.32, 0.3], [0.44, 0.36], [0.56, 0.32], [0.68, 0.38], [0.5, 0.26], [0.8, 0.3]].forEach(([dx, dy]) => { s += S.circle(hx + r * dx, hy + r * dy, r * 0.035, avDark(skin[1], 0.15), 0); }); return s; }
+    return '';
 }
 
 // Monster races (avMonsterSpec): what sets their faces apart - a long
@@ -349,6 +386,17 @@ const AV_MONSTER_THEMES = {
     abyss: { cloth: '#2a1a3a', metal: '#4a3a6a', trim: '#b05cff', glow: '#c07aff' },
 };
 function avMonsterSpec(type, level) {
+    const spec = avMonsterSpecBase(type, level);
+    // no two floors' monsters quite alike: build, face, scars / paint and a
+    // shade of the race's skin vary with the floor (deterministic)
+    const L = Math.max(1, level | 0), v = (L * 37 + type.length * 11 + 7) % 997;
+    const builds = type === 'swift' ? ['lean', 'lean', 'average'] : type === 'boss' ? ['broad', 'broad', 'average'] : ['lean', 'average', 'broad'];
+    Object.assign(spec, { build: builds[v % 3], face: AV_FACES[(v >> 2) % 3], nose: AV_NOSES[(v >> 3) % 3], brows: AV_BROWS[(v >> 4) % 3],
+        marks: ['none', 'scar', 'paint', 'tattoo', 'scar'][(v >> 5) % 5], paint: ['#8e1b1b', '#1a1a1a', '#2a4a8a'][(v >> 6) % 3] });
+    if (spec.skinTone) { const k = ((v >> 7) % 3 - 1) * 0.12; spec.skinTone = [k >= 0 ? avLight(spec.skinTone[0], k) : avDark(spec.skinTone[0], -k), k >= 0 ? avLight(spec.skinTone[1], k) : avDark(spec.skinTone[1], -k)]; }
+    return spec;
+}
+function avMonsterSpecBase(type, level) {
     const L = Math.max(1, level | 0);
     const themes = ['crypt', 'moss', 'ember', 'abyss'];
     const T = AV_MONSTER_THEMES[themes[Math.floor((L - 1) / 5) % themes.length]];
@@ -439,6 +487,17 @@ function avGem(S, x, y, r, item) {
 }
 const avLeather = (S, c) => S.lin(avLight(c, 0.15), avDark(c, 0.55));
 
+// A shaggy fur shape (collars, pelts, boot cuffs): an ellipse whose rim
+// alternates between full and tucked-in points, so it reads as tufts.
+function avFur(S, cx, cy, rx, ry, color, n) {
+    n = n || 14;
+    const pts = [];
+    for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2, k = i % 2 ? 0.8 : 1.06; pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]); }
+    let d = `M${avN(pts[0][0])} ${avN(pts[0][1])}`;
+    for (let i = 1; i <= pts.length; i++) { const p = pts[i % pts.length], q = pts[(i - 1) % pts.length]; d += ` Q${avN((p[0] + q[0]) / 2 + (p[1] - q[1]) * 0.18)} ${avN((p[1] + q[1]) / 2 - (p[0] - q[0]) * 0.18)} ${avN(p[0])} ${avN(p[1])}`; }
+    return S.path(d + ' Z', S.lin(avLight(color, 0.25), avDark(color, 0.45)), S.P.ol * 0.7);
+}
+
 const AV_PAINT = {
     helmet(S, it) {
         const P = S.P, hx = P.headX, hy = P.hy, r = P.hr, k = P.k, out = {};
@@ -488,6 +547,50 @@ const AV_PAINT = {
             let s = S.path(`M${avN(hx - r * 0.98)} ${avN(hy - r * 0.35)} Q${avN(hx + r * 0.1)} ${avN(hy - r * 0.8)} ${avN(hx + r * 0.98)} ${avN(hy - r * 0.45)} L${avN(hx + r * 0.98)} ${avN(hy - r * 0.3)} Q${avN(hx + r * 0.1)} ${avN(hy - r * 0.63)} ${avN(hx - r * 0.98)} ${avN(hy - r * 0.2)} Z`, S.metal(it.color || '#d4a84a'), P.ol * 0.6);
             s += avGem(S, hx + r * 0.55, hy - r * 0.58, r * 0.12, Object.assign({}, it, { tier: 3 }));
             out.head = s;
+        } else if (it.style === 'kettle') {
+            // a wide-brimmed kettle hat: face open, the brim casting a shadow
+            const m = S.metal(it.color);
+            let s = S.path(`M${avN(hx - r * 1.0)} ${avN(hy - r * 0.3)} Q${avN(hx - r * 1.02)} ${avN(hy - r * 1.42)} ${avN(hx + r * 0.05)} ${avN(hy - r * 1.42)} Q${avN(hx + r * 1.06)} ${avN(hy - r * 1.38)} ${avN(hx + r * 1.0)} ${avN(hy - r * 0.38)} Z`, m);
+            s += S.flat(`M${avN(hx - r * 1.0)} ${avN(hy - r * 0.3)} Q${avN(hx - r * 1.02)} ${avN(hy - r * 1.42)} ${avN(hx - r * 0.1)} ${avN(hy - r * 1.42)} Q${avN(hx - r * 0.35)} ${avN(hy - r * 0.9)} ${avN(hx - r * 0.3)} ${avN(hy - r * 0.32)} Z`, '#000', 0.22);
+            s += S.flat(`M${avN(hx - r * 0.2)} ${avN(hy - r * 0.32)} Q${avN(hx + r * 0.5)} ${avN(hy - r * 0.42)} ${avN(hx + r * 1.0)} ${avN(hy - r * 0.38)} L${avN(hx + r * 0.95)} ${avN(hy - r * 0.05)} Q${avN(hx + r * 0.4)} ${avN(hy - r * 0.15)} ${avN(hx - r * 0.2)} ${avN(hy - r * 0.05)} Z`, '#000', 0.3);
+            s += S.path(`M${avN(hx - r * 1.55)} ${avN(hy - r * 0.26)} Q${avN(hx)} ${avN(hy - r * 0.66)} ${avN(hx + r * 1.62)} ${avN(hy - r * 0.38)} L${avN(hx + r * 1.52)} ${avN(hy - r * 0.16)} Q${avN(hx)} ${avN(hy - r * 0.42)} ${avN(hx - r * 1.45)} ${avN(hy - r * 0.06)} Z`, S.metal(avDark(it.color, 0.15)), P.ol * 0.8);
+            s += S.line(`M${avN(hx + r * 0.05)} ${avN(hy - r * 1.42)} Q${avN(hx + r * 0.2)} ${avN(hy - r * 0.9)} ${avN(hx + r * 0.1)} ${avN(hy - r * 0.48)}`, AV_INK, P.ol * 0.5, 0.5);
+            s += avTrimLine(S, `M${avN(hx - r * 1.5)} ${avN(hy - r * 0.16)} Q${avN(hx)} ${avN(hy - r * 0.54)} ${avN(hx + r * 1.56)} ${avN(hy - r * 0.27)}`, it, 1.3 * k);
+            s += avGem(S, hx + r * 0.1, hy - r * 1.0, r * 0.12, it);
+            out.head = s; out.hidesHair = true;
+        } else if (it.style === 'winged') {
+            // a nasal helm with a swept wing at the back
+            const base = AV_PAINT.helmet(S, Object.assign({}, it, { style: 'nasal' })).head;
+            const wc = it.plume || '#e8e4d8';
+            let wing = '';
+            for (let i = 0; i < 4; i++) {
+                const a = -0.35 - i * 0.28, L = r * (1.9 - i * 0.22), x0 = hx - r * 0.55, y0 = hy - r * 0.7;
+                const x1 = x0 + Math.cos(a + Math.PI) * L, y1 = y0 + Math.sin(a + Math.PI) * L * 0.9;
+                wing += S.path(`M${avN(x0)} ${avN(y0)} Q${avN((x0 + x1) / 2 - r * 0.1)} ${avN((y0 + y1) / 2 - r * 0.45)} ${avN(x1)} ${avN(y1)} Q${avN((x0 + x1) / 2 + r * 0.15)} ${avN((y0 + y1) / 2 - r * 0.05)} ${avN(x0 + r * 0.2)} ${avN(y0 + r * 0.2)} Z`, S.lin(avLight(wc, 0.3), avDark(wc, 0.35), true), P.ol * 0.6);
+            }
+            out.head = wing + base; out.hidesHair = true;
+        } else if (it.style === 'bonemask') {
+            // a bone mask strapped over the face; eyes burn through it
+            const bone = S.lin('#f2ead6', '#9a8c6c', true);
+            let s = S.line(`M${avN(hx - r * 0.95)} ${avN(hy - r * 0.15)} Q${avN(hx - r * 0.2)} ${avN(hy - r * 0.45)} ${avN(hx + r * 0.35)} ${avN(hy - r * 0.25)}`, '#3a2616', 2.2 * k);
+            s += S.path(`M${avN(hx + r * 0.1)} ${avN(hy - r * 0.95)} Q${avN(hx + r * 1.18)} ${avN(hy - r * 1.0)} ${avN(hx + r * 1.12)} ${avN(hy + r * 0.1)} L${avN(hx + r * 0.98)} ${avN(hy + r * 0.78)} Q${avN(hx + r * 0.55)} ${avN(hy + r * 1.08)} ${avN(hx + r * 0.12)} ${avN(hy + r * 0.82)} Q${avN(hx - r * 0.05)} ${avN(hy - r * 0.1)} ${avN(hx + r * 0.1)} ${avN(hy - r * 0.95)} Z`, bone);
+            const ec = it.glow || '#ff5a2a';
+            [[0.42, 1], [0.86, 0.72]].forEach(([o, sc]) => { s += S.ell(hx + r * o, hy + r * 0.04, r * 0.15 * sc, r * 0.11, '#120a08', 0) + S.glow(hx + r * o, hy + r * 0.04, r * 0.22 * sc, ec, 0.7); });
+            s += S.path(`M${avN(hx + r * 0.62)} ${avN(hy + r * 0.25)} L${avN(hx + r * 0.72)} ${avN(hy + r * 0.48)} L${avN(hx + r * 0.56)} ${avN(hy + r * 0.48)} Z`, '#120a08', 0);
+            for (let i = 0; i < 4; i++) s += S.line(`M${avN(hx + r * (0.35 + i * 0.15))} ${avN(hy + r * 0.66)} L${avN(hx + r * (0.37 + i * 0.15))} ${avN(hy + r * 0.86)}`, '#5a4a32', 0.9, 0.8);
+            s += S.line(`M${avN(hx + r * 0.2)} ${avN(hy - r * 0.6)} Q${avN(hx + r * 0.6)} ${avN(hy - r * 0.75)} ${avN(hx + r * 1.05)} ${avN(hy - r * 0.55)}`, '#6a5a3a', 0.9, 0.7);
+            s += avGem(S, hx + r * 0.62, hy - r * 0.62, r * 0.1, it);
+            out.head = s; out.hideBeard = true;
+        } else if (it.style === 'pelt') {
+            // a wolf pelt worn as a hood: ears up, the snout over the brow
+            const c = it.color;
+            let s = S.path(`M${avN(hx - r * 1.35)} ${avN(hy + r * 1.3)} Q${avN(hx - r * 1.55)} ${avN(hy - r * 0.6)} ${avN(hx - r * 0.45)} ${avN(hy - r * 1.35)} Q${avN(hx + r * 0.55)} ${avN(hy - r * 1.62)} ${avN(hx + r * 1.2)} ${avN(hy - r * 0.95)} L${avN(hx + r * 1.62)} ${avN(hy - r * 0.62)} Q${avN(hx + r * 1.2)} ${avN(hy - r * 0.36)} ${avN(hx + r * 0.9)} ${avN(hy - r * 0.5)} Q${avN(hx + r * 0.15)} ${avN(hy - r * 0.78)} ${avN(hx - r * 0.55)} ${avN(hy - r * 0.2)} L${avN(hx - r * 0.7)} ${avN(hy + r * 1.3)} Z`, S.lin(avLight(c, 0.2), avDark(c, 0.45)));
+            for (let i = 0; i < 6; i++) s += S.line(`M${avN(hx - r * (1.3 - i * 0.02))} ${avN(hy + r * (1.1 - i * 0.38))} l${avN(r * 0.18)} ${avN(-r * 0.1)}`, avDark(c, 0.55), 0.9, 0.7);
+            s += S.path(`M${avN(hx - r * 0.45)} ${avN(hy - r * 1.3)} L${avN(hx - r * 0.25)} ${avN(hy - r * 1.95)} L${avN(hx + r * 0.05)} ${avN(hy - r * 1.38)} Z`, S.lin(avLight(c, 0.1), avDark(c, 0.4)), P.ol * 0.7);
+            s += S.path(`M${avN(hx + r * 1.42)} ${avN(hy - r * 0.62)} L${avN(hx + r * 1.66)} ${avN(hy - r * 0.6)} L${avN(hx + r * 1.5)} ${avN(hy - r * 0.48)} Z`, '#1a1210', 0);
+            for (let i = 0; i < 3; i++) s += S.path(`M${avN(hx + r * (0.95 + i * 0.18))} ${avN(hy - r * 0.48)} l${avN(r * 0.05)} ${avN(r * 0.16)} l${avN(r * 0.05)} ${avN(-r * 0.16)} Z`, '#f2ead6', 0.5);
+            s += S.circle(hx + r * 0.95, hy - r * 0.95, r * 0.07, it.glow || '#ffd24a', 0);
+            out.head = s; out.hidesHair = true;
         }
         return out;
     },
@@ -498,8 +601,9 @@ const AV_PAINT = {
         if (it.style === 'plate' || it.style === 'mail') {
             const body = it.style === 'mail' ? S.lin(avLight(it.color, 0.3), avDark(it.color, 0.4)) : S.metal(it.color);
             // cloth tabard hanging from the belt, behind the plate skirt
-            const tab = it.tabard || '#8e1b1b', tx = fx - 3;
+            const cr = P.crest, tab = cr ? cr.c1 : (it.tabard || '#8e1b1b'), tx = fx - 3;
             let s = S.path(`M${avN(tx - ww * 0.75)} ${wy + 4} L${avN(tx + ww * 0.75)} ${wy + 4} L${avN(tx + ww * 0.62 + 4 * k)} ${avN(hy + 48 * k)} L${avN(tx + 3 * k)} ${avN(hy + 55 * k)} L${avN(tx - ww * 0.62)} ${avN(hy + 46 * k)} Z`, S.cloth(tab));
+            if (cr) s += avCrestCharge(cr.sym, tx + 1.5 * k, hy + 30 * k, 8 * k, cr.c2, tab);
             s += avTrimLine(S, `M${avN(tx - ww * 0.62)} ${avN(hy + 44 * k)} L${avN(tx + 3 * k)} ${avN(hy + 52 * k)} L${avN(tx + ww * 0.62 + 4 * k)} ${avN(hy + 46 * k)}`, it, 1.6 * k);
             s += S.path(avTorsoPath(P, 1.2), body) + avTorsoShade(S, P, 1.2);
             if (it.style === 'mail') for (let y = sy + 6; y < wy; y += 5 * k) s += S.line(`M${avN(100 - P.sw * 0.55 + P.lean)} ${avN(y)} Q${avN(fx)} ${avN(y + 3)} ${avN(100 + P.sw * 0.85)} ${avN(y - 1)}`, avDark(it.color, 0.5), 0.8, 0.5);
@@ -548,6 +652,34 @@ const AV_PAINT = {
             out.back = S.path(`M${avN(P.shL[0] - 2)} ${sy - 6} Q${avN(100 - P.sw * 1.5)} ${avN((sy + fy) / 2)} ${avN(100 - P.sw * 1.5)} ${fy - 3} L${avN(100 + P.sw * 0.6)} ${fy - 5} Q${avN(100 + P.sw * 0.5)} ${avN((sy + fy) / 2)} ${avN(P.shR[0] - 6)} ${sy - 6} Z`, S.cloth(avDark(it.color, 0.25)));
             out.coversLegs = true;
             out.legCloth = avDark(it.color, 0.35);
+        } else if (it.style === 'brigandine') {
+            // cloth-covered plates: rows of rivets, a padded skirt
+            const body = S.lin(avLight(it.color, 0.15), avDark(it.color, 0.5));
+            let s = S.path(`M${avN(100 - ww * 0.95)} ${wy + 3} L${avN(100 + ww * 0.98)} ${wy + 3} L${avN(100 + ww + 3)} ${avN(hy + 26 * k)} L${avN(100 - ww - 4)} ${avN(hy + 26 * k)} Z`, body, P.ol * 0.8);
+            for (let x = 100 - ww * 0.6; x < 100 + ww; x += 7 * k) s += S.line(`M${avN(x)} ${wy + 5} L${avN(x + 1)} ${avN(hy + 24 * k)}`, avDark(it.color, 0.6), 0.8, 0.6);
+            s += S.path(avTorsoPath(P, 1.1), body) + avTorsoShade(S, P, 1.1);
+            const rv = S.metal(it.trim || '#c9a24a');
+            for (let y = sy + 4; y < wy - 1; y += 6.5 * k) for (let x = 100 - P.sw * 0.25 + P.lean; x < 100 + P.sw * 0.82 + P.lean; x += 7 * k) s += S.circle(x, y, 1.05 * k, rv, 0.4);
+            s += avTrimLine(S, `M${avN(100 - P.sw * 0.5 + P.lean)} ${avN(sy - 4)} Q${avN(100 + P.lean)} ${avN(sy - 12)} ${avN(100 + P.sw * 0.78 + P.lean)} ${avN(sy - 5)}`, it, 1.8 * k);
+            s += avGem(S, fx + 1, sy + 10 * k, 2.6 * k, it);
+            out.torso = s;
+            out.sleeveL = S.path(avLimbPath(avArm(P, 'L'), 7.6 * k, 6.6 * k, 5.6 * k, 0, 0.6), body);
+            out.sleeveR = S.path(avLimbPath(avArm(P, 'R'), 7.6 * k, 6.6 * k, 5.6 * k, 0, 0.6), body);
+            if (it.cape) out.back = avCape(S, it.cape, it);
+        } else if (it.style === 'fur') {
+            // a hide vest over bare arms, a thick fur collar
+            const body = avLeather(S, it.color);
+            let s = S.path(`M${avN(100 - ww * 0.9)} ${wy + 3} L${avN(100 + ww * 0.95)} ${wy + 3} L${avN(100 + ww + 2)} ${avN(hy + 22 * k)} L${avN(100 - ww - 3)} ${avN(hy + 24 * k)} Z`, body, P.ol * 0.8);
+            s += S.path(avTorsoPath(P, 0.7), body) + avTorsoShade(S, P, 0.7);
+            s += S.line(`M${avN(fx - 1)} ${avN(sy + 2)} L${avN(fx + 1)} ${avN(wy)}`, avDark(it.color, 0.5), 1.2, 0.8);
+            for (let i = 0; i < 3; i++) s += S.line(`M${avN(fx - 4)} ${avN(sy + 10 + i * 9)} L${avN(fx + 5)} ${avN(sy + 12 + i * 9)}`, '#c9b48a', 1, 0.8);
+            s += avFur(S, P.neckX + 1, sy - 3, P.sw * 0.95, 8 * k, it.fur || '#8a7a64', 12);
+            s += avFur(S, 100 + P.lean * 0.3, wy + 3, ww * 1.05, 4 * k, it.fur || '#8a7a64', 10);
+            s += avGem(S, fx + 2, sy + 4, 2.4 * k, it);
+            out.torso = s;
+            out.sleeveL = S.path(avLimbPath(avArm(P, 'L'), 7.6 * k, 6.6 * k, 5.6 * k, 0, 0.22), body);
+            out.sleeveR = S.path(avLimbPath(avArm(P, 'R'), 7.6 * k, 6.6 * k, 5.6 * k, 0, 0.22), body);
+            if (it.cape) out.back = avCape(S, it.cape, it);
         }
         return out;
     },
@@ -573,6 +705,15 @@ const AV_PAINT = {
                 s += S.path(`M${avN(ax - 11 * k * f)} ${avN(ay + 9 * k)} Q${avN(ax - 12 * k * f)} ${avN(ay - 9 * k)} ${avN(ax)} ${avN(ay - 9 * k)} Q${avN(ax + 12 * k * f)} ${avN(ay - 9 * k)} ${avN(ax + 11 * k * f)} ${avN(ay + 9 * k)} Q${avN(ax)} ${avN(ay + 4)} ${avN(ax - 11 * k * f)} ${avN(ay + 9 * k)} Z`, S.cloth(it.color));
                 s += avTrimLine(S, `M${avN(ax - 11 * k * f)} ${avN(ay + 9 * k)} Q${avN(ax)} ${avN(ay + 4)} ${avN(ax + 11 * k * f)} ${avN(ay + 9 * k)}`, it, 1.5 * k);
                 s += avGem(S, ax, ay - 1, 2.2 * k, it);
+            } else if (it.style === 'fur') {
+                s += avFur(S, ax, ay - 1, 12 * k * f, 8.5 * k, it.color, 9);
+                s += avGem(S, ax, ay - 1, 2.2 * k, it);
+            } else if (it.style === 'bone') {
+                s += S.path(`M${avN(ax - 10 * k * f)} ${avN(ay + 6 * k)} Q${avN(ax)} ${avN(ay - 11 * k)} ${avN(ax + 10 * k * f)} ${avN(ay + 6 * k)} Q${avN(ax)} ${avN(ay + 2)} ${avN(ax - 10 * k * f)} ${avN(ay + 6 * k)} Z`, avLeather(S, it.color));
+                const bone = S.lin('#f2ead6', '#8a7c5c', true);
+                [-7, 0, 7].forEach((o, i) => { s += S.path(`M${avN(ax + o * k - 2.4 * k)} ${avN(ay - 6 * k)} Q${avN(ax + o * k - 4 * k)} ${avN(ay - (16 + i * 2) * k)} ${avN(ax + o * k + 3 * k)} ${avN(ay - (21 + i * 2) * k)} Q${avN(ax + o * k + 1 * k)} ${avN(ay - 14 * k)} ${avN(ax + o * k + 2.4 * k)} ${avN(ay - 6 * k)} Z`, bone, P.ol * 0.55); });
+                s += S.circle(ax, ay - 1, 5.2 * k * f, bone, P.ol * 0.6);
+                s += S.circle(ax + 1.8 * k, ay - 2, 1.3 * k, it.glow || '#1a1210', 0) + S.circle(ax - 1.4 * k, ay - 2, 1.1 * k, it.glow || '#1a1210', 0);
             }
             out['shoulder' + sd] = s;
         });
@@ -623,10 +764,11 @@ const AV_PAINT = {
         ['L', 'R'].forEach(sd => {
             const g = avLeg(P, sd), [x, y] = g.ank, wa = g.wa;
             const m = it.style === 'plate' ? S.metal(it.color) : avLeather(S, it.color);
-            const cuff = it.style === 'plate' ? 14 : it.style === 'leather' ? 18 : 8;
+            const cuff = it.style === 'plate' ? 14 : it.style === 'leather' || it.style === 'fur' ? 18 : 8;
             let s = S.path(avBootPath(P, g, cuff), m);
             if (it.style !== 'cloth') s += S.path(`M${avN(x - wa - 3.5)} ${avN(y - cuff - 3)} L${avN(x + wa + 3.5)} ${avN(y - cuff - 3)} L${avN(x + wa + 3)} ${avN(y - cuff + 3)} L${avN(x - wa - 3)} ${avN(y - cuff + 3)} Z`, m, P.ol * 0.7);
             s += avTrimLine(S, `M${avN(x - wa - 3)} ${avN(P.fy - 2)} L${avN(x + wa + 12 * k)} ${avN(P.fy - 2)}`, it, 1.3 * k);
+            if (it.style === 'fur') s += avFur(S, x, y - cuff, wa + 5, 4.5 * k, it.fur || '#8a7a64', 8);
             s += avGem(S, x, y - cuff, 1.8 * k, it);
             out['boot' + sd] = s;
         });
@@ -635,7 +777,8 @@ const AV_PAINT = {
 
     belt(S, it) {
         const P = S.P, k = P.k, wy = P.wy, ww = P.ww, bx = 100 + ww * 0.45;
-        let s = S.path(`M${avN(100 - ww * 0.95 - 1.5)} ${wy - 3} Q${avN(100)} ${wy + 3} ${avN(100 + ww * 0.95 + 1.5)} ${wy - 2} L${avN(100 + ww * 0.95 + 1.5)} ${wy + 6} Q${avN(100)} ${wy + 11} ${avN(100 - ww * 0.95 - 1.5)} ${wy + 5} Z`, it.style === 'sash' ? S.cloth(it.color) : avLeather(S, it.color));
+        let s = S.path(`M${avN(100 - ww * 0.95 - 1.5)} ${wy - 3} Q${avN(100)} ${wy + 3} ${avN(100 + ww * 0.95 + 1.5)} ${wy - 2} L${avN(100 + ww * 0.95 + 1.5)} ${wy + 6} Q${avN(100)} ${wy + 11} ${avN(100 - ww * 0.95 - 1.5)} ${wy + 5} Z`, it.style === 'sash' ? S.cloth(it.color) : it.style === 'chain' ? S.metal(avDark(it.color, 0.3)) : avLeather(S, it.color));
+        if (it.style === 'chain') for (let x = 100 - ww * 0.9; x < 100 + ww * 0.95; x += 3.4 * k) s += S.ell(x, wy + 1.5 + 2.5 * Math.sin((x - 100) / ww), 1.9 * k, 2.6 * k, 'none', 0.9) + S.ell(x, wy + 1.5 + 2.5 * Math.sin((x - 100) / ww), 1.9 * k, 2.6 * k, S.metal(it.color), 0);
         s += S.path(`M${avN(bx - 4)} ${wy - 0.5} L${avN(bx + 4)} ${wy - 0.5} L${avN(bx + 4)} ${wy + 7.5} L${avN(bx - 4)} ${wy + 7.5} Z`, S.metal(it.trim || '#d4a84a'), P.ol * 0.5);
         if (it.style === 'sash') s += S.path(`M${avN(100 - ww * 0.7)} ${wy + 5} L${avN(100 - ww * 0.9)} ${avN(wy + 24 * k)} L${avN(100 - ww * 0.4)} ${avN(wy + 22 * k)} Z`, S.cloth(it.color), P.ol * 0.6);
         if (it.pouch) s += S.path(`M${avN(100 - ww * 0.55)} ${wy + 5} L${avN(100 - ww * 0.05)} ${wy + 5} L${avN(100 - ww * 0.1)} ${wy + 15} L${avN(100 - ww * 0.5)} ${wy + 15} Z`, S.lin('#6b4a30', '#2a1a10'), P.ol * 0.6);
@@ -664,7 +807,7 @@ const AV_PAINT = {
             return { held: S.rot(painter(S, Object.assign({}, it, { drawnTo: true }), A.hx, A.hy), 6, A.hx, A.hy), weaponR: string + arrow };
         }
         const A = avArm(P, 'R');
-        const ANG = { sword: 18, axe: 6, mace: 12, hammer: 8, spear: 30, dagger: 55, staff: 2, scythe: -6, wand: 40 };
+        const ANG = { sword: 18, saber: 16, axe: 6, mace: 12, flail: 10, hammer: 8, spear: 30, dagger: 55, staff: 2, scythe: -6, wand: 40 };
         const ang = P.stance && P.stance.wAng !== undefined ? P.stance.wAng + (it.style === 'wand' ? 30 : 0) : (ANG[it.style] === undefined ? 20 : ANG[it.style]);
         return { weaponR: S.rot(painter(S, it, A.hx, A.hy), ang, A.hx, A.hy) };
     },
@@ -683,9 +826,9 @@ const AV_PAINT = {
             s += S.path(d, S.lin(avLight(it.color, 0.15), avDark(it.color, 0.55), true));
             s += S.path(d, 'none', P.ol * 1.6, it.trim || '#c9a24a');
             const em = it.emblem || '#e8c35a';
-            s += it.tier >= 2 ? S.line(`M${avN(x - w * 0.6)} ${avN(y + h * 0.05)} L${avN(x)} ${avN(y - h * 0.3)} L${avN(x + w * 0.6)} ${avN(y + h * 0.05)}`, em, 3 * k) : S.line(`M${avN(x)} ${avN(y - h * 0.4)} L${avN(x + w * 0.05)} ${avN(y + h * 0.6)}`, em, 2.4 * k);
-            s += S.circle(x, y + h * 0.3, 4 * k, S.metal(em), 1.2);
-            s += avGem(S, x, y - h * 0.05, 3 * k, it);
+            if (P.crest) s += avCrestShield(P.crest, x + w * 0.02, y + h * 0.05, w * 0.6);
+            else s += it.tier >= 2 ? S.line(`M${avN(x - w * 0.6)} ${avN(y + h * 0.05)} L${avN(x)} ${avN(y - h * 0.3)} L${avN(x + w * 0.6)} ${avN(y + h * 0.05)}`, em, 3 * k) : S.line(`M${avN(x)} ${avN(y - h * 0.4)} L${avN(x + w * 0.05)} ${avN(y + h * 0.6)}`, em, 2.4 * k);
+            if (!P.crest) s += S.circle(x, y + h * 0.3, 4 * k, S.metal(em), 1.2) + avGem(S, x, y - h * 0.05, 3 * k, it);
             s += S.flat(`M${avN(x - w * 0.8)} ${avN(y - h * 0.5)} Q${avN(x - w * 0.3)} ${avN(y - h * 0.62)} ${avN(x)} ${avN(y - h * 0.62)} L${avN(x - w * 0.6)} ${avN(y + h * 0.3)} Z`, '#fff', 0.16);
             return { held: s };
         }
@@ -707,6 +850,28 @@ const AV_PAINT = {
             return { held: s };
         }
         if (it.style === 'dagger') return { held: S.rot(AV_WEAPONS.dagger(S, it, x, y), P.stance && P.stance.offAng !== undefined ? P.stance.offAng : 70, x, y) };
+        if (it.style === 'buckler') {
+            // a small round shield on the forearm
+            const R = 11 * k;
+            let s = S.circle(x + 2, y - 2, R, S.lin(avLight(it.color, 0.2), avDark(it.color, 0.5), true), P.ol * 0.9);
+            s += S.circle(x + 2, y - 2, R, 'none', P.ol * 1.4).replace('stroke="' + AV_INK + '"', 'stroke="' + (it.trim || '#c9a24a') + '"');
+            for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; s += S.circle(x + 2 + Math.cos(a) * R * 0.78, y - 2 + Math.sin(a) * R * 0.78, 0.9 * k, S.metal(it.trim || '#c9a24a'), 0); }
+            s += S.circle(x + 2, y - 2, 3.6 * k, S.metal(it.trim || '#c9a24a'), P.ol * 0.6);
+            s += S.flat(`M${avN(x + 2 - R * 0.7)} ${avN(y - 2 - R * 0.3)} Q${avN(x + 2 - R * 0.4)} ${avN(y - 2 - R * 0.8)} ${avN(x + 2 + R * 0.2)} ${avN(y - 2 - R * 0.85)} Q${avN(x + 2 - R * 0.3)} ${avN(y - 2 - R * 0.45)} ${avN(x + 2 - R * 0.7)} ${avN(y - 2 - R * 0.3)} Z`, '#fff', 0.25);
+            s += avGem(S, x + 2, y - 2, 2.2 * k, it);
+            return { held: s };
+        }
+        if (it.style === 'skull') {
+            // a skull talisman hanging from the hand on a short chain
+            const c = it.glow || '#7dff7a', sx = x + 1, sy2 = y + 16 * k;
+            let s = '';
+            for (let i = 0; i < 4; i++) s += S.ell(x + 0.3 * i, y + 2 + i * 3 * k, 1.2 * k, 1.7 * k, 'none', 0.8);
+            s += S.glow(sx, sy2, 9 * k, c, 0.5);
+            s += S.path(`M${avN(sx - 6 * k)} ${avN(sy2)} Q${avN(sx - 6.5 * k)} ${avN(sy2 - 8 * k)} ${avN(sx)} ${avN(sy2 - 8 * k)} Q${avN(sx + 6.5 * k)} ${avN(sy2 - 8 * k)} ${avN(sx + 6 * k)} ${avN(sy2)} L${avN(sx + 4 * k)} ${avN(sy2 + 3 * k)} L${avN(sx + 3.5 * k)} ${avN(sy2 + 6 * k)} L${avN(sx - 3.5 * k)} ${avN(sy2 + 6 * k)} L${avN(sx - 4 * k)} ${avN(sy2 + 3 * k)} Z`, S.lin('#f2ead6', '#8a7c5c', true), P.ol * 0.6);
+            s += S.ell(sx - 2.4 * k, sy2 - 1.5 * k, 1.7 * k, 2 * k, c, 0) + S.ell(sx + 2.4 * k, sy2 - 1.5 * k, 1.7 * k, 2 * k, c, 0);
+            for (let i = -1; i <= 1; i++) s += S.line(`M${avN(sx + i * 1.6 * k)} ${avN(sy2 + 3.5 * k)} L${avN(sx + i * 1.6 * k)} ${avN(sy2 + 6 * k)}`, '#5a4a32', 0.7);
+            return { held: s };
+        }
         if (it.style === 'quiver') {
             const qx = P.shL[0] - 4, qy = P.sy - 8;
             const s = S.path(`M${avN(qx - 5 * k)} ${avN(qy - 4)} L${avN(qx + 4 * k)} ${avN(qy - 8)} L${avN(qx + 12 * k)} ${avN(P.wy + 8)} L${avN(qx + 3 * k)} ${avN(P.wy + 12)} Z`, avLeather(S, it.color))
@@ -716,6 +881,53 @@ const AV_PAINT = {
         return {};
     },
 };
+
+// --- clan crests ---------------------------------------------------------------------------
+// A clan's arms: a field colour (c1), a charge colour (c2) and one of eight
+// charges, drawn in a -1..1 box. Painted on a tabard, a kite / tower shield
+// and in the clan windows (avCrestSvg). Values come from other players too,
+// so avCrestClean keeps them to known ones.
+const AV_CREST_SYMS = ['lion', 'wolf', 'skull', 'star', 'tower', 'axe', 'eagle', 'moon'];
+function avCrestClean(c) {
+    if (!c || typeof c !== 'object') return null;
+    const col = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null);
+    return { c1: col(c.c1) || '#8e1b1b', c2: col(c.c2) || '#d4a84a', sym: AV_CREST_SYMS.indexOf(c.sym) !== -1 ? c.sym : 'lion' };
+}
+function avCrestCharge(sym, cx, cy, r, fill, field) {
+    const P = pts => 'M' + pts.map(q => avN(cx + q[0] * r) + ' ' + avN(cy + q[1] * r)).join(' L') + ' Z';
+    const ink = `stroke="${AV_INK}" stroke-width="${avN(Math.max(0.6, r * 0.08))}" stroke-linejoin="round"`;
+    const path = (d, f) => `<path d="${d}" fill="${f || fill}" ${ink}/>`;
+    if (sym === 'star') { const q = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 0.42 : 1; q.push([Math.cos(a) * rr, Math.sin(a) * rr]); } return path(P(q)); }
+    if (sym === 'moon') return path(`M${avN(cx + 0.2 * r)} ${avN(cy - 0.95 * r)} A${avN(r * 0.95)} ${avN(r * 0.95)} 0 1 0 ${avN(cx + 0.2 * r)} ${avN(cy + 0.95 * r)} A${avN(r * 0.7)} ${avN(r * 0.7)} 0 1 1 ${avN(cx + 0.2 * r)} ${avN(cy - 0.95 * r)} Z`);
+    if (sym === 'tower') return path(P([[-0.6, 0.9], [-0.6, -0.5], [-0.75, -0.5], [-0.75, -0.9], [-0.42, -0.9], [-0.42, -0.68], [-0.15, -0.68], [-0.15, -0.9], [0.15, -0.9], [0.15, -0.68], [0.42, -0.68], [0.42, -0.9], [0.75, -0.9], [0.75, -0.5], [0.6, -0.5], [0.6, 0.9]]))
+        + path(P([[-0.2, 0.9], [-0.2, 0.45], [0, 0.3], [0.2, 0.45], [0.2, 0.9]]), field);
+    if (sym === 'axe') return path(P([[-0.08, -0.95], [0.08, -0.95], [0.08, 0.95], [-0.08, 0.95]])) + path(`M${avN(cx + 0.08 * r)} ${avN(cy - 0.7 * r)} Q${avN(cx + 0.95 * r)} ${avN(cy - 0.75 * r)} ${avN(cx + 0.85 * r)} ${avN(cy + 0.1 * r)} Q${avN(cx + 0.5 * r)} ${avN(cy - 0.15 * r)} ${avN(cx + 0.08 * r)} ${avN(cy - 0.05 * r)} Z`);
+    if (sym === 'skull') return path(`M${avN(cx - 0.75 * r)} ${avN(cy - 0.1 * r)} A${avN(0.75 * r)} ${avN(0.75 * r)} 0 1 1 ${avN(cx + 0.75 * r)} ${avN(cy - 0.1 * r)} L${avN(cx + 0.45 * r)} ${avN(cy + 0.35 * r)} L${avN(cx + 0.4 * r)} ${avN(cy + 0.85 * r)} L${avN(cx - 0.4 * r)} ${avN(cy + 0.85 * r)} L${avN(cx - 0.45 * r)} ${avN(cy + 0.35 * r)} Z`)
+        + `<circle cx="${avN(cx - 0.3 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.2 * r)}" fill="${field}"/><circle cx="${avN(cx + 0.3 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.2 * r)}" fill="${field}"/>`;
+    if (sym === 'wolf') return path(P([[-0.75, -0.95], [-0.35, -0.45], [0.35, -0.45], [0.75, -0.95], [0.7, 0.05], [0.2, 0.9], [-0.2, 0.9], [-0.7, 0.05]]))
+        + path(P([[-0.4, -0.05], [-0.15, 0.05], [-0.4, 0.12]]), field) + path(P([[0.4, -0.05], [0.15, 0.05], [0.4, 0.12]]), field);
+    if (sym === 'eagle') return path(P([[0, -0.55], [0.18, -0.35], [0.95, -0.75], [0.7, 0.05], [0.25, 0.1], [0.3, 0.85], [0, 0.6], [-0.3, 0.85], [-0.25, 0.1], [-0.7, 0.05], [-0.95, -0.75], [-0.18, -0.35]]))
+        + `<circle cx="${avN(cx)}" cy="${avN(cy - 0.7 * r)}" r="${avN(0.2 * r)}" fill="${fill}" ${ink}/>`;
+    // lion: a maned head
+    const q = []; for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, rr = i % 2 ? 0.72 : 0.98; q.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+    return path(P(q)) + `<circle cx="${avN(cx)}" cy="${avN(cy)}" r="${avN(0.5 * r)}" fill="${avLight(fill, 0.25)}" ${ink}/>`
+        + `<circle cx="${avN(cx - 0.18 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.07 * r)}" fill="${AV_INK}"/><circle cx="${avN(cx + 0.18 * r)}" cy="${avN(cy - 0.1 * r)}" r="${avN(0.07 * r)}" fill="${AV_INK}"/>`
+        + `<path d="M${avN(cx - 0.12 * r)} ${avN(cy + 0.16 * r)} L${avN(cx + 0.12 * r)} ${avN(cy + 0.16 * r)} L${avN(cx)} ${avN(cy + 0.3 * r)} Z" fill="${AV_INK}"/>`;
+}
+// The crest as a heater shield, centred on (cx, cy), r = half its width.
+function avCrestShield(crest, cx, cy, r) {
+    const c = avCrestClean(crest);
+    if (!c) return '';
+    const d = `M${avN(cx - r)} ${avN(cy - r * 1.05)} L${avN(cx + r)} ${avN(cy - r * 1.05)} L${avN(cx + r)} ${avN(cy + r * 0.1)} Q${avN(cx + r * 0.9)} ${avN(cy + r * 0.95)} ${avN(cx)} ${avN(cy + r * 1.3)} Q${avN(cx - r * 0.9)} ${avN(cy + r * 0.95)} ${avN(cx - r)} ${avN(cy + r * 0.1)} Z`;
+    return `<path d="${d}" fill="${c.c1}" stroke="${AV_INK}" stroke-width="${avN(Math.max(0.8, r * 0.12))}" stroke-linejoin="round"/>`
+        + avCrestCharge(c.sym, cx, cy, r * 0.62, c.c2, c.c1)
+        + `<path d="M${avN(cx - r * 0.8)} ${avN(cy - r * 0.85)} L${avN(cx - r * 0.1)} ${avN(cy - r * 0.85)} L${avN(cx - r * 0.75)} ${avN(cy + r * 0.2)} Z" fill="#fff" fill-opacity=".14"/>`;
+}
+// A stand-alone crest badge for the UI.
+function avCrestSvg(crest, size) {
+    const s = size || 40;
+    return `<svg class="crest-badge" width="${s}" height="${s}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${avCrestShield(crest || {}, 20, 17, 15)}</svg>`;
+}
 
 function avCape(S, color, it) {
     const P = S.P, sy = P.sy, fy = P.fy, k = P.k;
@@ -797,6 +1009,28 @@ const AV_WEAPONS = {
         if (it.glow) s = S.glow(hx + 24 * k, top + 4 * k, 14 * k, it.glow, 0.5) + s;
         return s + avGem(S, hx, top + 4, 2.2 * k, it);
     },
+    saber(S, it, hx, hy) {
+        // a curved blade with a knuckle guard
+        const k = S.P.k, m = S.metal(it.color || '#c9d2dc');
+        let s = S.path(`M${avN(hx - 2.6 * k)} ${avN(hy - 6)} Q${avN(hx + 3 * k)} ${avN(hy - 44)} ${avN(hx + 14 * k)} ${avN(hy - 76)} Q${avN(hx + 8 * k)} ${avN(hy - 44)} ${avN(hx + 2.8 * k)} ${avN(hy - 6)} Z`, m);
+        s += S.line(`M${avN(hx)} ${avN(hy - 12)} Q${avN(hx + 4 * k)} ${avN(hy - 44)} ${avN(hx + 12 * k)} ${avN(hy - 72)}`, '#fff', 1 * k, 0.6);
+        if (it.glow) s = S.glow(hx + 6 * k, hy - 42, 12 * k, it.glow, 0.35) + s;
+        s += S.path(`M${avN(hx - 9 * k)} ${avN(hy - 7)} Q${avN(hx)} ${avN(hy - 3)} ${avN(hx + 7 * k)} ${avN(hy - 8)} L${avN(hx + 7 * k)} ${avN(hy - 4)} Q${avN(hx)} ${avN(hy + 1)} ${avN(hx - 9 * k)} ${avN(hy - 3)} Z`, S.metal(it.trim || '#d4a84a'));
+        s += S.line(`M${avN(hx + 6 * k)} ${avN(hy - 6)} Q${avN(hx + 9 * k)} ${avN(hy + 4 * k)} ${avN(hx + 1 * k)} ${avN(hy + 10 * k)}`, it.trim || '#d4a84a', 1.6 * k);
+        s += S.path(`M${avN(hx - 2 * k)} ${avN(hy - 4)} L${avN(hx + 2 * k)} ${avN(hy - 4)} L${avN(hx + 2 * k)} ${avN(hy + 9 * k)} L${avN(hx - 2 * k)} ${avN(hy + 9 * k)} Z`, '#3a2616');
+        return s + avGem(S, hx, hy - 6, 1.8 * k, it);
+    },
+    flail(S, it, hx, hy) {
+        // a short haft, a few chain links, a spiked ball
+        const k = S.P.k, top = hy - 32, bx = hx + 10 * k, by = hy - 56;
+        let s = S.path(`M${avN(hx - 2.4 * k)} ${avN(hy + 10 * k)} L${avN(hx - 2.4 * k)} ${avN(top)} L${avN(hx + 2.4 * k)} ${avN(top)} L${avN(hx + 2.4 * k)} ${avN(hy + 10 * k)} Z`, S.lin('#6a4a2a', '#2a1a0c'));
+        s += S.circle(hx, top - 1, 3 * k, S.metal(it.trim || '#8a8f96'), 0.8);
+        for (let i = 1; i <= 4; i++) { const t = i / 5; s += S.ell(hx + (bx - hx) * t, top + (by - top) * t, 1.6 * k, 2.2 * k, 'none', 1.1); }
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; s += S.path(`M${avN(bx + Math.cos(a) * 6 * k)} ${avN(by + Math.sin(a) * 6 * k)} L${avN(bx + Math.cos(a + 0.2) * 12 * k)} ${avN(by + Math.sin(a + 0.2) * 12 * k)} L${avN(bx + Math.cos(a + 0.4) * 6 * k)} ${avN(by + Math.sin(a + 0.4) * 6 * k)} Z`, S.metal(it.color || '#a9b4c0'), S.P.ol * 0.5); }
+        s += S.circle(bx, by, 7 * k, S.metal(it.color || '#a9b4c0'));
+        if (it.glow) s = S.glow(bx, by, 14 * k, it.glow, 0.4) + s;
+        return s + avGem(S, bx, by, 2.4 * k, it);
+    },
     wand(S, it, hx, hy) {
         const k = S.P.k, c = it.glow || '#b05cff';
         return S.path(`M${avN(hx - 1.8 * k)} ${avN(hy + 6)} L${avN(hx - 1.4 * k)} ${avN(hy - 38)} L${avN(hx + 1.4 * k)} ${avN(hy - 38)} L${avN(hx + 1.8 * k)} ${avN(hy + 6)} Z`, S.lin('#4a2a4a', '#1a0a1a'))
@@ -873,6 +1107,8 @@ function avItemIcon(item, opts) {
         if (['gloves', 'boots', 'shoulders'].indexOf(vis.slot) !== -1) Object.keys(layers).forEach(k => { if (/L$/.test(k) && layers[k.slice(0, -1) + 'R']) delete layers[k]; });
         const keys = AV_ICON_ORDER.filter(k => typeof layers[k] === 'string').concat(Object.keys(layers).filter(k => typeof layers[k] === 'string' && AV_ICON_ORDER.indexOf(k) === -1));
         inner = keys.map(k => layers[k]).join('');
+        // a helmet floats oddly on nothing: a dark head silhouette under it
+        if (vis.slot === 'helmet') inner = (layers.headBack || '') + S.path(avHeadPath(P), '#262c38', P.ol * 0.6) + keys.filter(k => k !== 'headBack').map(k => layers[k]).join('');
     }
     if (!inner) { AV_ICON_CACHE.set(key, null); return null; }
     if (!box) {
@@ -893,7 +1129,8 @@ function avItemIcon(item, opts) {
 function avBodyKey(spec) { return (AV_CLASS_BODY[spec.cls] || spec.body || 'heavy') + '_' + (spec.gender === 'f' ? 'f' : 'm'); }
 
 function avPaint(spec) {
-    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls), S = avSession(P), k = P.k;
+    const bodyKey = avBodyKey(spec), P = avGeom(bodyKey, spec.cls, spec.build), S = avSession(P), k = P.k;
+    P.face = spec.face; P.nose = spec.nose; P.crest = spec.crest ? avCrestClean(spec.crest) : null;
     const look = Object.assign({ skin: 0, hair: P.female ? 'long' : 'short', hairColor: 1, beard: 'none' }, spec);
     const skin = S.skin(look.skinTone || AV_SKINS[look.skin || 0]);
     const gear = spec.gear || {};

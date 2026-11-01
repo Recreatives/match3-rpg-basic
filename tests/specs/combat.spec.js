@@ -374,7 +374,9 @@ describe('Golden master (seeded solo run)', { isolate: 'each', world: { seed: 20
     // consumes the seeded RNG differently from then on)
     // (v1.38: slower levelling changes the character's level mid-run, so
     // the loot level - and the RNG it consumes - changes with it)
-    var EXPECTED = '19/5cfc87b5/6:-3:-34:32';
+    // (v1.39: non-boss floors drop loot half the time, at the character's
+    // own level from the 10-tier catalog - a different RNG path from there)
+    var EXPECTED = '24/fb8525ad/8:46:53:85';
 
     it('40 scripted player moves produce the recorded fingerprint', async function (ctx) {
         var w = ctx.world, trace = [];

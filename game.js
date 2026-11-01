@@ -111,6 +111,8 @@ function getEnemyStatsForLevel(lvl, isBoss) {
 
 // Fraction of missing HP restored when moving on to the next level.
 const LEVEL_CLEAR_HEAL_PERCENT = 0.5;
+// Chance a non-boss floor drops an item (bosses always do).
+const LOOT_FLOOR_CHANCE = 0.5;
 
 // --- SPEED BONUS (TIME MULTIPLIER) ---
 // Only applies to the player's own moves. The faster you swap after
@@ -373,7 +375,9 @@ function pickClass(c) {
     document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: c.ultName });
     updateUI();
     document.getElementById('class-selection').style.display = 'none';
-    renderModeButtons();
+    // the town is the hub between adventures (town.js); the old mode picker
+    // is the fallback when it isn't there
+    if (typeof showTown === 'function') showTown(); else renderModeButtons();
 }
 
 // Shown right after a class is picked, before anything actually starts -
@@ -388,7 +392,7 @@ function renderModeButtons() {
     overlayTitle.innerText = t('NASIL OYNAMAK İSTİYORSUN?');
 
     const modes = [
-        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); } },
+        { emoji: '⚔️', label: 'Solo', desc: 'Tek başına canavar dalgalarına karşı savaş.', action: () => { container.style.display = 'none'; resetGame(); startLevel(); if (typeof runStart === 'function') runStart(); } },
         { emoji: '🤝', label: 'Co-op', desc: 'Bir arkadaşınla aynı zindanda, paylaşımlı tahtada savaş.', action: () => { overlay.classList.remove('visible'); toggleModal('coop-modal'); } },
         { emoji: '🗡️', label: 'PvP', desc: 'Gerçek zamanlı 1v1 düello.', action: () => { overlay.classList.remove('visible'); toggleModal('pvp-modal'); } }
     ];
@@ -423,9 +427,12 @@ function handleOverlayClick() {
 // straight to mode-selection, never back to square one at class-selection.
 function restoreMainMenuOverlay() {
     if (currentState !== STATE.START) return;
+    if (selectedClass && typeof showTown === 'function') { showTown(); return; }
     overlay.classList.add('visible');
     document.getElementById('class-selection').style.display = 'none';
-    renderModeButtons();
+    // the town is the hub between adventures (town.js); the old mode picker
+    // is the fallback when it isn't there
+    if (typeof showTown === 'function') showTown(); else renderModeButtons();
 }
 
 function resetGame() {
@@ -451,6 +458,7 @@ function resetGame() {
 
 function startLevel() {
     currentState = STATE.PLAYING;
+    if (typeof socialTouch === 'function') socialTouch('dungeon:' + Math.min(999, level));
     overlay.classList.remove('visible');
     rewardArea.style.display = 'none';
     gridDisplay.classList.remove('locked');
@@ -547,9 +555,11 @@ function goldRewardForKill(lvl, isBoss) {
 function winLevel() {
     if (currentState === STATE.REWARD) return;
     currentState = STATE.REWARD;
-    // loot rolls at the character's level, a little higher on deeper floors
-    if (typeof awardLootDrop === 'function') awardLootDrop(typeof characterLevel === 'function' ? characterLevel() + Math.floor((level - 1) / 5) : undefined);
-    if (typeof awardRunXp === 'function') awardRunXp(level, level % 5 === 0 ? 3 : 1);
+    // loot: a boss always drops, other floors half the time (LOOT_FLOOR_CHANCE);
+    // always at the character's own level, depth only nudges the rarity
+    if (typeof awardLootDrop === 'function' && (level % 5 === 0 || Math.random() < LOOT_FLOOR_CHANCE)) awardLootDrop({ floor: level, boss: level % 5 === 0 });
+    // experience is banked in the run (characters.js), paid out when it ends
+    if (typeof runRecordFloor === 'function') runRecordFloor(level, level % 5 === 0 ? 3 : 1);
     if (level % 5 === 0 && typeof claimDailyQuest === 'function') claimDailyQuest('kill_boss');
 
     let goldReward = goldRewardForKill(level, level % 5 === 0);
@@ -659,10 +669,13 @@ function showBossCheckpoint() {
 
 function returnToMainMenu() {
     document.getElementById('boss-checkpoint').style.display = 'none';
+    // leaving right after a boss: the run's experience is paid in full
+    if (typeof runEnd === 'function') runEnd('exit');
     currentState = STATE.START;
+    log(t('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.'), 'log-turn');
+    if (typeof showTown === 'function') { showTown(); return; }
     overlay.classList.add('visible');
     renderModeButtons(); // selectedClass is already set - straight to Solo/Co-op/PvP
-    log(t('Zindandan ayrıldın. Kazandıkların dükkanda seni bekliyor.'), 'log-turn');
 }
 
 // Turkish label for each REWARD_POOL tier key - used anywhere a tier is
@@ -796,15 +809,23 @@ function generateRewards() {
 function gameOver() {
     if (typeof resetActiveAchievements === 'function') resetActiveAchievements();
     if (typeof trackEvent === 'function') trackEvent('solo_run_ended', { level, class: selectedClass ? selectedClass.name : null });
-    // the death penalty: one worn item is lost (economy.js loseItemOnDeath)
-    if (typeof loseItemOnDeath === 'function') loseItemOnDeath('solo', msg => log(msg, 'log-hit'));
+    // the run ends in death: half the banked experience, 10% of the gold
+    // and one worn item (characters.js runEnd -> schema.sql end_run)
+    if (typeof runEnd === 'function') runEnd('death');
     currentState = STATE.GAMEOVER;
     overlayTitle.innerText = t("OYUN BİTTİ");
-    overlayBtn.innerText = t("TEKRAR DENE");
-    overlayBtn.style.display = 'block';
-    overlayBtn.onclick = handleOverlayClick;
     rewardArea.style.display = 'none';
     overlay.classList.add('visible');
+    overlayBtn.style.display = 'block';
+    // with a character the hero lives on - back to town; without one, the
+    // old "pick a class and try again"
+    if (typeof showTown === 'function' && typeof activeCharacter !== 'undefined' && activeCharacter) {
+        overlayBtn.innerText = t('KASABAYA DÖN');
+        overlayBtn.onclick = () => { overlayBtn.style.display = 'none'; overlay.classList.remove('visible'); showTown(); };
+        return;
+    }
+    overlayBtn.innerText = t("TEKRAR DENE");
+    overlayBtn.onclick = handleOverlayClick;
     selectedClass = null;
 }
 
@@ -1671,6 +1692,11 @@ function toggleModal(modalId) {
             restoreMainMenuOverlay();
         }
     } else {
+        // gear / gold / progress windows only open in town, never mid-fight (town.js)
+        if (typeof townModalAllowed === 'function' && !townModalAllowed(modalId)) {
+            log(t('Bunu sadece kasabadayken yapabilirsin.'), 'log-turn');
+            return;
+        }
         // Shop/inventory is a safe-checkpoint thing, not a mid-dungeon
         // thing - you're supposed to be too busy surviving to shop while
         // STATE.PLAYING (fighting) or STATE.REWARD (mid reward-pick / at
@@ -1692,6 +1718,7 @@ function toggleModal(modalId) {
             if (typeof renderShop === 'function') renderShop();
             if (typeof renderInventory === 'function') renderInventory();
         }
+        if (modalId === 'auction-modal' && typeof auctionOpen === 'function') auctionOpen();
         if (modalId === 'achievements-modal' && typeof renderAchievements === 'function') {
             renderAchievements();
         }
@@ -1699,9 +1726,10 @@ function toggleModal(modalId) {
             renderLeaderboard();
             if (typeof renderPvpLeaderboard === 'function') renderPvpLeaderboard();
         }
-        if (modalId === 'friends-modal' && typeof renderFriendsList === 'function') {
-            renderFriendsList();
+        if (modalId === 'friends-modal') {
+            if (typeof renderSocial === 'function') renderSocial(); else if (typeof renderFriendsList === 'function') renderFriendsList();
         }
+        if (modalId === 'clan-modal' && typeof renderClan === 'function') renderClan();
         if (modalId === 'guild-modal' && typeof renderGuildPanel === 'function') {
             renderGuildPanel();
         }

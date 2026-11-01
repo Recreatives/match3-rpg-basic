@@ -32,6 +32,30 @@ function characterLevelProgress(c) {
 
 function classDefFor(key) { return (typeof CLASSES !== 'undefined' && key) ? CLASSES[String(key).toUpperCase()] : null; }
 
+// The game server can't be reached (offline, or the Supabase project is
+// paused / down): say so on the start screen with a retry, instead of
+// leaving an empty hero list that looks like a hang.
+function charShowServerDown() {
+    const sel = document.getElementById('class-selection');
+    const title = document.getElementById('overlay-title');
+    const ov = document.getElementById('game-overlay');
+    if (!sel || !title) return;
+    if (ov) ov.classList.add('visible');
+    title.innerText = t('SUNUCUYA BAĞLANILAMIYOR');
+    sel.innerHTML = '';
+    sel.style.display = 'flex';
+    const p = document.createElement('p');
+    p.id = 'server-down-msg';
+    p.className = 'server-down';
+    p.textContent = t('Oyun sunucusuna şu an ulaşılamıyor. İnternet bağlantını kontrol et ve biraz sonra tekrar dene. Karakterlerin ve eşyaların güvende.');
+    const b = document.createElement('button');
+    b.id = 'server-retry-btn';
+    b.className = 'reward-btn rarity-rare';
+    b.textContent = t('Tekrar dene');
+    b.onclick = () => location.reload();
+    sel.append(p, b);
+}
+
 async function fetchCharacters() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
@@ -136,8 +160,93 @@ function charUpdateHudLabel() {
     const el = document.getElementById('player-class-label');
     if (!el || typeof selectedClass === 'undefined' || !selectedClass) return;
     el.style.color = 'var(--accent)';
-    if (activeCharacter) el.textContent = `${selectedClass.emoji} ${activeCharacter.name.toUpperCase()} · ${tf('Sv. {n}', { n: activeCharacter.level })}`;
+    if (activeCharacter) el.textContent = `${selectedClass.emoji} ${activeCharacter.name.toUpperCase()} · ${tf('Sv. {n}', { n: activeCharacter.level })}`
+        + (typeof dungeonRun !== 'undefined' && dungeonRun && dungeonRun.pending ? ` · ✨${dungeonRun.pending}` : '');
     else el.textContent = `${selectedClass.emoji} ${selectedClass.name.toUpperCase()}`;
+}
+
+// --- dungeon runs (schema.sql section 32) -------------------------------------------
+// A solo run banks its experience floor by floor; it's paid out when the
+// run ends - all of it when leaving right after a boss, half on death
+// (which also costs 10% of the gold and one worn item). A run left open
+// counts as a death when the next one starts.
+let dungeonRun = null; // { id, floor, pending }
+// run calls go out one after another (a floor must land before the run ends)
+let runQueue = Promise.resolve();
+function runQueued(fn) { const p = runQueue.then(fn, fn); runQueue = p.catch(() => {}); return p; }
+
+function runStart() { return runQueued(runStartNow); }
+async function runStartNow() {
+    dungeonRun = null;
+    if (!activeCharacter || typeof sb === 'undefined') return null;
+    const { data, error } = await sb.rpc('start_run');
+    if (error || !data) { if (error) console.warn('start_run:', error.message); return null; }
+    dungeonRun = { id: data.run_id, floor: 0, pending: 0 };
+    if (data.abandoned) runShowResult(data.abandoned, true);
+    charUpdateHudLabel();
+    return dungeonRun;
+}
+
+// A cleared floor: banks its experience (falls back to paying it at once
+// when there's no run - offline, or the run couldn't start).
+function runRecordFloor(floor, kills) { return runQueued(() => runRecordFloorNow(floor, kills)); }
+async function runRecordFloorNow(floor, kills) {
+    if (!dungeonRun) return typeof awardRunXp === 'function' ? awardRunXp(floor, kills) : null;
+    const { data, error } = await sb.rpc('record_floor', { p_run: dungeonRun.id, p_floor: floor, p_kills: kills });
+    if (error || !data || !data[0]) { if (error) console.warn('record_floor:', error.message); return null; }
+    dungeonRun.floor = data[0].floor; dungeonRun.pending = data[0].pending_xp;
+    if (typeof log === 'function') log(tf('✨ +{xp} tecrübe birikti (koşuda toplam {total})', { xp: data[0].gain, total: data[0].pending_xp }), 'log-heal');
+    charUpdateHudLabel();
+    return data[0];
+}
+
+// Ends the run: 'exit' (after a boss) or 'death'.
+function runEnd(outcome) { return runQueued(() => runEndNow(outcome)); }
+async function runEndNow(outcome) {
+    const run = dungeonRun;
+    dungeonRun = null;
+    charUpdateHudLabel();
+    if (!run || typeof sb === 'undefined') return null;
+    const { data, error } = await sb.rpc('end_run', { p_run: run.id, p_outcome: outcome });
+    if (error || !data) { if (error) console.warn('end_run:', error.message); return null; }
+    runShowResult(data, false);
+    return data;
+}
+
+// Applies an ended run's result locally and tells the player what it cost.
+function runShowResult(r, wasAbandoned) {
+    if (activeCharacter && r.level) {
+        const oldLevel = activeCharacter.level;
+        Object.assign(activeCharacter, { level: r.level, xp: r.xp, mastery: r.mastery || 0 });
+        charactersUpsertLocal(activeCharacter);
+        if (r.level > oldLevel) charLevelUpToast(r.level);
+    }
+    const lines = [];
+    if (wasAbandoned) lines.push(t('Yarıda bırakılan önceki koşu ölüm sayıldı.'));
+    if (r.outcome === 'exit') lines.push(tf('🏆 Zindandan sağ çıktın: {xp} tecrübenin tamamını aldın.', { xp: r.xp_granted }));
+    else lines.push(tf('💀 Ölümün bedeli: biriken {banked} tecrübenin yarısını ({xp}) aldın.', { banked: r.banked_xp, xp: r.xp_granted }));
+    if (r.lost_gold) lines.push(tf('🪙 Yanındaki altının %10\'u ({gold}) kayboldu.', { gold: r.lost_gold }));
+    if (r.lost_item && typeof currentOwnedItems !== 'undefined') {
+        const lost = currentOwnedItems.find(it => it.id === r.lost_item.id) || r.lost_item;
+        currentOwnedItems = currentOwnedItems.filter(it => it.id !== r.lost_item.id);
+        const info = typeof itemDisplayInfo === 'function' ? itemDisplayInfo(lost) : { name: lost.base_id, emoji: '' };
+        lines.push(tf('💀 {emoji} {name} kayboldu.', { emoji: info.emoji, name: info.name }));
+        if (typeof refreshMyAvatar === 'function') refreshMyAvatar();
+        if (typeof syncLegendaryAura === 'function') syncLegendaryAura();
+    }
+    if (typeof log === 'function') lines.forEach(l => log(l, r.outcome === 'exit' ? 'log-heal' : 'log-hit'));
+    if (typeof fetchWallet === 'function') fetchWallet();
+    if (typeof fetchTalentStatus === 'function') fetchTalentStatus();
+    charUpdateHudLabel();
+    const el = document.createElement('div');
+    el.className = 'achievement-toast';
+    const b = document.createElement('b');
+    b.textContent = r.outcome === 'exit' ? t('🏆 KOŞU TAMAMLANDI') : t('💀 KOŞU BİTTİ');
+    el.appendChild(b);
+    lines.forEach(l => { el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(l)); });
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), 10);
+    setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 5500);
 }
 
 // --- growth -----------------------------------------------------------------------------
@@ -169,7 +278,8 @@ function characterMaxHpBonus() {
 
 function charLookOf(c) {
     const a = (c && c.appearance) || {};
-    return { gender: c && c.gender === 'f' ? 'f' : 'm', skin: a.skin | 0, hair: a.hair || 'short', hairColor: a.hairColor | 0, beard: a.beard || 'none' };
+    return Object.assign({ gender: c && c.gender === 'f' ? 'f' : 'm', skin: a.skin | 0, hair: a.hair || 'short', hairColor: a.hairColor | 0, beard: a.beard || 'none' },
+        typeof heroFeatures === 'function' ? heroFeatures(a) : {});
 }
 const CHAR_PORTRAIT_CACHE = new Map();
 // A standalone <img> of a hero (its own document, so painter ids never clash).
@@ -237,6 +347,14 @@ function renderCharacterSelect() {
         bar.appendChild(fill);
         info.append(name, sub, bar);
         card.appendChild(info);
+        if (!c.needs_setup) {
+            const ed = document.createElement('span');
+            ed.className = 'char-edit';
+            ed.title = t('Görünüşü değiştir');
+            ed.textContent = '✎';
+            ed.onclick = ev => { ev.stopPropagation(); openCharacterCreator(c, true); };
+            card.appendChild(ed);
+        }
         const del = document.createElement('span');
         del.className = 'char-delete';
         del.title = t('Karakteri sil');
@@ -279,13 +397,17 @@ async function charConfirmDelete(c) {
 
 let charDraft = null;
 
-function openCharacterCreator(setupOf) {
-    const cls = 'warrior';
+function openCharacterCreator(setupOf, editLook) {
+    const cls = editLook && setupOf ? setupOf.class_key : 'warrior';
+    const cur = editLook && setupOf ? charLookOf(setupOf) : null;
     charDraft = {
-        setupId: setupOf ? setupOf.id : null,
+        editId: editLook && setupOf ? setupOf.id : null,
+        setupId: setupOf && !editLook ? setupOf.id : null,
         name: setupOf ? setupOf.name : '',
-        cls, gender: 'm', skin: 1, hair: 'short', hairColor: 1, beard: 'full'
+        cls, gender: 'm', skin: 1, hair: 'short', hairColor: 1, beard: 'full',
+        build: 'average', face: 'oval', nose: 'straight', brows: 'stern', eyes: 0, marks: 'none'
     };
+    if (cur) Object.assign(charDraft, cur);
     renderCharacterCreator();
     const m = document.getElementById('character-modal');
     if (!m) return;
@@ -319,6 +441,11 @@ function charOptionRow(label, options, current, onPick, render) {
 
 const CHAR_HAIR_LABELS = { short: 'Kısa', long: 'Uzun', topknot: 'Topuz', shaved: 'Kazınmış', braid: 'Örgü', bun: 'Topuz', bob: 'Kaküllü' };
 const CHAR_BEARD_LABELS = { none: 'Yok', stubble: 'Kirli sakal', full: 'Gür', braided: 'Örgülü' };
+const CHAR_BUILD_LABELS = { lean: 'İnce', average: 'Orta', broad: 'İri' };
+const CHAR_FACE_LABELS = { oval: 'Oval', square: 'Köşeli', angular: 'Sivri' };
+const CHAR_NOSE_LABELS = { straight: 'Düz', hooked: 'Kemerli', broad: 'Geniş' };
+const CHAR_BROW_LABELS = { stern: 'Sert', thick: 'Kalın', arched: 'Kavisli' };
+const CHAR_MARK_LABELS = { none: 'Yok', scar: 'Yara izi', paint: 'Savaş boyası', tattoo: 'Dövme', freckles: 'Çil' };
 
 function renderCharacterCreator() {
     const box = document.getElementById('character-creator');
@@ -330,7 +457,7 @@ function renderCharacterCreator() {
     box.innerHTML = '';
 
     const title = document.getElementById('character-modal-title');
-    if (title) title.textContent = d.setupId ? t('KAHRAMANINI TAMAMLA') : t('YENİ KAHRAMAN');
+    if (title) title.textContent = d.editId ? t('GÖRÜNÜŞÜ DEĞİŞTİR') : d.setupId ? t('KAHRAMANINI TAMAMLA') : t('YENİ KAHRAMAN');
 
     const preview = document.createElement('div');
     preview.id = 'char-preview';
@@ -345,7 +472,7 @@ function renderCharacterCreator() {
 
     const form = document.createElement('div');
     form.className = 'char-form';
-    form.appendChild(charOptionRow(t('Sınıf'), CHAR_CLASS_KEYS, d.cls, v => { d.cls = v; }, (b, v) => {
+    if (!d.editId) form.appendChild(charOptionRow(t('Sınıf'), CHAR_CLASS_KEYS, d.cls, v => { d.cls = v; }, (b, v) => {
         const c = classDefFor(v);
         b.textContent = c ? c.emoji + ' ' + c.name : v;
     }));
@@ -364,6 +491,16 @@ function renderCharacterCreator() {
     if (d.gender === 'm') {
         form.appendChild(charOptionRow(t('Sakal'), ['none', 'stubble', 'full', 'braided'], d.beard, v => { d.beard = v; }, (b, v) => { b.textContent = t(CHAR_BEARD_LABELS[v] || v); }));
     }
+    form.appendChild(charOptionRow(t('Yapı'), ['lean', 'average', 'broad'], d.build, v => { d.build = v; }, (b, v) => { b.textContent = t(CHAR_BUILD_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Yüz'), ['oval', 'square', 'angular'], d.face, v => { d.face = v; }, (b, v) => { b.textContent = t(CHAR_FACE_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Burun'), ['straight', 'hooked', 'broad'], d.nose, v => { d.nose = v; }, (b, v) => { b.textContent = t(CHAR_NOSE_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Kaş'), ['stern', 'thick', 'arched'], d.brows, v => { d.brows = v; }, (b, v) => { b.textContent = t(CHAR_BROW_LABELS[v]); }));
+    form.appendChild(charOptionRow(t('Göz rengi'), [0, 1, 2, 3, 4], d.eyes, v => { d.eyes = v; }, (b, v) => {
+        b.classList.add('swatch');
+        b.style.background = typeof AV_EYE_COLORS !== 'undefined' ? AV_EYE_COLORS[v] : '#3a2a1c';
+        b.setAttribute('aria-label', t('Göz rengi') + ' ' + (v + 1));
+    }));
+    form.appendChild(charOptionRow(t('İz / Boya'), ['none', 'scar', 'paint', 'tattoo', 'freckles'], d.marks, v => { d.marks = v; }, (b, v) => { b.textContent = t(CHAR_MARK_LABELS[v]); }));
 
     const nameRow = document.createElement('div');
     nameRow.className = 'char-row';
@@ -377,7 +514,7 @@ function renderCharacterCreator() {
     name.value = d.name;
     name.oninput = () => { d.name = name.value; };
     nameRow.append(nameLab, name);
-    form.appendChild(nameRow);
+    if (!d.editId) form.appendChild(nameRow);
 
     const msg = document.createElement('div');
     msg.id = 'char-create-msg';
@@ -387,7 +524,7 @@ function renderCharacterCreator() {
     const go = document.createElement('button');
     go.id = 'char-create-btn';
     go.className = 'reward-btn rarity-legendary';
-    go.textContent = d.setupId ? t('Kaydet ve oyna') : t('Yarat ve oyna');
+    go.textContent = d.editId ? t('Kaydet') : d.setupId ? t('Kaydet ve oyna') : t('Yarat ve oyna');
     go.onclick = () => charSubmit();
     form.appendChild(go);
     box.appendChild(form);
@@ -397,10 +534,20 @@ async function charSubmit() {
     const d = charDraft;
     const msg = document.getElementById('char-create-msg');
     const name = (d.name || '').trim();
-    if (name.length < 2 || name.length > 16) { if (msg) msg.textContent = t('Ad 2-16 karakter olmalı.'); return; }
-    const look = { skin: d.skin, hair: d.hair, hairColor: d.hairColor, beard: d.beard };
+    if (!d.editId && (name.length < 2 || name.length > 16)) { if (msg) msg.textContent = t('Ad 2-16 karakter olmalı.'); return; }
+    const look = { skin: d.skin, hair: d.hair, hairColor: d.hairColor, beard: d.beard, build: d.build, face: d.face, nose: d.nose, brows: d.brows, eyes: d.eyes, marks: d.marks };
     const btn = document.getElementById('char-create-btn');
     if (btn) btn.disabled = true;
+    if (d.editId) {
+        const { data, error } = await sb.rpc('update_character_look', { p_id: d.editId, p_gender: d.gender, p_appearance: look });
+        if (btn) btn.disabled = false;
+        if (error) { if (msg) msg.textContent = t('Karakter kaydedilemedi.'); return; }
+        charactersUpsertLocal(data);
+        if (activeCharacter && activeCharacter.id === d.editId && typeof refreshMyAvatar === 'function') refreshMyAvatar(true);
+        closeCharacterCreator();
+        renderCharacterSelect();
+        return;
+    }
     const r = d.setupId ? await setupCharacter(d.setupId, name, d.cls, d.gender, look) : await createCharacter(name, d.cls, d.gender, look);
     if (btn) btn.disabled = false;
     if (r.error) {
@@ -418,7 +565,7 @@ async function charSubmit() {
 // creator.
 async function initCharacters() {
     const list = await fetchCharacters();
-    if (!list) return;
+    if (!list) { charShowServerDown(); return; }
     if (typeof selectedClass !== 'undefined' && selectedClass && activeCharacter && selectedClass.name.toLowerCase() === activeCharacter.class_key) {
         charUpdateHudLabel();
         if (typeof refreshMyAvatar === 'function') refreshMyAvatar(true);
