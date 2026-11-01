@@ -955,7 +955,10 @@ class CombatStage {
         if (this.stripW) {
             // Fit within the canvas while preserving aspect ratio, leaving
             // side room for the class actions to lunge/dash into.
-            const scale = Math.min((h * 0.9) / this.stripH, (w * 0.8) / this.stripW, 4) * (this.sizeBoost || 1);
+            // A tall slot (the wide-screen arena) lets the fighter use its whole
+            // width - it is height, not width, that should limit it there.
+            const wFit = h > w * 1.3 ? 1.0 : 0.8;
+            const scale = Math.min((h * 0.9) / this.stripH, (w * wFit) / this.stripW, 4) * (this.sizeBoost || 1);
             this.portraitBaseScale = scale;
         }
         sprite.scale.set(this.portraitBaseScale);

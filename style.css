@@ -1079,6 +1079,10 @@ body {
        their own narrow column); it takes every pixel the board's height
        leaves, so both columns end on the same line */
     #solo-hud { height: max(260px, calc(var(--board-size) - var(--wide-left-chrome))); }
+    /* wider slots there: bigger fighters (they still stand well apart) */
+    #solo-hud .arena-slot { width: 44%; }
+    #solo-hud .slot-left { left: 3%; }
+    #solo-hud .slot-right { right: 3%; }
 }
 
 /* INFO MODAL */
