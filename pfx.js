@@ -307,6 +307,8 @@ function pfxPreloadClass(cls) {
     const names = new Set();
     moves.forEach(m => { pfxNamesOf(pfxSpecsFor(m)).forEach(n => names.add(n)); (PFX_SHOT_SHEETS[m.shot] || []).forEach(n => names.add(n)); });
     names.forEach(pfxLoad);
+    // loot beams for the common drops (rarer ones load when they first drop)
+    ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow'].forEach(pfxLoad);
 }
 
 // --- projectiles --------------------------------------------------------------------
@@ -357,4 +359,80 @@ if (typeof CG_SHOTS !== 'undefined') {
     pfxShot('pfxarrow', { ball: 'projectiles-arrow', blast: 'impacts-hit-spark', fallback: 'arrow', arc: 14, blastAt: 'hit', ballScale: 0.9, blastScale: 0.8 });
     pfxShot('pfxshard', { ball: 'ice-ice-lance', blast: 'ice-ice-shatter', fallback: 'shard', arc: 0, blastAt: 'hit', ballScale: 0.7, blastScale: 0.6 });
     pfxShot('pfxshadow', { ball: 'shadow-void-orb', blast: 'shadow-dark-explosion', fallback: 'orb', arc: 16, turn: false, ballDy: 78, ballScale: 0.4, blastScale: 0.5, shake: 3 });
+}
+
+// --- rare gear and loot (effects roadmap Faz 4) ---------------------------------------
+// Every hit of a weapon better than white throws sparks in its rarity's
+// color; a unique's passive (items.js triggerPassiveHook -> cgGearProc)
+// plays its own signature effect on the wearer; a loot drop gets a chest
+// and a beam in the item's rarity color (confetti for the legendaries).
+
+const PFX_RARITY_SPARK = {
+    blue: ['impacts-hit-spark-blue'], yellow: ['impacts-hit-spark-yellow'], green: ['impacts-hit-spark-green'],
+    orange: ['impacts-hit-spark-orange'], red: ['impacts-hit-spark-red', 'impacts-crit-hit'], teal: ['impacts-hit-spark-teal', 'impacts-crit-hit-teal'],
+};
+
+// Signature effect per unique item (items.js UNIQUE_LEGENDARIES ids); any
+// other unique falls back to its rarity's default.
+const PFX_UNIQUE_FX = {
+    uniq_nights_lament: ['shadow-life-steal', 0.8], uniq_shield_of_eternity: ['holy-divine-shield', 1], uniq_oracles_crown: ['arcane-mana-burst', 0.45],
+    uniq_dragonheart_plate: ['fire-fire-ring', 0.5], uniq_storm_eagle_pauldrons: ['lightning-charge-up', 0.7], uniq_butchers_claws: ['shadow-life-steal', 0.8],
+    uniq_windwalkers: ['status-haste', 1], uniq_ring_of_ancient_wisdom: ['arcane-magic-circle-cast', 0.45],
+    uniq_world_eater: ['shadow-dark-explosion', 0.4], uniq_the_last_wall: ['holy-divine-shield', 1.1], uniq_starfall_helm: ['arcane-star-fall', 0.45],
+    uniq_titans_hide: ['impacts-shield-block', 1], uniq_doomwings: ['fire-fire-ring', 0.55], uniq_the_throatreaver: ['impacts-crit-hit', 0.7],
+    uniq_timestep_striders: ['status-haste', 1], uniq_eternity_core: ['arcane-mana-burst', 0.5],
+    uniq_whisper_of_the_void: ['shadow-hex-sigil', 0.6], uniq_shattered_time_aegis: ['holy-divine-shield', 1], uniq_astral_sight: ['arcane-star-fall', 0.45],
+    uniq_shroud_of_shadows: ['explosions-smoke-bomb', 0.5], uniq_cosmic_wings: ['holy-feather-burst', 0.6], uniq_soul_rending_claws: ['shadow-life-steal', 0.8],
+    uniq_voidstep: ['arcane-blink-out', 0.9], uniq_eye_of_infinity: ['arcane-magic-circle-cast', 0.45],
+};
+const PFX_UNIQUE_DEFAULT = { orange: ['holy-feather-burst', 0.5], red: ['impacts-crit-hit', 0.7], teal: ['arcane-mana-burst', 0.45], green: ['holy-heal', 1] };
+function pfxUniqueFx(item) {
+    if (!item) return null;
+    return PFX_UNIQUE_FX[item.base_id || item.baseId] || PFX_UNIQUE_DEFAULT[item.rarity] || null;
+}
+
+// A hero's equipped look (hero.js heroSpecFor): fetch the sheets its gear
+// can play - the weapon's rarity sparks, each unique's signature.
+function pfxPreloadGear(spec) {
+    const gear = (spec && spec.gear) || {};
+    Object.keys(gear).forEach(slot => {
+        const g = gear[slot];
+        if (!g) return;
+        if (slot === 'weapon' && PFX_RARITY_SPARK[g.rarity]) PFX_RARITY_SPARK[g.rarity].forEach(pfxLoad);
+        const sig = pfxUniqueFx(g);
+        if (sig && ['orange', 'red', 'teal'].indexOf(g.rarity) !== -1) pfxLoad(sig[0]);
+    });
+}
+
+// On impact of a hero's weapon blow (graphics.js _perform).
+function pfxRaritySpark(stage, foe) {
+    const list = PFX_RARITY_SPARK[stage.weaponRarity];
+    if (!list || !foe || !stage.arena) return;
+    const p = stage.arena.bodyPoint(foe, 0.55);
+    list.forEach((name, i) => pfxPlay(stage.arena, name, p.x - (stage.facing || 1) * 6, p.y, { flip: (stage.facing || 1) < 0, scale: i ? 0.55 : 0.8 }));
+}
+
+// A unique's passive fired: its signature on my fighter (graphics.js cgGearProc).
+function pfxGearProc(stage, item) {
+    const sig = pfxUniqueFx(item);
+    if (!sig || !stage || !stage.arena) return false;
+    if (!pfxReady(sig[0])) { pfxLoad(sig[0]); return false; }
+    const p = stage.arena.bodyPoint(stage, sig[0] === 'holy-feather-burst' ? 0.5 : 0);
+    return !!pfxPlay(stage.arena, sig[0], p.x, p.y, { flip: (stage.facing || 1) < 0, scale: sig[1], ms: PFX_DATA[sig[0]].loop ? 1000 : undefined });
+}
+
+// A loot drop where the foe stood (graphics.js cgLootBeam). The beam's
+// sheets load on the first fight (pfxPreloadClass), so even the first
+// drop usually has them; if not, the vector beam plays.
+function pfxLootBeam(stage, rarityKey) {
+    const beam = 'pickups-loot-beam-' + rarityKey;
+    if (!stage || !stage.arena || !PFX_DATA[beam]) return false;
+    const big = ['orange', 'red', 'teal', 'green'].indexOf(rarityKey) !== -1;
+    const need = [beam, 'pickups-chest-open'].concat(big ? ['ui-confetti'] : []);
+    if (!need.every(pfxReady)) { need.forEach(pfxLoad); return false; }
+    const a = stage.arena, p = a.bodyPoint(stage, 0);
+    pfxPlay(a, 'pickups-chest-open', p.x, p.y, { scale: 0.6 });
+    a.after(500, () => pfxPlay(a, beam, p.x, p.y, { scale: big ? 0.9 : 0.75, ms: 2200 }));
+    if (big) a.after(650, () => pfxPlay(a, 'ui-confetti', p.x, p.y - 20, { scale: 0.6 }));
+    return true;
 }

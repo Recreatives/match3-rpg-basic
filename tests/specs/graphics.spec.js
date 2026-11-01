@@ -673,6 +673,33 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
         Object.keys(M).forEach(function (c) { expect(!!T[U[c].id], c + ' ult').toBe(true); });
     });
 
+    it('rare gear: rarity sparks, unique signatures and loot beams all point at baked sheets and real items', function (ctx) {
+        var w = ctx.world, D = w.g('PFX_DATA'), SP = w.g('PFX_RARITY_SPARK'), U = w.g('PFX_UNIQUE_FX'), DEF = w.g('PFX_UNIQUE_DEFAULT'), UL = w.g('UNIQUE_LEGENDARIES');
+        Object.keys(SP).forEach(function (r) { SP[r].forEach(function (n) { expect(!!D[n], r + ' spark ' + n).toBe(true); }); });
+        ['blue', 'yellow', 'green', 'orange', 'red', 'teal'].forEach(function (r) { expect(!!D['pickups-loot-beam-' + r], r + ' beam').toBe(true); });
+        var ids = {};
+        Object.keys(UL).forEach(function (r) { Object.keys(UL[r]).forEach(function (slot) { ids[UL[r][slot].id] = r; }); });
+        Object.keys(U).forEach(function (id) { expect(!!ids[id], 'a real unique: ' + id).toBe(true); expect(!!D[U[id][0]], id + ' -> ' + U[id][0]).toBe(true); });
+        Object.keys(ids).forEach(function (id) { expect(!!U[id], id + ' has a signature').toBe(true); });
+        Object.keys(DEF).forEach(function (r) { expect(!!D[DEF[r][0]], r + ' default').toBe(true); });
+    });
+
+    it("a hero's weapon rarity comes from its look, and a loot drop plays the chest and beam once loaded", async function (ctx) {
+        var w = ctx.world, me = await mageReady(w);
+        var item = { base_id: w.g("UNIQUE_LEGENDARIES.red.weapon.id"), rarity: 'red', slot: 'weapon', equipped_slot: 'weapon' };
+        await awaitInWorld(w, me.setAvatar(w.g('heroSpecFor')('mage', null, [item])));
+        expect(me.weaponRarity).toBe('red');
+        var foe = w.g("cgGetStage('enemy-sprite')");
+        ['pickups-loot-beam-teal', 'pickups-chest-open', 'ui-confetti'].forEach(function (n) { w.g('pfxLoad')(n); });
+        for (var i = 0; i < 3; i++) await awaitInWorld(w, w.g('pfxLoad')(['pickups-loot-beam-teal', 'pickups-chest-open', 'ui-confetti'][i]));
+        expect(w.g('pfxLootBeam')(foe, 'teal'), 'played').toBe(true);
+        await pumpFrames(w, 900);
+        expect(me.arena.pfxLive, 'chest + beam + confetti').toBeGreaterThanOrEqual(2);
+        await pumpFrames(w, 2600);
+        expect(me.arena.pfxLive, 'all done').toBe(0);
+        expect(me.arena.fxLayer.children.length, 'cleaned').toBe(0);
+    }, { timeout: 20000 });
+
     it('a class only fetches its own sheets when it steps into the arena', async function (ctx) {
         var w = ctx.world;
         w.g('PFX.textures = {}; PFX.loading = {}; PFX.preloaded = {}');

@@ -160,6 +160,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 ### Faz 4: Nadir silah ve eşya efektleri
 - Nadirliğe göre vuruş efekti, benzersiz eşya imza efektleri, ganimet ışını ve sandık.
 
+**Faz 4 yapılanlar (v1.45):** Beyazdan iyi her silahın darbesi nadirlik renginde kıvılcım saçıyor (mavi, altın, yeşil, turuncu; kırmızı ve turkuazda ek kritik parlaması) - aynı efektin palet varyantları. 24 efsanevi eşyanın her birinin pasifi tetiklenince imza efekti oynuyor (`pfx.js` `PFX_UNIQUE_FX`; ör. Kozmik Kanatlar tüy patlaması, Yıldız Düşüren Miğfer yıldız yağmuru, Hiçlik Adımı ışınlanma); bilinmeyen efsaneviler nadirlik varsayılanını kullanıyor. Ganimet: sandık açılışı + nadirlik renginde ışın, efsanevilerde konfeti. `hero.js` eşya görünümüne nadirlik ve kimlik ekliyor. Sayfalar kuşanılan eşyalara göre yükleniyor.
+
 ### Faz 5: Dünya, canavarlar ve arayüz
 - Canavar doğuş/ölüm, arena süsleri, kasaba havası, seviye/başarım/görev efektleri, kat geçişleri.
 

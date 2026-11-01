@@ -976,6 +976,9 @@ class CombatStage {
         await this.ready;
         if (typeof avPaint !== 'function') return;
         if (spec && spec.cls && typeof pfxPreloadClass === 'function') pfxPreloadClass(spec.cls); // its effect sheets (pfx.js)
+        if (spec && typeof pfxPreloadGear === 'function') pfxPreloadGear(spec);
+        // the weapon's rarity: every blow sparks in its color (pfx.js pfxRaritySpark)
+        this.weaponRarity = (spec && spec.gear && spec.gear.weapon && spec.gear.weapon.rarity) || null;
         const painted = avPaint(spec);
         const token = this.url = 'avatar:' + JSON.stringify(spec);
         this.charKey = spec.charKey || ('avatar_' + (spec.cls || 'hero'));
@@ -1451,6 +1454,7 @@ class CombatStage {
             // (pixelfx moves bring their own impact - no vector burst on top)
             if (!pfxDone && move.onImpact && cgEffectsEnabled()) move.onImpact(this, ctx);
             if (!foe) return;
+            if (kind !== 'self' && this.weaponRarity && cgEffectsEnabled() && typeof pfxRaritySpark === 'function') pfxRaritySpark(this, foe);
             if (tier >= 2) cgHitStop(tier >= 3 ? 110 : 60);
             arena.shake(tier >= 3 ? 7 : tier === 2 ? 4 : 2, 260);
             if (kind === 'melee' && !pfxDone) {
@@ -1930,7 +1934,10 @@ function cgGearProc(item, label) {
     const at = CG_GEAR_FX_AT[vis.slot] || 'chest';
     ['player-sprite', 'pvp-my-sprite', 'coop-my-sprite'].forEach(id => {
         const el = document.getElementById(id);
-        if (el && el.offsetParent !== null) cgStageDo(id, 'playProc', at, color, label);
+        if (el && el.offsetParent !== null) {
+            cgStageDo(id, 'playProc', at, color, label);
+            if (cgEffectsEnabled() && typeof pfxGearProc === 'function') pfxGearProc(cgGetStage(id), item); // its signature (pfx.js)
+        }
     });
 }
 // A loot drop: a beam where the foe fell, in the visible mode's arena.
@@ -1940,7 +1947,8 @@ function cgLootBeam(rarityKey) {
     const color = parseInt(String(def.color).replace('#', ''), 16);
     const big = ['green', 'orange', 'red', 'teal'].indexOf(rarityKey) !== -1;
     const id = ['enemy-sprite', 'coop-enemy-sprite', 'pvp-opp-sprite'].find(i => { const el = document.getElementById(i); return el && el.offsetParent !== null; });
-    if (id) cgStageDo(id, 'playLootBeam', color, big);
+    // a chest and a beam in its color (pfx.js), the vector beam otherwise
+    if (id && !(cgEffectsEnabled() && typeof pfxLootBeam === 'function' && pfxLootBeam(cgGetStage(id), rarityKey))) cgStageDo(id, 'playLootBeam', color, big);
     if (typeof playSound === 'function' && big) playSound('victory');
 }
 

@@ -57,6 +57,23 @@
     { "id": "arcane/star-fall", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20, "hit": 0.6 },
     { "id": "shadow/curse", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20 },
     { "id": "shadow/shadow-tendrils", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20, "hit": 0.5 },
-    { "id": "holy/sunburst", "fps": 20, "loopSec": 1.2 }
+    { "id": "holy/sunburst", "fps": 20, "loopSec": 1.2 },
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-blue", "opts": {"palette": ["#0a1a4a", "#1c3c9a", "#2f6ad8", "#5fa8ff", "#a6d4ff", "#e0f2ff", "#ffffff"]}},
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-yellow", "opts": {"palette": ["#4a3006", "#8a5a0a", "#d49a10", "#ffd24a", "#ffe98a", "#fff6cc", "#ffffff"]}},
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-green", "opts": {"palette": ["#0a3a1a", "#127a3a", "#22c55e", "#3dff8a", "#a6ffc8", "#e6fff0", "#ffffff"]}},
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-orange", "opts": {"palette": ["#4a1712", "#c9281f", "#f2561d", "#ff8a2a", "#ffc23d", "#fff3a6", "#ffffff"]}},
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-red", "opts": {"palette": ["#3a0606", "#8a1010", "#d42020", "#ff3a2a", "#ff9a7a", "#ffe0d0", "#ffffff"]}},
+    {"id": "impacts/hit-spark", "as": "impacts/hit-spark-teal", "opts": {"palette": ["#06302c", "#0c6a60", "#14b8a6", "#3fe0c0", "#a0fff0", "#e0fffa", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-blue", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#06102a", "#0a1a4a", "#1c3c9a", "#2f6ad8", "#5fa8ff", "#a6d4ff", "#e0f2ff", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-yellow", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#2a1a04", "#4a3006", "#8a5a0a", "#d49a10", "#ffd24a", "#ffe98a", "#fff6cc", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-green", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#06200e", "#0a3a1a", "#127a3a", "#22c55e", "#3dff8a", "#a6ffc8", "#e6fff0", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-orange", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#2a0c06", "#4a1712", "#c9281f", "#f2561d", "#ff8a2a", "#ffc23d", "#fff3a6", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-red", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#200404", "#3a0606", "#8a1010", "#d42020", "#ff3a2a", "#ff9a7a", "#ffe0d0", "#ffffff"]}},
+    {"id": "pickups/loot-beam", "as": "pickups/loot-beam-teal", "fps": 20, "loopSec": 1.2, "opts": {"palette": ["#031a18", "#06302c", "#0c6a60", "#14b8a6", "#3fe0c0", "#a0fff0", "#e0fffa", "#ffffff"]}},
+    {"id": "impacts/crit-hit", "as": "impacts/crit-hit-teal", "opts": {"palette": ["#031a18", "#06302c", "#0c6a60", "#14b8a6", "#3fe0c0", "#a0fff0", "#e0fffa", "#ffffff"]}},
+    {"id": "pickups/chest-open", "maxSec": 2.0, "fadeSec": 0.6, "fps": 20},
+    {"id": "ui/confetti", "maxSec": 2.0, "fadeSec": 0.7, "fps": 20},
+    {"id": "fire/fire-ring", "maxSec": 1.4, "fadeSec": 0.5, "fps": 20},
+    {"id": "status/haste", "fps": 20}
   ]
 }

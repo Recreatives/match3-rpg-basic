@@ -34,7 +34,8 @@ function heroItemVisual(item) {
     const vis = (typeof catalogVisual === 'function') ? catalogVisual(item) : null;
     if (!vis) return null;
     const look = HERO_RARITY_LOOK[item.rarity] || HERO_RARITY_LOOK.white;
-    return Object.assign({ tier: look.tier, glow: look.glow }, vis);
+    // rarity + baseId: the arena plays rarity sparks and unique signatures (pfx.js)
+    return Object.assign({ tier: look.tier, glow: look.glow, rarity: item.rarity, baseId: item.base_id }, vis);
 }
 
 // My appearance until characters carry their own (then the active
