@@ -1,0 +1,6 @@
+- [Turkish replies](turkish-language-responses.md) — every reply to the user in Turkish
+- [Git workflow](pixel-dungeon-git-workflow.md) — feature branch, Pages on the branch, merge only after the user tests
+- [Keep merged branches](keep-merged-branches.md) — never delete branches after a merge
+- [Mobile-safe UI](mobile-safe-ui-sizing.md) — nothing may overflow on a phone
+- [Art direction](art-direction-not-pixel.md) — 2D painted style C, not pixel / chibi / 3D
+- [Side panel](share-files-in-side-panel.md) — open files in the side panel, links only for external places
