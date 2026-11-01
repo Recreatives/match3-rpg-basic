@@ -1,6 +1,6 @@
 # pixelfx efektleri: analiz ve yol haritası
 
-Durum: Faz 0 (deneme sayfası) hazır, görünüm kararı bekleniyor (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
+Durum: Faz 0 bitti, görünüm D seçildi. Faz 1 (altyapı) hazır, kullanıcı testi bekleniyor (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
 
 ## 1. pixelfx nedir?
 
@@ -143,6 +143,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 - `tools/make_pixelfx.mjs` pişirme aracı, efekt listesi, üretilmiş `pixelfx-data.js`, `pfx.js` oynatıcısı.
 - Hit-stop ve kalite sistemine bağlama, tembel yükleme ve önbellek, lisans/emek notları, testler.
 - Görünür sonuç: tek bir hamle (ör. Büyücü'nün ateş topu) yeni efektle.
+
+**Faz 1 yapılanlar (v1.42):** `tools/make_pixelfx.mjs` + `tools/pixelfx-list.json` (pişirme), `assets/fx/*.png` ve üretilmiş `pixelfx-data.js`, `pfx.js` (oynatıcı: D görünümü tek GPU gölgelendiricisinde, ışık + yumuşak parlama, vuruş donmasına uyar, düşük grafikte kapalı, görsel yüklenmeden eski efekt). Büyücü'nün iki ateş topu hamlesi (`m.fireball`, `m.fire`) pişirilmiş ateş topu + küçük patlamayla oynuyor. Geliştirici sayfası: `tools/pfx-preview.html`. 3 yeni test. Henüz yok: sınıf başına tembel yükleme (şimdilik 3 efekt, ~0,9 MB, sayfa boşalınca hepsi yükleniyor) ve vücuda sarılan efektler için kendi karakter siluetimiz (pişirmede kuklanın şekli kullanılıyor).
 
 ### Faz 2: Mevcut sınıfların efektleri
 - Önce 7 ult, sonra kademe 3 bitirici hamleler, sonra kademe 2 ve 1.

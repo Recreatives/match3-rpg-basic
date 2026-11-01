@@ -613,6 +613,69 @@ describe('Arena moves (moves.js: variety, tiers, distance, timing)', { isolate: 
     });
 });
 
+describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, function () {
+    afterEach(function (ctx) { offScreen(ctx.world); });
+
+    function meshes(w, container) {
+        var Mesh = w.g('PIXI.Mesh'), n = 0;
+        (function walk(c) { c.children.forEach(function (ch) { if (ch instanceof Mesh) n++; walk(ch); }); })(container);
+        return n;
+    }
+    async function mageReady(w) {
+        onScreen(w);
+        await startSolo(w, 'MAGE', { immortal: true });
+        var me = w.g("cgGetStage('player-sprite')");
+        await awaitInWorld(w, me.setPortrait(w.g('CHARACTER_SPRITES.mage')));
+        await pumpFrames(w, 600);
+        return me;
+    }
+
+    it('every baked effect has sane data and all of its sheets load at the size the data says', async function (ctx) {
+        var w = ctx.world, D = w.g('PFX_DATA'), names = Object.keys(D);
+        expect(names.length, 'effects baked').toBeGreaterThanOrEqual(3);
+        for (var i = 0; i < names.length; i++) {
+            var n = names[i], d = D[n];
+            expect(d.frames > 0 && d.fps > 0 && d.cols >= 1 && d.cell[0] > 0 && d.cell[1] > 0, n + ' geometry').toBe(true);
+            expect(!!(d.layers.fc || d.layers.fl), n + ' has a front layer').toBe(true);
+            expect(await awaitInWorld(w, w.g('pfxLoad')(n)), n + ' loads').toBe(true);
+            var set = w.g('PFX.textures')[n];
+            Object.keys(d.layers).forEach(function (k) {
+                expect(set[k].source.width, n + '-' + k + ' width').toBe(Math.min(d.frames, d.cols) * d.cell[0]);
+                expect(set[k].source.height, n + '-' + k + ' height').toBe(Math.ceil(d.frames / d.cols) * d.cell[1]);
+            });
+        }
+    }, { timeout: 20000 });
+
+    it("the mage's fireball flies as the baked pixelfx fireball, blows up, and leaves nothing behind", async function (ctx) {
+        var w = ctx.world, me = await mageReady(w);
+        expect(await awaitInWorld(w, w.g('pfxLoad')('fire-fireball'))).toBe(true);
+        expect(await awaitInWorld(w, w.g('pfxLoad')('explosions-small-explosion'))).toBe(true);
+        var arena = me.arena, move = w.g("CG_MOVES.mage.sword.find(function (m) { return m.id === 'm.fireball'; })");
+        expect(move.shot).toBe('pfxfireball');
+        me._perform(move);
+        await pumpFrames(w, 330);
+        expect(meshes(w, arena.fxLayer), 'the fireball, in flight').toBeGreaterThan(0);
+        expect(w.g('PFX.broken'), 'shader works').toBe(false);
+        await pumpFrames(w, 450);
+        expect(arena.pfxBack && meshes(w, arena.pfxBack), 'the blast\'s smoke, behind the fighters').toBeGreaterThan(0);
+        await pumpFrames(w, 2200);
+        expect(arena.fxLayer.children.length, 'front cleaned up').toBe(0);
+        expect(arena.pfxBack.children.length, 'back cleaned up').toBe(0);
+    }, { timeout: 20000 });
+
+    it('until the sheets are in, the old vector fireball plays instead (nothing waits on an image)', async function (ctx) {
+        var w = ctx.world, me = await mageReady(w);
+        await awaitInWorld(w, w.g('pfxLoad')('fire-fireball')); // the page's own preload is done...
+        w.g('PFX.textures = {}');                                 // ...then "not loaded yet"
+        me._perform(w.g("CG_MOVES.mage.sword.find(function (m) { return m.id === 'm.fireball'; })"));
+        await pumpFrames(w, 330);
+        expect(me.arena.fxLayer.children.length, 'something flew').toBeGreaterThan(0);
+        expect(meshes(w, me.arena.fxLayer), 'not the baked one').toBe(0);
+        await pumpFrames(w, 1500);
+        expect(me.arena.fxLayer.children.length, 'cleaned up').toBe(0);
+    }, { timeout: 20000 });
+});
+
 describe('Painted heroes (avatar.js + hero.js)', { isolate: 'each' }, function () {
     var CLASSES = ['warrior', 'berserker', 'rogue', 'archer', 'mage', 'necromancer', 'paladin'];
 

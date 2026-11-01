@@ -1,0 +1,8 @@
+{
+  "_comment": "Which pixelfx effects tools/make_pixelfx.mjs bakes into assets/fx/ + pixelfx-data.js. id: pixelfx effect id; as: our name (default: the id); opts: the effect's own options (palette, size, ...); warm: seconds simulated before the first frame (loops that build up, e.g. a fireball's tail); maxSec / fadeSec: stop early, fading out over the last fadeSec (long smoke tails do not fit a ~1 s turn); fps: frames per second (default the effect own); margin: px of room around the effect box (default 12) for tails that spill out.",
+  "effects": [
+    { "id": "fire/fireball", "warm": 0.6, "margin": 48 },
+    { "id": "explosions/small-explosion", "maxSec": 1.8, "fadeSec": 0.7, "fps": 24 },
+    { "id": "impacts/hit-spark" }
+  ]
+}
