@@ -309,7 +309,7 @@ function pfxPreloadClass(cls) {
     names.forEach(pfxLoad);
     // loot beams for the common drops (rarer ones load when they first drop)
     ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up',
-        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed'].forEach(pfxLoad);
+        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed', 'own-rune-awaken'].forEach(pfxLoad);
 }
 
 // --- projectiles --------------------------------------------------------------------
@@ -559,4 +559,14 @@ function pfxStatus(stageId, name) {
     if (!st || !st.arena || !st.portraitSprite) return;
     const p = st.arena.bodyPoint(st, 0);
     pfxPlay(st.arena, name, p.x, p.y, { scale: 1.1, ms: 900, flip: (st.facing || 1) < 0 });
+}
+
+// --- our own effects (effects roadmap Faz 8, tools/fx-own/) ----------------------------
+// The ultimate just became ready (graphics.js setUltReady): the board's
+// five runes gather on the hero and burst.
+function pfxRuneAwaken(stage) {
+    if (!stage || !stage.arena || !stage.portraitSprite || !cgEffectsEnabled()) return;
+    if (!pfxReady('own-rune-awaken')) { pfxLoad('own-rune-awaken'); return; }
+    const p = stage.arena.bodyPoint(stage, 0);
+    pfxPlay(stage.arena, 'own-rune-awaken', p.x, p.y, { scale: 0.6 });
 }

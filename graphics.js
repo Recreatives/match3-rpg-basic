@@ -1562,7 +1562,11 @@ class CombatStage {
     // Persistent looks, drawn behind the fighter every frame they're on:
     // ULT ready (gold), an equipped unique item (its rarity color), an
     // enraged boss (red).
-    setUltReady(on) { this.auras.ult = on ? 0xffd24a : null; this.needsRender = true; }
+    setUltReady(on) {
+        // the moment it fills (not every UI refresh): the rune awakening (pfx.js)
+        if (on && this.auras.ult === null && typeof pfxRuneAwaken === 'function') pfxRuneAwaken(this);
+        this.auras.ult = on ? 0xffd24a : null; this.needsRender = true;
+    }
     setLegendary(color) { this.auras.legendary = color || null; this.needsRender = true; }
     setEnraged(on) { this.auras.enraged = !!on; this.needsRender = true; }
     setGroundGlow(color) { this.groundGlow = color; if (this.arena && this.shadow) this.arena._drawShadow(this); this.needsRender = true; }

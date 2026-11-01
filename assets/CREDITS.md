@@ -20,3 +20,6 @@ License: MIT (copy in `tools/vendor/pixelfx/LICENSE`); parts adapt Sprite Fusion
 pixel art VFX (Hugo Duprez, MIT) and Hollow Crown (rehan-remade, MIT), see its `NOTICE.md`.
 The sprite sheets in `assets/fx/` are baked from it by `tools/make_pixelfx.mjs` (no dithering; the
 game upscales them 4x with Scale2x on the GPU, `pfx.js`).
+
+Our own effects in `tools/fx-own/` (e.g. the rune awakening) are original work for this game, drawn
+with pixelfx's MIT-licensed drawing kit.

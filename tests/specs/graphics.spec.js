@@ -703,6 +703,19 @@ describe('Pixel effects (pfx.js: baked pixelfx sheets)', { isolate: 'each' }, fu
         expect(me.arena.fxLayer.children.length, 'cleaned').toBe(0);
     }, { timeout: 20000 });
 
+    it('our own effect (tools/fx-own): the rune awakening plays once when the ult fills, not on every refresh', async function (ctx) {
+        var w = ctx.world, me = await mageReady(w);
+        expect(w.g("PFX_DATA['own-rune-awaken'].src")).toBe('own/rune-awaken');
+        expect(await awaitInWorld(w, w.g("pfxLoad('own-rune-awaken')"))).toBe(true);
+        me.setUltReady(false);
+        me.setUltReady(true);
+        expect(me.arena.pfxLive, 'played').toBe(1);
+        me.setUltReady(true); me.setUltReady(true);
+        expect(me.arena.pfxLive, 'not again while it stays full').toBe(1);
+        await pumpFrames(w, 1700);
+        expect(me.arena.pfxLive).toBe(0);
+    }, { timeout: 20000 });
+
     it('a class only fetches its own sheets when it steps into the arena', async function (ctx) {
         var w = ctx.world;
         w.g('PFX.textures = {}; PFX.loading = {}; PFX.preloaded = {}');

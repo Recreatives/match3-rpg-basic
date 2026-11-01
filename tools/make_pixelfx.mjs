@@ -21,7 +21,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import zlib from "node:zlib";
 import { createFrame, clearFrame, createFx, stockActor, Painter } from "./vendor/pixelfx/src/core/index.js";
 import { effects } from "./vendor/pixelfx/src/fx/index.js";
@@ -91,7 +91,7 @@ const scaleAlpha = (c, f) => {
 };
 
 function bake(item) {
-  const mod = effects[item.id];
+  const mod = OWN[item.id] || effects[item.id];
   if (!mod) throw new Error("no pixelfx effect " + item.id);
   const meta = mod.meta || {};
   const [W0, H0] = meta.size || [128, 128], [ox0, oy0] = meta.origin || [W0 / 2, H0 / 2];
@@ -168,6 +168,9 @@ function bake(item) {
 }
 
 const list = JSON.parse(readFileSync(join(ROOT, "tools", "pixelfx-list.json"), "utf8")).effects;
+// our own effects (tools/fx-own/, written with pixelfx's kit): "src" in the list
+const OWN = {};
+for (const item of list) if (item.src) OWN[item.id] = await import(pathToFileURL(join(ROOT, item.src)).href);
 mkdirSync(OUT, { recursive: true });
 for (const f of readdirSync(OUT)) if (f.endsWith(".png")) unlinkSync(join(OUT, f)); // no stale sheets
 console.log(`baking ${list.length} effects into assets/fx/`);

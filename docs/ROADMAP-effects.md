@@ -1,6 +1,6 @@
 # pixelfx efektleri: analiz ve yol haritası
 
-Durum: Faz 0-1 bitti (görünüm D). Fazlar sırayla `feature/pixelfx-faz1` dalında yapılıyor (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
+Durum: Faz 0-8 `feature/pixelfx-faz1` dalında yapıldı (v1.49), kullanıcı testi ve `main`'e birleştirme bekliyor. Açık kalanlar: PvP/co-op'ta durum etkileri, Fırtına Çağırıcı ve Simyacı sınıfları (2026-11-01). Kaynak: https://patch-gg.github.io/pixelfx/ (kod: https://github.com/patch-gg/pixelfx). Kapsam: savaş efektleri, mevcut sınıflara yeni beceriler, nadir silah efektleri, yeni sınıflar, dünya ve arayüz efektleri, karakter animasyonu.
 
 ## 1. pixelfx nedir?
 
@@ -184,6 +184,8 @@ Her faz ayrı bir dalda yapılır, GitHub Pages o dala çevrilir, sen test edip 
 
 ### Faz 8 (isteğe bağlı): Kendi efektlerimiz
 - pixelfx'in Claude Code becerisiyle temamıza özel yeni efektler: benzersiz eşyaların imza efektleri ve yeni sınıfların ult'ları.
+
+**Faz 8 yapılanlar (v1.49):** Oyuna özel ilk efekt: `tools/fx-own/rune-awaken.js` ("Rün Uyanışı"), pixelfx'in çizim araçlarıyla, onun efektleriyle aynı yöntemle yazıldı. Tahtanın beş rünü (kılıç, kalp, kalkan, enerji, kafatası renkleri) kahramanın göğsünde dönerek toplanıp beyaz bir parlama, beş renkli halka ve kıvılcımlarla patlıyor; ult dolduğu an bir kez oynuyor. Pişirme aracı `src` ile kendi efekt dosyalarımızı da pişiriyor; yeni efektler bu klasöre aynı kalıpla eklenebilir.
 
 ## 9. Riskler
 
