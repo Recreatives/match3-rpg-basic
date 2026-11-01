@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sanat yönü denemesi</title>
+<!-- Dev tool, roadmap 2.0 R0 / decision A (docs/ROADMAP-v2.md): the same
+     fight three times - A1 the painted style-C fighters as they are, A2 the
+     same fighters forced onto a pixel grid (posterized, outlined, sharp),
+     A3 the same grid smoothed with the effects' own look-D upscale (Scale2x
+     twice) and outlined. The pixelfx effects are identical in all three:
+     only the characters change. A2 is an approximation - real A2 would be
+     new hand-made pixel art. Serve the repo root, open /tools/art-study.html. -->
+<style>
+  :root { --bg: #10161d; --panel: #1a2430; --line: #2c3a48; --text: #e8eef4; --dim: #9fb0c0; --gold: #d4a84a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 1500px; margin: 0 auto; padding: 12px 16px 40px; }
+  h1 { font-size: 1.15rem; margin: 4px 0 2px; color: var(--gold); }
+  .sub { color: var(--dim); font-size: 0.85rem; margin: 0 0 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+  .row > b { min-width: 110px; font-size: 0.82rem; color: var(--dim); }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  button.on { border-color: var(--gold); background: #2b2416; color: #ffe2a0; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 10px; }
+  .card h2 { font-size: 0.95rem; margin: 0 0 4px; color: var(--gold); }
+  .card p { margin: 0 0 6px; color: var(--dim); font-size: 0.8rem; }
+  .arena { position: relative; overflow: hidden; border-radius: 8px; border: 1px solid var(--line); height: 300px;
+    --arena-hud-h: 20px; background: radial-gradient(120% 90% at 50% 100%, #2a2f3a 0%, #151a22 60%, #0c1016 100%); }
+  .arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .arena-slot { position: absolute; top: var(--arena-hud-h); bottom: 0; width: 44%; pointer-events: none; }
+  .slot-left { left: 3%; } .slot-right { right: 3%; }
+</style></head><body><main>
+  <h1>Sanat yönü denemesi (yol haritası 2.0, R0 / Karar A)</h1>
+  <p class="sub">Aynı savaş üç kez: efektler üçünde de aynı (D görünümü), değişen yalnızca karakterler. Bir hamleye bas, üçünde aynı anda oynar.</p>
+  <div class="row"><b>Sınıf</b><span id="classes"></span></div>
+  <div class="row"><b>Piksel boyutu</b><span id="cells"></span><span class="sub" style="margin:0">(A2 ve A3'te karakterin piksel büyüklüğü, ekran pikseli)</span></div>
+  <div class="row"><b>Hamle</b><span id="moves"></span></div>
+  <div class="grid3" id="cards"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
+<script>for (const f of ["graphics","arena","pixelfx-data","pfx","moves","avatar","catalog","items","hero"]) document.write('<script src="' + f + '.js?t=' + Date.now() + '"><\/script>');</script>
+<script>
+const VARIANTS = [
+  { key: 'a1', name: 'A1. Boyalı (bugünkü stil C)', desc: 'Karakterler bugünkü gibi; efektler piksel.' },
+  { key: 'a2', name: 'A2. Saf piksel (yaklaşık)', desc: 'Karakter de piksel ızgarasında: kısıtlı renk, koyu kontur, keskin pikseller. Gerçek A2 elle yeni piksel çizim ister.' },
+  { key: 'a3', name: 'A3. Karma (önerilen)', desc: 'Aynı piksel ızgarası, efektlerdeki akıllı 4x büyütmeyle yumuşatılmış, ince kontur.' },
+];
+const params = new URLSearchParams(location.search);
+const state = { cls: params.get('cls') || 'mage', cell: +(params.get('cell') || 4) };
+if (typeof cgEffectsEnabled === 'function' && !cgEffectsEnabled()) cgToggleLowGraphics();
+
+// --- the character filter (A2 / A3) ---------------------------------------------------
+// Works in input-texture pixels: uCell px per character pixel. Each cell takes
+// the color at its center (premultiplied -> solid or empty at alpha 0.5),
+// colors are posterized, empty cells next to solid ones become the outline;
+// A3 then runs Scale2x twice over that cell grid, like the effects (pfx.js).
+const ART_FRAG = `
+precision highp float;
+in vec2 vTextureCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputSize;
+uniform vec4 uInputClamp;
+uniform float uCell;
+uniform float uMode;
+vec4 tap(vec2 px) {
+    vec2 uv = px * uInputSize.zw;
+    if (uv.x < uInputClamp.x || uv.y < uInputClamp.y || uv.x > uInputClamp.z || uv.y > uInputClamp.w) return vec4(0.0);
+    return texture(uTexture, uv);
+}
+// a cell's color: the average of four points inside it (a single point
+// turned the painted gradients into speckle), solid or empty, posterized
+vec4 raw(vec2 c) {
+    vec2 o = c * uCell;
+    vec4 t = (tap(o + uCell * vec2(0.25, 0.25)) + tap(o + uCell * vec2(0.75, 0.25)) + tap(o + uCell * vec2(0.25, 0.75)) + tap(o + uCell * vec2(0.75, 0.75))) * 0.25;
+    if (t.a < 0.45) return vec4(0.0);
+    vec3 rgb = t.rgb / t.a;
+    float lv = uMode > 1.5 ? 16.0 : 9.0;
+    rgb = floor(rgb * lv + 0.5) / lv;
+    return vec4(rgb, 1.0);
+}
+const vec4 INK = vec4(0.06, 0.05, 0.09, 1.0);
+vec4 cellc(vec2 c) {
+    vec4 p = raw(c);
+    if (p.a > 0.5) return p;
+    if (raw(c + vec2(1.0, 0.0)).a + raw(c - vec2(1.0, 0.0)).a + raw(c + vec2(0.0, 1.0)).a + raw(c - vec2(0.0, 1.0)).a > 0.5) return INK;
+    return vec4(0.0);
+}
+bool same(vec4 a, vec4 b) { vec4 d = abs(a - b); return max(max(d.r, d.g), max(d.b, d.a)) < 0.01; }
+vec4 pick(vec4 P, vec4 A, vec4 B, vec4 C, vec4 D, vec2 s) {
+    if (s.y < 0.5) {
+        if (s.x < 0.5) { if (same(C, A) && !same(C, D) && !same(A, B)) return A; }
+        else { if (same(A, B) && !same(A, C) && !same(B, D)) return B; }
+    } else {
+        if (s.x < 0.5) { if (same(D, C) && !same(D, B) && !same(C, A)) return C; }
+        else { if (same(B, D) && !same(B, A) && !same(D, C)) return D; }
+    }
+    return P;
+}
+vec4 S2(vec2 q) {
+    vec2 p = floor(q * 0.5);
+    return pick(cellc(p), cellc(p + vec2(0.0, -1.0)), cellc(p + vec2(1.0, 0.0)), cellc(p + vec2(-1.0, 0.0)), cellc(p + vec2(0.0, 1.0)), q - p * 2.0);
+}
+void main() {
+    vec2 px = vTextureCoord * uInputSize.xy / uCell;
+    if (uMode < 1.5) { finalColor = cellc(floor(px)); return; }
+    vec2 c4 = floor(px * 4.0), q = floor(c4 * 0.5);
+    finalColor = pick(S2(q), S2(q + vec2(0.0, -1.0)), S2(q + vec2(1.0, 0.0)), S2(q + vec2(-1.0, 0.0)), S2(q + vec2(0.0, 1.0)), c4 - q * 2.0);
+}`;
+let artProgram = null;
+function artFilter(mode) {
+  if (!artProgram) artProgram = PIXI.GlProgram.from({ vertex: PIXI.defaultFilterVert, fragment: ART_FRAG, name: 'art-study' });
+  const f = new PIXI.Filter({ glProgram: artProgram, resources: { art: { uCell: { value: state.cell * (cgShared.resolution || 1), type: 'f32' }, uMode: { value: mode, type: 'f32' } } }, padding: state.cell * 2 });
+  f.artMode = mode;
+  return f;
+}
+
+// --- three arenas -------------------------------------------------------------------
+const cards = document.getElementById('cards');
+cards.innerHTML = VARIANTS.map(v => `<div class="card"><h2>${v.name}</h2><p>${v.desc}</p><div class="arena" id="${v.key}-arena"><canvas class="arena-canvas" id="${v.key}-arena-canvas"></canvas><div class="arena-slot slot-left" id="${v.key}-hero" data-arena="${v.key}" data-side="left"></div><div class="arena-slot slot-right" id="${v.key}-foe" data-arena="${v.key}" data-side="right"></div></div></div>`).join('');
+const fights = VARIANTS.map(v => ({ v, hero: cgGetStage(v.key + '-hero'), foe: cgGetStage(v.key + '-foe') }));
+async function setup() {
+  await Promise.all(fights.map(f => Promise.all([f.hero.setAvatar(heroSpecFor(state.cls, null, [])), f.foe.setMonster('boss', 8)])));
+  applyFilters();
+}
+function applyFilters() {
+  fights.forEach((f, i) => [f.hero, f.foe].forEach(st => {
+    if (!st.root) return;
+    st.root.filters = i === 0 ? null : [artFilter(i)];
+    st.needsRender = true;
+    if (st.arena) st.arena.dirty = true;
+  }));
+}
+// keep the arenas drawing (the filtered fighters need a fresh frame as they breathe)
+setInterval(() => fights.forEach(f => { if (f.hero.arena) f.hero.arena.dirty = true; }), 100);
+
+function moveById(id) {
+  const all = [].concat(...Object.values(CG_MOVES[state.cls]), CG_ULTS[state.cls]);
+  return all.find(m => m.id === id);
+}
+function play(id) {
+  const m = moveById(id);
+  fights.forEach(f => { f.hero._perform(m); if (m.kind !== 'self') setTimeout(() => f.foe.playHit('skull', 0), cgImpactMs()); });
+}
+
+// --- UI ------------------------------------------------------------------------------
+function link(k, v, label, on) { return `<a href="?cls=${k === 'cls' ? v : state.cls}&cell=${k === 'cell' ? v : state.cell}"><button class="${on ? 'on' : ''}">${label}</button></a>`; }
+document.getElementById('classes').innerHTML = Object.keys(CG_MOVES).map(c => link('cls', c, c, c === state.cls)).join(' ');
+document.getElementById('cells').innerHTML = [2, 3, 4, 5, 6].map(c => link('cell', c, c + ' px', c === state.cell)).join(' ');
+const pick = [].concat(...Object.values(CG_MOVES[state.cls]), CG_ULTS[state.cls]).filter(m => CG_PFX_MOVES[m.id] || String(m.shot).startsWith('pfx'));
+document.getElementById('moves').innerHTML = pick.map(m => `<button data-id="${m.id}">${m.id}</button>`).join(' ');
+document.getElementById('moves').onclick = e => { const id = e.target.dataset && e.target.dataset.id; if (id) play(id); };
+setup();
+window.__art = { fights, play, applyFilters };
+</script></body></html>
