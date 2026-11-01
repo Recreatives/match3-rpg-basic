@@ -149,7 +149,7 @@ describe('Status effects (status.js, solo)', { isolate: 'each' }, function () {
             expect(w.g('statusHas("enemy", "' + want[key] + '")'), key + ' -> ' + want[key]).toBe(true);
             expect(w.$('enemy-status-badges').textContent, key + ' badge').toContain(w.g('STATUS_DEFS.' + want[key] + '.icon'));
         }
-    });
+    }, { timeout: 60000 }); // one fight per class (10)
 
     it('burning hurts the enemy at the start of its turn, through armor, and counts down', async function (ctx) {
         var w = ctx.world;
