@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pixelfx deneme</title>
+<!-- Dev tool (effects roadmap, Faz 0): pixelfx effects (tools/vendor/pixelfx,
+     MIT) played in the game's REAL combat arena, next to the painted
+     style-C hero and a monster doing their real moves - to pick how the
+     pixel effects should look before building anything into the game.
+     Serve the repo root and open /tools/pixelfx-study.html.
+     Here the effects are drawn live every frame; the game itself would
+     play pre-baked sprite sheets (docs/ROADMAP-effects.md, section 4). -->
+<style>
+  :root { --bg: #10161d; --panel: #1a2430; --line: #2c3a48; --text: #e8eef4; --dim: #9fb0c0; --gold: #d4a84a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 12px 16px 40px; }
+  h1 { font-size: 1.15rem; margin: 4px 0 2px; color: var(--gold); }
+  .sub { color: var(--dim); font-size: 0.85rem; margin: 0 0 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+  .row > b { min-width: 118px; font-size: 0.82rem; color: var(--dim); font-weight: 600; }
+  button, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  select { max-width: 100%; }
+  button.on { border-color: var(--gold); background: #2b2416; color: #ffe2a0; }
+  button:hover { border-color: #4a5d70; }
+  #stagewrap { margin: 12px auto; transition: width .2s; max-width: 100%; }
+  /* same structure and sizing rules as the game's solo arena (style.css) */
+  #study-arena { position: relative; overflow: hidden; border-radius: 8px; border: 1px solid var(--line);
+    --arena-hud-h: 42px; --portrait-h: 115px; height: calc(var(--portrait-h) * 1.3 + var(--arena-hud-h));
+    background: radial-gradient(120% 90% at 50% 100%, #2a2f3a 0%, #151a22 60%, #0c1016 100%); }
+  .arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .arena-slot { position: absolute; top: var(--arena-hud-h); bottom: 0; width: 40%; pointer-events: none; }
+  .slot-left { left: 5%; } .slot-right { right: 5%; }
+  #caption { position: absolute; top: 8px; left: 0; right: 0; text-align: center; font-weight: 700; font-size: 0.85rem; text-shadow: 0 1px 2px #000; z-index: 1; }
+  #stats { color: var(--dim); font: 12px monospace; text-align: right; }
+  .demos button { flex: 1 1 150px; text-align: left; }
+  .note { color: var(--dim); font-size: 0.8rem; margin: 6px 0; }
+  .looks button { flex: 1 1 180px; text-align: left; }
+  .looks small { display: block; color: var(--dim); font-size: 0.75rem; }
+</style></head><body>
+<main>
+  <h1>pixelfx deneme sayfası (Faz 0)</h1>
+  <p class="sub">Oyunun gerçek savaş arenası: kahraman ve canavar oyundaki gibi çiziliyor ve gerçek hamlelerini yapıyor; pixelfx efektleri vuruş anına denk geliyor.</p>
+
+  <div class="row looks" id="looks"></div>
+  <div class="row"><b>Piksel büyüklüğü</b><span id="scales"></span></div>
+  <div class="row"><b>Ekran</b><span id="widths"></span></div>
+  <div class="row"><b>Mevcut efektler</b><button id="oldfx">Gizli</button><span class="note">Açıkken oyunun bugünkü vektör efektleri de oynar (karşılaştırma için).</span></div>
+
+  <div id="stagewrap">
+    <div id="study-arena">
+      <canvas class="arena-canvas" id="study-arena-canvas"></canvas>
+      <div id="caption"></div>
+      <div class="arena-slot slot-left" id="study-hero" data-arena="study" data-side="left"></div>
+      <div class="arena-slot slot-right" id="study-foe" data-arena="study" data-side="right"></div>
+    </div>
+    <div id="stats"></div>
+  </div>
+
+  <div class="row demos" id="demos"></div>
+  <div class="row"><button id="auto">Hepsini sırayla oynat</button></div>
+
+  <div class="row"><b>Herhangi bir efekt</b><select id="pick"></select></div>
+  <div class="row"><b>Nereye</b><span id="places"></span><button id="playpick">Oynat</button></div>
+  <p class="note">"status" (durum) efektleri pixelfx'in kendi kuklasının üstüne çizildiği için kahramanımıza tam oturmaz; oyunda bunları kendi karakterimize göre yeniden pişiririz. Bilim-kurgu kategorisi temaya uymadığı için listede yok.</p>
+  <p class="note">Efektler: <a style="color:var(--gold)" href="https://github.com/patch-gg/pixelfx">pixelfx</a> (MIT, Patch &amp; Hugo Duprez).</p>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.16.0/pixi.min.js"></script>
+<script src="graphics.js"></script>
+<script src="arena.js"></script>
+<script src="moves.js"></script>
+<script src="avatar.js"></script>
+<script src="catalog.js"></script>
+<script src="items.js"></script>
+<script src="hero.js"></script>
+<script type="module">
+import { createFrame, clearFrame, createFx, stockActor } from "./tools/vendor/pixelfx/src/core/index.js";
+import { effects } from "./tools/vendor/pixelfx/src/fx/index.js";
+
+const $ = id => document.getElementById(id);
+const LOOKS = [
+  { key: 'A', name: 'A. Ham piksel', desc: 'keskin pikseller, parlama yok' },
+  { key: 'B', name: 'B. Yumuşak + parlama', desc: 'pikseller yumuşatılmış, ışık parlıyor' },
+  { key: 'C', name: 'C. Keskin piksel + parlama', desc: 'pikseller keskin, ışık parlıyor' },
+];
+const SCALES = [1.5, 2, 2.5, 3, 4];
+const WIDTHS = [{ name: 'Telefon', w: 360, ph: 90 }, { name: 'Büyük telefon', w: 430, ph: 104 }, { name: 'Masaüstü', w: 620, ph: 115 }];
+const state = { look: 'B', k: 2.5, width: 0, showOld: false, place: 'foe' };
+try { Object.assign(state, JSON.parse(localStorage.getItem('pfxStudy') || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem('pfxStudy', JSON.stringify(state)); } catch (e) {} };
+
+// --- the game's arena with a painted hero and a monster ------------------------
+const heroSt = cgGetStage('study-hero'), foeSt = cgGetStage('study-foe');
+const arena = cgGetArena('study');
+let heroCls = null;
+async function setHero(cls) {
+  if (heroCls === cls) return;
+  heroCls = cls;
+  await heroSt.setAvatar(heroSpecFor(cls, null, []));
+}
+foeSt.setMonster('boss', 8);
+
+// Hide (or show) the game's own vector effects and projectiles, to compare.
+const realVfx = {};
+Object.keys(CG_VFX).forEach(k => { realVfx[k] = CG_VFX[k]; CG_VFX[k] = function () { if (state.showOld) return realVfx[k].apply(this, arguments); }; });
+const realShoot = CombatArena.prototype.shoot;
+CombatArena.prototype.shoot = function (kind, from, to, ms, color, onHit) {
+  if (state.showOld || this !== arena) return realShoot.apply(this, arguments);
+  if (onHit) this.after(ms, onHit);
+};
+
+// --- pixelfx in the arena -------------------------------------------------------
+// Each live effect draws into its own pixel frame every tick; the frame's
+// color layer and light layer go to two canvases -> Pixi textures. Light is
+// drawn with additive blending (B and C add a blurred copy for the glow).
+const backC = new PIXI.Container(), frontC = new PIXI.Container();
+arena.root.addChildAt(backC, arena.root.getChildIndex(arena.fighterLayer));
+arena.fxLayer.addChild(frontC);
+const live = [];
+let lastNow = cgNow(), cpuMs = 0;
+
+function makeLayer(W, H, ox, oy, parent) {
+  const frame = createFrame(W, H, -ox, -oy);
+  const cc = document.createElement('canvas'), cl = document.createElement('canvas');
+  cc.width = cl.width = W; cc.height = cl.height = H;
+  const texC = PIXI.Texture.from(cc), texL = PIXI.Texture.from(cl);
+  const box = new PIXI.Container();
+  const sC = new PIXI.Sprite(texC), sL = new PIXI.Sprite(texL), sG = new PIXI.Sprite(texL);
+  sL.blendMode = 'add'; sG.blendMode = 'add';
+  [sC, sL, sG].forEach(s => s.position.set(-ox, -oy));
+  box.addChild(sG, sC, sL);
+  parent.addChild(box);
+  return { frame, cc, cl, xc: cc.getContext('2d'), xl: cl.getContext('2d'), texC, texL, box, sC, sL, sG,
+    lightBuf: new Uint32Array(W * H), W, H };
+}
+function styleLayer(L) {
+  const smooth = state.look === 'B', glow = state.look !== 'A';
+  L.texC.source.scaleMode = smooth ? 'linear' : 'nearest';
+  L.texL.source.scaleMode = smooth ? 'linear' : 'nearest';
+  L.sG.visible = glow;
+  if (glow) {
+    if (!L.sG.filters || !L.sG.filters.length) L.sG.filters = [new PIXI.BlurFilter({ strength: 3, quality: 3 })];
+    L.sG.alpha = 0.9;
+  }
+}
+function drawLayer(L, fx, layer) {
+  clearFrame(L.frame);
+  fx.draw(L.frame, layer);
+  let any = false;
+  const C = L.frame.color, Lt = L.frame.light, out = L.lightBuf;
+  for (let i = 0; i < C.length; i++) if (C[i]) { any = true; break; }
+  let anyL = false;
+  // The arena canvas is transparent (its backdrop is CSS), so light can't be
+  // a plain opaque "add": over nothing it would turn into dark opaque pixels.
+  // Like pixelfx's own composite over transparency: alpha = the brightest
+  // channel, color divided by it (the canvas premultiplies it back), then
+  // additive blending adds exactly the light's color to whatever is behind.
+  for (let i = 0; i < Lt.length; i++) {
+    const l = Lt[i] & 0xffffff;
+    if (!l) { out[i] = 0; continue; }
+    anyL = true;
+    const r = l & 255, g = (l >>> 8) & 255, b = (l >>> 16) & 255, m = Math.max(r, g, b), k = 255 / m;
+    out[i] = ((m << 24) | (Math.min(255, Math.round(b * k)) << 16) | (Math.min(255, Math.round(g * k)) << 8) | Math.min(255, Math.round(r * k))) >>> 0;
+  }
+  L.box.visible = any || anyL;
+  if (any) { L.xc.putImageData(new ImageData(new Uint8ClampedArray(C.buffer.slice(0)), L.W, L.H), 0, 0); L.texC.source.update(); }
+  if (anyL) { L.xl.putImageData(new ImageData(new Uint8ClampedArray(out.buffer.slice(0)), L.W, L.H), 0, 0); L.texL.source.update(); }
+  L.sC.visible = any; L.sL.visible = anyL; L.sG.visible = anyL && state.look !== 'A';
+}
+
+// Effects that wrap a body (heal, auras, frost, hits) read pixelfx's stock
+// dummy's silhouette. Give them OUR fighter's instead: render it, cut it into
+// cells of the current pixel size, keep the solid ones. Its `pixels` (the
+// body's own colors) are all transparent on purpose: an effect that repaints
+// the body (what drew the grey dummy over the hero) then paints nothing, and
+// only glows around it.
+const actorCache = new Map();
+function actorFor(st) {
+  const key = st.charKey + '@' + state.k + '@' + arena.size.join('x');
+  if (actorCache.has(key)) return actorCache.get(key);
+  const rnd = cgShared.renderer;
+  const b = st.root.getBounds();
+  const ex = rnd.extract.pixels(st.root);
+  const px = ex.pixels, ew = ex.width, eh = ex.height, sx = ew / b.width, sy = eh / b.height;
+  const f = feet(st), k = state.k;
+  const ax = Math.floor((b.x - f.x) / k), ay = Math.floor((b.y - f.y) / k);
+  const w = Math.ceil((b.x + b.width - f.x) / k) - ax, h = Math.ceil((b.y + b.height - f.y) / k) - ay;
+  const data = new Uint8Array(w * h);
+  let top = h;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const X = Math.floor(((ax + i + 0.5) * k + f.x - b.x) * sx), Y = Math.floor(((ay + j + 0.5) * k + f.y - b.y) * sy);
+    if (X < 0 || Y < 0 || X >= ew || Y >= eh) continue;
+    if (px[(Y * ew + X) * 4 + 3] > 110) { data[j * w + i] = 1; top = Math.min(top, j); }
+  }
+  const actor = { mask: { w, h, data }, pixels: new Uint32Array(w * h), x: ax, y: ay, w, h, k: 2, head: [0, ay + top], chest: [0, Math.round((ay + top) * 0.62)] };
+  actorCache.set(key, actor);
+  return actor;
+}
+// placed somewhere else (a caster that isn't drawn): the dummy's shape, never its paint
+const blankDummy = () => { const a = stockActor(2); return Object.assign({}, a, { pixels: new Uint32Array(a.w * a.h) }); };
+function actorAt(at) {
+  for (const st of [heroSt, foeSt]) { const f = feet(st); if (Math.abs(f.x - at.x) < 2 && Math.abs(f.y - at.y) < 2) return actorFor(st); }
+  return blankDummy();
+}
+
+// spawn(id, {x, y} in arena px, {delay ms, life ms, palette, flip, to: {x,y} to fly there over `fly` ms})
+function spawn(id, at, o = {}) {
+  const mod = effects[id];
+  if (!mod) { console.warn('no effect', id); return; }
+  const meta = mod.meta || {};
+  const [W, H] = meta.size || [128, 128], [ox, oy] = meta.origin || [W / 2, H / 2];
+  // only options actually given: an undefined palette would wipe the effect's own
+  const fo = { x: 0, y: 0, flip: !!o.flip };
+  if (o.palette) fo.palette = o.palette;
+  if (o.seed !== undefined) fo.seed = o.seed;
+  if (meta.actor) fo.actor = actorAt(at);
+  const fx = createFx(mod, fo);
+  const e = { id, fx, meta, at: { ...at }, o, wait: (o.delay || 0) / 1000, age: 0,
+    life: (o.life || (meta.loop ? 2400 : (meta.duration || 1) * 1000 + 100)) / 1000,
+    back: makeLayer(W, H, ox, oy, backC), front: makeLayer(W, H, ox, oy, frontC) };
+  [e.back, e.front].forEach(L => { styleLayer(L); L.box.visible = false; });
+  live.push(e);
+  return e;
+}
+function kill(e) {
+  [e.back, e.front].forEach(L => { L.box.destroy({ children: true }); L.texC.destroy(true); L.texL.destroy(true); });
+}
+function tick() {
+  const now = cgNow(), dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000));
+  lastNow = now;
+  if (!live.length) return;
+  const t0 = performance.now();
+  for (let i = live.length - 1; i >= 0; i--) {
+    const e = live[i];
+    if (e.wait > 0) { e.wait -= dt; if (e.wait > 0) continue; }
+    e.age += dt;
+    if (e.meta.loop && e.age >= e.life) e.fx.stop();
+    e.fx.update(dt);
+    if (e.fx.done() || e.age > e.life + 1.5) { kill(e); live.splice(i, 1); continue; }
+    let { x, y } = e.at;
+    if (e.o.to) { const q = Math.min(1, e.age * 1000 / e.o.fly); x += (e.o.to.x - x) * q; y += (e.o.to.y - y) * q - Math.sin(q * Math.PI) * 18; if (q >= 1 && e.o.landed !== true) { e.o.landed = true; e.fx.stop(); } }
+    [e.back, e.front].forEach(L => { L.box.position.set(x, y); L.box.scale.set(state.k); });
+    drawLayer(e.back, e.fx, 'back');
+    drawLayer(e.front, e.fx, 'front');
+  }
+  cpuMs = cpuMs * 0.9 + (performance.now() - t0) * 0.1;
+  arena.dirty = true;
+}
+function restyle() { live.forEach(e => [e.back, e.front].forEach(styleLayer)); }
+
+// --- where things are -----------------------------------------------------------
+const feet = st => arena.bodyPoint(st, 0);
+const body = (st, f) => arena.bodyPoint(st, f === undefined ? 0.5 : f);
+const mid = () => { const a = feet(heroSt), b = feet(foeSt); return { x: (a.x + b.x) / 2, y: Math.max(a.y, b.y) }; };
+// an effect with a caster and a target (pixelfx "act") is placed so its
+// target point lands on the monster
+function onFoe(id) {
+  const mod = effects[id], f = feet(foeSt), tx = mod && mod.act && mod.act.target ? mod.act.target.x : 0;
+  return { x: f.x - tx * state.k, y: f.y };
+}
+const hitT = (id, n = 0) => { const a = effects[id] && effects[id].act; return a && a.hits && a.hits[n] ? a.hits[n].t * 1000 : 0; };
+const IMPACT = () => cgImpactMs();
+
+function moveById(cls, id) {
+  const set = CG_MOVES[cls] || {};
+  for (const k in set) for (const m of set[k]) if (m.id === id) return m;
+  return null;
+}
+async function perform(cls, id) {
+  await setHero(cls);
+  await heroSt.ready;
+  const m = moveById(cls, id);
+  if (m) heroSt._perform(m);
+  setTimeout(() => foeSt.playHit && foeSt.playHit('sword', 0), IMPACT());
+}
+
+// --- the demos ------------------------------------------------------------------
+const DEMOS = [
+  { name: 'Kılıç darbesi (Savaşçı)', run: async () => { await perform('warrior', 'w.overhead');
+      spawn('melee/sword-slash', onFoe('melee/sword-slash'), { delay: IMPACT() - hitT('melee/sword-slash') });
+      spawn('impacts/hit-spark', onFoe('impacts/hit-spark'), { delay: IMPACT() - hitT('impacts/hit-spark') }); } },
+  { name: 'Ağır yarma (Savaşçı, bitirici)', run: async () => { await perform('warrior', 'w.leapstrike');
+      spawn('melee/heavy-cleave', onFoe('melee/heavy-cleave'), { delay: IMPACT() - hitT('melee/heavy-cleave') });
+      spawn('impacts/ground-slam', feet(foeSt), { delay: IMPACT() - 60 }); } },
+  { name: 'Ateş topu (Büyücü)', run: async () => { await perform('mage', 'm.fireball');
+      setTimeout(() => { const h = arena.handPoint(heroSt) || body(heroSt, 0.6); spawn('fire/fireball', h, { to: body(foeSt, 0.5), fly: IMPACT() - 230, life: IMPACT() - 230 }); }, 230);
+      spawn('explosions/small-explosion', feet(foeSt), { delay: IMPACT() }); } },
+  { name: 'Buz novası (Büyücü)', run: async () => { await perform('mage', 'm.frost');
+      spawn('ice/frost-nova', feet(foeSt), { delay: Math.max(0, IMPACT() - hitT('ice/frost-nova', 1)) }); } },
+  { name: 'Yıldırım (Büyücü)', run: async () => { await perform('mage', 'm.chain');
+      spawn('lightning/lightning-strike', feet(foeSt), { delay: Math.max(0, IMPACT() - 250) }); } },
+  { name: 'Ok atışı (Okçu)', run: async () => { await perform('archer', 'a.shot');
+      setTimeout(() => { const h = arena.handPoint(heroSt) || body(heroSt, 0.6); spawn('projectiles/arrow', h, { to: body(foeSt, 0.55), fly: IMPACT() - 230, life: IMPACT() - 230 }); }, 230);
+      spawn('impacts/hit-spark', onFoe('impacts/hit-spark'), { delay: IMPACT() - hitT('impacts/hit-spark') }); } },
+  { name: 'Kutsal sütun (Paladin)', run: async () => { await perform('paladin', 'p.smite');
+      spawn('holy/holy-pillar', feet(foeSt), { delay: IMPACT() - 200 });
+      spawn('holy/heal', feet(heroSt), { delay: 0 }); } },
+  { name: 'Ruh emme (Nekromant)', run: async () => { await perform('necromancer', 'n.drain');
+      spawn('shadow/grasping-hands', feet(foeSt), { delay: IMPACT() - 300 });
+      spawn('shadow/life-steal', feet(heroSt), { delay: IMPACT() - hitT('shadow/life-steal') }); } },
+  { name: 'Efsanevi ganimet', run: async () => { await setHero(heroCls || 'warrior');
+      const m = mid();
+      spawn('pickups/chest-open', m, {});
+      spawn('pickups/loot-beam', m, { delay: 900, life: 2600, palette: ['#3a1204', '#7a2a06', '#c2460a', '#f97316', '#ffb35c', '#ffe2b0', '#ffffff'] }); } },
+];
+let demoAt = 0;
+function playDemo(i) {
+  demoAt = i;
+  $('caption').textContent = DEMOS[i].name;
+  document.querySelectorAll('#demos button').forEach((b, j) => b.classList.toggle('on', j === i));
+  DEMOS[i].run();
+}
+
+// --- UI -------------------------------------------------------------------------
+function buttons(el, items, isOn, onPick, label) {
+  el.innerHTML = '';
+  items.forEach(it => { const b = document.createElement('button'); b.innerHTML = label(it); b.className = isOn(it) ? 'on' : ''; b.onclick = () => { onPick(it); save(); buttons(el, items, isOn, onPick, label); }; el.appendChild(b); });
+}
+function refreshUI() {
+  buttons($('looks'), LOOKS, l => l.key === state.look, l => { state.look = l.key; restyle(); }, l => `${l.name}<small>${l.desc}</small>`);
+  buttons($('scales'), SCALES, s => s === state.k, s => { state.k = s; }, s => s + 'x');
+  buttons($('widths'), WIDTHS.map((w, i) => ({ ...w, i })), w => w.i === state.width, w => { state.width = w.i; applyWidth(); }, w => w.name);
+  buttons($('places'), [{ k: 'foe', n: 'Rakip' }, { k: 'hero', n: 'Kahraman' }, { k: 'mid', n: 'Orta' }], p => p.k === state.place, p => { state.place = p.k; }, p => p.n);
+  $('oldfx').textContent = state.showOld ? 'Açık' : 'Gizli';
+  $('oldfx').className = state.showOld ? 'on' : '';
+}
+function applyWidth() {
+  const w = WIDTHS[state.width] || WIDTHS[0];
+  $('stagewrap').style.width = w.w + 'px';
+  $('study-arena').style.setProperty('--portrait-h', w.ph + 'px');
+  setTimeout(() => arena.layout(), 250);
+}
+$('oldfx').onclick = () => { state.showOld = !state.showOld; save(); refreshUI(); };
+DEMOS.forEach((d, i) => { const b = document.createElement('button'); b.textContent = d.name; b.onclick = () => { stopAuto(); playDemo(i); }; $('demos').appendChild(b); });
+let autoTimer = null;
+function stopAuto() { clearInterval(autoTimer); autoTimer = null; $('auto').classList.remove('on'); }
+$('auto').onclick = () => { if (autoTimer) return stopAuto(); $('auto').classList.add('on'); playDemo(0); autoTimer = setInterval(() => playDemo((demoAt + 1) % DEMOS.length), 3400); };
+
+const ids = Object.keys(effects).filter(id => !id.startsWith('scifi/') && !/pistol|rocket|nuke|bullet|smg|shotgun|laser|homing|plasma-shot/.test(id));
+let cat = '';
+$('pick').innerHTML = ids.map(id => { const c = id.split('/')[0]; const g = c !== cat ? (cat ? '</optgroup>' : '') + `<optgroup label="${c}">` : ''; cat = c; return g + `<option value="${id}">${(effects[id].meta && effects[id].meta.name) || id}</option>`; }).join('') + '</optgroup>';
+$('pick').value = state.pick && effects[state.pick] ? state.pick : 'ice/frost-nova';
+$('pick').onchange = () => { state.pick = $('pick').value; save(); };
+$('playpick').onclick = () => {
+  const id = $('pick').value;
+  $('caption').textContent = (effects[id].meta && effects[id].meta.name) || id;
+  const at = state.place === 'hero' ? feet(heroSt) : state.place === 'mid' ? mid() : onFoe(id);
+  spawn(id, at, { life: 3000 });
+};
+
+// FPS + how long drawing the effects takes per frame
+let frames = 0, fpsT = performance.now();
+(function loop(now) {
+  try { tick(); } catch (e) { console.error('pixelfx study:', e); live.splice(0).forEach(kill); }
+  frames++;
+  if (now - fpsT >= 1000) { $('stats').textContent = `FPS ${Math.round(frames * 1000 / (now - fpsT))} · efekt çizimi ${cpuMs.toFixed(1)} ms/kare · canlı efekt ${live.length}`; frames = 0; fpsT = now; }
+  requestAnimationFrame(loop);
+})(performance.now());
+
+refreshUI();
+applyWidth();
+setHero('warrior');
+window.__pfxStudy = { spawn, live, effects, state, arena, heroSt, foeSt, playDemo, tick, restyle };
+</script></body></html>

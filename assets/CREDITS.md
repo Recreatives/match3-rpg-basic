@@ -12,3 +12,10 @@ Source: [Kenney Particle Pack](https://kenney.nl/assets/particle-pack) by Kenney
 License: CC0 (public domain) - no attribution required, included anyway as thanks.
 The shipped files are downscaled from the pack's 512x512 PNGs to 256x256 lossless WebP
 (they never render larger than ~260 device pixels in a portrait) - 869 KB -> 263 KB total.
+
+## pixel effects (`tools/vendor/pixelfx/`, effects roadmap)
+
+Source: [pixelfx](https://github.com/patch-gg/pixelfx) by Patch and Hugo Duprez.
+License: MIT (copy in `tools/vendor/pixelfx/LICENSE`); parts adapt Sprite Fusion's open-source
+pixel art VFX (Hugo Duprez, MIT) and Hollow Crown (rehan-remade, MIT), see its `NOTICE.md`.
+Used so far only by the dev page `tools/pixelfx-study.html`.
