@@ -29,7 +29,7 @@ const PFX = {
 function pfxScale(arena) {
     const f = arena && arena.fighters && arena.fighters[0];
     const h = (f && f.size && f.size[1]) || 120;
-    return Math.max(1.5, Math.min(3.5, h / 48));
+    return Math.max(1.5, Math.min(5, h / 48)); // up to 5 on the wide-screen arena
 }
 
 function pfxReady(name) {

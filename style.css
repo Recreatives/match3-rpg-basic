@@ -371,7 +371,12 @@ body {
    board never loses room on a small phone. */
 :root {
     --arena-hud-h: 42px;
-    --arena-h: calc(var(--portrait-h) * 1.3 + var(--arena-hud-h));
+    /* Portrait phones (docs/ANALYSIS-orientation.md): the height a tall phone
+       has left under the board (the board is width-limited there) goes to the
+       arena - up to 110px, so effects and fighters get room. Where the board
+       is height-limited (small phones) this is 0: nothing changes. */
+    --arena-extra: clamp(0px, calc(100dvh - var(--chrome-h) - var(--board-size) - 14px), 110px);
+    --arena-h: calc(var(--portrait-h) * 1.3 + var(--arena-hud-h) + var(--arena-extra));
 }
 .hud.arena {
     position: relative; display: block;
@@ -1014,6 +1019,7 @@ body {
     :root {
         --board-size: clamp(200px, min(100dvh - 30px, 56vw), 560px);
         --ui-width: 100%;
+        --arena-extra: 0px;
     }
     #app {
         display: grid;
@@ -1032,6 +1038,33 @@ body {
     .log-toggle, .action-btn { margin-top: 4px; }
     .log-toggle { padding: 3px 8px; }
     .action-btn { padding: 6px 12px; margin-bottom: 0; }
+}
+
+/* Wide landscape screens - desktops, laptops, tablets on their side
+   (docs/ANALYSIS-orientation.md): the same two columns as short landscape
+   phones, at full size - a big arena with the fight on the left, the board
+   on the right. The left column is capped so a 1920px screen doesn't
+   stretch the arena into a strip; the pair sits in the middle. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 601px) {
+    :root {
+        --board-size: clamp(300px, min(100dvh - 40px, 46vw), 640px);
+        --arena-extra: 0px;
+        --ui-width: 100%;
+    }
+    /* the big arena is the solo screen's only (the PvP / co-op windows keep
+       their own narrow column) */
+    #solo-hud { height: calc(clamp(115px, calc((100dvh - 310px) / 1.3), 230px) * 1.3 + var(--arena-hud-h)); }
+    #app {
+        display: grid;
+        grid-template-columns: minmax(0, 860px) auto;
+        grid-auto-rows: min-content;
+        justify-content: center;
+        align-content: center;
+        column-gap: 18px;
+        padding: 10px 16px;
+    }
+    #app > * { grid-column: 1; }
+    #app > #grid { grid-column: 2; grid-row: 1 / span 20; align-self: center; }
 }
 
 /* INFO MODAL */
