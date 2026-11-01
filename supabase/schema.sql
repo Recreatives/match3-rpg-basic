@@ -265,3 +265,51 @@ drop trigger if exists coop_sessions_touch_updated_at on public.coop_sessions;
 create trigger coop_sessions_touch_updated_at
     before update on public.coop_sessions
     for each row execute procedure public.touch_updated_at();
+
+-- 11. achievement catalog (reference table) -------------------------------------
+-- "insert own achievements" above only ever checked auth.uid() = player_id - it
+-- never verified achievement_id was one of the 8 ids achievements.js's
+-- ACHIEVEMENT_CATALOG actually defines. A client using the anon key can call
+-- supabase.from('player_achievements').insert() directly, bypassing
+-- unlockAchievement()'s catalog lookup entirely, so nothing stops it writing
+-- any arbitrary string as an "unlocked" achievement for its own player_id.
+-- Harmless today (achievements.js only ever renders whatever's actually in the
+-- catalog, so a fake id just never shows a badge), but a landmine for any
+-- future feature that treats achievement count/unlocks as meaningful (e.g. a
+-- reward tied to "N achievements unlocked").
+--
+-- This table is a DB-side mirror of achievements.js's ACHIEVEMENT_CATALOG
+-- keys only - not a duplicate of its names/descriptions/bonuses, which stay
+-- client-side exactly as achievements.js's own comment describes. Keep the 8
+-- ids below in sync by hand whenever ACHIEVEMENT_CATALOG in achievements.js
+-- gains or loses an entry.
+create table if not exists public.achievement_defs (
+    id text primary key
+);
+
+insert into public.achievement_defs (id) values
+    ('boss_slayer'),
+    ('flawless_victory'),
+    ('first_betrayal'),
+    ('loyal_survivor'),
+    ('cursed_but_victorious'),
+    ('mutual_destruction'),
+    ('down_and_up'),
+    ('dungeon_boss_5')
+on conflict (id) do nothing;
+
+alter table public.achievement_defs enable row level security;
+
+drop policy if exists "read achievement catalog" on public.achievement_defs;
+create policy "read achievement catalog" on public.achievement_defs
+    for select using (true);
+
+-- Ties player_achievements.achievement_id to the catalog above, so an insert
+-- with an id outside the 8 known values is rejected at the database level -
+-- no trigger needed, and this also protects every future insert path, not
+-- just today's unlockAchievement().
+alter table public.player_achievements
+    drop constraint if exists player_achievements_achievement_id_fkey;
+alter table public.player_achievements
+    add constraint player_achievements_achievement_id_fkey
+    foreign key (achievement_id) references public.achievement_defs(id);
