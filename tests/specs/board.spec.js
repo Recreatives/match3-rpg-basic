@@ -231,7 +231,7 @@ describe('Enemy AI', { isolate: 'each' }, function () {
         var state = w.g('currentState'), STATE = w.g('STATE');
         if (state === STATE.PLAYING) expect(w.g('isPlayerTurn')).toBe(true);
         expect(w.g('isProcessing') && state === STATE.PLAYING).toBe(false);
-    });
+    }, { timeout: 45000 }); // a whole enemy turn and its chains: >15s on a slow CI runner
 });
 
 describe('Seeded determinism', { world: false }, function () {
