@@ -84,6 +84,8 @@
     {"id": "status/bleeding", "fps": 20, "loopSec": 1.0, "noBody": true},
     {"id": "status/stunned", "fps": 20, "loopSec": 1.0, "noBody": true},
     {"id": "status/cursed", "fps": 20, "loopSec": 1.0, "noBody": true},
+    {"id": "status/frozen", "fps": 20, "loopSec": 1.0, "noBody": true},
+    {"id": "status/slowed", "fps": 20, "loopSec": 1.0, "noBody": true},
     {"id": "nature/vine-whip"},
     {"id": "nature/healing-bloom", "maxSec": 1.6, "fadeSec": 0.6, "fps": 20},
     {"id": "nature/leaf-storm", "fps": 20, "loopSec": 1.2, "noBody": true},

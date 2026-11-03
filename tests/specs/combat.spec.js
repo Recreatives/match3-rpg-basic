@@ -205,6 +205,147 @@ describe('Status effects (status.js, solo)', { isolate: 'each' }, function () {
     });
 });
 
+describe('Spell schools (spells.js, prototype)', { isolate: 'each' }, function () {
+    async function mage(w, school) {
+        await startSolo(w, 'MAGE', { level: 4 });
+        w.g('enemyHP = maxEnemyHP = 1000; enemyArmor = 0; playerHP = maxPlayerHP = 300; playerArmor = 0; isProcessing = false; isPlayerTurn = true; currentMinionType = "normal"');
+        if (school !== undefined) w.g('spellSetSchool(' + JSON.stringify(school) + ')');
+    }
+
+    it('without a school nothing changes: no spell bar, the class ult', async function (ctx) {
+        var w = ctx.world;
+        await mage(w);
+        expect(w.$('spell-bar').hidden).toBe(true);
+        expect(w.g('spellSchool')).toBe(null);
+        w.g('updateUI()');
+        expect(w.$('ult-btn').textContent).toContain('ARCANE BLAST');
+        expect(w.g('spellOnPlayerMatch("sword", 1)')).toBe(0);
+    });
+
+    it('only the mage has the prototype schools', async function (ctx) {
+        var w = ctx.world;
+        await startSolo(w, 'WARRIOR');
+        w.g('spellSetSchool("ates")');
+        expect(w.g('spellSchool')).toBe(null);
+        expect(w.$('spell-bar').hidden).toBe(true);
+    });
+
+    it('matches fill mana (3 / 6 / 9), the bar shows it, a spell lights up when affordable', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'ates');
+        expect(w.$('spell-bar').hidden).toBe(false);
+        expect(w.$('spell-btn-0').disabled, 'fireball 30 - no mana yet').toBe(true);
+        w.g('spellOnPlayerMatch("heart", 1); spellOnPlayerMatch("heart", 2); spellOnPlayerMatch("heart", 3)');
+        expect(w.g('spellState.mana')).toBe(18);
+        w.g('spellState.mana = 30; spellRender()');
+        expect(w.$('spell-btn-0').disabled).toBe(false);
+        expect(w.$('spell-mana-text').textContent).toContain('30');
+    });
+
+    it('Fire: a fireball hits, costs mana and ends the turn; a quick spark does not', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'ates');
+        freezeEnemyTurn(w);
+        w.g('spellState.mana = 100; spellRender()');
+        var u = w.g('TILE_STATS.ult_dmg');
+        w.$('spell-btn-1').click(); // spark: quick
+        expect(w.g('statusHas("enemy", "burn")')).toBe(true);
+        expect(w.g('isProcessing'), 'quick - still my turn').toBe(false);
+        w.$('spell-btn-0').click(); // fireball
+        expect(w.g('enemyHP')).toBe(1000 - Math.round(u * 0.7));
+        expect(w.g('spellState.mana')).toBe(100 - 15 - 30);
+        expect(w.g('isProcessing'), 'turn is ending').toBe(true);
+    });
+
+    it('Fire: swords hit a burning enemy 20% harder; the school ult replaces the class ult', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'ates');
+        freezeEnemyTurn(w);
+        var sword = w.g('TILE_STATS.sword');
+        w.g('statusApply("enemy", "burn", 3); applyRPGEffects("sword", 1)');
+        expect(w.g('enemyHP')).toBe(1000 - Math.floor(sword * 1.2));
+        w.g('enemyHP = 1000; ultCharge = 100; isProcessing = false; updateUI()');
+        expect(w.$('ult-btn').textContent).toContain('METEOR SHOWER');
+        var u = w.g('TILE_STATS.ult_dmg');
+        w.g('useUltimate()');
+        expect(w.g('enemyHP')).toBe(1000 - Math.round(u * 1.8));
+        expect(w.g('TILE_STATS.ult_dmg'), 'the class ult (which grows) did not run').toBe(u);
+    });
+
+    it('Fire: the flame wall softens the next two enemy hits and burns the attacker', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'ates');
+        w.g('spellState.flameWall = 2; isPlayerTurn = false');
+        w.g('inflictDamage("player", 100)');
+        expect(w.g('playerHP')).toBe(300 - 60);
+        expect(w.g('statusHas("enemy", "burn")')).toBe(true);
+        w.g('inflictDamage("player", 100); inflictDamage("player", 100)');
+        expect(w.g('playerHP'), 'two softened, the third lands whole').toBe(300 - 60 - 60 - 100);
+    });
+
+    it('Frost: freeze makes the enemy lose its turn', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'buz');
+        var played = 0;
+        w.win.enemyPlayTurn = function () { played++; };
+        w.g('spellState.mana = 50; spellRender()');
+        w.$('spell-btn-1').click();
+        expect(w.g('statusHas("enemy", "freeze")')).toBe(true);
+        await w.tick(3000);
+        expect(played, 'enemy never moved').toBe(0);
+        expect(w.g('isPlayerTurn')).toBe(true);
+        expect(w.g('isProcessing')).toBe(false);
+    });
+
+    it('Frost: a slowed enemy hits 15% softer (stacks with weakness)', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'buz');
+        w.g('statusApply("enemy", "slow", 2); isPlayerTurn = false; inflictDamage("player", 100)');
+        expect(w.g('playerHP')).toBe(300 - 85);
+        w.g('playerHP = 300; statusApply("enemy", "weaken", 2); inflictDamage("player", 100)');
+        expect(w.g('playerHP')).toBe(300 - Math.floor(100 * 0.85 * 0.75));
+    });
+
+    it('Arcane: energy gives extra mana, every third spell is free, time warp keeps the turn', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'arkan');
+        var played = 0;
+        w.win.enemyPlayTurn = function () { played++; };
+        w.g('spellOnPlayerMatch("energy", 1)');
+        expect(w.g('spellState.mana')).toBe(3 + 5);
+        w.g('spellState.mana = 100; spellState.casts = 2; spellRender()');
+        expect(w.$('spell-btn-2').textContent, 'the third cast shows 0').toContain('0');
+        w.$('spell-btn-2').click(); // time warp, free
+        expect(w.g('spellState.mana')).toBe(100);
+        await w.tick(3000);
+        expect(played, 'extra turn - the enemy waits').toBe(0);
+        expect(w.g('isPlayerTurn')).toBe(true);
+        expect(w.g('isProcessing')).toBe(false);
+    });
+
+    it('Arcane: the mana shield pays half of a hit with mana, for two enemy turns', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'arkan');
+        w.g('spellState.manaShield = 2; spellState.mana = 30; isPlayerTurn = false; inflictDamage("player", 40)');
+        expect(w.g('playerHP')).toBe(300 - 20);
+        expect(w.g('spellState.mana')).toBe(10);
+        w.g('spellPlayerTurnStart(); spellPlayerTurnStart()');
+        expect(w.g('spellState.manaShield')).toBe(0);
+    });
+
+    it('a new fight starts with empty mana; a spell can end the fight', async function (ctx) {
+        var w = ctx.world;
+        await mage(w, 'ates');
+        w.g('spellState.mana = 80; level = 5; startLevel()');
+        await w.settle(500);
+        expect(w.g('spellState.mana')).toBe(0);
+        expect(w.g('spellSchool && spellSchool.name')).toBe('Ateş');
+        w.g('enemyHP = 5; enemyArmor = 0; isPlayerTurn = true; isProcessing = false; currentState = STATE.PLAYING; spellState.mana = 30; spellRender()');
+        w.$('spell-btn-0').click();
+        expect(w.g('currentState')).toBe(w.g('STATE.GAMEOVER'));
+    });
+});
+
 describe('Damage, armor, defense', { isolate: 'each' }, function () {
     beforeEach(async function (ctx) { await startSolo(ctx.world, 'WARRIOR'); ctx.world.g('enemyHP = maxEnemyHP = 200; playerHP = maxPlayerHP = 100'); });
 

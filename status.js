@@ -30,6 +30,9 @@ const STATUS_DEFS = {
     bleed:  { icon: '🩸', name: 'Kanama',     dot: 0.05, fx: 'status-bleeding' },
     stun:   { icon: '💫', name: 'Sersemleme', skip: true, fx: 'status-stunned' },
     weaken: { icon: '🔻', name: 'Zayıflık',   outMult: 0.75, fx: 'status-cursed' },
+    // spell schools (spells.js, docs/DESIGN-spell-schools.md)
+    freeze: { icon: '❄️', name: 'Donma',      skip: true, fx: 'status-frozen' },
+    slow:   { icon: '🐌', name: 'Yavaşlama',  outMult: 0.85, fx: 'status-slowed' },
 };
 
 // --- shared helpers (a "map" is { key: turns left }) ---------------------------------
@@ -54,11 +57,15 @@ function statusTickMap(map, maxHP) {
         map[key]--;
         if (map[key] <= 0) delete map[key];
     });
-    return { dmg, skip, keys };
+    return { dmg, skip, keys, frozen: keys.indexOf('freeze') >= 0 };
 }
 
-// The multiplier on what the owner of `map` deals (weakness).
-function statusMultOf(map) { return map && map.weaken > 0 ? STATUS_DEFS.weaken.outMult : 1; }
+// The multiplier on what the owner of `map` deals (weakness, slow - they stack).
+function statusMultOf(map) {
+    let m = 1;
+    Object.keys(map || {}).forEach(k => { if (map[k] > 0 && STATUS_DEFS[k] && STATUS_DEFS[k].outMult) m *= STATUS_DEFS[k].outMult; });
+    return m;
+}
 
 // Badges in the bottom corner of a fighter's HUD box (absolutely placed:
 // no layout change). `hud` is the .fighter-hud element.
@@ -118,7 +125,7 @@ function statusTick(side) {
     }
     r.keys.forEach(k => statusFx(isPlayer ? 'player-sprite' : 'enemy-sprite', k));
     statusRender();
-    return { skip: r.skip };
+    return { skip: r.skip, frozen: r.frozen };
 }
 
 function statusRender() {

@@ -515,6 +515,7 @@ function resetGame() {
 function startLevel() {
     currentState = STATE.PLAYING;
     if (typeof statusClear === 'function') statusClear(); // a new fight starts clean (status.js)
+    if (typeof spellRefresh === 'function') spellRefresh(); // spell school + empty mana (spells.js)
     if (typeof socialTouch === 'function') socialTouch('dungeon:' + Math.min(999, level));
     overlay.classList.remove('visible');
     rewardArea.style.display = 'none';
@@ -1288,8 +1289,11 @@ function applyRPGEffects(type, multiplier) {
         if (stage) stage.playClassMotion(selectedClass.name.toLowerCase(), type, multiplier, soloBoard.cascadeDepth);
     }
 
+    // spell schools (spells.js, prototype): mana and the school's tile rule
+    let spellBonus = (isPlayerTurn && typeof spellOnPlayerMatch === 'function') ? spellOnPlayerMatch(type, multiplier) : 0;
+
     if (type === 'sword') {
-        let baseVal = Math.floor(stats.sword * multiplier);
+        let baseVal = Math.floor(stats.sword * multiplier * (1 + spellBonus));
         inflictDamage(target, baseVal);
         soloPlayHitReaction(target, 'sword');
         soloCombatText(target, '-' + baseVal, 'dmg');
@@ -1431,6 +1435,8 @@ function applyDefensiveTraits(amount) {
 function inflictDamage(targetStr, amount) {
     // a weakened enemy hits for less (status.js)
     if (targetStr === 'player' && !isPlayerTurn && typeof statusOutgoingMult === 'function') amount = Math.floor(amount * statusOutgoingMult('enemy'));
+    // a school's defensive spell (spells.js): flame wall, mana shield
+    if (targetStr === 'player' && !isPlayerTurn && typeof spellIncoming === 'function') amount = spellIncoming(amount);
     if (targetStr === 'player') {
         let afterDefense = applyDefensiveTraits(amount);
         if (afterDefense === null) {
@@ -1508,13 +1514,14 @@ function endTurnLogic() {
             const tick = statusTick(isPlayerTurn ? 'player' : 'enemy');
             if (playerHP <= 0 || enemyHP <= 0) { updateUI(); checkWinCondition(); return; }
             if (!isPlayerTurn && tick.skip) {
-                log(t('💫 Düşman sersemledi, turunu kaçırdı!'), 'log-match');
+                log(tick.frozen ? t('❄️ Düşman dondu, turunu kaçırdı!') : t('💫 Düşman sersemledi, turunu kaçırdı!'), 'log-match');
                 isPlayerTurn = true;
                 isProcessing = false;
                 statusTick('player');
                 if (playerHP <= 0) { updateUI(); checkWinCondition(); return; }
             }
         }
+        if (isPlayerTurn && typeof spellPlayerTurnStart === 'function') spellPlayerTurnStart();
         updateTurnBanner();
         updateUI();
         if (!isPlayerTurn) {
@@ -1667,16 +1674,18 @@ function useUltimate() {
         let ultCtx = makeSinglePlayerCombatContext();
         // emptied BEFORE the effect: an ult may refill part of itself (stormcaller)
         ultCharge = 0;
-        selectedClass.ultEffect(ultCtx);
+        // a spell school (spells.js) brings its own ult, visual included
+        const schoolUlt = typeof spellUltOverride === 'function' && spellUltOverride(ultCtx);
+        if (!schoolUlt) selectedClass.ultEffect(ultCtx);
 
         if (typeof triggerPassiveHook === 'function') triggerPassiveHook('ultimate', ultCtx, {});
 
         // 3. Visuals
-        if (typeof cgGetStage === 'function') {
+        if (!schoolUlt && typeof cgGetStage === 'function') {
             let stage = cgGetStage('player-sprite');
             if (stage) stage.playUlt(selectedClass.name.toLowerCase());
         }
-        log(tf('ULTİMATE! {name} kullanıldı!', { name: selectedClass.ultName }), "log-hit");
+        log(tf('ULTİMATE! {name} kullanıldı!', { name: typeof spellUltName === 'function' ? spellUltName() : selectedClass.ultName }), "log-hit");
         if (typeof playSound === 'function') playSound('ult');
         if (typeof claimDailyQuest === 'function') claimDailyQuest('use_ultimate');
         updateUI(); // Disables button immediately
@@ -1731,7 +1740,8 @@ function updateUI() {
     ultBtn.disabled = ultCharge < 100 || !isPlayerTurn || isProcessing;
     // Re-derived every refresh: the static data-i18n-en text would otherwise
     // replace the class's ult name on a language switch.
-    if (selectedClass) document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: selectedClass.ultName });
+    if (selectedClass) document.getElementById('ult-btn-label').innerText = tf('{name} KULLAN (%100)', { name: typeof spellUltName === 'function' ? spellUltName() : selectedClass.ultName });
+    if (typeof spellRender === 'function') spellRender();
     if (typeof cgStageDo === 'function') cgStageDo('player-sprite', 'setUltReady', ultCharge >= 100);
     document.getElementById('ult-text').innerText = `${Math.floor(ultCharge)}%`;
     // Stat readout (own + enemy) lives in the hover tooltip now (see

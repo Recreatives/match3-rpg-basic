@@ -871,4 +871,18 @@ const EN_DICT = {
     'ULT: Tempest {dmg} hasar verdi, ult %30 doldu!': 'ULT: Tempest dealt {dmg} damage, the ult refilled 30%!',
     '<b>Simya:</b> +10 Kafatası Hasarı, +2 İyileşme. Ult hasar verir, biraz iyileştirir, düşmanı <b>ZEHİRLER</b> ve <b>ZAYIFLATIR</b>.': '<b>Alchemy:</b> +10 Skull Damage, +2 Healing. Ult deals damage, heals a little, <b>POISONS</b> and <b>WEAKENS</b> the enemy.',
     'ULT: Grand Concoction {dmg} hasar verdi, {heal} iyileştirdi!': 'ULT: Grand Concoction dealt {dmg} damage and healed {heal}!',
+    // spell schools prototype (spells.js)
+    'Donma': 'Frozen', 'Yavaşlama': 'Slowed',
+    '❄️ Düşman dondu, turunu kaçırdı!': '❄️ The enemy is frozen and loses its turn!',
+    'Ateş': 'Fire', 'Buz': 'Frost', 'Arkan': 'Arcane',
+    'Kafatası %25 yakar · yanan düşmana kılıç +%20': 'Skulls burn 25% of the time · +20% sword damage on a burning enemy',
+    'Kılıç %20 yavaşlatır · yavaş/donmuş düşmana kılıç +%20': 'Swords slow 20% of the time · +20% sword damage on a slowed/frozen enemy',
+    'Enerji eşleşmesi +5 mana · her 3. büyü bedava': 'Energy matches +5 mana · every 3rd spell is free',
+    'Ateş Topu': 'Fireball', 'Kıvılcım': 'Spark', 'Alev Duvarı': 'Flame Wall', 'Ateş Yağmuru': 'Fire Rain',
+    'Buz Mızrağı': 'Ice Lance', 'Dondur': 'Freeze', 'Buz Zırhı': 'Ice Armor', 'Tipi': 'Blizzard',
+    'Arkan Füzeler': 'Arcane Missiles', 'Mana Kalkanı': 'Mana Shield', 'Zaman Bükme': 'Time Warp', 'Arkan Patlama': 'Arcane Burst',
+    '🧱 Alev Duvarı saldırıyı kırdı!': '🧱 The Flame Wall broke the attack!',
+    '🌀 Mana Kalkanı {n} hasarı emdi': '🌀 The Mana Shield absorbed {n} damage',
+    '✨ Büyü: {name}': '✨ Spell: {name}',
+    '(bedava)': '(free)', 'tümü': 'all',
 };

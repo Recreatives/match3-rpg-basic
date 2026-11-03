@@ -56,9 +56,39 @@ function png(w, h, rgba) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
   ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
-  const raw = Buffer.alloc((w * 4 + 1) * h);
-  for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; rgba.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4); }
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
+  // PNG row filters (none / sub / up / average / paeth): the sheet is
+  // packed with each single filter and with a per-row pick (smallest sum of
+  // |bytes|), and the smallest result wins - lossless either way. Mostly
+  // empty sheets often do best unfiltered, dense glows with paeth.
+  const stride = w * 4;
+  const paeth = (a, b, c) => { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); return pa <= pb && pa <= pc ? a : pb <= pc ? b : c; };
+  const filterRow = (f, y, o) => {
+    const cur = y * stride, prev = cur - stride;
+    let sum = 0;
+    for (let i = 0; i < stride; i++) {
+      const x = rgba[cur + i], a = i >= 4 ? rgba[cur + i - 4] : 0, b = y ? rgba[prev + i] : 0, c = y && i >= 4 ? rgba[prev + i - 4] : 0;
+      const v = (x - (f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : paeth(a, b, c))) & 255;
+      o[i] = v; sum += v < 128 ? v : 256 - v;
+    }
+    return sum;
+  };
+  const tmp = Buffer.alloc(stride);
+  let idat = null;
+  for (const mode of [0, 1, 2, 3, 4, 'adaptive']) {
+    const raw = Buffer.alloc((stride + 1) * h);
+    for (let y = 0; y < h; y++) {
+      let f = mode;
+      if (mode === 'adaptive') {
+        let bestSum = Infinity;
+        for (let k = 0; k < 5; k++) { const s = filterRow(k, y, tmp); if (s < bestSum) { bestSum = s; f = k; } }
+      }
+      raw[y * (stride + 1)] = f;
+      filterRow(f, y, raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)));
+    }
+    const z = zlib.deflateSync(raw, { level: 9 });
+    if (!idat || z.length < idat.length) idat = z;
+  }
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
 }
 
 // Size: light layers are wide soft gradients - the faintest of them can't be

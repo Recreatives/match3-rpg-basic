@@ -318,7 +318,7 @@ function pfxPreloadClass(cls) {
     names.forEach(pfxWant);
     // loot beams for the common drops (rarer ones load when they first drop)
     ['pickups-chest-open', 'pickups-loot-beam-blue', 'pickups-loot-beam-yellow', 'ui-level-up',
-        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed', 'own-rune-awaken'].forEach(pfxWant);
+        'status-burning', 'status-poisoned', 'status-bleeding', 'status-stunned', 'status-cursed', 'status-frozen', 'status-slowed', 'own-rune-awaken'].forEach(pfxWant);
 }
 
 // --- projectiles --------------------------------------------------------------------

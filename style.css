@@ -1013,6 +1013,26 @@ body {
 }
 .action-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
+/* spell schools prototype (spells.js): a mana bar and four spell buttons under the ULT button */
+.spell-bar { width: var(--ui-width); max-width: 100%; box-sizing: border-box; flex-shrink: 0; margin: 2px 0 4px; }
+.spell-bar[hidden] { display: none; }
+.spell-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.spell-school { font-size: 0.8rem; font-weight: bold; color: #9fd8ff; white-space: nowrap; cursor: help; }
+.spell-mana { position: relative; flex: 1; height: 14px; border-radius: 7px; background: #1b2633; overflow: hidden; border: 1px solid #2e4257; }
+.spell-mana-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, #2471c8, #5fb4ff); transition: width 0.3s ease; }
+.spell-mana-text { position: relative; display: block; text-align: center; font-size: 0.7rem; line-height: 14px; color: #fff; text-shadow: 0 1px 2px #000; }
+.spell-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.spell-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; min-height: 48px;
+    border-radius: 6px; border: 1px solid #3c6c99; background: #1d3550; color: #e8f2ff; cursor: pointer; font: inherit; }
+.spell-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.spell-btn:not(:disabled):hover { background: #26466a; }
+.spell-icon { font-size: 1.05rem; line-height: 1; }
+.spell-name { font-size: 0.66rem; line-height: 1.1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.spell-cost { font-size: 0.62rem; color: #8fc7ff; }
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 601px) {
+    #app:has(#spell-bar:not([hidden])) { --wide-left-chrome: 190px; }
+}
+
 /* T5 (roadmap v2) - landscape phones. Stacking everything vertically put
    the board almost entirely below a 360-420px-tall screen. Short landscape
    screens get two columns instead: the UI on the left, the board on the

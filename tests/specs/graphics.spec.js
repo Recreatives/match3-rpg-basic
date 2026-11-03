@@ -110,7 +110,7 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         await pumpFrames(w, 1400); // ult burst ~1.2s + layer stagger
         expect(stage.activeTweens).toBe(0);
         expect(stage.effectLayer.children.length, 'burst sprites cleaned up').toBe(0);
-    });
+    }, { timeout: 45000 }); // real frames are pumped: slow on a CI runner
 
     it('portraits re-layout when the viewport changes size', async function (ctx) {
         var w = ctx.world;
@@ -230,7 +230,7 @@ describe('Combat scene (G3)', { isolate: 'each' }, function () {
         expect(dx, 'flies to the player (their attack then crosses the arena)').toBeCloseTo((me.left + me.width / 2) - (tile.left + tile.width / 2), 1);
         await w.settle(5000);
         expect(w.doc.querySelectorAll('.cg-projectile').length, 'cleaned up').toBe(0);
-    });
+    }, { timeout: 45000 }); // a solo start + a full match resolve: >15s on a slow CI runner
 
     it('heal/shield shots go to your own portrait; low-graphics fires none', async function (ctx) {
         var w = ctx.world;

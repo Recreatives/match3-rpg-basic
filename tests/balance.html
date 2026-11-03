@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Denge simülatörü</title>
+<!-- Dev tool, roadmap 2.0 R0 (docs/ROADMAP-v2.md): plays the REAL game (a test
+     world: tests/harness.js, seeded, fake clock, no server) with a simple
+     bot, class x floor, and reports win rate, fight length and HP left.
+     Serve the repo root, open /tests/balance.html. Params:
+       classes=WARRIOR,MAGE:ates   (default: every class + the 3 mage schools)
+       floors=1,3,5,8,10           runs=4   seed=1
+       herolvl=1.0  hero level = floor x this (no gear - the bare class)
+       think=2500   ms the bot 'thinks' before a tile move (the speed bonus
+                    shrinks with time; 0 = a superhuman instant player) -->
+<style>
+  :root { --bg: #10161d; --panel: #1a2430; --line: #2c3a48; --text: #e8eef4; --dim: #9fb0c0; --good: #22c55e; --bad: #ef4444; --mid: #eab308; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
+  h1 { font-size: 1.1rem; margin: 4px 0; color: #d4a84a; }
+  .sub { color: var(--dim); font-size: 0.82rem; margin: 0 0 10px; }
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; white-space: nowrap; }
+  th { background: var(--panel); color: var(--dim); font-weight: 600; }
+  td.cls { text-align: left; font-weight: 600; }
+  td small { color: var(--dim); display: block; font-size: 0.72rem; }
+  #status { margin: 8px 0; color: var(--dim); }
+  #world-host { position: fixed; left: -10000px; top: 0; }
+  #world-host iframe { border: 0; display: block; }
+  textarea { width: 100%; height: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--line); font: 12px monospace; margin-top: 10px; }
+</style>
+</head>
+<body><main>
+<h1>Denge simülatörü</h1>
+<p class="sub">Gerçek oyunu bir botla oynatır (ekipmansız, sınıfın kendisi). Hücre: kazanma oranı, altında ortalama tur ve kazanınca kalan can. Bot: ult dolunca ult, okul varsa gücü yeten en pahalı büyü, yoksa (2,5 sn düşünüp) en iyi taş hamlesi.</p>
+<div id="status">Hazırlanıyor…</div>
+<div class="wrap"><table id="table"></table></div>
+<textarea id="csv" readonly placeholder="CSV burada çıkacak"></textarea>
+</main>
+<script src="harness.js"></script>
+<script src="helpers.js"></script>
+<script>
+(async function () {
+    const P = new URLSearchParams(location.search);
+    const ALL = ['WARRIOR', 'PALADIN', 'BERSERKER', 'ROGUE', 'ARCHER', 'MAGE', 'MAGE:ates', 'MAGE:buz', 'MAGE:arkan', 'NECROMANCER', 'DRUID', 'STORMCALLER', 'ALCHEMIST'];
+    const classes = (P.get('classes') || ALL.join(',')).split(',').filter(Boolean);
+    const floors = (P.get('floors') || '1,3,5,8,10').split(',').map(Number);
+    const runs = +(P.get('runs') || 4);
+    const heroK = +(P.get('herolvl') || 1);
+    const think = +(P.get('think') || 2500);
+    const MAX_TURNS = 120;
+    const status = document.getElementById('status');
+    const table = document.getElementById('table');
+    table.innerHTML = '<tr><th>Sınıf</th>' + floors.map(f => `<th>Kat ${f}${f % 5 === 0 ? ' (boss)' : ''}</th>`).join('') + '<th>Ortalama</th></tr>';
+    const rows = [];
+
+    const world = await createWorld({ seed: +(P.get('seed') || 1), pixi: false });
+    world.win.PFX_NO_PRELOAD = true;
+
+    async function fight(clsKey, floor, run) {
+        const [cls, school] = clsKey.split(':');
+        world.g('Math.random = (function () { let s = ' + (floor * 7919 + run * 104729 + 1) + '; return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })()');
+        world.g('if (typeof activeCharacter !== "undefined" && activeCharacter) activeCharacter.level = ' + Math.max(1, Math.round(floor * heroK)));
+        world.g('spellForced = ' + JSON.stringify(school || ''));
+        await startSolo(world, cls, { level: floor });
+        world.g('currentMinionType = currentMinionType || "normal"');
+        const startHP = world.g('maxPlayerHP');
+        let turns = 0;
+        for (let guard = 0; guard < 2000 && turns < MAX_TURNS; guard++) {
+            const S = world.g('STATE'), st = world.g('currentState');
+            if (st !== S.PLAYING) break;
+            if (!world.g('isPlayerTurn') || world.g('isProcessing')) { await world.tick(500); continue; }
+            turns++;
+            if (world.g('ultCharge') >= 100) { world.g('useUltimate()'); await world.settle(30000); continue; }
+            const spell = world.g('spellSchool ? spellSchool.spells.map((s, i) => [i, s]).filter(p => spellCanCast(p[0]) && !p[1].quick).sort((a, b) => b[1].mana - a[1].mana).map(p => p[0])[0] : undefined');
+            if (spell !== undefined && spell !== null) { world.g('spellCast(' + spell + ')'); await world.settle(30000); continue; }
+            if (think) await world.tick(think);
+            if (world.g('currentState') !== S.PLAYING || !world.g('isPlayerTurn') || world.g('isProcessing')) continue;
+            const m = world.g('findBestMove()');
+            if (!m) { await world.tick(1000); continue; }
+            const tiles = world.g('tiles');
+            world.g('handleInputStart')(tiles[m.index]);
+            world.g('handleInputStart')(tiles[m.target]);
+            await world.settle(30000);
+        }
+        const won = world.g('enemyHP') <= 0 && world.g('playerHP') > 0;
+        return { won, turns, hpLeft: won ? Math.max(0, world.g('playerHP')) / startHP : 0 };
+    }
+
+    const csv = ['class,floor,runs,winrate,avg_turns,avg_hp_left_on_win'];
+    const t0 = performance.now();
+    let done = 0, total = classes.length * floors.length * runs;
+    for (const clsKey of classes) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="cls">${clsKey}</td>`;
+        table.appendChild(tr);
+        const all = [];
+        for (const floor of floors) {
+            const res = [];
+            for (let r = 0; r < runs; r++) {
+                status.textContent = `${clsKey} · kat ${floor} · ${r + 1}/${runs}  (${done}/${total}, ${Math.round((performance.now() - t0) / 1000)} sn)`;
+                try { res.push(await fight(clsKey, floor, r)); }
+                catch (e) { res.push({ won: false, turns: 0, hpLeft: 0, error: String(e) }); console.error(clsKey, floor, e); }
+                done++;
+            }
+            all.push(...res);
+            const wr = res.filter(x => x.won).length / res.length;
+            const avgT = res.reduce((a, x) => a + x.turns, 0) / res.length;
+            const wins = res.filter(x => x.won);
+            const hp = wins.length ? wins.reduce((a, x) => a + x.hpLeft, 0) / wins.length : 0;
+            const color = wr >= 0.75 ? 'var(--good)' : wr >= 0.4 ? 'var(--mid)' : 'var(--bad)';
+            const td = document.createElement('td');
+            td.innerHTML = `<b style="color:${color}">${Math.round(wr * 100)}%</b><small>${avgT.toFixed(1)} tur · ${Math.round(hp * 100)}% can</small>`;
+            tr.appendChild(td);
+            csv.push([clsKey, floor, runs, wr.toFixed(2), avgT.toFixed(1), hp.toFixed(2)].join(','));
+            document.getElementById('csv').value = csv.join('\n');
+        }
+        const wrAll = all.filter(x => x.won).length / all.length;
+        const td = document.createElement('td');
+        td.innerHTML = `<b>${Math.round(wrAll * 100)}%</b>`;
+        tr.appendChild(td);
+        rows.push({ cls: clsKey, wr: wrAll });
+    }
+    status.textContent = `Bitti: ${total} savaş, ${Math.round((performance.now() - t0) / 1000)} sn.`;
+    window.__BALANCE__ = { rows, csv: csv.join('\n') };
+})();
+</script>
+</body>
+</html>
