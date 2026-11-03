@@ -288,6 +288,22 @@ function sbDropAndRefill(board, isInitial) {
     sbBroadcast(board, 'refill', { falls });
     if (!live) return; // the fight ended mid-chain - refilled, nothing more resolves
 
+    // a chain resolves once the tiles have LANDED: popping a tile mid-fall
+    // swapped its .falling animation for .matched, so it jumped from halfway
+    // down to its final cell and popped there (the "tiles aren't smooth" bug).
+    // Same timing as the .falling keyframes (style.css).
+    let landMs = 0;
+    if (animate.length && !isInitial) {
+        for (let i = 0; i < falls.length; i++) if (falls[i] > 0) landMs = Math.max(landMs, 220 + falls[i] * 45 + (i % w) * 15);
+        landMs = sbMotionMs(landMs);
+    }
+    if (landMs) setTimeout(() => { if (board.isLive()) sbAfterLanding(board, isInitial); }, landMs);
+    else sbAfterLanding(board, isInitial);
+}
+
+// The board has settled after a refill: chain, reshuffle a dead board, or end the move.
+function sbAfterLanding(board, isInitial) {
+    const w = board.width, tiles = board.tiles;
     let chained = sbResolveMatches(board, isInitial);
     if (!chained && (isInitial || board.isLive()) && !boardHasValidMove(tiles, w)) {
         reshuffleBoard(tiles, w, board.pool);

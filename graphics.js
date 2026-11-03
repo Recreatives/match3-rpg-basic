@@ -33,6 +33,16 @@ const CG_LOW_GRAPHICS_KEY = 'pixelDungeonLowGraphics';
 const CG_QUALITY_SOURCE_KEY = 'pixelDungeonQualitySource';
 let cgLowGraphics = localStorage.getItem(CG_LOW_GRAPHICS_KEY) === 'true';
 let cgQualitySource = localStorage.getItem(CG_QUALITY_SOURCE_KEY);
+// v1.56: an AUTO low-graphics decision from before the two-sample check
+// (cgRunAutoQuality) may have been a loading-time false alarm - forget it
+// once and measure again. A manual choice is never touched.
+if (cgQualitySource === 'auto' && localStorage.getItem('pixelDungeonQualityCheck') !== '2') {
+    cgLowGraphics = false;
+    cgQualitySource = null;
+    localStorage.removeItem(CG_LOW_GRAPHICS_KEY);
+    localStorage.removeItem(CG_QUALITY_SOURCE_KEY);
+}
+localStorage.setItem('pixelDungeonQualityCheck', '2');
 
 function cgEffectsEnabled() { return !cgLowGraphics; }
 
@@ -64,6 +74,7 @@ function cgToggleLowGraphics() {
 // overridden. A hidden tab (no frames at all) proves nothing and is skipped.
 const CG_AUTO_LOW_FPS = 40;
 const CG_AUTO_SAMPLE_MS = 3000;
+const CG_AUTO_RECHECK_MS = 4000;
 
 function cgMeasureFps(ms) {
     return new Promise(resolve => {
@@ -88,8 +99,19 @@ function cgPageVisible() { return !document.visibilityState || document.visibili
 async function cgRunAutoQuality() {
     if (cgQualitySource === 'manual' || cgLowGraphics) return cgQualityLevel();
     if (!cgPageVisible()) return cgQualityLevel();
-    const fps = await cgMeasureFps(CG_AUTO_SAMPLE_MS);
+    let fps = await cgMeasureFps(CG_AUTO_SAMPLE_MS);
     if (fps === null || cgQualitySource === 'manual') return cgQualityLevel();
+    // the first sample overlaps boot (scripts, portraits, sheets decoding):
+    // a strong machine can dip under the line there and was switched to low
+    // graphics for good - only a second low sample, once loading has calmed
+    // down, counts
+    if (fps < CG_AUTO_LOW_FPS) {
+        await new Promise(r => setTimeout(r, CG_AUTO_RECHECK_MS));
+        if (cgQualitySource === 'manual' || cgLowGraphics || !cgPageVisible()) return cgQualityLevel();
+        const again = await cgMeasureFps(CG_AUTO_SAMPLE_MS);
+        if (again === null) return cgQualityLevel();
+        fps = Math.max(fps, again);
+    }
     if (fps < CG_AUTO_LOW_FPS) {
         cgLowGraphics = true;
         cgQualitySource = 'auto';
@@ -141,6 +163,7 @@ function cgRand() {
 // Idle breathing: a slow squash-and-stretch, repainted at ~15fps (plenty
 // for motion this subtle, and far cheaper than 60 on a phone).
 const CG_BREATH_STEP_MS = 66;
+const CG_IDLE_BLEND_MS = 350; // the idle easing back in after a move
 
 // --- CLASS CHOREOGRAPHY (per-class, per-action animation + vector CG_VFX) ------
 // Every hero class has its OWN move for every action - sword, skull, heart,
@@ -796,42 +819,44 @@ function cgFrame(ticker) {
         if (stage.paused || !stage.portraitSprite) continue;
         if (!cgIsVisible(stage.arena ? stage.arena.canvasEl : stage.canvasEl)) continue;
         // Idle breathing, only while nothing else is animating the sprite.
-        if (stage.stripH && !stage.dead && stage.activeTweens === 0 && stage.idleStyle && stage.joints.shinL) {
-            // painted avatars: a livelier idle at ~30fps - the body sinks into
-            // its knees and rises (feet planted), arms and weapon drift out of
-            // phase, the head settles, each class at its own rhythm
-            // (15fps in low graphics - weak phones, auto-detected or chosen)
+        // Every frame (it used to step at ~30fps, which juddered against a
+        // 60-144Hz screen); 15fps only in low graphics. After a move it
+        // eases back in over CG_IDLE_BLEND_MS - the move ends on the rest
+        // pose, the idle used to pick up mid-sway and snap.
+        const idle = stage.stripH && !stage.dead && stage.activeTweens === 0;
+        if (!idle) stage.idleFrom = null;
+        else {
             const now = performance.now();
-            const step = Math.floor(now / (cgLowGraphics ? CG_BREATH_STEP_MS : 33));
+            if (stage.idleFrom == null) stage.idleFrom = now;
+            const step = cgLowGraphics ? Math.floor(now / CG_BREATH_STEP_MS) : cgShared.stats.frames;
             if (step !== stage.lastFrame) {
                 stage.lastFrame = step;
-                const I = stage.idleStyle, sec = now / 1000, ph = stage.breathPhase, w = 2 * Math.PI * I.hz;
-                const b = 0.5 + 0.5 * Math.sin(sec * w + ph);
-                const j = stage.joints;
-                stage.portraitSprite.scale.set(stage.portraitBaseScale);
-                if (j.torso) j.torso.rotation = I.torso * Math.sin(sec * w * 0.5 + ph + 1);
-                if (j.head) j.head.rotation = I.head * Math.sin(sec * w * 0.5 + ph + 2.2);
-                if (j.armR) j.armR.rotation = I.sway * Math.sin(sec * w + ph + 0.9);
-                if (j.foreR) j.foreR.rotation = -I.sway * 1.3 * Math.sin(sec * w + ph + 1.6);
-                if (j.armL) j.armL.rotation = -I.sway * 0.8 * Math.sin(sec * w + ph + 0.3);
-                if (j.foreL) j.foreL.rotation = I.sway * 1.1 * Math.sin(sec * w + ph + 1.1);
-                ['legL', 'legR', 'shinL', 'shinR'].forEach(n => { if (j[n]) j[n].rotation = 0; });
-                stage._setDrop(I.bob * b);
-                stage.needsRender = true;
-            }
-        } else if (stage.stripH && !stage.dead && stage.activeTweens === 0) {
-            const now = performance.now();
-            const step = Math.floor(now / CG_BREATH_STEP_MS);
-            if (step !== stage.lastFrame) {
-                stage.lastFrame = step;
-                const sec = now / 1000, b = Math.sin(sec * 2.4 + stage.breathPhase);
-                stage.portraitSprite.scale.set(stage.portraitBaseScale * (1 - 0.012 * b), stage.portraitBaseScale * (1 + 0.022 * b));
-                // idle life: arms sway out of phase, head bobs, weight shifts
-                const j = stage.joints;
-                if (j.armL) j.armL.rotation = 0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 0.6);
-                if (j.armR) j.armR.rotation = -0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 1.2);
-                if (j.head) j.head.rotation = 0.04 * Math.sin(sec * 1.2 + stage.breathPhase);
-                if (j.torso) j.torso.rotation = 0.015 * Math.sin(sec * 1.2 + stage.breathPhase + 2);
+                const u = Math.min(1, (now - stage.idleFrom) / CG_IDLE_BLEND_MS), k = u * u * (3 - 2 * u);
+                const sec = now / 1000, j = stage.joints;
+                if (stage.idleStyle && j.shinL) {
+                    // painted avatars: the body sinks into its knees and rises
+                    // (feet planted), arms and weapon drift out of phase, the
+                    // head settles, each class at its own rhythm
+                    const I = stage.idleStyle, ph = stage.breathPhase, w = 2 * Math.PI * I.hz;
+                    const b = 0.5 + 0.5 * Math.sin(sec * w + ph);
+                    stage.portraitSprite.scale.set(stage.portraitBaseScale);
+                    if (j.torso) j.torso.rotation = k * I.torso * Math.sin(sec * w * 0.5 + ph + 1);
+                    if (j.head) j.head.rotation = k * I.head * Math.sin(sec * w * 0.5 + ph + 2.2);
+                    if (j.armR) j.armR.rotation = k * I.sway * Math.sin(sec * w + ph + 0.9);
+                    if (j.foreR) j.foreR.rotation = -k * I.sway * 1.3 * Math.sin(sec * w + ph + 1.6);
+                    if (j.armL) j.armL.rotation = -k * I.sway * 0.8 * Math.sin(sec * w + ph + 0.3);
+                    if (j.foreL) j.foreL.rotation = k * I.sway * 1.1 * Math.sin(sec * w + ph + 1.1);
+                    ['legL', 'legR', 'shinL', 'shinR'].forEach(n => { if (j[n]) j[n].rotation = 0; });
+                    stage._setDrop(k * I.bob * b);
+                } else {
+                    const b = k * Math.sin(sec * 2.4 + stage.breathPhase);
+                    stage.portraitSprite.scale.set(stage.portraitBaseScale * (1 - 0.012 * b), stage.portraitBaseScale * (1 + 0.022 * b));
+                    // idle life: arms sway out of phase, head bobs, weight shifts
+                    if (j.armL) j.armL.rotation = k * 0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 0.6);
+                    if (j.armR) j.armR.rotation = -k * 0.07 * Math.sin(sec * 2.4 + stage.breathPhase + 1.2);
+                    if (j.head) j.head.rotation = k * 0.04 * Math.sin(sec * 1.2 + stage.breathPhase);
+                    if (j.torso) j.torso.rotation = k * 0.015 * Math.sin(sec * 1.2 + stage.breathPhase + 2);
+                }
                 stage.needsRender = true;
             }
         }

@@ -75,18 +75,19 @@ describe('Portrait renderer (shared WebGL)', { isolate: 'each' }, function () {
         expect(stage.renderCount).toBe(0);
     });
 
-    it('an idle visible arena breathes at ~30fps (15 in low graphics), never full frame rate', async function (ctx) {
+    it('an idle visible arena breathes every frame (smooth on any screen), ~15fps in low graphics', async function (ctx) {
         var w = ctx.world;
         onScreen(w);
         await startSolo(w, 'WARRIOR');
         var stage = w.g("cgGetStage('player-sprite')");
         await awaitInWorld(w, stage.setPortrait(w.g('CHARACTER_SPRITES.warrior')));
         await pumpFrames(w, 1300); // the monster's walk-in finishes first
-        var before = stage.renderCount;
+        var before = stage.renderCount, frames0 = w.g('cgShared.stats.frames');
         await pumpFrames(w, 1000);
-        var perSecond = stage.renderCount - before;
-        // painted fighters (the monsters too, since v1.37) idle at ~30fps
-        expect(perSecond, 'renders in 1s idle').toBeLessThan(40);
+        var perSecond = stage.renderCount - before, frames = w.g('cgShared.stats.frames') - frames0;
+        // v1.56: painted fighters (the monsters too) idle on every frame - the
+        // old ~30fps step juddered on 60-144Hz screens
+        expect(perSecond, 'renders in 1s idle (' + frames + ' frames)').toBeGreaterThan(frames * 0.9);
         expect(perSecond, 'idle breathing does repaint').toBeGreaterThan(5);
         // low graphics (weak phones): ~15fps
         w.g('cgToggleLowGraphics()');
@@ -307,7 +308,8 @@ describe('Automatic quality (G4)', { isolate: 'each', world: { pixi: false } }, 
     it('a slow device (25 fps) switches itself to low graphics, remembered as auto', async function (ctx) {
         var w = ctx.world;
         fakeFps(w, 25);
-        expect(await w.g('cgRunAutoQuality()')).toBe('low-auto');
+        // two low samples (the second one after a pause) - awaitInWorld runs the fake clock
+        expect(await awaitInWorld(w, w.g('cgRunAutoQuality()'), 20000)).toBe('low-auto');
         expect(w.doc.documentElement.classList.contains('low-graphics-mode')).toBe(true);
         expect(w.$('low-graphics-btn').innerText).toBe('🐢');
         expect(w.win.localStorage.getItem('pixelDungeonQualitySource')).toBe('auto');
@@ -332,10 +334,19 @@ describe('Automatic quality (G4)', { isolate: 'each', world: { pixi: false } }, 
     it('the player can turn an auto-lowered device back to high, and it sticks', async function (ctx) {
         var w = ctx.world;
         fakeFps(w, 20);
-        await w.g('cgRunAutoQuality()');
+        await awaitInWorld(w, w.g('cgRunAutoQuality()'), 20000);
+        expect(w.g('cgQualityLevel()')).toBe('low-auto');
         w.g('cgToggleLowGraphics()');
         expect(w.g('cgQualityLevel()')).toBe('high');
         expect(await w.g('cgRunAutoQuality()')).toBe('high');
+    });
+
+    it('a dip while the game is still loading is not enough: a smooth second sample keeps high', async function (ctx) {
+        var w = ctx.world, samples = [30, 60], n = 0;
+        w.win.cgMeasureFps = function () { return Promise.resolve(samples[n++]); };
+        expect(await awaitInWorld(w, w.g('cgRunAutoQuality()'), 20000)).toBe('high');
+        expect(n, 'measured twice').toBe(2);
+        expect(w.win.localStorage.getItem('pixelDungeonQualitySource')).toBe(null);
     });
 
     it('a hidden tab is never measured', async function (ctx) {
@@ -357,6 +368,17 @@ describe('Automatic quality (G4)', { isolate: 'each', world: { pixi: false } }, 
         var p = w.g('cgMeasureFps(3000)');
         await w.tick(3100); // fake 3s pass instantly in real time
         expect(await p).toBeNull();
+    });});
+
+describe('Automatic quality: an old auto decision', { world: false }, function () {
+    it('an auto low-graphics from before v1.56 is forgotten once (it may have been a loading dip); manual stays', async function () {
+        var w = await createWorld({ pixi: false, storage: { pixelDungeonLowGraphics: 'true', pixelDungeonQualitySource: 'auto' } });
+        try {
+            expect(w.g('cgQualityLevel()')).toBe('high');
+            expect(w.win.localStorage.getItem('pixelDungeonQualitySource')).toBe(null);
+        } finally { w.destroy(); }
+        var m = await createWorld({ pixi: false, storage: { pixelDungeonLowGraphics: 'true', pixelDungeonQualitySource: 'manual' } });
+        try { expect(m.g('cgQualityLevel()')).toBe('low-manual'); } finally { m.destroy(); }
     });
 });
 

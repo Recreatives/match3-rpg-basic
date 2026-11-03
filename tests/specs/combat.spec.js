@@ -607,7 +607,9 @@ describe('Golden master (seeded solo run)', { isolate: 'each', world: { seed: 20
     // the loot level - and the RNG it consumes - changes with it)
     // (v1.39: non-boss floors drop loot half the time, at the character's
     // own level from the 10-tier catalog - a different RNG path from there)
-    var EXPECTED = '24/fb8525ad/8:46:53:85';
+    // (v1.56: a chain resolves once the tiles have landed - its refill
+    // draws from the RNG later, interleaved differently with other timers)
+    var EXPECTED = '24/5b302c33/8:47:51:85';
 
     it('40 scripted player moves produce the recorded fingerprint', async function (ctx) {
         var w = ctx.world, trace = [];

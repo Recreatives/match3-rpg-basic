@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Akıcılık ölçümü</title>
+<!-- Dev tool: the real game in a test world on REAL time (no fake clock),
+     on screen, playing a few moves while every frame's length is recorded.
+     Reports frame-time percentiles, frames over 20 / 33 / 50 ms and where the
+     time went (the shared Pixi ticker, the CSS/layout side). Serve the repo
+     root, open /tests/perf.html. Params: w=1280 h=720 cls=MAGE moves=6 low=0 -->
+<style>
+  body { margin: 0; background: #10161d; color: #e8eef4; font: 13px/1.4 monospace; }
+  #out { padding: 8px 12px; white-space: pre; }
+  #world-host { position: relative; }
+  #world-host iframe { border: 0; display: block; }
+</style>
+</head>
+<body>
+<div id="out">Hazırlanıyor…</div>
+<script src="harness.js"></script>
+<script src="helpers.js"></script>
+<script>
+(async function () {
+    const P = new URLSearchParams(location.search);
+    const W = +(P.get('w') || 1280), H = +(P.get('h') || 720);
+    const out = document.getElementById('out');
+    const world = await createWorld({ fakeTimers: false, viewport: { width: W, height: H } });
+    document.getElementById('world-host').style.position = 'relative';
+    document.getElementById('world-host').style.left = '0';
+    const win = world.win;
+    if (P.get('low') === '1') world.g("cgQualitySource = 'manual'; cgLowGraphics = true; cgApplyLowGraphicsState()");
+    else world.g("cgQualitySource = 'manual'; cgLowGraphics = false; cgApplyLowGraphicsState()");
+    win.PFX_NO_PRELOAD = false;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    world.g('selectedClass = CLASSES.' + (P.get('cls') || 'MAGE'));
+    world.g('rebuildTileStats(); resetGame(); startLevel()');
+    await sleep(3000); // sheets, portraits, the walk-in
+
+    // instrumentation: the shared ticker's own cost per frame, and frame gaps
+    const tick = [];
+    const ticker = win.eval('cgShared.ticker');
+    const origFrame = win.eval('cgFrame');
+    ticker.remove(origFrame);
+    ticker.add(t => { const a = win.performance.now(); origFrame(t); tick.push(win.performance.now() - a); });
+    const gaps = [];
+    let last = 0, recording = true;
+    const loop = now => { if (last) gaps.push(now - last); last = now; if (recording) win.requestAnimationFrame(loop); };
+    win.requestAnimationFrame(loop);
+    const longs = [];
+    try { new win.PerformanceObserver(l => l.getEntries().forEach(e => longs.push(e.duration))).observe({ entryTypes: ['longtask'] }); } catch (e) {}
+
+    // play: real moves, with real waits, like a person
+    const moves = +(P.get('moves') || 6);
+    for (let i = 0; i < moves; i++) {
+        for (let k = 0; k < 80 && !(world.g('isPlayerTurn') && !world.g('isProcessing') && world.g('currentState') === STATE_PLAYING()); k++) await sleep(100);
+        out.textContent = 'hamle ' + (i + 1) + '/' + moves + ' …';
+        const m = world.g('findBestMove()');
+        if (!m) break;
+        const tiles = world.g('tiles');
+        world.g('handleInputStart')(tiles[m.index]);
+        world.g('handleInputStart')(tiles[m.target]);
+        await sleep(1200);
+    }
+    function STATE_PLAYING() { return world.g('STATE.PLAYING'); }
+    await sleep(1500);
+    recording = false;
+
+    const s = a => a.slice().sort((x, y) => x - y);
+    const pct = (a, p) => a.length ? s(a)[Math.min(a.length - 1, Math.floor(a.length * p))] : 0;
+    const over = (a, ms) => a.filter(x => x > ms).length;
+    const sum = a => a.reduce((x, y) => x + y, 0);
+    const report = {
+        viewport: W + 'x' + H, dpr: win.devicePixelRatio, quality: world.g('cgQualityLevel()'),
+        frames: gaps.length, seconds: +(sum(gaps) / 1000).toFixed(1),
+        fps: +(gaps.length / (sum(gaps) / 1000)).toFixed(1),
+        gap_p50: +pct(gaps, 0.5).toFixed(1), gap_p95: +pct(gaps, 0.95).toFixed(1), gap_p99: +pct(gaps, 0.99).toFixed(1), gap_max: +Math.max(...gaps).toFixed(1),
+        over20: over(gaps, 20), over33: over(gaps, 33), over50: over(gaps, 50),
+        ticker_avg: +(sum(tick) / tick.length).toFixed(2), ticker_p95: +pct(tick, 0.95).toFixed(2), ticker_max: +Math.max(...tick).toFixed(1),
+        renders: world.g('cgShared.stats.renders'),
+        longtasks: longs.length, longtask_ms: Math.round(sum(longs)),
+    };
+    out.textContent = JSON.stringify(report, null, 1);
+    window.__PERF__ = report;
+})();
+</script>
+</body>
+</html>

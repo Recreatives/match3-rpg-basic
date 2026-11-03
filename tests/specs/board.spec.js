@@ -143,6 +143,24 @@ describe('Solo board resolution (live board, fake clock)', { isolate: 'each' }, 
         }
     }, { timeout: 120000 }); // 5 seeds; a slow CI machine needs ~8s each
 
+    it('a chain waits until the refilled tiles have landed (no tile pops mid-fall)', async function (ctx) {
+        var w = ctx.world, landed = [];
+        var orig = w.win.sbAfterLanding;
+        w.win.sbAfterLanding = function (board, initial) { landed.push(w.win.Date.now()); return orig(board, initial); };
+        var b = noMatchBoard(); b[0] = b[1] = b[2] = 'shield';
+        setBoard(w, b);
+        w.g('checkForMatches(false)');
+        var popAt = w.win.Date.now();
+        // pop -> gravity pause -> drop: the tiles are falling, nothing resolved yet
+        await w.tick(w.g('soloBoard.clearDelayMs') + 20);
+        expect(w.doc.querySelectorAll('#grid .tile.falling').length, 'tiles falling').toBeGreaterThan(0);
+        expect(landed.length, 'not resolved mid-fall').toBe(0);
+        await w.settle(10000);
+        expect(landed.length, 'resolved (a refill may chain further)').toBeGreaterThan(0);
+        // the top row fell 1 row in columns 0-2: 220 + 45 + up to 2 x 15 ms
+        expect(landed[0] - popAt - w.g('soloBoard.clearDelayMs'), 'waited for the landing').toBeGreaterThan(260);
+    });
+
     it('the turn ends exactly once per player move (no double enemy turn)', async function (ctx) {
         var w = ctx.world, ends = 0;
         w.win.endTurnLogic = function () { ends++; };
